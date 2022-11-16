@@ -3,6 +3,7 @@ module PowerNetworkMatrices
 export PTDF
 export Ybus
 export LODF
+export Adjacency
 
 export validate_connectivity
 export find_connected_components
