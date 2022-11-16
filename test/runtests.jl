@@ -1,5 +1,6 @@
 using Test
 import Logging
+using PowerNetworkMatrices
 
 import Aqua
 Aqua.test_unbound_args(PowerNetworkMatrices)

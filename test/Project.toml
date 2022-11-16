@@ -1,5 +1,7 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+PowerNetworkMatrices = "bed98974-b02a-5e2f-9fe0-a103f5c450dd"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
