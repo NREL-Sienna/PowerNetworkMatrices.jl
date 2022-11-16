@@ -8,7 +8,7 @@ abstract type PowerNetworkMatrix{T} <: AbstractArray{T, 2} end
 #  This Source Code Form is subject to the terms of the Mozilla Public
 #  License, v. 2.0.
 
-function PSY.get_bus_indices(branch, bus_lookup)
+function get_bus_indices(branch, bus_lookup)
     fr_b = bus_lookup[PSY.get_number(PSY.get_from(PSY.get_arc(branch)))]
     to_b = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_arc(branch)))]
     return fr_b, to_b
@@ -48,7 +48,7 @@ function lookup_index(i, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[i]
 end
 
-function lookup_index(i::Component, lookup::Dict)
+function lookup_index(i::PSY., lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
 
@@ -252,7 +252,7 @@ end
 
 Base.to_index(b::Bus) = PSY.get_number(b)
 Base.to_index(b::T) where {T <: ACBranch} = PSY.get_name(b)
-Base.to_index(ix::Component...) = to_index.(ix)
+Base.to_index(ix::PSY....) = to_index.(ix)
 
 """returns the raw array data of the `PowerNetworkMatrix`"""
 PSY.get_data(mat::PowerNetworkMatrix) = mat.data
