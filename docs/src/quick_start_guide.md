@@ -33,7 +33,7 @@ More details about parsing text files from different formats in [this section](@
 ## Using `PowerSystems.jl` for modeling
 
 This example function implements a function where the modeler can choose the technology
-by its type and use the different implementations of [`get_max_active_power`](@ref). **Using
+by its type and use the different implementations of [`PSY.get_max_active_power`](@ref). **Using
 the "dot" access to get a parameter value from a device is actively discouraged, use "getter" functions instead**
 
 Refer to [Modeling with JuMP](@ref modeling_with_jump) for a more detailed use of `PowerSystems.jl` to develop
@@ -42,8 +42,8 @@ a model
 ```@example generated_quick_start_guide
 function installed_capacity(system::System; technology::Type{T} = Generator) where T <: Generator
     installed_capacity = 0.0
-    for g in get_components(T, system)
-        installed_capacity += get_max_active_power(g)
+    for g in PSY.get_components(T, system)
+        installed_capacity += PSY.get_max_active_power(g)
     end
     return installed_capacity
 end
@@ -86,7 +86,7 @@ system = System(joinpath(DATA_DIR, "matpower/case5.m"))
 new_renewable = RenewableDispatch(
         name = "WindPowerNew",
         available = true,
-        bus = get_component(Bus, system, "3"),
+        bus = PSY.get_component(Bus, system, "3"),
         active_power = 2.0,
         reactive_power = 1.0,
         rating = 1.2,
