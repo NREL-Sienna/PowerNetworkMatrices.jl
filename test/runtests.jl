@@ -2,11 +2,11 @@ using Test
 import Logging
 
 import Aqua
-Aqua.test_unbound_args(SIIP-PACKAGE)
-Aqua.test_undefined_exports(SIIP-PACKAGE)
-Aqua.test_ambiguities(SIIP-PACKAGE)
-Aqua.test_stale_deps(SIIP-PACKAGE)
-Aqua.test_deps_compat(SIIP-PACKAGE)
+Aqua.test_unbound_args(PowerNetworkMatrices)
+Aqua.test_undefined_exports(PowerNetworkMatrices)
+Aqua.test_ambiguities(PowerNetworkMatrices)
+Aqua.test_stale_deps(PowerNetworkMatrices)
+Aqua.test_deps_compat(PowerNetworkMatrices)
 
 LOG_FILE = "power-systems.log"
 LOG_LEVELS = Dict(
@@ -59,9 +59,9 @@ macro includetests(testarg...)
     end
 end
 
-function get_logging_level_from_env(env_name::String, default)
+function PSY.get_logging_level_from_env(env_name::String, default)
     level = get(ENV, env_name, default)
-    return IS.get_logging_level(level)
+    return IS.PSY.get_logging_level(level)
 end
 
 function run_tests()
@@ -88,11 +88,11 @@ function run_tests()
         end
 
         # Testing Topological components of the schema
-        @time @testset "Begin SIIP-PACKAGE tests" begin
+        @time @testset "Begin PowerNetworkMatrices tests" begin
             @includetests ARGS
         end
 
-        @test length(IS.get_log_events(multi_logger.tracker, Logging.Error)) == 0
+        @test length(IS.PSY.get_log_events(multi_logger.tracker, Logging.Error)) == 0
         @info IS.report_log_summary(multi_logger)
     end
 end

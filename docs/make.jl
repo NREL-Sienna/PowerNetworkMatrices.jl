@@ -1,4 +1,4 @@
-using Documenter, SIIP-PACKAGE
+using Documenter, PowerNetworkMatrices
 
 
 pages = OrderedDict(
