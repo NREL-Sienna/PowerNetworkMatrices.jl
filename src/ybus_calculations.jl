@@ -11,7 +11,7 @@ end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    br::ACBranch,
+    br::PSY.ACBranch,
     num_bus::Dict{Int, Int},
 )
     arc = PSY.get_arc(br)
@@ -34,7 +34,7 @@ end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    br::DynamicBranch,
+    br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
 )
     _ybus!(ybus, br.branch, num_bus)
@@ -43,7 +43,7 @@ end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    br::Transformer2W,
+    br::PSY.Transformer2W,
     num_bus::Dict{Int, Int},
 )
     arc = PSY.get_arc(br)
@@ -65,7 +65,7 @@ end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    br::TapTransformer,
+    br::PSY.TapTransformer,
     num_bus::Dict{Int, Int},
 )
     arc = PSY.get_arc(br)
@@ -92,7 +92,7 @@ end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    br::PhaseShiftingTransformer,
+    br::PSY.PhaseShiftingTransformer,
     num_bus::Dict{Int, Int},
 )
     arc = PSY.get_arc(br)
@@ -118,7 +118,7 @@ end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    fa::FixedAdmittance,
+    fa::PSY.FixedAdmittance,
     num_bus::Dict{Int, Int},
 )
     bus = PSY.get_bus(fa)
@@ -157,7 +157,7 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 function Ybus(
     branches,
     nodes,
-    fixed_admittances = Vector{FixedAdmittance}();
+    fixed_admittances = Vector{PSY.FixedAdmittance}();
     check_connectivity::Bool = true,
     kwargs...,
 )
@@ -181,7 +181,7 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 - `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
 - `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
 """
-function Ybus(sys::System; check_connectivity::Bool = true, kwargs...)
+function Ybus(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     branches = PSY.get_components(ACBranch, sys)
     nodes = PSY.get_components(Bus, sys)
     fixed_admittances = PSY.get_components(FixedAdmittance, sys)
@@ -243,7 +243,7 @@ Builds a Adjacency from the system. The return is an N x N Adjacency Array index
 - `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
 - `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
 """
-function Adjacency(sys::System; check_connectivity::Bool = true, kwargs...)
+function Adjacency(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     nodes = sort!(
         collect(PSY.get_components(Bus, sys, x -> PSY.get_bustype(x) != BusTypes.ISOLATED));
         by = x -> PSY.get_number(x),
@@ -286,7 +286,7 @@ Checks the network connectivity of the system.
 * Note that the default Goderya method is more efficient, but is resource intensive and may not scale well on large networks.
 """
 function validate_connectivity(
-    sys::System;
+    sys::PSY.System;
     connectivity_method::Function = goderya_connectivity,
 )
     nodes = sort!(
@@ -306,7 +306,7 @@ end
 
 function validate_connectivity(
     M,
-    nodes::Vector{Bus},
+    nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int64, Int64};
     connectivity_method::Function = goderya_connectivity,
 )
@@ -314,7 +314,7 @@ function validate_connectivity(
     return connected
 end
 
-function goderya_connectivity(M, nodes::Vector{Bus}, bus_lookup::Dict{Int64, Int64})
+function goderya_connectivity(M, nodes::Vector{PSY.Bus}, bus_lookup::Dict{Int64, Int64})
     @info "Validating connectivity with Goderya algorithm"
     length(nodes) > 15_000 &&
         @warn "The Goderya algorithm is memory intensive on large networks and may not scale well, try `connectivity_method = PowerSystems.dfs_connectivity"
@@ -343,7 +343,7 @@ end
 Finds the set of bus numbers that belong to each connnected component in the System
 """
 # this function extends the PowerModels.jl implementation to accept a System
-function find_connected_components(sys::System)
+function find_connected_components(sys::PSY.System)
     a = Adjacency(sys; check_connectivity = false)
     return find_connected_components(a.data, a.lookup[1])
 end
@@ -368,7 +368,7 @@ function find_connected_components(M, bus_lookup::Dict{Int64, Int64})
     return Set(connected_components)
 end
 
-function dfs_connectivity(M, _::Vector{Bus}, bus_lookup::Dict{Int64, Int64})
+function dfs_connectivity(M, ::Vector{PSY.Bus}, bus_lookup::Dict{Int64, Int64})
     @info "Validating connectivity with depth first search (network traversal)"
     cc = find_connected_components(M, bus_lookup)
     if length(cc) != 1

@@ -10,8 +10,13 @@ export find_connected_components
 
 using DocStringExtensions
 import PowerSystems
-
 const PSY = PowerSystems
+
+import SparseArrays
+import LinearAlgebra: LAPACK.getri!
+import LinearAlgebra: LAPACK.getrf!
+import LinearAlgebra: BLAS.gemm
+import LinearAlgebra
 
 @template (FUNCTIONS, METHODS) = """
                                  $(TYPEDSIGNATURES)

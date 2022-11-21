@@ -14,7 +14,7 @@ function get_bus_indices(branch, bus_lookup)
     return fr_b, to_b
 end
 
-function _make_ax_ref(buses::AbstractVector{Bus})
+function _make_ax_ref(buses::AbstractVector{PSY.Bus})
     return _make_ax_ref(PSY.get_number.(buses))
 end
 
@@ -48,7 +48,7 @@ function lookup_index(i, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[i]
 end
 
-function lookup_index(i::PSY., lookup::Dict)
+function lookup_index(i::PSY.Bus, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
 
@@ -250,12 +250,12 @@ function Base.show(io::IO, array::PowerNetworkMatrix)
     return
 end
 
-Base.to_index(b::Bus) = PSY.get_number(b)
-Base.to_index(b::T) where {T <: ACBranch} = PSY.get_name(b)
-Base.to_index(ix::PSY....) = to_index.(ix)
+Base.to_index(b::PSY.Bus) = PSY.get_number(b)
+Base.to_index(b::T) where {T <: PSY.ACBranch} = PSY.get_name(b)
+Base.to_index(ix::PSY.Component) = to_index.(ix)
 
 """returns the raw array data of the `PowerNetworkMatrix`"""
-PSY.get_data(mat::PowerNetworkMatrix) = mat.data
+get_data(mat::PowerNetworkMatrix) = mat.data
 
 """
     returns the lookup tuple of the `PowerNetworkMatrix`. The first entry corresponds
@@ -263,4 +263,4 @@ PSY.get_data(mat::PowerNetworkMatrix) = mat.data
     instance in Ybus the first dimension is buses and second dimension is buses too, and in
     PTDF the first dimension is branches and the second dimension is buses
 """
-PSY.get_lookup(mat::PowerNetworkMatrix) = mat.lookup
+get_lookup(mat::PowerNetworkMatrix) = mat.lookup

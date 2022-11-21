@@ -10,7 +10,7 @@ end
 
 function _buildlodf(branches, nodes, dist_slack::Array{Float64} = [0.1])
     linecount = length(branches)
-    ptdf, a = PowerSystems._buildptdf(branches, nodes, dist_slack)
+    ptdf, a = PSY._buildptdf(branches, nodes, dist_slack)
     H = gemm('N', 'N', ptdf, a)
     ptdf_denominator = H
     for iline in 1:linecount
@@ -55,7 +55,7 @@ Builds the LODF matrix from a system. The return is a LOLDF array indexed with t
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-function LODF(sys::System, dist_slack::Vector{Float64} = [0.1])
+function LODF(sys::PSY.System, dist_slack::Vector{Float64} = [0.1])
     branches = sort!(
         collect(PSY.get_components(ACBranch, sys));
         by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
