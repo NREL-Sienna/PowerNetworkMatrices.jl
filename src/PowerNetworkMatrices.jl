@@ -5,11 +5,16 @@ export Ybus
 export LODF
 export Adjacency
 
-export validate_connectivity
+export dfs_connectivity
 export find_connected_components
+export validate_connectivity
 
 using DocStringExtensions
+import InfrastructureSystems
 import PowerSystems
+import PowerSystems: BusTypes
+
+const IS = InfrastructureSystems
 const PSY = PowerSystems
 
 import SparseArrays

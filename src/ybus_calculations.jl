@@ -20,7 +20,9 @@ function _ybus!(
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
     Y11 = Y_l + (1im * PSY.get_b(br).from)
     if !isfinite(Y11) || !isfinite(Y_l)
-        error("Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))")
+        error(
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+        )
     end
     ybus[bus_from_no, bus_from_no] += Y11
     Y12 = -Y_l
@@ -53,7 +55,9 @@ function _ybus!(
     Y11 = Y_t
     b = PSY.get_primary_shunt(br)
     if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(b)
-        error("Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))")
+        error(
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+        )
     end
 
     ybus[bus_from_no, bus_from_no] += Y11 - (1im * b)
@@ -80,7 +84,9 @@ function _ybus!(
     ybus[bus_from_no, bus_from_no] += Y11 - (1im * b)
     Y12 = (-Y_t * c)
     if !isfinite(Y11) || !isfinite(Y12) || !isfinite(b)
-        error("Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))")
+        error(
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+        )
     end
     ybus[bus_from_no, bus_to_no] += Y12
     #Y21 = Y12
@@ -104,7 +110,9 @@ function _ybus!(
     b = PSY.get_primary_shunt(br)
     Y11 = (Y_t / abs(tap)^2)
     if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(b * c_tap)
-        error("Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))")
+        error(
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+        )
     end
     ybus[bus_from_no, bus_from_no] += Y11 - (1im * b)
     Y12 = (-Y_t / c_tap)
@@ -167,9 +175,9 @@ function Ybus(
     bus_lookup = _make_ax_ref(bus_ax)
     look_up = (bus_lookup, bus_lookup)
     ybus = _buildybus(branches, nodes, fixed_admittances)
-    if check_connectivity
+    if check_connectivity && length(nodes) > 1
         connected = validate_connectivity(ybus, nodes, bus_lookup; kwargs...)
-        !connected && throw(DataFormatError("Network not connected"))
+        !connected && throw(IS.DataFormatError("Network not connected"))
     end
     return Ybus(ybus, axes, look_up)
 end
@@ -182,9 +190,9 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 - `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
 """
 function Ybus(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
-    branches = PSY.get_components(ACBranch, sys)
-    nodes = PSY.get_components(Bus, sys)
-    fixed_admittances = PSY.get_components(FixedAdmittance, sys)
+    branches = PSY.get_components(PSY.ACBranch, sys)
+    nodes = PSY.get_components(PSY.Bus, sys)
+    fixed_admittances = PSY.get_components(PSY.FixedAdmittance, sys)
     return Ybus(
         branches,
         nodes,
@@ -221,7 +229,7 @@ function Adjacency(branches, nodes; check_connectivity::Bool = true, kwargs...)
     a = SparseArrays.spzeros(Int, buscount, buscount)
 
     for b in branches
-        (fr_b, to_b) = PSY.get_bus_indices(b, bus_lookup)
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
         a[fr_b, to_b] = 1
         a[to_b, fr_b] = -1
         a[fr_b, fr_b] = 1
@@ -245,10 +253,12 @@ Builds a Adjacency from the system. The return is an N x N Adjacency Array index
 """
 function Adjacency(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     nodes = sort!(
-        collect(PSY.get_components(Bus, sys, x -> PSY.get_bustype(x) != BusTypes.ISOLATED));
+        collect(
+            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
+        );
         by = x -> PSY.get_number(x),
     )
-    branches = PSY.get_components(Branch, sys, PSY.get_available)
+    branches = PSY.get_components(PSY.get_available, PSY.Branch, sys)
     return Adjacency(branches, nodes; check_connectivity = check_connectivity, kwargs...)
 end
 
@@ -290,10 +300,12 @@ function validate_connectivity(
     connectivity_method::Function = goderya_connectivity,
 )
     nodes = sort!(
-        collect(PSY.get_components(Bus, sys, x -> PSY.get_bustype(x) != BusTypes.ISOLATED));
+        collect(
+            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
+        );
         by = x -> PSY.get_number(x),
     )
-    branches = PSY.get_components(Branch, sys, PSY.get_available)
+    branches = PSY.get_components(PSY.get_available, PSY.Branch, sys)
     a = Adjacency(branches, nodes; check_connectivity = false)
 
     return validate_connectivity(
@@ -317,7 +329,7 @@ end
 function goderya_connectivity(M, nodes::Vector{PSY.Bus}, bus_lookup::Dict{Int64, Int64})
     @info "Validating connectivity with Goderya algorithm"
     length(nodes) > 15_000 &&
-        @warn "The Goderya algorithm is memory intensive on large networks and may not scale well, try `connectivity_method = PowerSystems.dfs_connectivity"
+        @warn "The Goderya algorithm is memory intensive on large networks and may not scale well, try `connectivity_method = dfs_connectivity"
 
     I = _goderya(M)
 
@@ -359,7 +371,7 @@ function find_connected_components(M, bus_lookup::Dict{Int64, Int64})
     ],)
 
     data = Dict("bus" => pm_buses, "branch" => pm_branches)
-    cc = calc_connected_components(data)
+    cc = PSY.calc_connected_components(data)
     bus_decode = Dict(value => key for (key, value) in bus_lookup)
     connected_components = Vector{Set{Int64}}()
     for c in cc

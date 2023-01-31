@@ -2,7 +2,10 @@
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 PowerNetworkMatrices = "bed98974-b02a-5e2f-9fe0-a103f5c450dd"
+PowerSystemCaseBuilder = "f00506e0-b84f-492a-93c2-c0a9afc4364e"
+PowerSystems = "bcd98974-b02a-5e2f-9ee0-a103f5c450dd"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 
 [compat]
 julia = "^1.6"

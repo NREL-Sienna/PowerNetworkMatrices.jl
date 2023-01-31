@@ -1,12 +1,16 @@
 using SparseArrays
 using Test
 
-include(joinpath(BASE_DIR, "test", "data_5bus_pu.jl"))
-include(joinpath(BASE_DIR, "test", "data_14bus_pu.jl"))
+include(joinpath(DATA_DIR, "psy_data", "data_5bus_pu.jl"))
+include(joinpath(DATA_DIR, "psy_data", "data_14bus_pu.jl"))
 
 # The 5-bus case from PowerModels data is modified to include 2 phase shifters
 sys = PSB.build_system(PSB.MatpowerTestSystems, "matpower_case5_sys")
-RTS = create_rts_system();
+RTS = PSB.build_system(
+    PSB.PSITestSystems,
+    "test_RTS_GMLC_sys";
+    force_build = true,
+);
 
 # mixed up ids for data_5bus_pu
 Br5NS_ids = [2, 3, 5, 1, 4, 6]
@@ -527,8 +531,8 @@ end
     remove_component!(Line, t2_sys5_re, "5")
     @test isa(Ybus(t2_sys5_re), Ybus)
 
-    sys_3bus = PSB.build_system(PSB.PSSETestSystems, "psse_3bus_gen_cls_sys")
-    bus_103 = PSY.get_component(Bus, sys_3bus, "BUS 3")
+    sys_3bus = PSB.build_system(PSB.PSYTestSystems, "psse_3bus_gen_cls_sys")
+    bus_103 = PSY.get_component(PSY.Bus, sys_3bus, "BUS 3")
     fix_shunt = FixedAdmittance("FixAdm_Bus3", true, bus_103, 0.0 + 0.2im)
     add_component!(sys_3bus, fix_shunt)
     Ybus3 = Ybus(sys_3bus)
@@ -547,23 +551,16 @@ end
             "Validating connectivity with depth first search (network traversal)",
         ) match_mode = :any validate_connectivity(
             sys,
-            connectivity_method = PowerSystems.dfs_connectivity,
+            connectivity_method = dfs_connectivity,
         )
     )
     @test length(collect(find_connected_components(sys))[1]) == 5
-    @test_logs (
-        :info,
-        "Validating connectivity with depth first search (network traversal)",
-    ) match_mode = :any solve_powerflow(
-        RTS,
-        connectivity_method = PowerSystems.dfs_connectivity,
-    )
 end
 
 @testset "Test disconnected networks" begin
     remove_components!(sys, Line)
     @test (@test_logs (:warn, "Principal connected component does not contain:") match_mode =
         :any validate_connectivity(sys)) == false
-    @test validate_connectivity(sys; connectivity_method = PowerSystems.dfs_connectivity) ==
+    @test validate_connectivity(sys; connectivity_method = dfs_connectivity) ==
           false
 end

@@ -10,7 +10,7 @@ end
 
 function _buildlodf(branches, nodes, dist_slack::Array{Float64} = [0.1])
     linecount = length(branches)
-    ptdf, a = PSY._buildptdf(branches, nodes, dist_slack)
+    ptdf, a = _buildptdf(branches, nodes, dist_slack)
     H = gemm('N', 'N', ptdf, a)
     ptdf_denominator = H
     for iline in 1:linecount
@@ -57,9 +57,10 @@ Builds the LODF matrix from a system. The return is a LOLDF array indexed with t
 """
 function LODF(sys::PSY.System, dist_slack::Vector{Float64} = [0.1])
     branches = sort!(
-        collect(PSY.get_components(ACBranch, sys));
-        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
+        collect(PSY.get_components(PSY.ACBranch, sys));
+        by = x ->
+            (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
     )
-    nodes = sort!(collect(PSY.get_components(Bus, sys)); by = x -> PSY.get_number(x))
+    nodes = sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
     return LODF(branches, nodes, dist_slack)
 end
