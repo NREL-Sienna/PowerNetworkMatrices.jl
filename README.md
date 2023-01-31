@@ -16,6 +16,6 @@
 
 ## License
 
-PowerSystems is released under a BSD [license](https://github.com/NREL/PowerNetworkMatrices.jl/blob/master/LICENSE).
-PowerSystems has been developed as part of the Scalable Integrated Infrastructure Planning (SIIP)
+PowerNetworkMatrices is released under a BSD [license](https://github.com/NREL/PowerNetworkMatrices.jl/blob/master/LICENSE).
+PowerNetworkMatrices has been developed as part of the Scalable Integrated Infrastructure Planning (SIIP)
 initiative at the U.S. Department of Energy's National Renewable Energy Laboratory ([NREL](https://www.nrel.gov/)).
