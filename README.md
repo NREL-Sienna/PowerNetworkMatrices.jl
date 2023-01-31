@@ -13,3 +13,9 @@
 
 - PowerNetworkMatrices.jl will work with Julia v1.6+.
 - PowerNetworkMatrices.jl exports Matrix methods that were available in PowerSystems.jl version 1.0 and have been implemented as a separate package.
+
+## License
+
+PowerSystems is released under a BSD [license](https://github.com/NREL/PowerNetworkMatrices.jl/blob/master/LICENSE).
+PowerSystems has been developed as part of the Scalable Integrated Infrastructure Planning (SIIP)
+initiative at the U.S. Department of Energy's National Renewable Energy Laboratory ([NREL](https://www.nrel.gov/)).
