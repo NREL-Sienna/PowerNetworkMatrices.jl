@@ -1,13 +1,13 @@
 # # Network Matrices
 
-# `PowerSystems.jl` is able to build classic power systems modeling network matrices such as
+# `PowerNetworkMatrices.jl` is able to build classic power systems modeling network matrices such as
 # [Ybus](https://en.wikipedia.org/wiki/Nodal_admittance_matrix), [PTDF](https://www.powerworld.com/WebHelp/Content/MainDocumentation_HTML/Power_Transfer_Distribution_Factors.htm) and LODF.
 
 # Check section [Network Matrices](@ref net_mat) for more details.
 
 # ## Overview
 #
-# Network matrices are implemented in `PowerSystems.jl` as arrays that enable using Branch or Bus
+# Network matrices are implemented in `PowerNetworkMatrices.jl` as arrays that enable using Branch or Bus
 # names as indexes to facilitate exploration and analysis. Ybus is stored as an SparseMatrix
 # and the PTDF and LODF are stored as dense matrices. **Note*** Ybus is converted to a dense
 # matrix for printing in the REPL,
