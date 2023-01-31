@@ -48,6 +48,10 @@ function lookup_index(i, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[i]
 end
 
+function lookup_index(i::PSY.ACBranch, lookup::Dict)
+    return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
+end
+
 function lookup_index(i::PSY.Bus, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
@@ -252,7 +256,6 @@ end
 
 Base.to_index(b::PSY.Bus) = PSY.get_number(b)
 Base.to_index(b::T) where {T <: PSY.ACBranch} = PSY.get_name(b)
-Base.to_index(ix::PSY.Component) = to_index.(ix)
 
 """returns the raw array data of the `PowerNetworkMatrix`"""
 get_data(mat::PowerNetworkMatrix) = mat.data

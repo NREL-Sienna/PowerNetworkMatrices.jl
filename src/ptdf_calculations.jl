@@ -33,19 +33,20 @@ function _buildptdf(branches, nodes, dist_slack::Vector{Float64})
 
     #build incidence matrix
     for (ix, b) in enumerate(branches)
-        if isa(b, DCBranch)
+        if isa(b, PSY.DCBranch)
             @warn("PTDF construction ignores DC-Lines")
             continue
         end
 
-        (fr_b, to_b) = PSY.get_bus_indices(b, bus_lookup)
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
         A[fr_b, ix] = 1
         A[to_b, ix] = -1
 
         inv_X[ix, ix] = PSY.get_series_susceptance(b)
     end
 
-    slacks = [bus_lookup[PSY.get_number(n)] for n in nodes if PSY.get_bustype(n) == BusTypes.REF]
+    slacks =
+        [bus_lookup[PSY.get_number(n)] for n in nodes if PSY.get_bustype(n) == BusTypes.REF]
     isempty(slacks) && error("System must have a reference bus!")
 
     slack_position = slacks[1]
@@ -118,9 +119,10 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 """
 function PTDF(sys::PSY.System, dist_slack::Vector{Float64} = [0.1])
     branches = sort!(
-        collect(PSY.get_components(ACBranch, sys));
-        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
+        collect(PSY.get_components(PSY.ACBranch, sys));
+        by = x ->
+            (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
     )
-    nodes = sort!(collect(PSY.get_components(Bus, sys)); by = x -> PSY.get_number(x))
+    nodes = sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
     return PTDF(branches, nodes, dist_slack)
 end

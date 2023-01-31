@@ -1,6 +1,17 @@
 using Test
 import Logging
 using PowerNetworkMatrices
+using PowerSystems
+using InfrastructureSystems
+using PowerSystemCaseBuilder
+using TimeSeries
+
+const IS = InfrastructureSystems
+const PSY = PowerSystems
+const PSB = PowerSystemCaseBuilder
+
+const BASE_DIR = dirname(dirname(Base.find_package("PowerSystems")))
+const DATA_DIR = PSB.DATA_DIR
 
 import Aqua
 Aqua.test_unbound_args(PowerNetworkMatrices)
@@ -16,7 +27,6 @@ LOG_LEVELS = Dict(
     "Warn" => Logging.Warn,
     "Error" => Logging.Error,
 )
-
 
 """
 Copied @includetests from https://github.com/ssfrr/TestSetExtensions.jl.
@@ -60,9 +70,9 @@ macro includetests(testarg...)
     end
 end
 
-function PSY.get_logging_level_from_env(env_name::String, default)
+function get_logging_level_from_env(env_name::String, default)
     level = get(ENV, env_name, default)
-    return IS.PSY.get_logging_level(level)
+    return IS.get_logging_level(level)
 end
 
 function run_tests()
@@ -76,13 +86,13 @@ function run_tests()
             console_level = Logging.Error,
         )
     end
-    console_logger = ConsoleLogger(config.console_stream, config.console_level)
+    console_logger = Logging.ConsoleLogger(config.console_stream, config.console_level)
 
     IS.open_file_logger(config.filename, config.file_level) do file_logger
         levels = (Logging.Info, Logging.Warn, Logging.Error)
         multi_logger =
             IS.MultiLogger([console_logger, file_logger], IS.LogEventTracker(levels))
-        global_logger(multi_logger)
+        Logging.global_logger(multi_logger)
 
         if !isempty(config.group_levels)
             IS.set_group_levels!(multi_logger, config.group_levels)
@@ -93,17 +103,17 @@ function run_tests()
             @includetests ARGS
         end
 
-        @test length(IS.PSY.get_log_events(multi_logger.tracker, Logging.Error)) == 0
+        @test length(IS.get_log_events(multi_logger.tracker, Logging.Error)) == 0
         @info IS.report_log_summary(multi_logger)
     end
 end
 
-logger = global_logger()
+logger = Logging.global_logger()
 
 try
     run_tests()
 finally
     # Guarantee that the global logger is reset.
-    global_logger(logger)
+    Logging.global_logger(logger)
     nothing
 end
