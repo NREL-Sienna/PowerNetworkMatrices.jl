@@ -1,5 +1,5 @@
 using Documenter, PowerNetworkMatrices
-
+import DataStructures: OrderedDict
 
 pages = OrderedDict(
         "Welcome Page" => "index.md",
