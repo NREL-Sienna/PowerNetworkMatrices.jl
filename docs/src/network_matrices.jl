@@ -27,7 +27,7 @@ ybus = Ybus(system_data)
 # 1-14. However, in large systems buses don't usually follow sequential numbering. You can access
 # the entries of the Ybus with direct indexing or using the buses.
 
-ybus_entry = ybus[3,3]
+ybus_entry = ybus[3, 3]
 #
 bus3 = get_component(Bus, system_data, "Bus 3     HV")
 ybus_entry = ybus[bus3, bus3]
