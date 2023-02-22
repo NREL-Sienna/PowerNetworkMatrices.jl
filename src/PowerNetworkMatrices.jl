@@ -29,6 +29,7 @@ import LinearAlgebra
                                  """
 
 # network calculations
+include("PowerNetworkMatrix.jl")
 include("common.jl")
 include("ybus_calculations.jl")
 include("ptdf_calculations.jl")
