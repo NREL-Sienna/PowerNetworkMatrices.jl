@@ -3,8 +3,8 @@ Power Transfer Distribution Factors (PTDF) indicate the incremental change in re
 
 The PTDF struct is indexed using the Bus numbers and branch names
 """
-struct PTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
-    data::Array{Float64, 2}
+struct PTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{T <: Real}
+    data::Array{T, 2}
     axes::Ax
     lookup::L
 end
@@ -99,11 +99,12 @@ Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF 
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-function PTDF(branches, nodes, dist_slack::Vector{Float64} = [0.1])
+function PTDF(branches, nodes::Vector{PSY.Buses}, dist_slack::Vector{Float64} = [0.1], linear_solver)
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
-    S, A = _buildptdf(branches, nodes, dist_slack)
+
+    S = _buildptdf(branches, nodes, dist_slack)
 
     axes = (line_ax, bus_ax)
     look_up = (_make_ax_ref(line_ax), _make_ax_ref(bus_ax))
@@ -117,12 +118,9 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-function PTDF(sys::PSY.System, dist_slack::Vector{Float64} = [0.1])
-    branches = sort!(
-        collect(PSY.get_components(PSY.ACBranch, sys));
-        by = x ->
-            (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
-    )
-    nodes = sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
-    return PTDF(branches, nodes, dist_slack)
+function PTDF(sys::PSY.System; dist_slack::Vector{Float64} = [0.1], linear_solver = "KLU")
+    branches = get_branches(sys)
+    nodes = get_nodes(sys)
+    validate_linear_solver(linear_solver)
+    return PTDF(branches, nodes, dist_slack, linear_solver)
 end
