@@ -46,7 +46,7 @@ function _buildptdf(branches, nodes, dist_slack::Vector{Float64})
     end
 
     slacks =
-        [bus_lookup[PSY.get_number(n)] for n in nodes if PSY.get_bustype(n) == BusTypes.REF]
+        [bus_lookup[PSY.get_number(n)] for n in nodes if PSY.get_bustype(n) == ACBusTypes.REF]
     isempty(slacks) && error("System must have a reference bus!")
 
     slack_position = slacks[1]
