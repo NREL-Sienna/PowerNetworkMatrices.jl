@@ -254,7 +254,7 @@ Builds a Adjacency from the system. The return is an N x N Adjacency Array index
 function Adjacency(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     nodes = sort!(
         collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
+            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.Bus, sys),
         );
         by = x -> PSY.get_number(x),
     )
@@ -301,7 +301,7 @@ function validate_connectivity(
 )
     nodes = sort!(
         collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
+            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.Bus, sys),
         );
         by = x -> PSY.get_number(x),
     )
