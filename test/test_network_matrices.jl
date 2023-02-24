@@ -435,24 +435,27 @@ Ybus3_matpower[3, 3] = 1.379310344827586 - 16.351724137931036im
 @testset "PTDF matrices" begin
     nodes_5 = nodes5()
     branches_5 = branches5(nodes_5)
-    P5 = PTDF(branches_5, nodes_5)
-    @test maximum(P5.data - S5_slackB4) <= 1e-3
-    @test P5[branches_5[1], nodes_5[1]] == 0.1939166051164976
+    for solver in ["KLU", "Dense"]
+        P5 = PTDF(branches_5, nodes_5; linear_solver = solver)
+        @test maximum(P5.data - S5_slackB4) <= 1e-3
+        @test abs(P5[branches_5[1], nodes_5[1]] - 0.1939166051164976) <= 1e-9
+        # @test P5[branches_5[1], nodes_5[1]] == 0.1939166051164976
 
-    nodes_14 = nodes14()
-    branches_14 = branches14(nodes_14)
-    P14 = PTDF(branches_14, nodes_14)
-    @test maximum(P14.data - S14_slackB1) <= 1e-3
+        nodes_14 = nodes14()
+        branches_14 = branches14(nodes_14)
+        P14 = PTDF(branches_14, nodes_14)
+        @test maximum(P14.data - S14_slackB1) <= 1e-3
 
-    P5NS = PTDF([branches_5[b] for b in Br5NS_ids], [nodes_5[b] for b in Bu5NS_ids])
-    for br in Br5NS_ids, b in Bu5NS_ids
-        @test getindex(P5NS, string(br), b) - S5_slackB4[br, b] <= 1e-3
-    end
+        P5NS = PTDF([branches_5[b] for b in Br5NS_ids], [nodes_5[b] for b in Bu5NS_ids])
+        for br in Br5NS_ids, b in Bu5NS_ids
+            @test getindex(P5NS, string(br), b) - S5_slackB4[br, b] <= 1e-3
+        end
 
-    PRTS = PTDF(RTS)
-    bnums = sort([PSY.get_number(b) for b in PSY.get_components(Bus, RTS)])
-    for (ibr, br) in enumerate(RTS_branchnames), (ib, b) in enumerate(bnums)
-        @test getindex(PRTS, br, b) - SRTS_GMLC[ibr, ib] <= 1e-3
+        PRTS = PTDF(RTS)
+        bnums = sort([PSY.get_number(b) for b in PSY.get_components(Bus, RTS)])
+        for (ibr, br) in enumerate(RTS_branchnames), (ib, b) in enumerate(bnums)
+            @test getindex(PRTS, br, b) - SRTS_GMLC[ibr, ib] <= 1e-3
+        end
     end
 end
 
@@ -461,7 +464,8 @@ end
     branches_5 = branches5(nodes_5)
     L5 = LODF(branches_5, nodes_5)
     @test maximum(L5.data - Lodf_5) <= 1e-3
-    @test L5[branches_5[1], branches_5[2]] == 0.3447946513849091
+    @test abs(L5[branches_5[1], branches_5[2]] - 0.3447946513849091) < 1e-9
+    # @test L5[branches_5[1], branches_5[2]] == 0.3447946513849091
 
     nodes_14 = nodes14()
     branches_14 = branches14(nodes_14)
