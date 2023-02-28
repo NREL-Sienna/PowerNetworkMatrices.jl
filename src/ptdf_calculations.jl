@@ -22,41 +22,35 @@ function binfo_check(binfo::Int)
     return
 end
 
-
-
 # version 1: use same structure as already present ###########################
 
-function _buildptdf(branches, nodes::Vector{PSY.Bus}, 
-                    dist_slack::Vector{Float64}, linear_solver::String = "Dense")
-
+function _buildptdf(branches, nodes::Vector{PSY.Bus},
+    dist_slack::Vector{Float64}, linear_solver::String = "Dense")
     if linear_solver == "KLU"
         ptdf, a = calculate_PTDF_matrix_KLU(branches, nodes, dist_slack)
     elseif linear_solver == "Dense"
         ptdf, a = calculate_PTDF_matrix_DENSE(branches, nodes, dist_slack)
     elseif linear_solver == "MKLPardiso"
-        error("MKLPardiso still to be implemented",)
+        error("MKLPardiso still to be implemented")
     end
 
     return ptdf, a
-
 end
 
-function _buildptdf(A::SparseArrays.SparseMatrixCSC{Int8, Int32}, 
-                    BA::SparseArrays.SparseMatrixCSC{T, Int32}
-                    where T<:Union{Float32, Float64},
-                    dist_slack::Vector{Float64},
-                    linear_solver::String)
-
+function _buildptdf(A::SparseArrays.SparseMatrixCSC{Int8, Int32},
+    BA::SparseArrays.SparseMatrixCSC{T, Int32}
+    where {T <: Union{Float32, Float64}},
+    dist_slack::Vector{Float64},
+    linear_solver::String)
     if linear_solver == "KLU"
         ptdf, a = calculate_PTDF_matrix_KLU(A, BA, dist_slack)
     elseif linear_solver == "Dense"
         ptdf, a = calculate_PTDF_matrix_DENSE(A, BA, dist_slack)
     elseif linear_solver == "MKLPardiso"
-        error("MKLPardiso still to be implemented",)
+        error("MKLPardiso still to be implemented")
     end
 
     return ptdf, a
-
 end
 
 """
@@ -67,9 +61,9 @@ Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF 
     The distributed slack vector has to be the same length as the number of buses
 """
 function PTDF(branches,
-              nodes::Vector{PSY.Bus},
-              dist_slack::Vector{Float64} = [0.1];
-              linear_solver::String="Dense")
+    nodes::Vector{PSY.Bus},
+    dist_slack::Vector{Float64} = [0.1];
+    linear_solver::String = "Dense")
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
@@ -78,7 +72,6 @@ function PTDF(branches,
     look_up = (_make_ax_ref(line_ax), _make_ax_ref(bus_ax))
 
     return PTDF(S, axes, look_up)
-
 end
 
 """
@@ -89,27 +82,24 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
     The distributed slack vector has to be the same length as the number of buses
 """
 function PTDF(sys::PSY.System,
-              dist_slack::Vector{Float64} = [0.1];
-              linear_solver::String = "Dense")
+    dist_slack::Vector{Float64} = [0.1];
+    linear_solver::String = "Dense")
     branches = get_ac_branches(sys)
     nodes = get_buses(sys)
     validate_linear_solver(linear_solver)
     return PTDF(branches, nodes, dist_slack; linear_solver)
-
 end
 
 # version 2: use BA and ABA fucntions created before #########################
 
-function PTDF(A::SparseArrays.SparseMatrixCSC{Int8, Int32}, 
-              BA::SparseArrays.SparseMatrixCSC{T, Int32} 
-              where T<:Union{Float32, Float64};
-              linear_solver = "Dense")
-    
+function PTDF(A::SparseArrays.SparseMatrixCSC{Int8, Int32},
+    BA::SparseArrays.SparseMatrixCSC{T, Int32}
+    where {T <: Union{Float32, Float64}};
+    linear_solver = "Dense")
     validate_linear_solver(linear_solver)
     S = _buildptdf(A, BA, linear_solver)
     axes = get_axes(A)
     look_up = get_lookup(A)
 
     return PTDF(S, axes, look_up)
-
 end
