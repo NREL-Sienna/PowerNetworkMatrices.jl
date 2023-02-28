@@ -3,8 +3,8 @@ function get_ac_branches(sys::PSY.System)
     # Filter out DC Branches here
     return sort!(
         collect(PSY.get_components(PSY.ACBranch, sys));
-        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to))
-        )
+        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
+    )
 end
 
 # get buses from system
@@ -14,9 +14,11 @@ end
 
 # get slack bus
 function find_slack_positions(nodes)
-    bus_lookup = _make_ax_ref(nodes);
-    return sort([bus_lookup[PSY.get_number(n)]
-                for n in nodes if PSY.get_bustype(n) == BusTypes.REF])
+    bus_lookup = _make_ax_ref(nodes)
+    return sort([
+        bus_lookup[PSY.get_number(n)]
+        for n in nodes if PSY.get_bustype(n) == BusTypes.REF
+    ])
 end
 
 # validate solver so be used for 
@@ -31,7 +33,6 @@ end
 
 # incidence matrix (A) evaluation ############################################
 function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
-
     bus_lookup = _make_ax_ref(nodes)
     slack_positions = find_slack_positions(nodes)
 
@@ -41,7 +42,6 @@ function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
 
     # build incidence matrix A (lines x buses)
     for (ix, b) in enumerate(branches)
-
         (fr_b, to_b) = get_bus_indices(b, bus_lookup)
 
         # change column number
@@ -52,18 +52,15 @@ function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
         push!(A_I, ix)
         push!(A_J, to_b)
         push!(A_V, -1)
-
     end
 
     return SparseArrays.sparse(A_I, A_J, A_V), slack_positions
-
 end
 
 # BA matrix evaluation #######################################################
 function calculate_BA_matrix(branches,
-                             slack_positions::Vector{Int64},
-                             bus_lookup::Dict{Int64, Int64})
-
+    slack_positions::Vector{Int64},
+    bus_lookup::Dict{Int64, Int64})
     BA_I = Int32[]
     BA_J = Int32[]
     BA_V = Float64[]
@@ -90,27 +87,24 @@ function calculate_BA_matrix(branches,
             push!(BA_J, to_b - check_)
             push!(BA_V, -b_val)
         end
-
     end
 
     BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
 
     return BA
-
 end
 
 # ABA matrix evaluation ######################################################
 function calculate_ABA_matrix(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int32}, 
-    BA::SparseArrays.SparseMatrixCSC{T, Int32} where T<:Union{Float32, Float64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int32},
+    BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
     slack_positions::Vector{Int64})
-    return A[:, setdiff(1:end, slack_positions[1])]'*BA
+    return A[:, setdiff(1:end, slack_positions[1])]' * BA
 end
 
 # PTDF evaluation ############################################################
 function calculate_PTDF_matrix_KLU(branches, nodes::Vector{PSY.Bus},
-                                   dist_slack::Vector{Float64})
-    
+    dist_slack::Vector{Float64})
     buscount = length(nodes)
     linecount = length(branches)
 
@@ -119,23 +113,23 @@ function calculate_PTDF_matrix_KLU(branches, nodes::Vector{PSY.Bus},
     BA = calculate_BA_matrix(branches, slack_positions, bus_lookup)
     ABA = calculate_ABA_matrix(A, BA, slack_positions)
     K = klu(ABA)
-    Ix = Matrix(1.0LinearAlgebra.I, size(ABA, 1),  size(ABA, 1))
+    Ix = Matrix(1.0LinearAlgebra.I, size(ABA, 1), size(ABA, 1))
     ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
-    ldiv!(ABA_inv, K, Ix);
+    ldiv!(ABA_inv, K, Ix)
 
     slack_position = slack_positions[1]
     if dist_slack[1] == 0.1 && length(dist_slack) == 1
-        S = BA*ABA_inv
+        S = BA * ABA_inv
         @views S =
             hcat(S[:, 1:(slack_position - 1)], zeros(linecount), S[:, slack_position:end])
     elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
         @info "Distributed bus"
-        S = BA*ABA_inv
+        S = BA * ABA_inv
         @views S =
             hcat(S[:, 1:(slack_position - 1)], zeros(linecount), S[:, slack_position:end])
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
-        S = S - (S*slack_array)*ones(1, buscount)
+        S = S - (S * slack_array) * ones(1, buscount)
     elseif length(slack_position) == 0
         @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
         S = Array{Float64, 2}(undef, linecount, buscount)
@@ -144,25 +138,21 @@ function calculate_PTDF_matrix_KLU(branches, nodes::Vector{PSY.Bus},
     end
 
     return S, A
-
 end
 
-function calculate_PTDF_matrix_KLU(A::SparseArrays.SparseMatrixCSC{Int8, Int32}, 
-                                   BA::SparseArrays.SparseMatrixCSC{T, Int32}
-                                   where T<:Union{Float32, Float64})
-        
+function calculate_PTDF_matrix_KLU(A::SparseArrays.SparseMatrixCSC{Int8, Int32},
+    BA::SparseArrays.SparseMatrixCSC{T, Int32}
+    where {T <: Union{Float32, Float64}})
     ABA = calculate_BA_matrix(A, BA)
-    Ix = Matrix(1.0I, size(ABA, 1),  size(ABA, 1))
+    Ix = Matrix(1.0I, size(ABA, 1), size(ABA, 1))
     S = zeros(Float64, size(ABA, 1), size(ABA, 2))
-    ldiv!(S, K, Ix);
+    ldiv!(S, K, Ix)
 
-    return BA*S
-
+    return BA * S
 end
 
 function calculate_PTDF_matrix_DENSE(branches, nodes::Vector{PSY.Bus},
-                                     dist_slack::Vector{Float64})
-
+    dist_slack::Vector{Float64})
     buscount = length(nodes)
     linecount = length(branches)
 
@@ -231,19 +221,18 @@ function calculate_PTDF_matrix_DENSE(branches, nodes::Vector{PSY.Bus},
     end
 
     return S, A
-
 end
 
-function calculate_PTDF_matrix_DENSE(A::SparseArrays.SparseMatrixCSC{Int8, Int32}, 
-                                     BA::SparseArrays.SparseMatrixCSC{T, Int32}
-                                     where T<:Union{Float32, Float64})
+function calculate_PTDF_matrix_DENSE(A::SparseArrays.SparseMatrixCSC{Int8, Int32},
+    BA::SparseArrays.SparseMatrixCSC{T, Int32}
+    where {T <: Union{Float32, Float64}})
 
     # get ABA
     ABA = gemm(
         'T',
         'N',
         A,
-        BA
+        BA,
     )
 
     # get LU factorization matrices
@@ -258,5 +247,4 @@ function calculate_PTDF_matrix_DENSE(A::SparseArrays.SparseMatrixCSC{Int8, Int32
     )
 
     return S
-
 end
