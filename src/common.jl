@@ -42,8 +42,9 @@ function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
 
     # build incidence matrix A (lines x buses)
     for (ix, b) in enumerate(branches)
-        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
 
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+        
         # change column number
         push!(A_I, ix)
         push!(A_J, fr_b)
@@ -58,7 +59,8 @@ function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
 end
 
 # BA matrix evaluation #######################################################
-function calculate_BA_matrix(branches,
+function calculate_BA_matrix(
+    branches,
     slack_positions::Vector{Int64},
     bus_lookup::Dict{Int64, Int64})
     BA_I = Int32[]
@@ -74,15 +76,15 @@ function calculate_BA_matrix(branches,
         (fr_b, to_b) = get_bus_indices(b, bus_lookup)
         b_val = PSY.get_series_susceptance(b)
 
-        if fr_b ∉ slack_positions
-            check_ = sum(fr_b .> slack_positions)
+        if fr_b ∉ slack_positions[1]
+            check_ = sum(fr_b .> slack_positions[1])
             push!(BA_I, ix)
             push!(BA_J, fr_b - check_)
             push!(BA_V, b_val)
         end
 
-        if to_b ∉ slack_positions
-            check_ = sum(to_b .> slack_positions)
+        if to_b ∉ slack_positions[1]
+            check_ = sum(to_b .> slack_positions[1])
             push!(BA_I, ix)
             push!(BA_J, to_b - check_)
             push!(BA_V, -b_val)
@@ -103,61 +105,86 @@ function calculate_ABA_matrix(
 end
 
 # PTDF evaluation ############################################################
-function calculate_PTDF_matrix_KLU(branches, nodes::Vector{PSY.Bus},
+function calculate_PTDF_matrix_KLU(
+    branches,
+    nodes::Vector{PSY.Bus},
     dist_slack::Vector{Float64})
+    
     buscount = length(nodes)
     linecount = length(branches)
-
     A, slack_positions = calculate_A_matrix(branches, nodes)
     bus_lookup = _make_ax_ref(nodes)
+
     BA = calculate_BA_matrix(branches, slack_positions, bus_lookup)
     ABA = calculate_ABA_matrix(A, BA, slack_positions)
     K = klu(ABA)
     Ix = Matrix(1.0LinearAlgebra.I, size(ABA, 1), size(ABA, 1))
     ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
     ldiv!(ABA_inv, K, Ix)
-
+    PTDFm = zeros(size(BA, 1), size(BA, 2)+1)
     slack_position = slack_positions[1]
+
     if dist_slack[1] == 0.1 && length(dist_slack) == 1
-        S = BA * ABA_inv
-        @views S =
-            hcat(S[:, 1:(slack_position - 1)], zeros(linecount), S[:, slack_position:end])
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
     elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
         @info "Distributed bus"
-        S = BA * ABA_inv
-        @views S =
-            hcat(S[:, 1:(slack_position - 1)], zeros(linecount), S[:, slack_position:end])
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
-        S = S - (S * slack_array) * ones(1, buscount)
+        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
     elseif length(slack_position) == 0
         @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
-        S = Array{Float64, 2}(undef, linecount, buscount)
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
     else
         @assert false
     end
 
-    return S, A
+    return PTDFm, A
 end
 
-function calculate_PTDF_matrix_KLU(A::SparseArrays.SparseMatrixCSC{Int8, Int32},
-    BA::SparseArrays.SparseMatrixCSC{T, Int32}
-    where {T <: Union{Float32, Float64}})
-    ABA = calculate_BA_matrix(A, BA)
-    Ix = Matrix(1.0I, size(ABA, 1), size(ABA, 1))
-    S = zeros(Float64, size(ABA, 1), size(ABA, 2))
-    ldiv!(S, K, Ix)
-
-    return BA * S
-end
-
-function calculate_PTDF_matrix_DENSE(branches, nodes::Vector{PSY.Bus},
+function calculate_PTDF_matrix_KLU(
+    A::IncidenceMatrix,
+    BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
     dist_slack::Vector{Float64})
+
+    linecount = length(A.axes[1])
+    buscount = length(A.axes[2])
+    slack_positions = A.slack_positions
+
+    ABA = calculate_ABA_matrix(A.data, BA, slack_positions)
+    K = klu(ABA)
+    Ix = Matrix(1.0I, size(ABA, 1), size(ABA, 1))
+    ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
+    ldiv!(ABA_inv, K, Ix)
+    PTDFm = zeros(size(BA, 1), size(BA, 2)+1)
+    slack_position = slack_positions[1]
+
+    if dist_slack[1] == 0.1 && length(dist_slack) == 1
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+    elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+        @info "Distributed bus"
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+        slack_array = dist_slack / sum(dist_slack)
+        slack_array = reshape(slack_array, buscount, 1)
+        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
+    elseif length(slack_position) == 0
+        @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
+    else
+        @assert false
+    end
+
+    return PTDFm, A.data
+end
+
+function calculate_PTDF_matrix_DENSE(
+    branches,
+    nodes::Vector{PSY.Bus},
+    dist_slack::Vector{Float64})
+
     buscount = length(nodes)
     linecount = length(branches)
-
     bus_lookup = _make_ax_ref(nodes)
-
     A = zeros(Float64, buscount, linecount)
     inv_X = zeros(Float64, linecount, linecount)
 
@@ -190,61 +217,168 @@ function calculate_PTDF_matrix_DENSE(branches, nodes::Vector{PSY.Bus},
     if dist_slack[1] == 0.1 && length(dist_slack) == 1
         (B, bipiv, binfo) = getrf!(B)
         binfo_check(binfo)
-        S = gemm(
+        PTDFm = gemm(
             'N',
             'N',
             gemm('N', 'T', inv_X, A[setdiff(1:end, slack_position), :]),
             getri!(B, bipiv),
         )
-        @views S =
-            hcat(S[:, 1:(slack_position - 1)], zeros(linecount), S[:, slack_position:end])
+        @views PTDFm =
+            hcat(PTDFm[:, 1:(slack_position - 1)], zeros(linecount), PTDFm[:, slack_position:end])
     elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
         @info "Distributed bus"
         (B, bipiv, binfo) = getrf!(B)
         binfo_check(binfo)
-        S = gemm(
+        PTDFm = gemm(
             'N',
             'N',
             gemm('N', 'T', inv_X, A[setdiff(1:end, slack_position), :]),
             getri!(B, bipiv),
         )
-        @views S =
-            hcat(S[:, 1:(slack_position - 1)], zeros(linecount), S[:, slack_position:end])
+        @views PTDFm =
+            hcat(PTDFm[:, 1:(slack_position - 1)], zeros(linecount), PTDFm[:, slack_position:end])
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
-        S = S - gemm('N', 'N', gemm('N', 'N', S, slack_array), ones(1, buscount))
+        PTDFm = PTDFm - gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
     elseif length(slack_position) == 0
         @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
-        S = Array{Float64, 2}(undef, linecount, buscount)
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
     else
         @assert false
     end
 
-    return S, A
+    return PTDFm, A
 end
 
-function calculate_PTDF_matrix_DENSE(A::SparseArrays.SparseMatrixCSC{Int8, Int32},
-    BA::SparseArrays.SparseMatrixCSC{T, Int32}
-    where {T <: Union{Float32, Float64}})
+# ! makes no sense since it requires the conversion of A and BA from sparse to dense
+# function calculate_PTDF_matrix_DENSE(
+#     A::IncidenceMatrix,
+#     BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
+#     dist_slack::Vector{Float64})
 
-    # get ABA
-    ABA = gemm(
-        'T',
-        'N',
-        A,
-        BA,
-    )
+#     linecount = length(A.axes[1])
+#     buscount = length(A.axes[2])
+#     slack_positions = A.slack_positions
+#     slack_position = slack_positions[1]
+#     ABA = gemm('T', 'N', A.data[:, setdiff(1:end, slack_positions[1])], BA)
 
-    # get LU factorization matrices
-    (ABA, bipiv, binfo) = getrf!(ABA)
-    binfo_check(binfo)
-    # evaluate ptdf matrix
-    S = gemm(
-        'N',
-        'N',
-        BA,
-        getri!(B, bipiv),
-    )
+#     # evaluate ptdf matrix
+#     if dist_slack[1] == 0.1 && length(dist_slack) == 1
+#         (ABA, bipiv, binfo) = getrf!(ABA)
+#         binfo_check(binfo)
+#         PTDFm = gemm(
+#             'N',
+#             'N',
+#             BA,
+#             getri!(B, bipiv),
+#         )
+#         @views PTDFm =
+#             hcat(PTDFm[:, 1:(slack_position - 1)], zeros(linecount), PTDFm[:, slack_position:end])
+#     elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+#         @info "Distributed bus"
+#         (ABA, bipiv, binfo) = getrf!(ABA)
+#         binfo_check(binfo)
+#         PTDFm = gemm(
+#             'N',
+#             'N',
+#             BA,
+#             getri!(B, bipiv),
+#         )
+#         @views PTDFm =
+#             hcat(PTDFm[:, 1:(slack_position - 1)], zeros(linecount), PTDFm[:, slack_position:end])
+#         slack_array = dist_slack / sum(dist_slack)
+#         slack_array = reshape(slack_array, buscount, 1)
+#         PTDFm = PTDFm - gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
+#     elseif length(slack_position) == 0
+#         @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+#         PTDFm = Array{Float64, 2}(undef, linecount, buscount)
+#     else
+#         @assert false
+#     end
 
-    return S
+#     return PTDFm, A.data
+# end
+
+function calculate_PTDF_matrix_MKLPardiso(
+    branches,
+    nodes::Vector{PSY.Bus},
+    dist_slack::Vector{Float64})
+    
+    # initialize solver and number of threads to use
+    ENV["OPENBLAS_NUM_THREADS"] = 10
+    ENV["MKL_NUM_THREADS"] = 10
+    ps = Pardiso.MKLPardisoSolver()
+    set_num_threads(10)
+    Pardiso.set_nprocs!(ps, 10)
+
+    buscount = length(nodes)
+    linecount = length(branches)
+    A, slack_positions = calculate_A_matrix(branches, nodes)
+    bus_lookup = _make_ax_ref(nodes)
+
+    BA = calculate_BA_matrix(branches, slack_positions, bus_lookup)
+    ABA = calculate_ABA_matrix(A, BA, slack_positions)
+    Ix = Matrix(1.0I, size(ABA, 1),  size(ABA, 1))
+    ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
+    Pardiso.solve!(ps, ABA_inv, ABA, Ix)
+    PTDFm = zeros(size(BA, 1), size(BA, 2)+1)
+    slack_position = slack_positions[1]
+
+    if dist_slack[1] == 0.1 && length(dist_slack) == 1
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+    elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+        @info "Distributed bus"
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+        slack_array = dist_slack / sum(dist_slack)
+        slack_array = reshape(slack_array, buscount, 1)
+        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
+    elseif length(slack_position) == 0
+        @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
+    else
+        @assert false
+    end
+
+    return PTDFm, A
+end
+
+function calculate_PTDF_matrix_MKLPardiso(
+    A::IncidenceMatrix,
+    BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
+    dist_slack::Vector{Float64})
+
+    # initialize solver and number of threads to use
+    ENV["OPENBLAS_NUM_THREADS"] = 10
+    ENV["MKL_NUM_THREADS"] = 10
+    ps = Pardiso.MKLPardisoSolver()
+    set_num_threads(10)
+    Pardiso.set_nprocs!(ps, 10)
+
+    linecount = length(A.axes[1])
+    buscount = length(A.axes[2])
+    slack_positions = A.slack_positions
+
+    ABA = calculate_ABA_matrix(A.data, BA, slack_positions)
+    Ix = Matrix(1.0I, size(ABA, 1),  size(ABA, 1))
+    ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
+    Pardiso.solve!(ps, ABA_inv, ABA, Ix)
+    PTDFm = zeros(size(BA, 1), size(BA, 2)+1)
+    slack_position = slack_positions[1]
+
+    if dist_slack[1] == 0.1 && length(dist_slack) == 1
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+    elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+        @info "Distributed bus"
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+        slack_array = dist_slack / sum(dist_slack)
+        slack_array = reshape(slack_array, buscount, 1)
+        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
+    elseif length(slack_position) == 0
+        @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
+    else
+        @assert false
+    end
+
+    return PTDFm, A.data
 end
