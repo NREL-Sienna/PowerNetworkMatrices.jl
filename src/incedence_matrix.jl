@@ -3,11 +3,11 @@ Incidence matrix: shows connection between buses, defining lines
 """
 
 # define structure for incidence matrix A
-struct IncidenceMatrix <: PowerNetworkMatrix{Int}
+struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Real}
     data::SparseArrays.SparseMatrixCSC{Int8, Int32}
-    axes::Tuple{Vector{Int64}, Vector{Int64}}
-    lookup::Dict{Int64, Int64}
-    slack_positions::Vector{Int}
+    axes::Ax
+    lookup::L
+    slack_positions::Vector{Int64}
 end
 
 # functions to get stored data
@@ -19,10 +19,10 @@ get_slack_position(A::IncidenceMatrix) = A.slack_positions
 function IncidenceMatrix(sys::PSY.System)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
-    # ! column related to slack bus has been removed
-    data, _ = calculate_A_matrix(branches, buses)
-    slack_positions = find_slack_positions(buses)
-    lookup = _make_ax_ref(buses)
-    axes = (PSY.get_number.(branches), PSY.get_number.(buses))
+    line_ax = [PSY.get_name(branch) for branch in branches]
+    bus_ax = [PSY.get_number(bus) for bus in buses]
+    data, slack_positions = calculate_A_matrix(branches, buses)
+    axes = (line_ax, bus_ax)
+    lookup = (_make_ax_ref(line_ax), _make_ax_ref(bus_ax))
     return IncidenceMatrix(data, axes, lookup, slack_positions)
 end
