@@ -3,8 +3,8 @@ Power Transfer Distribution Factors (PTDF) indicate the incremental change in re
 
 The PTDF struct is indexed using the Bus numbers and branch names
 """
-struct PTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
-    data::Array{Float64, 2}
+struct PTDF{Ax, L <: NTuple{2, Dict}, T <: Real} <: PowerNetworkMatrix{Real}
+    data::Array{T, 2}
     axes::Ax
     lookup::L
 end
@@ -22,74 +22,38 @@ function binfo_check(binfo::Int)
     return
 end
 
-function _buildptdf(branches, nodes, dist_slack::Vector{Float64})
-    buscount = length(nodes)
-    linecount = length(branches)
+# version 1: use same structure as already present ###########################
 
-    bus_lookup = _make_ax_ref(nodes)
-
-    A = zeros(Float64, buscount, linecount)
-    inv_X = zeros(Float64, linecount, linecount)
-
-    #build incidence matrix
-    for (ix, b) in enumerate(branches)
-        if isa(b, PSY.DCBranch)
-            @warn("PTDF construction ignores DC-Lines")
-            continue
-        end
-
-        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
-        A[fr_b, ix] = 1
-        A[to_b, ix] = -1
-
-        inv_X[ix, ix] = PSY.get_series_susceptance(b)
+function _buildptdf(
+    branches,
+    nodes::Vector{PSY.Bus},
+    dist_slack::Vector{Float64},
+    linear_solver::String = "Dense")
+    if linear_solver == "KLU"
+        PTDFm, A = calculate_PTDF_matrix_KLU(branches, nodes, dist_slack)
+    elseif linear_solver == "Dense"
+        PTDFm, A = calculate_PTDF_matrix_DENSE(branches, nodes, dist_slack)
+    elseif linear_solver == "MKLPardiso"
+        PTDFm, A = calculate_PTDF_matrix_MKLPardiso(branches, nodes, dist_slack)
     end
 
-    slacks =
-        [bus_lookup[PSY.get_number(n)] for n in nodes if PSY.get_bustype(n) == BusTypes.REF]
-    isempty(slacks) && error("System must have a reference bus!")
+    return PTDFm, A
+end
 
-    slack_position = slacks[1]
-    B = gemm(
-        'N',
-        'T',
-        gemm('N', 'N', A[setdiff(1:end, slack_position), 1:end], inv_X),
-        A[setdiff(1:end, slack_position), 1:end],
-    )
-    if dist_slack[1] == 0.1 && length(dist_slack) == 1
-        (B, bipiv, binfo) = getrf!(B)
-        binfo_check(binfo)
-        S = gemm(
-            'N',
-            'N',
-            gemm('N', 'T', inv_X, A[setdiff(1:end, slack_position), :]),
-            getri!(B, bipiv),
-        )
-        @views S =
-            hcat(S[:, 1:(slack_position - 1)], zeros(linecount), S[:, slack_position:end])
-    elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
-        @info "Distributed bus"
-        (B, bipiv, binfo) = getrf!(B)
-        binfo_check(binfo)
-        S = gemm(
-            'N',
-            'N',
-            gemm('N', 'T', inv_X, A[setdiff(1:end, slack_position), :]),
-            getri!(B, bipiv),
-        )
-        @views S =
-            hcat(S[:, 1:(slack_position - 1)], zeros(linecount), S[:, slack_position:end])
-        slack_array = dist_slack / sum(dist_slack)
-        slack_array = reshape(slack_array, buscount, 1)
-        S = S - gemm('N', 'N', gemm('N', 'N', S, slack_array), ones(1, buscount))
-    elseif length(slack_position) == 0
-        @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
-        S = Array{Float64, 2}(undef, linecount, buscount)
-    else
-        @assert false
+function _buildptdf(
+    A::IncidenceMatrix,
+    BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
+    dist_slack::Vector{Float64},
+    linear_solver::String)
+    if linear_solver == "KLU"
+        PTDFm, A = calculate_PTDF_matrix_KLU(A, BA, dist_slack)
+    elseif linear_solver == "Dense"
+        PTDFm, A = calculate_PTDF_matrix_DENSE(A, BA, dist_slack)
+    elseif linear_solver == "MKLPardiso"
+        PTDFm, A = calculate_PTDF_matrix_MKLPardiso(A, BA, dist_slack)
     end
 
-    return S, A
+    return PTDFm, A
 end
 
 """
@@ -99,14 +63,19 @@ Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF 
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-function PTDF(branches, nodes, dist_slack::Vector{Float64} = [0.1])
+function PTDF(
+    branches,
+    nodes::Vector{PSY.Bus},
+    dist_slack::Vector{Float64} = [0.1];
+    linear_solver::String = "Dense")
+
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
-    S, A = _buildptdf(branches, nodes, dist_slack)
-
+    S, _ = _buildptdf(branches, nodes, dist_slack, linear_solver)
     axes = (line_ax, bus_ax)
     look_up = (_make_ax_ref(line_ax), _make_ax_ref(bus_ax))
+
     return PTDF(S, axes, look_up)
 end
 
@@ -117,12 +86,26 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-function PTDF(sys::PSY.System, dist_slack::Vector{Float64} = [0.1])
-    branches = sort!(
-        collect(PSY.get_components(PSY.ACBranch, sys));
-        by = x ->
-            (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
-    )
-    nodes = sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
-    return PTDF(branches, nodes, dist_slack)
+function PTDF(
+    sys::PSY.System,
+    dist_slack::Vector{Float64} = [0.1];
+    linear_solver::String = "Dense")
+    branches = get_ac_branches(sys)
+    nodes = get_buses(sys)
+    validate_linear_solver(linear_solver)
+
+    return PTDF(branches, nodes, dist_slack; linear_solver)
+end
+
+# version 2: use BA and ABA fucntions created before #########################
+
+function PTDF(
+    A::IncidenceMatrix,
+    BA::BA_Matrix,
+    dist_slack::Vector{Float64} = [0.1];
+    linear_solver = "Dense")
+    validate_linear_solver(linear_solver)
+    S, _ = _buildptdf(A, BA.data, dist_slack, linear_solver)
+
+    return PTDF(S, A.axes, A.lookup)
 end
