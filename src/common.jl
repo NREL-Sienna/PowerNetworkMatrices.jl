@@ -1,269 +1,389 @@
-
-abstract type PowerNetworkMatrix{T} <: AbstractArray{T, 2} end
-
-#  The container code for PowerNetworkMatrix is based in JuMP's Container in order to
-#  remove the limitations of AxisArrays and the doubts about long term maintenance
-#  https://github.com/JuliaOpt/JuMP.jl/blob/master/src/Containers/DenseAxisArray.jl
-#  JuMP'sCopyright 2017, Iain Dunning, Joey Huchette, Miles Lubin, and contributors
-#  This Source Code Form is subject to the terms of the Mozilla Public
-#  License, v. 2.0.
-
-function get_bus_indices(branch, bus_lookup)
-    fr_b = bus_lookup[PSY.get_number(PSY.get_from(PSY.get_arc(branch)))]
-    to_b = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_arc(branch)))]
-    return fr_b, to_b
-end
-
-function _make_ax_ref(buses::AbstractVector{PSY.Bus})
-    return _make_ax_ref(PSY.get_number.(buses))
-end
-
-function _make_ax_ref(ax::AbstractVector)
-    ref = Dict{eltype(ax), Int}()
-    for (ix, el) in enumerate(ax)
-        if haskey(ref, el)
-            @error("Repeated index element $el. Index sets must have unique elements.")
-        end
-        ref[el] = ix
-    end
-    return ref
-end
-
-# AbstractArray interface
-Base.isempty(A::PowerNetworkMatrix) = isempty(A.data)
-Base.size(A::PowerNetworkMatrix) = size(A.data)
-Base.LinearIndices(A::PowerNetworkMatrix) =
-    error("PowerSystems.$(typeof(A)) does not support this operation.")
-Base.axes(A::PowerNetworkMatrix) = A.axes
-Base.CartesianIndices(A::PowerNetworkMatrix) =
-    error("PowerSystems.$(typeof(A)) does not support this operation.")
-
-############
-# Indexing #
-############
-
-Base.eachindex(A::PowerNetworkMatrix) = CartesianIndices(size(A.data))
-
-function lookup_index(i, lookup::Dict)
-    return isa(i, Colon) ? Colon() : lookup[i]
-end
-
-function lookup_index(i::PSY.ACBranch, lookup::Dict)
-    return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
-end
-
-function lookup_index(i::PSY.Bus, lookup::Dict)
-    return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
-end
-
-# Lisp-y tuple recursion trick to handle indexing in a nice type-
-# stable way. The idea here is that `_to_index_tuple(idx, lookup)`
-# performs a lookup on the first element of `idx` and `lookup`,
-# then recurses using the remaining elements of both tuples.
-# The compiler knows the lengths and types of each tuple, so
-# all of the types are inferable.
-function _to_index_tuple(idx::Tuple, lookup::Tuple)
-    return tuple(
-        lookup_index(first(idx), first(lookup)),
-        _to_index_tuple(Base.tail(idx), Base.tail(lookup))...,
+# get branches from system
+function get_ac_branches(sys::PSY.System)
+    # Filter out DC Branches here
+    return sort!(
+        collect(PSY.get_components(PSY.ACBranch, sys));
+        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
     )
 end
 
-# Handle the base case when we have more indices than lookups:
-function _to_index_tuple(idx::NTuple{N}, ::NTuple{0}) where {N}
-    return ntuple(k -> begin
-            i = idx[k]
-            (i == 1) ? 1 : error("invalid index $i")
-        end, Val(N))
+# get buses from system
+function get_buses(sys::PSY.System)
+    return sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
 end
 
-# Handle the base case when we have fewer indices than lookups:
-_to_index_tuple(idx::NTuple{0}, lookup::Tuple) = ()
+# get slack bus
+function find_slack_positions(nodes)
+    bus_lookup = _make_ax_ref(nodes)
+    return sort([
+        bus_lookup[PSY.get_number(n)]
+        for n in nodes if PSY.get_bustype(n) == BusTypes.REF
+    ])
+end
 
-# Resolve ambiguity with the above two base cases
-_to_index_tuple(idx::NTuple{0}, lookup::NTuple{0}) = ()
-to_index(A::PowerNetworkMatrix, idx...) = _to_index_tuple(idx, A.lookup)
+# validate solver so be used for 
+function validate_linear_solver(linear_solver::String)
+    if linear_solver ∉ SUPPORTED_LINEAR_SOLVERS
+        error(
+            "Invalid linear solver. Supported linear solvers are: $(SUPPORTED_LINEAR_SOLVERS)",
+        )
+    end
+    return
+end
 
-# Doing `Colon() in idx` is relatively slow because it involves
-# a non-unrolled loop through the `idx` tuple which may be of
-# varying element type. Another lisp-y recursion trick fixes that
-has_colon(idx::Tuple{}) = false
-has_colon(idx::Tuple) = isa(first(idx), Colon) || has_colon(Base.tail(idx))
+# incidence matrix (A) evaluation ############################################
+function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
+    bus_lookup = _make_ax_ref(nodes)
+    slack_positions = find_slack_positions(nodes)
 
-# TODO: better error (or just handle correctly) when user tries to index with a range like a:b
-# The only kind of slicing we support is dropping a dimension with colons
-function Base.getindex(A::PowerNetworkMatrix, row, column)
-    #=
-    This is old code when we accepted idx... instead of row, column
-    if has_colon(idx)
-        PTDF(A.data[to_index(A,idx...)...], (ax for (i,ax) in enumerate(A.axes) if idx[i] == Colon())...)
+    A_I = Int32[]
+    A_J = Int32[]
+    A_V = Int8[]
+
+    # build incidence matrix A (lines x buses)
+    for (ix, b) in enumerate(branches)
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+
+        # change column number
+        push!(A_I, ix)
+        push!(A_J, fr_b)
+        push!(A_V, 1)
+
+        push!(A_I, ix)
+        push!(A_J, to_b)
+        push!(A_V, -1)
+    end
+
+    return SparseArrays.sparse(A_I, A_J, A_V), slack_positions
+end
+
+# BA matrix evaluation #######################################################
+function calculate_BA_matrix(
+    branches,
+    slack_positions::Vector{Int64},
+    bus_lookup::Dict{Int64, Int64})
+    BA_I = Int32[]
+    BA_J = Int32[]
+    BA_V = Float64[]
+
+    for (ix, b) in enumerate(branches)
+        if isa(b, PSY.DCBranch)
+            @warn("PTDF construction ignores DC-Lines")
+            continue
+        end
+
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+        b_val = PSY.get_series_susceptance(b)
+
+        if fr_b ∉ slack_positions[1]
+            check_ = sum(fr_b .> slack_positions[1])
+            push!(BA_I, ix)
+            push!(BA_J, fr_b - check_)
+            push!(BA_V, b_val)
+        end
+
+        if to_b ∉ slack_positions[1]
+            check_ = sum(to_b .> slack_positions[1])
+            push!(BA_I, ix)
+            push!(BA_J, to_b - check_)
+            push!(BA_V, -b_val)
+        end
+    end
+
+    BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
+
+    return BA
+end
+
+# ABA matrix evaluation ######################################################
+function calculate_ABA_matrix(
+    A::SparseArrays.SparseMatrixCSC{Int8, Int32},
+    BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
+    slack_positions::Vector{Int64})
+    return A[:, setdiff(1:end, slack_positions[1])]' * BA
+end
+
+# PTDF evaluation ############################################################
+function calculate_PTDF_matrix_KLU(
+    branches,
+    nodes::Vector{PSY.Bus},
+    dist_slack::Vector{Float64})
+    buscount = length(nodes)
+    linecount = length(branches)
+    A, slack_positions = calculate_A_matrix(branches, nodes)
+    bus_lookup = _make_ax_ref(nodes)
+
+    BA = calculate_BA_matrix(branches, slack_positions, bus_lookup)
+    ABA = calculate_ABA_matrix(A, BA, slack_positions)
+    K = klu(ABA)
+    Ix = Matrix(1.0LinearAlgebra.I, size(ABA, 1), size(ABA, 1))
+    ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
+    ldiv!(ABA_inv, K, Ix)
+    PTDFm = zeros(size(BA, 1), size(BA, 2) + 1)
+    slack_position = slack_positions[1]
+
+    if dist_slack[1] == 0.1 && length(dist_slack) == 1
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+    elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+        @info "Distributed bus"
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+        slack_array = dist_slack / sum(dist_slack)
+        slack_array = reshape(slack_array, buscount, 1)
+        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
+    elseif length(slack_position) == 0
+        @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
     else
-        return A.data[to_index(A,idx...)...]
+        @assert false
     end
-    =#
-    return A.data[to_index(A, row, column)...]
+
+    return PTDFm, A
 end
-Base.getindex(A::PowerNetworkMatrix, idx::CartesianIndex) = A.data[idx]
-Base.setindex!(A::PowerNetworkMatrix, v, idx...) = A.data[to_index(A, idx...)...] = v
-Base.setindex!(A::PowerNetworkMatrix, v, idx::CartesianIndex) = A.data[idx] = v
 
-Base.IndexStyle(::Type{PowerNetworkMatrix}) = IndexAnyCartesian()
+function calculate_PTDF_matrix_KLU(
+    A::IncidenceMatrix,
+    BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
+    dist_slack::Vector{Float64})
+    linecount = length(A.axes[1])
+    buscount = length(A.axes[2])
+    slack_positions = A.slack_positions
 
-########
-# Keys #
-########
+    ABA = calculate_ABA_matrix(A.data, BA, slack_positions)
+    K = klu(ABA)
+    Ix = Matrix(1.0I, size(ABA, 1), size(ABA, 1))
+    ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
+    ldiv!(ABA_inv, K, Ix)
+    PTDFm = zeros(size(BA, 1), size(BA, 2) + 1)
+    slack_position = slack_positions[1]
 
-struct PowerNetworkMatrixKey{T <: Tuple}
-    I::T
-end
-Base.getindex(k::PowerNetworkMatrixKey, args...) = getindex(k.I, args...)
-
-struct PowerNetworkMatrixKeys{T <: Tuple}
-    product_iter::Base.Iterators.ProductIterator{T}
-end
-Base.length(iter::PowerNetworkMatrixKeys) = length(iter.product_iter)
-function Base.eltype(iter::PowerNetworkMatrixKeys)
-    return PowerNetworkMatrixKey{eltype(iter.product_iter)}
-end
-function Base.iterate(iter::PowerNetworkMatrixKeys)
-    next = iterate(iter.product_iter)
-    return next === nothing ? nothing : (PowerNetworkMatrixKey(next[1]), next[2])
-end
-function Base.iterate(iter::PowerNetworkMatrixKeys, state)
-    next = iterate(iter.product_iter, state)
-    return next === nothing ? nothing : (PowerNetworkMatrixKey(next[1]), next[2])
-end
-function Base.keys(a::PowerNetworkMatrix)
-    return PowerNetworkMatrixKeys(Base.Iterators.product(a.axes...))
-end
-Base.getindex(a::PowerNetworkMatrix, k::PowerNetworkMatrixKey) = a[k.I...]
-
-########
-# Show #
-########
-
-# Adapted printing from JuMP's implementation of the Julia's show.jl
-# used in PowerNetworkMatrixs
-
-# Copyright (c) 2009-2016: Jeff Bezanson, Stefan Karpinski, Viral B. Shah,
-# and other contributors:
-#
-# https://github.com/JuliaLang/julia/contributors
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-
-function Base.summary(io::IO, A::PowerNetworkMatrix)
-    _summary(io, A)
-    for (k, ax) in enumerate(A.axes)
-        print(io, "    Dimension $k, ")
-        show(IOContext(io, :limit => true), ax)
-        println(io)
+    if dist_slack[1] == 0.1 && length(dist_slack) == 1
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+    elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+        @info "Distributed bus"
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+        slack_array = dist_slack / sum(dist_slack)
+        slack_array = reshape(slack_array, buscount, 1)
+        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
+    elseif length(slack_position) == 0
+        @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
+    else
+        @assert false
     end
-    print(io, "And data, a ", size(A.data))
-    return
-end
-_summary(io::IO, A::PowerNetworkMatrix) = println(io, "PowerNetworkMatrix")
 
-function Base.summary(
-    io::IOContext{Base.GenericIOBuffer{Array{UInt8, 1}}},
-    ::PowerNetworkMatrix,
-)
-    println(io, "PowerNetworkMatrix")
-    return
+    return PTDFm, A.data
 end
 
-function Base.summary(A::PowerNetworkMatrix)
-    io = IOBuffer()
-    Base.summary(io, A)
-    String(take!(io))
-    return
-end
+function calculate_PTDF_matrix_DENSE(
+    branches,
+    nodes::Vector{PSY.Bus},
+    dist_slack::Vector{Float64})
+    buscount = length(nodes)
+    linecount = length(branches)
+    bus_lookup = _make_ax_ref(nodes)
+    A = zeros(Float64, buscount, linecount)
+    inv_X = zeros(Float64, linecount, linecount)
 
-if isdefined(Base, :print_array) # 0.7 and later
-    Base.print_array(io::IO, X::PowerNetworkMatrix) = Base.print_matrix(io, X.data)
-end
-
-# n-dimensional arrays
-function Base.show_nd(
-    io::IO,
-    a::PowerNetworkMatrix,
-    print_matrix::Function,
-    label_slices::Bool,
-)
-    limit::Bool = get(io, :limit, false)
-    if isempty(a)
-        return
-    end
-    tailinds = Base.tail(Base.tail(axes(a.data)))
-    nd = ndims(a) - 2
-    for I in CartesianIndices(tailinds)
-        idxs = I.I
-        if limit
-            for i in 1:nd
-                ii = idxs[i]
-                ind = tailinds[i]
-                if length(ind) > 10
-                    if ii == ind[4] && all(d -> idxs[d] == first(tailinds[d]), 1:(i - 1))
-                        for j in (i + 1):nd
-                            szj = size(a.data, j + 2)
-                            indj = tailinds[j]
-                            if szj > 10 && first(indj) + 2 < idxs[j] <= last(indj) - 3
-                                @goto skip
-                            end
-                        end
-                        #println(io, idxs)
-                        print(io, "...\n\n")
-                        @goto skip
-                    end
-                    if ind[3] < ii <= ind[end - 3]
-                        @goto skip
-                    end
-                end
-            end
+    #build incidence matrix
+    for (ix, b) in enumerate(branches)
+        if isa(b, PSY.DCBranch)
+            @warn("PTDF construction ignores DC-Lines")
+            continue
         end
-        if label_slices
-            print(io, "[:, :, ")
-            for i in 1:(nd - 1)
-                show(io, a.axes[i + 2][idxs[i]])
-                print(io, ", ")
-            end
-            show(io, a.axes[end][idxs[end]])
-            println(io, "] =")
-        end
-        slice = view(a.data, axes(a.data, 1), axes(a.data, 2), idxs...)
-        Base.print_matrix(io, slice)
-        print(io, idxs == map(last, tailinds) ? "" : "\n\n")
-        @label skip
+
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+        A[fr_b, ix] = 1
+        A[to_b, ix] = -1
+
+        inv_X[ix, ix] = PSY.get_series_susceptance(b)
     end
+
+    slacks =
+        [bus_lookup[PSY.get_number(n)] for n in nodes if PSY.get_bustype(n) == BusTypes.REF]
+    isempty(slacks) && error("System must have a reference bus!")
+
+    slack_position = slacks[1]
+    B = gemm(
+        'N',
+        'T',
+        gemm('N', 'N', A[setdiff(1:end, slack_position), 1:end], inv_X),
+        A[setdiff(1:end, slack_position), 1:end],
+    )
+    # get LU factorization matrices
+    if dist_slack[1] == 0.1 && length(dist_slack) == 1
+        (B, bipiv, binfo) = getrf!(B)
+        binfo_check(binfo)
+        PTDFm = gemm(
+            'N',
+            'N',
+            gemm('N', 'T', inv_X, A[setdiff(1:end, slack_position), :]),
+            getri!(B, bipiv),
+        )
+        @views PTDFm =
+            hcat(
+                PTDFm[:, 1:(slack_position - 1)],
+                zeros(linecount),
+                PTDFm[:, slack_position:end],
+            )
+    elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+        @info "Distributed bus"
+        (B, bipiv, binfo) = getrf!(B)
+        binfo_check(binfo)
+        PTDFm = gemm(
+            'N',
+            'N',
+            gemm('N', 'T', inv_X, A[setdiff(1:end, slack_position), :]),
+            getri!(B, bipiv),
+        )
+        @views PTDFm =
+            hcat(
+                PTDFm[:, 1:(slack_position - 1)],
+                zeros(linecount),
+                PTDFm[:, slack_position:end],
+            )
+        slack_array = dist_slack / sum(dist_slack)
+        slack_array = reshape(slack_array, buscount, 1)
+        PTDFm =
+            PTDFm - gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
+    elseif length(slack_position) == 0
+        @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
+    else
+        @assert false
+    end
+
+    return PTDFm, A
 end
 
-function Base.show(io::IO, array::PowerNetworkMatrix)
-    summary(io, array)
-    isempty(array) && return
-    println(io, ":")
-    Base.print_array(io, array)
-    return
+# ! makes no sense since it requires the conversion of A and BA from sparse to dense
+# function calculate_PTDF_matrix_DENSE(
+#     A::IncidenceMatrix,
+#     BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
+#     dist_slack::Vector{Float64})
+
+#     linecount = length(A.axes[1])
+#     buscount = length(A.axes[2])
+#     slack_positions = A.slack_positions
+#     slack_position = slack_positions[1]
+#     ABA = gemm('T', 'N', A.data[:, setdiff(1:end, slack_positions[1])], BA)
+
+#     # evaluate ptdf matrix
+#     if dist_slack[1] == 0.1 && length(dist_slack) == 1
+#         (ABA, bipiv, binfo) = getrf!(ABA)
+#         binfo_check(binfo)
+#         PTDFm = gemm(
+#             'N',
+#             'N',
+#             BA,
+#             getri!(B, bipiv),
+#         )
+#         @views PTDFm =
+#             hcat(PTDFm[:, 1:(slack_position - 1)], zeros(linecount), PTDFm[:, slack_position:end])
+#     elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+#         @info "Distributed bus"
+#         (ABA, bipiv, binfo) = getrf!(ABA)
+#         binfo_check(binfo)
+#         PTDFm = gemm(
+#             'N',
+#             'N',
+#             BA,
+#             getri!(B, bipiv),
+#         )
+#         @views PTDFm =
+#             hcat(PTDFm[:, 1:(slack_position - 1)], zeros(linecount), PTDFm[:, slack_position:end])
+#         slack_array = dist_slack / sum(dist_slack)
+#         slack_array = reshape(slack_array, buscount, 1)
+#         PTDFm = PTDFm - gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
+#     elseif length(slack_position) == 0
+#         @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+#         PTDFm = Array{Float64, 2}(undef, linecount, buscount)
+#     else
+#         @assert false
+#     end
+
+#     return PTDFm, A.data
+# end
+
+function calculate_PTDF_matrix_MKLPardiso(
+    branches,
+    nodes::Vector{PSY.Bus},
+    dist_slack::Vector{Float64})
+
+    # initialize solver and number of threads to use
+    ENV["OPENBLAS_NUM_THREADS"] = 10
+    ENV["MKL_NUM_THREADS"] = 10
+    ps = Pardiso.MKLPardisoSolver()
+    set_num_threads(10)
+    Pardiso.set_nprocs!(ps, 10)
+
+    buscount = length(nodes)
+    linecount = length(branches)
+    A, slack_positions = calculate_A_matrix(branches, nodes)
+    bus_lookup = _make_ax_ref(nodes)
+
+    BA = calculate_BA_matrix(branches, slack_positions, bus_lookup)
+    ABA = calculate_ABA_matrix(A, BA, slack_positions)
+    Ix = Matrix(1.0I, size(ABA, 1), size(ABA, 1))
+    ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
+    Pardiso.solve!(ps, ABA_inv, ABA, Ix)
+    PTDFm = zeros(size(BA, 1), size(BA, 2) + 1)
+    slack_position = slack_positions[1]
+
+    if dist_slack[1] == 0.1 && length(dist_slack) == 1
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+    elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+        @info "Distributed bus"
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+        slack_array = dist_slack / sum(dist_slack)
+        slack_array = reshape(slack_array, buscount, 1)
+        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
+    elseif length(slack_position) == 0
+        @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
+    else
+        @assert false
+    end
+
+    return PTDFm, A
 end
 
-Base.to_index(b::PSY.Bus) = PSY.get_number(b)
-Base.to_index(b::T) where {T <: PSY.ACBranch} = PSY.get_name(b)
+function calculate_PTDF_matrix_MKLPardiso(
+    A::IncidenceMatrix,
+    BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
+    dist_slack::Vector{Float64})
 
-"""returns the raw array data of the `PowerNetworkMatrix`"""
-get_data(mat::PowerNetworkMatrix) = mat.data
+    # initialize solver and number of threads to use
+    ENV["OPENBLAS_NUM_THREADS"] = 10
+    ENV["MKL_NUM_THREADS"] = 10
+    ps = Pardiso.MKLPardisoSolver()
+    set_num_threads(10)
+    Pardiso.set_nprocs!(ps, 10)
 
-"""
-    returns the lookup tuple of the `PowerNetworkMatrix`. The first entry corresponds
-    to the first dimension and the second entry corresponds to the second dimension. For
-    instance in Ybus the first dimension is buses and second dimension is buses too, and in
-    PTDF the first dimension is branches and the second dimension is buses
-"""
-get_lookup(mat::PowerNetworkMatrix) = mat.lookup
+    linecount = length(A.axes[1])
+    buscount = length(A.axes[2])
+    slack_positions = A.slack_positions
+
+    ABA = calculate_ABA_matrix(A.data, BA, slack_positions)
+    Ix = Matrix(1.0I, size(ABA, 1), size(ABA, 1))
+    ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
+    Pardiso.solve!(ps, ABA_inv, ABA, Ix)
+    PTDFm = zeros(size(BA, 1), size(BA, 2) + 1)
+    slack_position = slack_positions[1]
+
+    if dist_slack[1] == 0.1 && length(dist_slack) == 1
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+    elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
+        @info "Distributed bus"
+        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+        slack_array = dist_slack / sum(dist_slack)
+        slack_array = reshape(slack_array, buscount, 1)
+        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
+    elseif length(slack_position) == 0
+        @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
+        PTDFm = Array{Float64, 2}(undef, linecount, buscount)
+    else
+        @assert false
+    end
+
+    return PTDFm, A.data
+end
