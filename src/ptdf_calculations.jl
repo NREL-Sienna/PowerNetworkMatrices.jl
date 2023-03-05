@@ -29,7 +29,6 @@ function _buildptdf(
     nodes::Vector{PSY.Bus},
     dist_slack::Vector{Float64},
     linear_solver::String = "Dense")
-
     if linear_solver == "KLU"
         PTDFm, A = calculate_PTDF_matrix_KLU(branches, nodes, dist_slack)
     elseif linear_solver == "Dense"
@@ -46,7 +45,6 @@ function _buildptdf(
     BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
     dist_slack::Vector{Float64},
     linear_solver::String)
-
     if linear_solver == "KLU"
         PTDFm, A = calculate_PTDF_matrix_KLU(A, BA, dist_slack)
     elseif linear_solver == "Dense"
@@ -92,7 +90,6 @@ function PTDF(
     sys::PSY.System,
     dist_slack::Vector{Float64} = [0.1];
     linear_solver::String = "Dense")
-
     branches = get_ac_branches(sys)
     nodes = get_buses(sys)
     validate_linear_solver(linear_solver)
@@ -107,7 +104,6 @@ function PTDF(
     BA::BA_Matrix,
     dist_slack::Vector{Float64} = [0.1];
     linear_solver = "Dense")
-
     validate_linear_solver(linear_solver)
     S, _ = _buildptdf(A, BA.data, dist_slack, linear_solver)
 

@@ -483,7 +483,7 @@ Ybus3_matpower[3, 3] = 1.379310344827586 - 16.351724137931036im
                 else
                     A = IncidenceMatrix(sys5)
                     BA = BA_Matrix(sys5)
-                    P5 = PTDF(A , BA; linear_solver = solver)
+                    P5 = PTDF(A, BA; linear_solver = solver)
                 end
             end
             @test isapprox(maximum(P5.data), maximum(S5_slackB4), atol = 1e-3)
@@ -496,7 +496,11 @@ Ybus3_matpower[3, 3] = 1.379310344827586 - 16.351724137931036im
 
             P5NS = PTDF([branches_5[b] for b in Br5NS_ids], [nodes_5[b] for b in Bu5NS_ids])
             for br in Br5NS_ids, b in Bu5NS_ids
-                @test isapprox(getindex(P5NS, string(br), b), S5_slackB4[br, b], atol = 1e-3)
+                @test isapprox(
+                    getindex(P5NS, string(br), b),
+                    S5_slackB4[br, b],
+                    atol = 1e-3,
+                )
             end
 
             PRTS = PTDF(RTS)
@@ -527,7 +531,11 @@ end
 
     L5NS = LODF([branches_5[b] for b in Br5NS_ids], [nodes_5[b] for b in Bu5NS_ids])
     for brf in Br5NS_ids, brt in Br5NS_ids
-        @test isapprox(getindex(L5NS, string(brf), string(brt)), Lodf_5[brf, brt], atol = 1e-3)
+        @test isapprox(
+            getindex(L5NS, string(brf), string(brt)),
+            Lodf_5[brf, brt],
+            atol = 1e-3,
+        )
     end
 end
 
