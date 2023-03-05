@@ -1,7 +1,7 @@
 name = "PowerNetworkMatrices"
 uuid = "bed98974-b02a-5e2f-9fe0-a103f5c450dd"
 authors = ["Jose Daniel Lara", "Sourabh Dalvi"]
-version = "0.1.1"
+version = "0.2.0"
 
 [deps]
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
