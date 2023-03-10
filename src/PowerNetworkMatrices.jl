@@ -1,6 +1,7 @@
 module PowerNetworkMatrices
 
 export PTDF
+export VirtualPTDF
 export IncidenceMatrix
 export BA_Matrix
 export Ybus
@@ -21,6 +22,7 @@ const PSY = PowerSystems
 
 import SparseArrays
 import KLU: klu
+import KLU
 import LinearAlgebra: LAPACK.getri!, LAPACK.getrf!, BLAS.gemm, BLAS.set_num_threads
 import LinearAlgebra: ldiv!, mul!, I
 import LinearAlgebra
@@ -40,5 +42,6 @@ include("definitions.jl")
 include("ptdf_calculations.jl")
 include("ybus_calculations.jl")
 include("lodf_calculations.jl")
+include("virtual_ptdf_calculations.jl")
 
 end
