@@ -22,8 +22,6 @@ function binfo_check(binfo::Int)
     return
 end
 
-# version 1: use same structure as already present ###########################
-
 function _buildptdf(
     branches,
     nodes::Vector{PSY.Bus},
@@ -38,6 +36,7 @@ function _buildptdf(
     end
 
     return PTDFm, A
+
 end
 
 function _buildptdf(
@@ -55,6 +54,8 @@ function _buildptdf(
 
     return PTDFm, A
 end
+
+# version 1: use same structure as already present ###########################
 
 """
 Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF array indexed with the bus numbers.
