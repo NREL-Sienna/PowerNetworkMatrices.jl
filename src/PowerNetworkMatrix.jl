@@ -104,6 +104,7 @@ function Base.getindex(A::PowerNetworkMatrix, row, column)
     return A.data[to_index(A, row, column)...]
 end
 Base.getindex(A::PowerNetworkMatrix, idx::CartesianIndex) = A.data[idx]
+Base.getindex(A::PowerNetworkMatrix, row::Integer, column::Integer) = A.data[row, column]
 Base.setindex!(A::PowerNetworkMatrix, v, idx...) = A.data[to_index(A, idx...)...] = v
 Base.setindex!(A::PowerNetworkMatrix, v, idx::CartesianIndex) = A.data[idx] = v
 

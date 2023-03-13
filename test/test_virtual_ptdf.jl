@@ -13,9 +13,6 @@ using PowerSystems
 using PowerSystemCaseBuilder
 using PowerNetworkMatrices
 using Base
-using KLU
-using SparseArrays
-import LinearAlgebra: ldiv!, mul!
 
 sys = System("ACTIVSg2000.m")
 
@@ -24,73 +21,92 @@ sys = System("ACTIVSg2000.m")
 # TODO: "setindex" must check if the given values are already contained, and to check that dimensions and name are correct (if ∈ axes)
 # TODO: put everything in a test file and in the functions directory
 
-# These below might not be needed
-function _buildptdf_columns(
-    K::KLU.KLUFactorization{Float64, Int32},
-    BA_row::SparseArrays.SparseVector{Float64, Int32})
-    # inizialize matrices for evaluation
-    col = zeros(length(BA_row))
-    ldiv!(col, K, BA_row)
+# Base.setindex!(A::VirtualPTDF, v, idx...) = A.data[to_index(A, idx...)...] = v
+# Base.setindex!(A::VirtualPTDF, v, idx::CartesianIndex) = A.data[idx] = v
 
-    return col
-end
+# check dimensions
+function _check_dimensions(vptdf::VirtualPTDF, v::Array{Float64})
 
-# functions to get indeces
-function _get_line_index(vptdf::VirtualPTDF, row::String)
-    row_ = findall(x->x==row, vptdf.axes[1])
-    if length(row_) > 1
-        error("multiple lines with the same name $row in vptdf.axes[1]")
-    else
-        row = row_[1]
+    row_len = size(vptdf, 2)
+    if length(array) != row_len
+        error("If useing array as imput, it must be the same lenght as the number of column of Matrix BA")
     end
-    return row
-end
 
-function _get_value(vptdf::VirtualPTDF, row::Union{Int, String}, column::Union{Int, Colon})
-    # get stored value if present
-    if !isempty(vptdf.data[1][row]) && !isempty(vptdf.data[2][row])
-        vptdf.data[3][row] =+ 1
-        if column isa Colon
-            return vptdf.data[2][row]
-        else
-            return vptdf.data[2][row][column]
-        end
-    else
-        return []
-    end
-end
-
-function Base.getindex(vptdf::VirtualPTDF, row::Union{Int, String}, column::Union{Int, Colon})
-    # at first get the index value if needed
-    if row isa String
-        row = _get_line_index(vptdf, row)
-    end
-    # at first check if value is in the cache
-    value_ = _get_value(vptdf, row, column)
-    if !isempty(value_)
-        return value_
-    else
-        # evaluate the value for the PTDF column
-        PTDF_row = _buildptdf_columns(vptdf.K, vptdf.BA[row, :])
-        # add slack bus value (zero)
-        PTDF_row = vcat(PTDF_row[1:vptdf.slack_positions[1]-1], [0], PTDF_row[vptdf.slack_positions[1]:end])
-        # add the valute in cache
-        vptdf.data[1][row] = vptdf.axes[1][row]
-        vptdf.data[2][row] = PTDF_row
-        vptdf.data[3][row] =+ 1
-        # return value
-        if column isa Colon
-            return PTDF_row
-        else
-            return PTDF_row[column]
-        end
-    end
 end
 
 # functions to set indeces
+"""
+Can allocate values (single number or entire row) in the PTDF matrix 
+(data[2]). 
+"""
+function Base.setindex!(vptdf::VirtualPTDF, v::Union{Float64, Array{Float64}}, row::Union{Integer, String}, column::Union{Integer, Colon})
+
+    # allocate line name
+    if row isa String
+        row = _get_line_index(vptdf, row)
+    end
+    vptdf.data[1][row] = vptdf.axes[1][row]
+
+    # allocate value/row
+    if length(v) > 1 && column isa Colon
+        # check if dimensions match
+        _check_dimensions(v)
+        vptdf.axes[2][row] = v
+    elseif length(v) == 1 && column isa Integer
+        if isempty(vptdf.axes[2][row])
+            error("Single element of each row can be modified only if row is already present")
+        else
+            vptdf.axes[2][row][column] = v
+        end
+    else
+        error("value(s) to allocate must either be a non-empty Float64 or Array{FLoat64}")
+    end
+    
+end
 
 ## tests #####################################################################
 
+# set values
+
+# first set values per each indexed line
+ptdf_complete = PTDF(sys; linear_solver="KLU")
+ptdf_virtual = VirtualPTDF(sys)
+
+# per each row
+for i in axes(ptdf_complete.data, 1)
+    for j in axes(ptdf_complete.data, 2)
+        # check values
+        setindex!(ptdf_virtual, ptdf_complete[i, j], i, j)
+    end
+end
+
+# per each element
+for i in axes(ptdf_complete.data, 1)
+    for j in axes(ptdf_complete.data, 2)
+        # check values
+        setindex!(ptdf_virtual, ptdf_complete[i, j], i, j)
+    end
+end
+
+# now check if they are the same
+count_ = 0
+for i in axes(ptdf_complete.data, 1)
+    for j in axes(ptdf_complete.data, 2)
+        # check values
+        if !isapprox(ptdf_complete[i, j], ptdf_virtual[i, j], atol=1e-10)
+            @show count_ =+ 1
+        end
+    end
+end
+
+
+
+# set values per each line name
+
+
+# now check if they are the same
+
+# get values
 ptdf_complete = PTDF(sys; linear_solver="KLU")
 ptdf_virtual = VirtualPTDF(sys)
 
