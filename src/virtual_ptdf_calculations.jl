@@ -10,7 +10,8 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, T <: Real} <: PowerNetworkMatrix{Re
     dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
-    data::Vector{Array{Union{String, Float64, Array{Float64}}}}
+    data::Vector{Vector}
+
 end
 
 function _build_virtualptdf(
@@ -39,13 +40,12 @@ function VirtualPTDF(
     dist_slack::Vector{Float64} = [0.1])
 
     #Get axis names
-    empty_cache = Array{Union{String, Float64, Array{Float64}}}[]
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
     look_up = (_make_ax_ref(line_ax), _make_ax_ref(bus_ax))
     BA, K, _, slack_positions = _build_virtualptdf(branches, nodes)
-
+    empty_cache = [["" for i in 1:size(BA,1)], [Float64[] for i in 1:size(BA,1)], zeros(Int32, size(BA,1))]
     return VirtualPTDF(K, BA, slack_positions, dist_slack, axes, look_up, empty_cache)
 
 end
@@ -104,7 +104,11 @@ end
 Base.size(vptdf::VirtualPTDF) = size(vptdf.BA)
 Base.eachindex(vptdf::VirtualPTDF) = CartesianIndices(size(vptdf.BA))
 
-# get data from indeces
+# get data from indeces or line name
+
+Base.getindex(vptdf::VirtualPTDF, idx::CartesianIndex) = vptdf.data[idx]
+# Base.getindex(vptdf::VirtualPTDF, rowname::String, bus::Int) = vptdf.data[rowname, bus]
+
 function Base.getindex(vptdf::VirtualPTDF, row, column)
     # Here is where the method has to implement the logic calculating the column
     # use the indexes to get the proper entry address
@@ -116,9 +120,8 @@ function Base.getindex(vptdf::VirtualPTDF, row, column)
     return
 end
 
-# # These below might not be needed
-Base.getindex(vptdf::VirtualPTDF, idx::CartesianIndex) = vptdf.data[idx]
-Base.getindex(vptdf::VirtualPTDF, rowname::String, bus::Int) = vptdf.data[rowname, bus]
+
+
 Base.setindex!(A::VirtualPTDF, v, idx...) = A.data[to_index(A, idx...)...] = v
 Base.setindex!(A::VirtualPTDF, v, idx::CartesianIndex) = A.data[idx] = v
 
