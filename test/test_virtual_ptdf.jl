@@ -18,12 +18,6 @@ sys = System("ACTIVSg2000.m")
 
 # test if adding data works
 
-# TODO: "setindex" must check if the given values are already contained, and to check that dimensions and name are correct (if ∈ axes)
-# TODO: put everything in a test file and in the functions directory
-
-# Base.setindex!(A::VirtualPTDF, v, idx...) = A.data[to_index(A, idx...)...] = v
-# Base.setindex!(A::VirtualPTDF, v, idx::CartesianIndex) = A.data[idx] = v
-
 # check dimensions
 function _check_dimensions(vptdf::VirtualPTDF, v::Array{Float64})
 
