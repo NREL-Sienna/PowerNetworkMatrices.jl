@@ -14,11 +14,11 @@ function get_bus_indices(branch, bus_lookup)
     return fr_b, to_b
 end
 
-function _make_ax_ref(buses::AbstractVector{PSY.Bus})
-    return _make_ax_ref(PSY.get_number.(buses))
+function make_ax_ref(buses::AbstractVector{PSY.Bus})
+    return make_ax_ref(PSY.get_number.(buses))
 end
 
-function _make_ax_ref(ax::AbstractVector)
+function make_ax_ref(ax::AbstractVector)
     ref = Dict{eltype(ax), Int}()
     for (ix, el) in enumerate(ax)
         if haskey(ref, el)

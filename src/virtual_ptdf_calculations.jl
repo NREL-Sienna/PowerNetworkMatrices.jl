@@ -20,7 +20,7 @@ function _build_virtualptdf(
     nodes::Vector{PSY.Bus})
     slack_positions = find_slack_positions(nodes)
     A, _ = calculate_A_matrix(branches, nodes)
-    BA = calculate_BA_matrix(branches, slack_positions, _make_ax_ref(nodes))
+    BA = calculate_BA_matrix(branches, slack_positions, make_ax_ref(nodes))
     ABA = calculate_ABA_matrix(A, BA, slack_positions)
     K = klu(ABA)
 
@@ -56,7 +56,7 @@ function VirtualPTDF(
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
-    look_up = (_make_ax_ref(line_ax), _make_ax_ref(bus_ax))
+    look_up = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
     BA, K, _, slack_positions = _build_virtualptdf(branches, nodes)
     empty_cache = Dict{String, Array{Flaot64}}()
     return VirtualPTDF(K, BA, slack_positions, dist_slack, axes, look_up, empty_cache, tol)

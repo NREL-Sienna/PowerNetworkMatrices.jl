@@ -239,7 +239,7 @@ function PTDF(
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
-    look_up = (_make_ax_ref(line_ax), _make_ax_ref(bus_ax))
+    look_up = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
     S, _ = _buildptdf(branches, nodes, look_up[2], dist_slack, linear_solver)
     return PTDF(S, axes, look_up, eps())
 end
