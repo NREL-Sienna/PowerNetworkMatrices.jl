@@ -14,11 +14,11 @@ function get_bus_indices(branch, bus_lookup)
     return fr_b, to_b
 end
 
-function _make_ax_ref(buses::AbstractVector{PSY.Bus})
-    return _make_ax_ref(PSY.get_number.(buses))
+function make_ax_ref(buses::AbstractVector{PSY.Bus})
+    return make_ax_ref(PSY.get_number.(buses))
 end
 
-function _make_ax_ref(ax::AbstractVector)
+function make_ax_ref(ax::AbstractVector)
     ref = Dict{eltype(ax), Int}()
     for (ix, el) in enumerate(ax)
         if haskey(ref, el)
@@ -93,15 +93,8 @@ has_colon(idx::Tuple) = isa(first(idx), Colon) || has_colon(Base.tail(idx))
 # TODO: better error (or just handle correctly) when user tries to index with a range like a:b
 # The only kind of slicing we support is dropping a dimension with colons
 function Base.getindex(A::PowerNetworkMatrix, row, column)
-    #=
-    This is old code when we accepted idx... instead of row, column
-    if has_colon(idx)
-        PTDF(A.data[to_index(A,idx...)...], (ax for (i,ax) in enumerate(A.axes) if idx[i] == Colon())...)
-    else
-        return A.data[to_index(A,idx...)...]
-    end
-    =#
-    return A.data[to_index(A, row, column)...]
+    i, j = to_index(A, row, column)
+    return A.data[i, j]
 end
 Base.getindex(A::PowerNetworkMatrix, idx::CartesianIndex) = A.data[idx]
 Base.setindex!(A::PowerNetworkMatrix, v, idx...) = A.data[to_index(A, idx...)...] = v
@@ -168,9 +161,10 @@ function Base.summary(io::IO, A::PowerNetworkMatrix)
         show(IOContext(io, :limit => true), ax)
         println(io)
     end
-    print(io, "And data, a ", size(A.data))
+    print(io, "And data, a ", size(A))
     return
 end
+
 _summary(io::IO, A::PowerNetworkMatrix) = println(io, "PowerNetworkMatrix")
 
 function Base.summary(

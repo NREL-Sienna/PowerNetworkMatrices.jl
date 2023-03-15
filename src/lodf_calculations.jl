@@ -8,24 +8,32 @@ struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     lookup::L
 end
 
-function _buildlodf(branches, nodes, dist_slack::Array{Float64} = [0.1])
-    linecount = length(branches)
-    ptdf, a = _buildptdf(branches, nodes, dist_slack)
-    H = gemm('N', 'N', ptdf, a)
-    ptdf_denominator = H
+function _buildlodf(
+    branches,
+    nodes::Vector{PSY.Bus},
+    bus_lookup::Dict{Int, Int},
+    dist_slack::Array{Float64},
+)
+    ptdf, a = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
+    return _buildlodf(a, ptdf)
+end
+
+function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int32}, ptdf::Matrix{Float64})
+    linecount = size(ptdf, 1)
+    ptdf_denominator = ptdf * transpose(a)
     for iline in 1:linecount
         if (1.0 - ptdf_denominator[iline, iline]) < 1.0E-06
             ptdf_denominator[iline, iline] = 0.0
         end
     end
     (Dem, dipiv, dinfo) = getrf!(
-        Matrix{Float64}(LinearAlgebra.I, linecount, linecount) -
+        Matrix{Float64}(1.0I, linecount, linecount) -
         Array(LinearAlgebra.Diagonal(ptdf_denominator)),
     )
-    lodf = gemm('N', 'N', H, getri!(Dem, dipiv))
+    lodf = gemm('N', 'N', ptdf_denominator, getri!(Dem, dipiv))
     lodf =
         lodf - Array(LinearAlgebra.Diagonal(lodf)) -
-        Matrix{Float64}(LinearAlgebra.I, linecount, linecount)
+        Matrix{Float64}(1.0I, linecount, linecount)
     return lodf
 end
 
@@ -36,15 +44,14 @@ Builds the LODF matrix from a group of branches and nodes. The return is a LOLDF
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-function LODF(branches, nodes, dist_slack::Vector{Float64} = [0.1])
+function LODF(branches, nodes::Vector{PSY.Bus}, dist_slack::Vector{Float64} = Float64[])
 
     #Get axis names
     line_ax = [branch.name for branch in branches]
-    lodf = _buildlodf(branches, nodes, dist_slack)
-
     axes = (line_ax, line_ax)
-    look_up = (_make_ax_ref(line_ax), _make_ax_ref(line_ax))
-
+    look_up = (make_ax_ref(line_ax), make_ax_ref(line_ax))
+    bus_ax = [PSY.get_number(bus) for bus in nodes]
+    lodf = _buildlodf(branches, nodes, make_ax_ref(bus_ax), dist_slack)
     return LODF(lodf, axes, look_up)
 end
 
@@ -55,7 +62,7 @@ Builds the LODF matrix from a system. The return is a LOLDF array indexed with t
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-function LODF(sys::PSY.System, dist_slack::Vector{Float64} = [0.1])
+function LODF(sys::PSY.System, dist_slack::Vector{Float64} = Float64[])
     branches = sort!(
         collect(PSY.get_components(PSY.ACBranch, sys));
         by = x ->
@@ -63,4 +70,13 @@ function LODF(sys::PSY.System, dist_slack::Vector{Float64} = [0.1])
     )
     nodes = sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
     return LODF(branches, nodes, dist_slack)
+end
+
+function LODF(
+    A::IncidenceMatrix,
+    PTDFm::PTDF,
+)
+    _buildlodf(A.data, PTDFm.data)
+    ax_ref = make_ax_ref(A.axes[1])
+    return LODF(_buildlodf(A.data, PTDFm.data), (A.axes[1], A.axes[1]), (ax_ref, ax_ref))
 end
