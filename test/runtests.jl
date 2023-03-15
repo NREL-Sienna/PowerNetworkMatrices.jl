@@ -20,6 +20,8 @@ Aqua.test_ambiguities(PowerNetworkMatrices)
 Aqua.test_stale_deps(PowerNetworkMatrices)
 Aqua.test_deps_compat(PowerNetworkMatrices)
 
+include("testing_data.jl")
+
 LOG_FILE = "power-systems.log"
 LOG_LEVELS = Dict(
     "Debug" => Logging.Debug,
