@@ -23,15 +23,15 @@ function _check_dimensions(vptdf::VirtualPTDF, v::Array{Float64})
 
     row_len = size(vptdf, 2)
     if length(array) != row_len
-        error("If useing array as imput, it must be the same lenght as the number of column of Matrix BA")
+        error("If using array as imput, it must be the same lenght as the number of column of Matrix BA")
     end
 
 end
 
 # functions to set indeces
 """
-Can allocate values (single number or entire row) in the PTDF matrix 
-(data[2]). 
+Can allocate values (single number or entire row) in the PTDF matrix
+(data[2]).
 """
 function Base.setindex!(vptdf::VirtualPTDF, v::Union{Float64, Array{Float64}}, row::Union{Integer, String}, column::Union{Integer, Colon})
 
@@ -55,7 +55,7 @@ function Base.setindex!(vptdf::VirtualPTDF, v::Union{Float64, Array{Float64}}, r
     else
         error("value(s) to allocate must either be a non-empty Float64 or Array{FLoat64}")
     end
-    
+
 end
 
 ## tests #####################################################################
