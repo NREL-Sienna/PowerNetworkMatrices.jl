@@ -8,11 +8,12 @@ struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     lookup::L
 end
 
-function _buildlodf(branches, nodes, dist_slack::Array{Float64} = [0.1])
+function _buildlodf(branches, nodes, bus_lookup::Dict{Int, Int}, dist_slack::Array{Float64} = [0.1])
     linecount = length(branches)
-    ptdf, a = _buildptdf(branches, nodes, dist_slack)
-    H = gemm('N', 'N', ptdf, a)
-    ptdf_denominator = H
+    ptdf, a = calculate_PTDF_matrix_DENSE(branches, nodes, bus_lookup, dist_slack)
+    @error size(a)
+    ptdf_denominator = ptdf*a
+    #ptdf_denominator = gemm('N', 'N', ptdf, Matrix{Float64}(a))
     for iline in 1:linecount
         if (1.0 - ptdf_denominator[iline, iline]) < 1.0E-06
             ptdf_denominator[iline, iline] = 0.0
@@ -40,11 +41,10 @@ function LODF(branches, nodes, dist_slack::Vector{Float64} = [0.1])
 
     #Get axis names
     line_ax = [branch.name for branch in branches]
-    lodf = _buildlodf(branches, nodes, dist_slack)
-
     axes = (line_ax, line_ax)
-    look_up = (_make_ax_ref(line_ax), _make_ax_ref(line_ax))
-
+    look_up = (make_ax_ref(line_ax), make_ax_ref(line_ax))
+    bus_ax = [PSY.get_number(bus) for bus in nodes]
+    lodf = _buildlodf(branches, nodes, make_ax_ref(bus_ax), dist_slack)
     return LODF(lodf, axes, look_up)
 end
 
