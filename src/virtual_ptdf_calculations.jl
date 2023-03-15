@@ -110,12 +110,13 @@ function _get_value(vptdf::VirtualPTDF, row::Int)
     end
 end
 
-function Base.getindex(
-    vptdf::VirtualPTDF,
-    row::String,
-    column::Union{Int, Colon},
-)
+function Base.getindex(vptdf::VirtualPTDF, row, column)
     row, column = to_index(vptdf, row, column)
+    return _getindex(vptdf, row, column)
+end
+
+# Define for ambiguity resolution
+function Base.getindex(vptdf::VirtualPTDF, row::Integer, column::Integer)
     return _getindex(vptdf, row, column)
 end
 
