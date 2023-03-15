@@ -5,46 +5,8 @@ include(joinpath(DATA_DIR, "psy_data", "data_5bus_pu.jl"))
 include(joinpath(DATA_DIR, "psy_data", "data_14bus_pu.jl"))
 
 # The 5-bus case from PowerModels data is modified to include 2 phase shifters
-sys = PSB.build_system(PSB.MatpowerTestSystems, "matpower_case5_sys")
-sys5 = PSB.build_system(PSB.MatpowerTestSystems, "matpower_case5_sys")
-sys14 = PSB.build_system(PSB.MatpowerTestSystems, "matpower_case5_sys")
+
 RTS = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys");
-
-# set same branches between "data_5bus_pu.jl" and "sys"
-PSY.remove_components!(PhaseShiftingTransformer, sys5)
-PSY.remove_components!(Line, sys5)
-PSY.remove_components!(Bus, sys5)
-PSY.remove_components!(ThermalStandard, sys5)
-PSY.remove_components!(PowerLoad, sys5)
-PSY.remove_components!(LoadZone, sys5)
-PSY.remove_components!(Area, sys5)
-PSY.remove_components!(Arc, sys5)
-nodes_5 = nodes5()
-for nd in nodes_5
-    add_component!(sys5, nd)
-end
-branches_5 = branches5(nodes_5)
-for br in branches_5
-    add_component!(sys5, br)
-end
-
-# do the same for case with 14 buses
-PSY.remove_components!(PhaseShiftingTransformer, sys14)
-PSY.remove_components!(Line, sys14)
-PSY.remove_components!(Bus, sys14)
-PSY.remove_components!(ThermalStandard, sys14)
-PSY.remove_components!(PowerLoad, sys14)
-PSY.remove_components!(LoadZone, sys14)
-PSY.remove_components!(Area, sys14)
-PSY.remove_components!(Arc, sys14)
-nodes_14 = nodes14()
-for nd in nodes_14
-    add_component!(sys14, nd)
-end
-branches_14 = branches14(nodes_14)
-for br in branches_14
-    add_component!(sys14, br)
-end
 
 # mixed up ids for data_5bus_pu
 Br5NS_ids = [2, 3, 5, 1, 4, 6]
