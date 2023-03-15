@@ -1,3 +1,5 @@
+# TODO: add descriptions to functions
+
 """
 Power Transfer Distribution Factors (PTDF) indicate the incremental change in real power that occurs on transmission lines due to real power injections changes at the buses.
 
