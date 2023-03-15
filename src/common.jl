@@ -2,13 +2,13 @@
 function get_ac_branches(sys::PSY.System)
     # Filter out DC Branches here
     return sort!(
-        collect(PSY.get_components(PSY.ACBranch, sys));
+        collect(PSY.get_components(PSY.get_available, PSY.ACBranch, sys));
         by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
     )
 end
 
 # get buses from system
-function get_buses(sys::PSY.System)
+function get_buses(sys::PSY.System)::Vector{PSY.Bus}
     return sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
 end
 
