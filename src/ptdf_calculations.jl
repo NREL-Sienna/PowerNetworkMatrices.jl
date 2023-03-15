@@ -55,7 +55,6 @@ function _calculate_PTDF_matrix_KLU(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int32},
     slack_positions::Vector{Int64},
     dist_slack::Vector{Float64})
-
     linecount = size(BA, 1)
     buscount = size(BA, 2)
 
