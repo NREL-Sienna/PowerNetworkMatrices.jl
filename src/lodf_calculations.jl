@@ -14,8 +14,12 @@ function _buildlodf(
     bus_lookup::Dict{Int, Int},
     dist_slack::Array{Float64},
 )
-    linecount = length(branches)
     ptdf, a = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
+    return _buildlodf(a, ptdf)
+end
+
+function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int32}, ptdf::Matrix{Float64})
+    linecount = size(ptdf,1)
     ptdf_denominator = ptdf * transpose(a)
     for iline in 1:linecount
         if (1.0 - ptdf_denominator[iline, iline]) < 1.0E-06
@@ -23,13 +27,13 @@ function _buildlodf(
         end
     end
     (Dem, dipiv, dinfo) = getrf!(
-        Matrix{Float64}(LinearAlgebra.I, linecount, linecount) -
+        Matrix{Float64}(1.0I, linecount, linecount) -
         Array(LinearAlgebra.Diagonal(ptdf_denominator)),
     )
     lodf = gemm('N', 'N', ptdf_denominator, getri!(Dem, dipiv))
     lodf =
         lodf - Array(LinearAlgebra.Diagonal(lodf)) -
-        Matrix{Float64}(LinearAlgebra.I, linecount, linecount)
+        Matrix{Float64}(1.0I, linecount, linecount)
     return lodf
 end
 
@@ -66,4 +70,13 @@ function LODF(sys::PSY.System, dist_slack::Vector{Float64} = Float64[])
     )
     nodes = sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
     return LODF(branches, nodes, dist_slack)
+end
+
+function LODF(
+    A::IncidenceMatrix,
+    PTDFm::PTDF,
+    )
+    _buildlodf(A.data, PTDFm.data)
+    ax_ref = make_ax_ref(A.axes[1])
+    return LODF(_buildlodf(A.data, PTDFm.data), (A.axes[1], A.axes[1]), (ax_ref, ax_ref))
 end
