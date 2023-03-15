@@ -15,10 +15,14 @@ end
 # get slack bus
 function find_slack_positions(nodes)
     bus_lookup = make_ax_ref(nodes)
-    return sort([
+    slack_position = sort([
         bus_lookup[PSY.get_number(n)]
         for n in nodes if PSY.get_bustype(n) == BusTypes.REF
     ])
+    if length(slack_position) == 0
+        error("Slack bus not identified in the Bus/Nodes list, can't build NetworkMatrix")
+    end
+    return slack_position
 end
 
 # validate solver so be used for
