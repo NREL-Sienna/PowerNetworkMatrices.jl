@@ -3,14 +3,15 @@ Power Transfer Distribution Factors (PTDF) indicate the incremental change in re
 
 The PTDF struct is indexed using the Bus numbers and branch names
 """
-struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, T <: Real} <: PowerNetworkMatrix{Real}
+struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int32}
-    BA::SparseArrays.SparseMatrixCSC{T, Int32}
+    BA::SparseArrays.SparseMatrixCSC{Float64, Int32}
     slack_positions::Vector{Int64}
     dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
-    data::Dict{String, Array{Float64}}
+    temp_data::Vector{Float64}
+    cache::Dict{String, Array{Float64}}
     tol::Float64
 end
 
@@ -155,4 +156,4 @@ end
 
 # ! change it so to get only the non-empty values
 
-get_data(mat::PowerNetworkMatrix) = mat.data
+get_data(mat::VirtualPTDF) = mat.cache
