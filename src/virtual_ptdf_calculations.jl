@@ -24,7 +24,7 @@ function _build_virtualptdf(
     ABA = calculate_ABA_matrix(A, BA, slack_positions)
     K = klu(ABA)
 
-    return BA, K , A, slack_positions
+    return BA, K, A, slack_positions
 end
 
 function _buildptdf_row(
@@ -60,7 +60,6 @@ function VirtualPTDF(
     BA, K, _, slack_positions = _build_virtualptdf(branches, nodes)
     empty_cache = Dict{String, Array{Flaot64}}()
     return VirtualPTDF(K, BA, slack_positions, dist_slack, axes, look_up, empty_cache, tol)
-
 end
 
 # !
@@ -98,7 +97,7 @@ Base.eachindex(vptdf::VirtualPTDF) = CartesianIndices(size(vptdf.BA))
 
 # Get indices
 function _get_line_index(vptdf::VirtualPTDF, row::String)
-    row_ = findall(x->x==row, vptdf.axes[1])
+    row_ = findall(x -> x == row, vptdf.axes[1])
     if length(row_) > 1
         error("multiple lines with the same name $row in vptdf.axes[1]")
     elseif length(row_) > 1
@@ -116,7 +115,11 @@ function _get_value(vptdf::VirtualPTDF, branch::String, column::Union{Int, Colon
     end
 end
 
-function Base.getindex(vptdf::VirtualPTDF, row::Union{Int, String}, column::Union{Int, Colon})
+function Base.getindex(
+    vptdf::VirtualPTDF,
+    row::Union{Int, String},
+    column::Union{Int, Colon},
+)
 
     # ! add tolerance field --> initialize as Float64 (round number below this to zero)
     # ! it is imported by vptdf
@@ -133,7 +136,11 @@ function Base.getindex(vptdf::VirtualPTDF, row::Union{Int, String}, column::Unio
         # evaluate the value for the PTDF column
         PTDF_row = _buildptdf_row(vptdf.K, vptdf.BA[row, :])
         # add slack bus value (zero)
-        PTDF_row = vcat(PTDF_row[1:vptdf.slack_positions[1]-1], [0], PTDF_row[vptdf.slack_positions[1]:end])
+        PTDF_row = vcat(
+            PTDF_row[1:(vptdf.slack_positions[1] - 1)],
+            [0],
+            PTDF_row[vptdf.slack_positions[1]:end],
+        )
         # add the valute in cache
         vptdf.data[1][row] = vptdf.axes[1][row]
         vptdf.data[2][row] = PTDF_row

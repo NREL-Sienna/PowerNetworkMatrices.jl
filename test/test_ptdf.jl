@@ -1,4 +1,3 @@
-include("test_data.jl")
 @testset "PTDF matrices" begin
     for solver in ["KLU", "Dense", "MKLPardiso"]
         for approach in ["standard", "separate_matrices"]
