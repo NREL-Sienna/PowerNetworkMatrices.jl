@@ -22,7 +22,6 @@ Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF 
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-# !
 function VirtualPTDF(
     branches,
     nodes::Vector{PSY.Bus},
@@ -52,7 +51,6 @@ function VirtualPTDF(
     )
 end
 
-# !
 """
 Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
 
@@ -60,7 +58,6 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-# !
 function VirtualPTDF(
     sys::PSY.System,
     dist_slack::Vector{Float64} = [0.1])
