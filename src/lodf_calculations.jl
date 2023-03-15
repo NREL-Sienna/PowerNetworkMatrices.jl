@@ -10,9 +10,9 @@ end
 
 function _buildlodf(
     branches,
-    nodes,
+    nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    dist_slack::Array{Float64} = [0.1],
+    dist_slack::Array{Float64},
 )
     linecount = length(branches)
     ptdf, a = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
@@ -40,7 +40,7 @@ Builds the LODF matrix from a group of branches and nodes. The return is a LOLDF
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-function LODF(branches, nodes, dist_slack::Vector{Float64} = [0.1])
+function LODF(branches, nodes::Vector{PSY.Bus}, dist_slack::Vector{Float64} = Float64[])
 
     #Get axis names
     line_ax = [branch.name for branch in branches]
@@ -58,7 +58,7 @@ Builds the LODF matrix from a system. The return is a LOLDF array indexed with t
 - `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
     The distributed slack vector has to be the same length as the number of buses
 """
-function LODF(sys::PSY.System, dist_slack::Vector{Float64} = [0.1])
+function LODF(sys::PSY.System, dist_slack::Vector{Float64} = Float64[])
     branches = sort!(
         collect(PSY.get_components(PSY.ACBranch, sys));
         by = x ->
