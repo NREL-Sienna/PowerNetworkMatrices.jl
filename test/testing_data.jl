@@ -8,11 +8,7 @@ include(joinpath(DATA_DIR, "psy_data", "data_14bus_pu.jl"))
 sys = PSB.build_system(PSB.MatpowerTestSystems, "matpower_case5_sys")
 sys5 = PSB.build_system(PSB.MatpowerTestSystems, "matpower_case5_sys")
 sys14 = PSB.build_system(PSB.MatpowerTestSystems, "matpower_case5_sys")
-RTS = PSB.build_system(
-    PSB.PSITestSystems,
-    "test_RTS_GMLC_sys";
-    force_build = true,
-);
+RTS = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys");
 
 # set same branches between "data_5bus_pu.jl" and "sys"
 PSY.remove_components!(PhaseShiftingTransformer, sys5)
