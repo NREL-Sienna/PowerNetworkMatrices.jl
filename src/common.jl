@@ -14,7 +14,7 @@ end
 
 # get slack bus
 function find_slack_positions(nodes)
-    bus_lookup = _make_ax_ref(nodes)
+    bus_lookup = make_ax_ref(nodes)
     return sort([
         bus_lookup[PSY.get_number(n)]
         for n in nodes if PSY.get_bustype(n) == BusTypes.REF
@@ -33,7 +33,7 @@ end
 
 # incidence matrix (A) evaluation ############################################
 function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
-    bus_lookup = _make_ax_ref(nodes)
+    bus_lookup = make_ax_ref(nodes)
     slack_positions = find_slack_positions(nodes)
 
     A_I = Int32[]

@@ -23,6 +23,6 @@ function IncidenceMatrix(sys::PSY.System)
     bus_ax = [PSY.get_number(bus) for bus in buses]
     data, slack_positions = calculate_A_matrix(branches, buses)
     axes = (line_ax, bus_ax)
-    lookup = (_make_ax_ref(line_ax), _make_ax_ref(bus_ax))
+    lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
     return IncidenceMatrix(data, axes, lookup, slack_positions)
 end
