@@ -140,9 +140,7 @@ function _getindex(
     end
 end
 
-# Get indices
-# Base.setindex!(A::VirtualPTDF, v, idx...) = A.data[to_index(A, idx...)...] = v
-# Base.setindex!(A::VirtualPTDF, v, idx::CartesianIndex) = A.data[idx] = v
+Base.setindex!(A::VirtualPTDF, v, idx...) = error("Operation not supported by VirtualPTDF")
 
 """ PTDF data is stored in the the cache
     it is a nested vecotr containing an array for the names of each row,
