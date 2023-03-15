@@ -1,21 +1,21 @@
-# include("test_data.jl")
+@testset "Virtual PTDF matrices" begin
+    sys = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys")
+    ptdf_complete = PTDF(sys; linear_solver = "KLU")
+    ptdf_virtual = VirtualPTDF(sys)
 
-# @testset "Test indexing methods" begin
-# end
+    for i in axes(ptdf_complete, 1)
+        comp = ptdf_complete[i, :]
+        virtual = ptdf_virtual[i, :]
+        for j in axes(ptdf_complete, 2)
+            # check values using PTDFs axes
+            @test isapprox(ptdf_complete[i, j], ptdf_virtual[i, j]; atol = 1e-10)
+        end
+    end
+    # Check the cache is populated
+    @test length(ptdf_virtual.cache) == length(ptdf_virtual.axes[1])
+end
 
-# @testset "Test actual numbers" begin
-# end
-
-# first test on the vPTDF construction
-
-using Revise
-using PowerSystems
-using PowerSystemCaseBuilder
-using PowerNetworkMatrices
-using Base
-
-sys = System("ACTIVSg2000.m")
-
+#=
 # test if adding data works
 
 # check dimensions
@@ -145,3 +145,4 @@ no differences
 new_ptdf = reduce(vcat, transpose.(ptdf_virtual.data[2]))
 old_ptds = ptdf_complete.data
 isapprox(new_ptdf, old_ptds; atol = 1e-10)
+=#
