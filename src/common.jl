@@ -31,6 +31,19 @@ function validate_linear_solver(linear_solver::String)
     return
 end
 
+function _binfo_check(binfo::Int)
+    if binfo != 0
+        if binfo < 0
+            error("Illegal Argument in Inputs")
+        elseif binfo > 0
+            error("Singular value in factorization. Possibly there is an islanded bus")
+        else
+            @assert false
+        end
+    end
+    return
+end
+
 # incidence matrix (A) evaluation ############################################
 function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
     bus_lookup = _make_ax_ref(nodes)
@@ -212,7 +225,7 @@ function calculate_PTDF_matrix_DENSE(
     # get LU factorization matrices
     if dist_slack[1] == 0.1 && length(dist_slack) == 1
         (B, bipiv, binfo) = getrf!(B)
-        binfo_check(binfo)
+        _binfo_check(binfo)
         PTDFm = gemm(
             'N',
             'N',
@@ -228,7 +241,7 @@ function calculate_PTDF_matrix_DENSE(
     elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
         @info "Distributed bus"
         (B, bipiv, binfo) = getrf!(B)
-        binfo_check(binfo)
+        _binfo_check(binfo)
         PTDFm = gemm(
             'N',
             'N',
