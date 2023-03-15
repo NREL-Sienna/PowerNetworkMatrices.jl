@@ -20,12 +20,12 @@ sys = System("ACTIVSg2000.m")
 
 # check dimensions
 function _check_dimensions(vptdf::VirtualPTDF, v::Array{Float64})
-
     row_len = size(vptdf, 2)
     if length(array) != row_len
-        error("If using array as imput, it must be the same lenght as the number of column of Matrix BA")
+        error(
+            "If using array as imput, it must be the same lenght as the number of column of Matrix BA",
+        )
     end
-
 end
 
 # functions to set indeces
@@ -33,7 +33,12 @@ end
 Can allocate values (single number or entire row) in the PTDF matrix
 (data[2]).
 """
-function Base.setindex!(vptdf::VirtualPTDF, v::Union{Float64, Array{Float64}}, row::Union{Integer, String}, column::Union{Integer, Colon})
+function Base.setindex!(
+    vptdf::VirtualPTDF,
+    v::Union{Float64, Array{Float64}},
+    row::Union{Integer, String},
+    column::Union{Integer, Colon},
+)
 
     # allocate line name
     if row isa String
@@ -48,14 +53,15 @@ function Base.setindex!(vptdf::VirtualPTDF, v::Union{Float64, Array{Float64}}, r
         vptdf.axes[2][row] = v
     elseif length(v) == 1 && column isa Integer
         if isempty(vptdf.axes[2][row])
-            error("Single element of each row can be modified only if row is already present")
+            error(
+                "Single element of each row can be modified only if row is already present",
+            )
         else
             vptdf.axes[2][row][column] = v
         end
     else
         error("value(s) to allocate must either be a non-empty Float64 or Array{FLoat64}")
     end
-
 end
 
 ## tests #####################################################################
@@ -63,7 +69,7 @@ end
 # set values
 
 # first set values per each indexed line
-ptdf_complete = PTDF(sys; linear_solver="KLU")
+ptdf_complete = PTDF(sys; linear_solver = "KLU")
 ptdf_virtual = VirtualPTDF(sys)
 
 # per each row
@@ -87,29 +93,26 @@ count_ = 0
 for i in axes(ptdf_complete.data, 1)
     for j in axes(ptdf_complete.data, 2)
         # check values
-        if !isapprox(ptdf_complete[i, j], ptdf_virtual[i, j], atol=1e-10)
-            @show count_ =+ 1
+        if !isapprox(ptdf_complete[i, j], ptdf_virtual[i, j]; atol = 1e-10)
+            @show count_ = +1
         end
     end
 end
 
-
-
 # set values per each line name
-
 
 # now check if they are the same
 
 # get values
-ptdf_complete = PTDF(sys; linear_solver="KLU")
+ptdf_complete = PTDF(sys; linear_solver = "KLU")
 ptdf_virtual = VirtualPTDF(sys)
 
 count_ = 0
 for i in axes(ptdf_complete.data, 1)
     for j in axes(ptdf_complete.data, 2)
         # check values
-        if !isapprox(ptdf_complete.data[i, j], ptdf_virtual[i, j], atol=1e-10)
-            @show count_ =+ 1
+        if !isapprox(ptdf_complete.data[i, j], ptdf_virtual[i, j]; atol = 1e-10)
+            @show count_ = +1
             # @show ptdf_complete.data[i, j] - ptdf_virtual[i, j]
         end
     end
@@ -119,8 +122,8 @@ ptdf_virtual = VirtualPTDF(sys)
 count1_ = 0
 for i in axes(ptdf_complete.data, 1)
     # check values
-    if !isapprox(ptdf_complete.data[i, :], ptdf_virtual[i, :], atol=1e-10)
-        @show count1_ =+ 1
+    if !isapprox(ptdf_complete.data[i, :], ptdf_virtual[i, :]; atol = 1e-10)
+        @show count1_ = +1
         # @show ptdf_complete.data[i, j] - ptdf_virtual[i, j]
     end
 end
@@ -128,8 +131,8 @@ end
 ptdf_virtual = VirtualPTDF(sys)
 count2_ = 0
 for (i, name) in enumerate(ptdf_complete.axes[1])
-    if !isapprox(ptdf_complete.data[i, :], ptdf_virtual[name, :], atol=1e-10)
-        @show count2_ =+ 1
+    if !isapprox(ptdf_complete.data[i, :], ptdf_virtual[name, :]; atol = 1e-10)
+        @show count2_ = +1
         # @show ptdf_complete.data[i, j] - ptdf_virtual[i, j]
     end
 end
@@ -139,6 +142,6 @@ no differences
 """
 
 # final check on entire matrix
-new_ptdf = reduce(vcat,transpose.(ptdf_virtual.data[2]))
+new_ptdf = reduce(vcat, transpose.(ptdf_virtual.data[2]))
 old_ptds = ptdf_complete.data
-isapprox(new_ptdf, old_ptds, atol=1e-10)
+isapprox(new_ptdf, old_ptds; atol = 1e-10)

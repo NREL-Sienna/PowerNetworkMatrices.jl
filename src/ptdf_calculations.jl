@@ -25,7 +25,6 @@ function _buildptdf(
     end
 
     return PTDFm, A
-
 end
 
 function _buildptdf_from_matrices(
@@ -37,7 +36,12 @@ function _buildptdf_from_matrices(
         PTDFm = _calculate_PTDF_matrix_KLU(A.data, BA, A.slack_positions, dist_slack)
     elseif linear_solver == "Dense"
         # Convert SparseMatrices to Dense
-        PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A.data), Matrix(BA), A.slack_positions, dist_slack)
+        PTDFm = _calculate_PTDF_matrix_DENSE(
+            Matrix(A.data),
+            Matrix(BA),
+            A.slack_positions,
+            dist_slack,
+        )
     elseif linear_solver == "MKLPardiso"
         PTDFm = _calculate_PTDF_matrix_MKLPardiso(A.data, BA, A.slack_positions, dist_slack)
     end
@@ -51,7 +55,6 @@ function _calculate_PTDF_matrix_KLU(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int32},
     slack_positions::Vector{Int64},
     dist_slack::Vector{Float64})
-
     linecount = size(BA, 1)
     buscount = size(BA, 2)
 
@@ -177,7 +180,6 @@ function _calculate_PTDF_matrix_MKLPardiso(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int32},
     slack_positions::Vector{Int64},
     dist_slack::Vector{Float64})
-
     ps = Pardiso.MKLPardisoSolver()
 
     linecount = size(BA, 1)
@@ -213,7 +215,6 @@ function calculate_PTDF_matrix_MKLPardiso(
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int64, Int64},
     dist_slack::Vector{Float64})
-
     A, slack_positions = calculate_A_matrix(branches, nodes)
     BA = calculate_BA_matrix(branches, slack_positions, bus_lookup)
     PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, slack_positions, dist_slack)
