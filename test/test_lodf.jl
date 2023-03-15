@@ -1,6 +1,7 @@
 @testset "LODF matrices" begin
     nodes_5 = nodes5()
     branches_5 = branches5(nodes_5)
+    P5 = PTDF(branches_5, nodes_5)
     L5 = LODF(branches_5, nodes_5)
     @test isapprox(maximum(L5.data), maximum(Lodf_5), atol = 1e-3)
     @test isapprox(L5[branches_5[1], branches_5[2]], 0.3447946513849091)
