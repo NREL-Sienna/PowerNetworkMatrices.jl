@@ -15,7 +15,7 @@ function _buildlodf(
     dist_slack::Array{Float64} = [0.1],
 )
     linecount = length(branches)
-    ptdf, a = calculate_PTDF_matrix_DENSE(branches, nodes, bus_lookup, dist_slack)
+    ptdf, a = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
     ptdf_denominator = ptdf * transpose(a)
     for iline in 1:linecount
         if (1.0 - ptdf_denominator[iline, iline]) < 1.0E-06
