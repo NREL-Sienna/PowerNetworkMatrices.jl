@@ -21,7 +21,7 @@ function find_slack_positions(nodes)
     ])
 end
 
-# validate solver so be used for 
+# validate solver so be used for
 function validate_linear_solver(linear_solver::String)
     if linear_solver ∉ SUPPORTED_LINEAR_SOLVERS
         error(
@@ -254,55 +254,6 @@ function calculate_PTDF_matrix_DENSE(
 
     return PTDFm, A
 end
-
-# ! makes no sense since it requires the conversion of A and BA from sparse to dense
-# function calculate_PTDF_matrix_DENSE(
-#     A::IncidenceMatrix,
-#     BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
-#     dist_slack::Vector{Float64})
-
-#     linecount = length(A.axes[1])
-#     buscount = length(A.axes[2])
-#     slack_positions = A.slack_positions
-#     slack_position = slack_positions[1]
-#     ABA = gemm('T', 'N', A.data[:, setdiff(1:end, slack_positions[1])], BA)
-
-#     # evaluate ptdf matrix
-#     if dist_slack[1] == 0.1 && length(dist_slack) == 1
-#         (ABA, bipiv, binfo) = getrf!(ABA)
-#         binfo_check(binfo)
-#         PTDFm = gemm(
-#             'N',
-#             'N',
-#             BA,
-#             getri!(B, bipiv),
-#         )
-#         @views PTDFm =
-#             hcat(PTDFm[:, 1:(slack_position - 1)], zeros(linecount), PTDFm[:, slack_position:end])
-#     elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
-#         @info "Distributed bus"
-#         (ABA, bipiv, binfo) = getrf!(ABA)
-#         binfo_check(binfo)
-#         PTDFm = gemm(
-#             'N',
-#             'N',
-#             BA,
-#             getri!(B, bipiv),
-#         )
-#         @views PTDFm =
-#             hcat(PTDFm[:, 1:(slack_position - 1)], zeros(linecount), PTDFm[:, slack_position:end])
-#         slack_array = dist_slack / sum(dist_slack)
-#         slack_array = reshape(slack_array, buscount, 1)
-#         PTDFm = PTDFm - gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
-#     elseif length(slack_position) == 0
-#         @warn("Slack bus not identified in the Bus/Nodes list, can't build PTDF")
-#         PTDFm = Array{Float64, 2}(undef, linecount, buscount)
-#     else
-#         @assert false
-#     end
-
-#     return PTDFm, A.data
-# end
 
 function calculate_PTDF_matrix_MKLPardiso(
     branches,
