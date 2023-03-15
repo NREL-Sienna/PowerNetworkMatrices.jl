@@ -13,21 +13,22 @@ end
 function _buildptdf(
     branches,
     nodes::Vector{PSY.Bus},
+    bus_lookup::Dict{Int64, Int64},
     dist_slack::Vector{Float64},
     linear_solver::String = "Dense")
     if linear_solver == "KLU"
-        PTDFm, A = calculate_PTDF_matrix_KLU(branches, nodes, dist_slack)
+        PTDFm, A = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
     elseif linear_solver == "Dense"
-        PTDFm, A = calculate_PTDF_matrix_DENSE(branches, nodes, dist_slack)
+        PTDFm, A = calculate_PTDF_matrix_DENSE(branches, nodes, bus_lookup, dist_slack)
     elseif linear_solver == "MKLPardiso"
-        PTDFm, A = calculate_PTDF_matrix_MKLPardiso(branches, nodes, dist_slack)
+        PTDFm, A = calculate_PTDF_matrix_MKLPardiso(branches, nodes, bus_lookup, dist_slack)
     end
 
     return PTDFm, A
 
 end
 
-function _buildptdf(
+function _buildptdf_from_matrices(
     A::IncidenceMatrix,
     BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
     dist_slack::Vector{Float64},
@@ -36,12 +37,12 @@ function _buildptdf(
         PTDFm = _calculate_PTDF_matrix_KLU(A.data, BA, A.slack_positions, dist_slack)
     elseif linear_solver == "Dense"
         # Convert SparseMatrices to Dense
-        PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A.data), Matrix(BA),  A.slack_positions, dist_slack)
+        PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A.data), Matrix(BA), A.slack_positions, dist_slack)
     elseif linear_solver == "MKLPardiso"
-        PTDFm = _calculate_PTDF_matrix_MKLPardiso(A.data, BA,  A.slack_positions, dist_slack)
+        PTDFm = _calculate_PTDF_matrix_MKLPardiso(A.data, BA, A.slack_positions, dist_slack)
     end
 
-    return PTDFm, A
+    return PTDFm
 end
 
 # PTDF evaluation ############################################################
@@ -51,8 +52,8 @@ function _calculate_PTDF_matrix_KLU(
     slack_positions::Vector{Int64},
     dist_slack::Vector{Float64})
 
-    linecount = length(A.axes[1])
-    buscount = length(A.axes[2])
+    linecount = size(BA, 1)
+    buscount = size(BA, 2)
 
     ABA = calculate_ABA_matrix(A, BA, slack_positions)
     K = klu(ABA)
@@ -83,6 +84,7 @@ end
 function calculate_PTDF_matrix_KLU(
     branches,
     nodes::Vector{PSY.Bus},
+    bus_lookup::Dict{Int64, Int64},
     dist_slack::Vector{Float64})
     A, slack_positions = calculate_A_matrix(branches, nodes)
     BA = calculate_BA_matrix(branches, slack_positions, bus_lookup)
@@ -104,18 +106,15 @@ function _binfo_check(binfo::Int)
 end
 
 function _calculate_PTDF_matrix_DENSE(
-    A::Matrix{Int},
+    A::Matrix{Int8},
     BA::Matrix{T},
-    slack_positions::Vector{Int64},
+    slack_position::Vector{Int64},
     dist_slack::Vector{Float64}) where {T <: Union{Float32, Float64}}
 
-    slacks =
-        [bus_lookup[PSY.get_number(n)] for n in nodes if PSY.get_bustype(n) == BusTypes.REF]
-    isempty(slacks) && error("System must have a reference bus!")
-
     # Use dense calculation of ABA
-    ABA = A[:, setdiff(1:end, slack_positions[1])]' * BA
-
+    ABA = A[:, setdiff(1:end, slack_position[1])]' * BA
+    linecount = size(BA, 1)
+    buscount = size(BA, 2)
     # get LU factorization matrices
     if dist_slack[1] == 0.1 && length(dist_slack) == 1
         (ABA, bipiv, binfo) = getrf!(ABA)
@@ -123,14 +122,14 @@ function _calculate_PTDF_matrix_DENSE(
         PTDFm = gemm(
             'N',
             'N',
-            gemm('N', 'T', inv_X, A[setdiff(1:end, slack_position), :]),
+            BA,
             getri!(ABA, bipiv),
         )
         @views PTDFm =
             hcat(
-                PTDFm[:, 1:(slack_position - 1)],
+                PTDFm[:, 1:(slack_position[1] - 1)],
                 zeros(linecount),
-                PTDFm[:, slack_position:end],
+                PTDFm[:, slack_position[1]:end],
             )
     elseif dist_slack[1] != 0.1 && length(dist_slack) == buscount
         @info "Distributed bus"
@@ -139,14 +138,14 @@ function _calculate_PTDF_matrix_DENSE(
         PTDFm = gemm(
             'N',
             'N',
-            gemm('N', 'T', inv_X, A[setdiff(1:end, slack_position), :]),
+            BA,
             getri!(ABA, bipiv),
         )
         @views PTDFm =
             hcat(
-                PTDFm[:, 1:(slack_position - 1)],
+                PTDFm[:, 1:(slack_position[1] - 1)],
                 zeros(linecount),
-                PTDFm[:, slack_position:end],
+                PTDFm[:, slack_position[1]:end],
             )
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
@@ -159,12 +158,13 @@ function _calculate_PTDF_matrix_DENSE(
         @assert false
     end
 
-    return PTDFm, A
+    return PTDFm
 end
 
 function calculate_PTDF_matrix_DENSE(
     branches,
     nodes::Vector{PSY.Bus},
+    bus_lookup::Dict{Int64, Int64},
     dist_slack::Vector{Float64})
     A, slack_positions = calculate_A_matrix(branches, nodes)
     BA = Matrix(calculate_BA_matrix(branches, slack_positions, bus_lookup))
@@ -180,10 +180,10 @@ function _calculate_PTDF_matrix_MKLPardiso(
 
     ps = Pardiso.MKLPardisoSolver()
 
-    linecount = length(A.axes[1])
-    buscount = length(A.axes[2])
+    linecount = size(BA, 1)
+    buscount = size(BA, 2)
 
-    ABA = calculate_ABA_matrix(A.data, BA, slack_positions)
+    ABA = calculate_ABA_matrix(A, BA, slack_positions)
     Ix = Matrix(1.0I, size(ABA, 1), size(ABA, 1))
     ABA_inv = zeros(Float64, size(ABA, 1), size(ABA, 2))
     Pardiso.solve!(ps, ABA_inv, ABA, Ix)
@@ -211,6 +211,7 @@ end
 function calculate_PTDF_matrix_MKLPardiso(
     branches,
     nodes::Vector{PSY.Bus},
+    bus_lookup::Dict{Int64, Int64},
     dist_slack::Vector{Float64})
 
     A, slack_positions = calculate_A_matrix(branches, nodes)
@@ -237,10 +238,9 @@ function PTDF(
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
-    S, _ = _buildptdf(branches, nodes, dist_slack, linear_solver)
     axes = (line_ax, bus_ax)
     look_up = (_make_ax_ref(line_ax), _make_ax_ref(bus_ax))
-
+    S, _ = _buildptdf(branches, nodes, look_up[2], dist_slack, linear_solver)
     return PTDF(S, axes, look_up, eps())
 end
 
@@ -272,7 +272,7 @@ function PTDF(
     dist_slack::Vector{Float64} = [0.1];
     linear_solver = "Dense")
     validate_linear_solver(linear_solver)
-    S, _ = _buildptdf(A, BA.data, dist_slack, linear_solver)
+    S = _buildptdf_from_matrices(A, BA.data, dist_slack, linear_solver)
 
     return PTDF(S, A.axes, A.lookup, eps())
 end

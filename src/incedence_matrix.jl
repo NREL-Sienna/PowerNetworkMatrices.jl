@@ -3,7 +3,7 @@ Incidence matrix: shows connection between buses, defining lines
 """
 
 # define structure for incidence matrix A
-struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Real}
+struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int32}
     axes::Ax
     lookup::L
