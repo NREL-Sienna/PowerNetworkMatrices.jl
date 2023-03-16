@@ -124,20 +124,27 @@ function _getindex(
     row::Int,
     column::Union{Int, Colon},
 )
-    # check if value is in the cache
-    if haskey(vptdf.cache, row)
-        return vptdf.cache[row][column]
-    else
-        # evaluate the value for the PTDF column
-        ldiv!(vptdf.temp_data, vptdf.K, vptdf.BA[row, :])
-        # add slack bus value (zero) and make copy of temp into the cache
-        vptdf.cache[row] = vcat(
-            vptdf.temp_data[1:(vptdf.slack_positions[1] - 1)],
-            [0],
-            vptdf.temp_data[vptdf.slack_positions[1]:end],
-        )
-        return vptdf.cache[row][column]
-    end
+
+    # # check if value is in the cache
+    # if haskey(vptdf.cache, row)
+    #     return vptdf.cache[row][column]
+    # else
+
+    # evaluate the value for the PTDF column
+    ldiv!(vptdf.temp_data, vptdf.K, vptdf.BA[row, :])
+    # ! vptdf.temp_data[:] .= KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
+
+    # add slack bus value (zero) and make copy of temp into the cache
+
+    # vptdf.temp_data = vptdf.K\Vector(vptdf.BA[row, :])
+    vptdf.cache[row] = vcat(
+        vptdf.temp_data[1:(vptdf.slack_positions[1] - 1)],
+        [0.0],
+        vptdf.temp_data[vptdf.slack_positions[1]:end],
+    )
+    return vptdf.cache[row][column]
+
+    # end
 end
 
 Base.setindex!(::VirtualPTDF, _, idx...) = error("Operation not supported by VirtualPTDF")
