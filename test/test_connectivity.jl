@@ -16,7 +16,7 @@ end
 @testset "Test disconnected networks" begin
     sys = PSB.build_system(PSB.MatpowerTestSystems, "matpower_case5_sys")
     remove_components!(sys, Line)
-    @test (@test_logs (:warn,  "The system contains islands") match_mode =
+    @test (@test_logs (:warn, "The system contains islands") match_mode =
         :any validate_connectivity(sys)) == false
     @test validate_connectivity(sys; connectivity_method = dfs_connectivity) ==
           false

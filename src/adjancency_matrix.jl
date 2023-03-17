@@ -31,7 +31,12 @@ function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwarg
         by = x -> PSY.get_number(x),
     )
     branches = PSY.get_components(PSY.get_available, PSY.Branch, sys)
-    return AdjacencyMatrix(branches, nodes; check_connectivity = check_connectivity, kwargs...)
+    return AdjacencyMatrix(
+        branches,
+        nodes;
+        check_connectivity = check_connectivity,
+        kwargs...,
+    )
 end
 
 """
@@ -138,7 +143,10 @@ function dfs_connectivity(M::SparseArrays.SparseMatrixCSC,
     return connected
 end
 
-function find_connected_components(M::SparseArrays.SparseMatrixCSC, bus_lookup::Dict{Int, Int})
+function find_connected_components(
+    M::SparseArrays.SparseMatrixCSC,
+    bus_lookup::Dict{Int, Int},
+)
     pm_buses = Dict([i => Dict("bus_type" => 1, "bus_i" => b) for (i, b) in bus_lookup])
 
     arcs = findall((LinearAlgebra.UpperTriangular(M) - LinearAlgebra.I) .!= 0)
