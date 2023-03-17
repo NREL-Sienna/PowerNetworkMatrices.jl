@@ -176,7 +176,7 @@ function Ybus(
     look_up = (bus_lookup, bus_lookup)
     ybus = _buildybus(branches, nodes, fixed_admittances)
     if check_connectivity && length(nodes) > 1
-        connected = validate_connectivity(ybus, nodes, bus_lookup; kwargs...)
+        connected = dfs_connectivity(ybus, bus_lookup)
         !connected && throw(IS.DataFormatError("Network not connected"))
     end
     return Ybus(ybus, axes, look_up)

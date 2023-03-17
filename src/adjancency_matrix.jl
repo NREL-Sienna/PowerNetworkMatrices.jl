@@ -23,7 +23,7 @@ Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix
 - `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
 - `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
 """
-function AdjacencyMatrixMatrix(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
+function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     nodes = sort!(
         collect(
             PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
@@ -31,7 +31,7 @@ function AdjacencyMatrixMatrix(sys::PSY.System; check_connectivity::Bool = true,
         by = x -> PSY.get_number(x),
     )
     branches = PSY.get_components(PSY.get_available, PSY.Branch, sys)
-    return AdjacencyMatrixMatrix(branches, nodes; check_connectivity = check_connectivity, kwargs...)
+    return AdjacencyMatrix(branches, nodes; check_connectivity = check_connectivity, kwargs...)
 end
 
 """
@@ -125,7 +125,7 @@ function goderya_connectivity(M::SparseArrays.SparseMatrixCSC{Int8, Int},
     return connected
 end
 
-function dfs_connectivity(M::SparseArrays.SparseMatrixCSC{Int8, Int},
+function dfs_connectivity(M::SparseArrays.SparseMatrixCSC,
     bus_lookup::Dict{Int, Int})
     @info "Validating connectivity with depth first search (network traversal)"
     cc = find_connected_components(M, bus_lookup)
@@ -138,7 +138,7 @@ function dfs_connectivity(M::SparseArrays.SparseMatrixCSC{Int8, Int},
     return connected
 end
 
-function find_connected_components(M, bus_lookup::Dict{Int, Int})
+function find_connected_components(M::SparseArrays.SparseMatrixCSC, bus_lookup::Dict{Int, Int})
     pm_buses = Dict([i => Dict("bus_type" => 1, "bus_i" => b) for (i, b) in bus_lookup])
 
     arcs = findall((LinearAlgebra.UpperTriangular(M) - LinearAlgebra.I) .!= 0)

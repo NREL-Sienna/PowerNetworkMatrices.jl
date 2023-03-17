@@ -2,7 +2,7 @@
 Finds the set of bus numbers that belong to each connnected component in the System
 """
 function find_connected_components(sys::PSY.System)
-    a = Adjacency(sys; check_connectivity = false)
+    a = AdjacencyMatrix(sys; check_connectivity = false)
     return find_connected_components(a.data, a.lookup[1])
 end
 
