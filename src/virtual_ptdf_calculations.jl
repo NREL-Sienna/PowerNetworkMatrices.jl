@@ -6,9 +6,9 @@ Power Transfer Distribution Factors (PTDF) indicate the incremental change in re
 The PTDF struct is indexed using the Bus numbers and branch names
 """
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
-    K::KLU.KLUFactorization{Float64, Int32}
-    BA::SparseArrays.SparseMatrixCSC{Float64, Int32}
-    slack_positions::Vector{Int64}
+    K::KLU.KLUFactorization{Float64, Int}
+    BA::SparseArrays.SparseMatrixCSC{Float64, Int}
+    slack_positions::Vector{Int}
     dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
