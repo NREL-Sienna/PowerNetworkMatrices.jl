@@ -110,8 +110,8 @@ function _get_value(vptdf::VirtualPTDF, row::Int)
 end
 
 function Base.getindex(vptdf::VirtualPTDF, row, column)
-    row, column = to_index(vptdf, row, column)
-    return _getindex(vptdf, row, column)
+    row_, column_ = to_index(vptdf, row, column)
+    return _getindex(vptdf, row_, column_)
 end
 
 # Define for ambiguity resolution
@@ -131,8 +131,7 @@ function _getindex(
     # else
 
     # evaluate the value for the PTDF column
-    ldiv!(vptdf.temp_data, vptdf.K, vptdf.BA[row, :])
-    # ! vptdf.temp_data[:] .= KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
+    vptdf.temp_data[:] .= KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
 
     # add slack bus value (zero) and make copy of temp into the cache
 
