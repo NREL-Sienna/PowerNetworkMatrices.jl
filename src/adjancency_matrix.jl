@@ -110,8 +110,10 @@ function goderya_connectivity(M::SparseArrays.SparseMatrixCSC{Int8, Int},
     bus_lookup::Dict{Int, Int})
     @info "Validating connectivity with Goderya algorithm"
     node_count = length(bus_lookup)
-    node_count > 15_000 &&
+
+    if node_count > GODERYA_MAX_PERFORMANCE_NODE
         @warn "The Goderya algorithm is memory intensive on large networks and may not scale well, try `connectivity_method = dfs_connectivity"
+    end
 
     I = _goderya(M)
 
