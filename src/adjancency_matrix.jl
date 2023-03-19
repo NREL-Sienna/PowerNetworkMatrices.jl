@@ -99,7 +99,7 @@ function _goderya(ybus::SparseArrays.SparseMatrixCSC)
             end
             T_ = temp
         else
-            @assert false
+            error("Invalid connectivity condition")
         end
         #@assert n < node_count - 1
     end
@@ -117,7 +117,7 @@ function goderya_connectivity(M::SparseArrays.SparseMatrixCSC{Int8, Int},
 
     I = _goderya(M)
 
-    connections = Dict([i => count(x -> x == i, I) for i in Set(I)])
+    connections = Dict(i => count(x -> x == i, I) for i in Set(I))
 
     if length(Set(I)) == node_count
         connected = true
