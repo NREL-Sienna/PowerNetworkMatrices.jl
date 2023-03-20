@@ -50,7 +50,7 @@ end
     @test sum(ptdf_complete_klu.data - ptdf_complete_dense.data) < 1e-9
     @test isapprox(ptdf_complete_klu.data, ptdf_complete_dense.data, atol = 1e-6)
 
-    # check submatrice: siunce connected by a single bus, areas must have the same numbers
+    # check submatrices: siunce connected by a single bus, areas must have the same numbers
     branch_number = length(ptdf_complete_klu.axes[1])
     bus_number = length(ptdf_complete_klu.axes[2])
     ptdf_first_area =

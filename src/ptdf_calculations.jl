@@ -54,7 +54,7 @@ end
 function _calculate_PTDF_matrix_KLU(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    slack_positions::Vector{Int},
+    ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64})
     linecount = size(BA, 1)
     buscount = size(BA, 2)
@@ -112,7 +112,7 @@ end
 function _calculate_PTDF_matrix_DENSE(
     A::Matrix{Int8},
     BA::Matrix{T},
-    slack_position::Vector{Int},
+    ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64}) where {T <: Union{Float32, Float64}}
 
     # Use dense calculation of ABA
@@ -138,18 +138,12 @@ function _calculate_PTDF_matrix_DENSE(
         @info "Distributed bus"
         (ABA, bipiv, binfo) = getrf!(ABA)
         _binfo_check(binfo)
-        PTDFm = gemm(
+        PTDFm[:, setdiff(1:end, ref_bus_positions)] = gemm(
             'N',
             'N',
             BA,
             getri!(ABA, bipiv),
         )
-        @views PTDFm =
-            hcat(
-                PTDFm[:, 1:(ref_bus_positions[1] - 1)],
-                zeros(linecount),
-                PTDFm[:, slack_position[1]:end],
-            )
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
         PTDFm =
@@ -175,7 +169,7 @@ end
 function _calculate_PTDF_matrix_MKLPardiso(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    slack_positions::Vector{Int},
+    ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64})
     ps = Pardiso.MKLPardisoSolver()
 
@@ -193,15 +187,15 @@ function _calculate_PTDF_matrix_MKLPardiso(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        PTDFm[:, setdiff(1:end, ref_bus_positions[1])] = BA * ABA_inv
+        PTDFm[:, setdiff(1:end, ref_bus_positions)] .= BA * ABA_inv
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        PTDFm[:, setdiff(1:end, ref_bus_positions[1])] = BA * ABA_inv
+        PTDFm[:, setdiff(1:end, ref_bus_positions)] .= BA * ABA_inv
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
         PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
     else
-        error("Distributed bus specification doesn't match the number of buses")
+        error("Distributed bus specification doesn't match the number of buses.")
     end
 
     return PTDFm
