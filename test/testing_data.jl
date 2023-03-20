@@ -428,7 +428,6 @@ Ybus3_matpower[1, 3] = -0.689655172413793 + 8.275862068965518im
 Ybus3_matpower[2, 3] = -0.689655172413793 + 8.275862068965518im
 Ybus3_matpower[3, 3] = 1.379310344827586 - 16.351724137931036im
 
-
 ## System with 10 buses ######################################################
 """
 It is composed by 2 identical 5-bus systems connected by a DC line

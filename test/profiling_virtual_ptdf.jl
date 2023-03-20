@@ -76,7 +76,11 @@ end
 
 ProfileView.@profview begin
     A, ref_bus_positions = PowerNetworkMatrices.calculate_A_matrix(branches, nodes)
-    BA = PowerNetworkMatrices.calculate_BA_matrix(branches, ref_bus_positions, make_ax_ref(nodes))
+    BA = PowerNetworkMatrices.calculate_BA_matrix(
+        branches,
+        ref_bus_positions,
+        make_ax_ref(nodes),
+    )
     ABA = PowerNetworkMatrices.calculate_ABA_matrix(A, BA, ref_bus_positions)
     empty_cache = Dict{Int, Array{Float64}}()
     temp_data = Vector{Float64}(undef, size(BA, 2))
