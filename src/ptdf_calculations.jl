@@ -43,7 +43,8 @@ function _buildptdf_from_matrices(
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
-        PTDFm = _calculate_PTDF_matrix_MKLPardiso(A.data, BA, A.ref_bus_positions, dist_slack)
+        PTDFm =
+            _calculate_PTDF_matrix_MKLPardiso(A.data, BA, A.ref_bus_positions, dist_slack)
     end
 
     return PTDFm
@@ -66,7 +67,9 @@ function _calculate_PTDF_matrix_KLU(
     PTDFm = zeros(linecount, buscount + length(ref_bus_positions))
 
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
-        error("Distibuted slack is not supported for systems with multiple reference buses.")
+        error(
+            "Distibuted slack is not supported for systems with multiple reference buses.",
+        )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         PTDFm[:, setdiff(1:end, ref_bus_positions)] .= BA * ABA_inv
     elseif length(dist_slack) == buscount
@@ -118,7 +121,9 @@ function _calculate_PTDF_matrix_DENSE(
     buscount = size(BA, 2)
     # get LU factorization matrices
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
-        error("Distibuted slack is not supported for systems with multiple reference buses.")
+        error(
+            "Distibuted slack is not supported for systems with multiple reference buses.",
+        )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         (ABA, bipiv, binfo) = getrf!(ABA)
         _binfo_check(binfo)
@@ -184,7 +189,9 @@ function _calculate_PTDF_matrix_MKLPardiso(
     PTDFm = zeros(linecount, buscount + 1)
 
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
-        error("Distibuted slack is not supported for systems with multiple reference buses.")
+        error(
+            "Distibuted slack is not supported for systems with multiple reference buses.",
+        )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         PTDFm[:, setdiff(1:end, ref_bus_positions[1])] = BA * ABA_inv
     elseif length(dist_slack) == buscount
