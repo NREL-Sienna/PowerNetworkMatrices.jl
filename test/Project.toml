@@ -1,6 +1,5 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 InfrastructureSystems = "2cd47ed4-ca9b-11e9-27f2-ab636a7671f1"
