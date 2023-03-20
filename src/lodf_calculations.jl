@@ -18,7 +18,7 @@ function _buildlodf(
     return _buildlodf(a, ptdf)
 end
 
-function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int32}, ptdf::Matrix{Float64})
+function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int}, ptdf::Matrix{Float64})
     linecount = size(ptdf, 1)
     ptdf_denominator = ptdf * transpose(a)
     for iline in 1:linecount
