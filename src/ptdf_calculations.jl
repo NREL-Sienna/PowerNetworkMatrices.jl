@@ -33,17 +33,18 @@ function _buildptdf_from_matrices(
     dist_slack::Vector{Float64},
     linear_solver::String)
     if linear_solver == "KLU"
-        PTDFm = _calculate_PTDF_matrix_KLU(A.data, BA, A.slack_positions, dist_slack)
+        PTDFm = _calculate_PTDF_matrix_KLU(A.data, BA, A.ref_bus_positions, dist_slack)
     elseif linear_solver == "Dense"
         # Convert SparseMatrices to Dense
         PTDFm = _calculate_PTDF_matrix_DENSE(
             Matrix(A.data),
             Matrix(BA),
-            A.slack_positions,
+            A.ref_bus_positions,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
-        PTDFm = _calculate_PTDF_matrix_MKLPardiso(A.data, BA, A.slack_positions, dist_slack)
+        PTDFm =
+            _calculate_PTDF_matrix_MKLPardiso(A.data, BA, A.ref_bus_positions, dist_slack)
     end
 
     return PTDFm
@@ -53,28 +54,32 @@ end
 function _calculate_PTDF_matrix_KLU(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    slack_positions::Vector{Int},
+    ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64})
     linecount = size(BA, 1)
     buscount = size(BA, 2)
 
-    ABA = calculate_ABA_matrix(A, BA, slack_positions)
+    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     K = klu(ABA)
     Ix = Matrix(1.0I, buscount, buscount)
     ABA_inv = zeros(Float64, buscount, buscount)
     ldiv!(ABA_inv, K, Ix)
-    PTDFm = zeros(linecount, buscount + 1)
+    PTDFm = zeros(linecount, buscount + length(ref_bus_positions))
 
-    if isempty(dist_slack) && length(slack_positions) == 1
-        PTDFm[:, setdiff(1:end, slack_positions[1])] .= BA * ABA_inv
+    if !isempty(dist_slack) && length(ref_bus_positions) != 1
+        error(
+            "Distibuted slack is not supported for systems with multiple reference buses.",
+        )
+    elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
+        PTDFm[:, setdiff(1:end, ref_bus_positions)] .= BA * ABA_inv
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        PTDFm[:, setdiff(1:end, slack_positions[1])] .= BA * ABA_inv
+        PTDFm[:, setdiff(1:end, ref_bus_positions)] .= BA * ABA_inv
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
         PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
     else
-        error("Distributed bus specification doesn't match the number of buses")
+        error("Distributed bus specification doesn't match the number of buses.")
     end
 
     return PTDFm
@@ -85,9 +90,9 @@ function calculate_PTDF_matrix_KLU(
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
-    A, slack_positions = calculate_A_matrix(branches, nodes)
-    BA = calculate_BA_matrix(branches, slack_positions, bus_lookup)
-    PTDFm = _calculate_PTDF_matrix_KLU(A, BA, slack_positions, dist_slack)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    BA = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
+    PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
 end
 
@@ -107,45 +112,38 @@ end
 function _calculate_PTDF_matrix_DENSE(
     A::Matrix{Int8},
     BA::Matrix{T},
-    slack_position::Vector{Int},
+    ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64}) where {T <: Union{Float32, Float64}}
 
     # Use dense calculation of ABA
-    ABA = A[:, setdiff(1:end, slack_position[1])]' * BA
+    ABA = A[:, setdiff(1:end, ref_bus_positions)]' * BA
     linecount = size(BA, 1)
     buscount = size(BA, 2)
     # get LU factorization matrices
-    if isempty(dist_slack) && length(slack_position) == 1
+    if !isempty(dist_slack) && length(ref_bus_positions) != 1
+        error(
+            "Distibuted slack is not supported for systems with multiple reference buses.",
+        )
+    elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         (ABA, bipiv, binfo) = getrf!(ABA)
         _binfo_check(binfo)
-        PTDFm = gemm(
+        PTDFm = zeros(linecount, buscount + length(ref_bus_positions))
+        PTDFm[:, setdiff(1:end, ref_bus_positions)] = gemm(
             'N',
             'N',
             BA,
             getri!(ABA, bipiv),
         )
-        @views PTDFm =
-            hcat(
-                PTDFm[:, 1:(slack_position[1] - 1)],
-                zeros(linecount),
-                PTDFm[:, slack_position[1]:end],
-            )
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
         (ABA, bipiv, binfo) = getrf!(ABA)
         _binfo_check(binfo)
-        PTDFm = gemm(
+        PTDFm[:, setdiff(1:end, ref_bus_positions)] = gemm(
             'N',
             'N',
             BA,
             getri!(ABA, bipiv),
         )
-        @views PTDFm =
-            hcat(
-                PTDFm[:, 1:(slack_position[1] - 1)],
-                zeros(linecount),
-                PTDFm[:, slack_position[1]:end],
-            )
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
         PTDFm =
@@ -162,38 +160,42 @@ function calculate_PTDF_matrix_DENSE(
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
-    A, slack_positions = calculate_A_matrix(branches, nodes)
-    BA = Matrix(calculate_BA_matrix(branches, slack_positions, bus_lookup))
-    PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A), BA, slack_positions, dist_slack)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    BA = Matrix(calculate_BA_matrix(branches, ref_bus_positions, bus_lookup))
+    PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A), BA, ref_bus_positions, dist_slack)
     return PTDFm, A
 end
 
 function _calculate_PTDF_matrix_MKLPardiso(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    slack_positions::Vector{Int},
+    ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64})
     ps = Pardiso.MKLPardisoSolver()
 
     linecount = size(BA, 1)
     buscount = size(BA, 2)
 
-    ABA = calculate_ABA_matrix(A, BA, slack_positions)
+    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     Ix = Matrix(1.0I, buscount, buscount)
     ABA_inv = zeros(Float64, buscount, buscount)
     Pardiso.solve!(ps, ABA_inv, ABA, Ix)
     PTDFm = zeros(linecount, buscount + 1)
 
-    if isempty(dist_slack) && length(slack_positions) == 1
-        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+    if !isempty(dist_slack) && length(ref_bus_positions) != 1
+        error(
+            "Distibuted slack is not supported for systems with multiple reference buses.",
+        )
+    elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
+        PTDFm[:, setdiff(1:end, ref_bus_positions)] .= BA * ABA_inv
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        PTDFm[:, setdiff(1:end, slack_positions[1])] = BA * ABA_inv
+        PTDFm[:, setdiff(1:end, ref_bus_positions)] .= BA * ABA_inv
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
         PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
     else
-        error("Distributed bus specification doesn't match the number of buses")
+        error("Distributed bus specification doesn't match the number of buses.")
     end
 
     return PTDFm
@@ -204,9 +206,9 @@ function calculate_PTDF_matrix_MKLPardiso(
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
-    A, slack_positions = calculate_A_matrix(branches, nodes)
-    BA = calculate_BA_matrix(branches, slack_positions, bus_lookup)
-    PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, slack_positions, dist_slack)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    BA = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
+    PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
 end
 

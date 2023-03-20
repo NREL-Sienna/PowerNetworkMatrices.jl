@@ -7,10 +7,10 @@ end
 function BA_Matrix(sys::PSY.System)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
-    slack_positions = find_slack_positions(buses)
+    ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
 
-    data = calculate_BA_matrix(branches, slack_positions, bus_lookup)
+    data = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
     return BA_Matrix(data)
 end
 
