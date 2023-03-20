@@ -40,3 +40,20 @@
         end
     end
 end
+
+@testset "PTDF matrices for 10 bus system with 2 reference buses" begin
+    # get system
+    sys = get_10bus_test_system()   # get the system composed by 2 5-bus ones connected by a DC line
+    ptdf_complete_klu = PTDF(sys; linear_solver = "KLU")
+    ptdf_complete_dense = PTDF(sys; linear_solver = "Dense")
+
+    @test sum(ptdf_complete_klu.data - ptdf_complete_dense.data) < 1e-9
+    @test isapprox(ptdf_complete_klu.data, ptdf_complete_dense.data, atol=1e-6)
+
+    # check submatrice: siunce connected by a single bus, areas must have the same numbers
+    branch_number = length(ptdf_complete_klu.axes[1])
+    bus_number = length(ptdf_complete_klu.axes[2])
+    ptdf_first_area = ptdf_complete_klu.data[1:Int(branch_number/2), 1:Int(bus_number/2)]
+    ptdf_second_area = ptdf_complete_klu.data[Int(branch_number/2)+1:end, Int(bus_number/2)+1:end]
+    @test isapprox(ptdf_first_area, ptdf_second_area, atol=1e-6)
+end

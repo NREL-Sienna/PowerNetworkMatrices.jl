@@ -8,7 +8,7 @@ The PTDF struct is indexed using the Bus numbers and branch names
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int32}
     BA::SparseArrays.SparseMatrixCSC{Float64, Int32}
-    slack_positions::Vector{Int64}
+    ref_bus_positions::Vector{Int64}
     dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
@@ -35,15 +35,15 @@ function VirtualPTDF(
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
     look_up = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
-    A, slack_positions = calculate_A_matrix(branches, nodes)
-    BA = calculate_BA_matrix(branches, slack_positions, make_ax_ref(nodes))
-    ABA = calculate_ABA_matrix(A, BA, slack_positions)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    BA = calculate_BA_matrix(branches, ref_bus_positions, make_ax_ref(nodes))
+    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     empty_cache = Dict{Int, Array{Float64}}()
     temp_data = Vector{Float64}(undef, size(BA, 2))
     return VirtualPTDF(
         klu(ABA),
         BA,
-        slack_positions,
+        ref_bus_positions,
         dist_slack,
         axes,
         look_up,
@@ -137,9 +137,9 @@ function _getindex(
 
     # vptdf.temp_data = vptdf.K\Vector(vptdf.BA[row, :])
     vptdf.cache[row] = vcat(
-        vptdf.temp_data[1:(vptdf.slack_positions[1] - 1)],
+        vptdf.temp_data[1:(vptdf.ref_bus_positions[1] - 1)],
         [0.0],
-        vptdf.temp_data[vptdf.slack_positions[1]:end],
+        vptdf.temp_data[vptdf.ref_bus_positions[1]:end],
     )
     return vptdf.cache[row][column]
 
