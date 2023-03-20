@@ -4,10 +4,10 @@ Incidence matrix: shows connection between buses, defining lines
 
 # define structure for incidence matrix A
 struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
-    data::SparseArrays.SparseMatrixCSC{Int8, Int32}
+    data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
-    ref_bus_positions::Vector{Int64}
+    slack_positions::Vector{Int}
 end
 
 # functions to get stored data

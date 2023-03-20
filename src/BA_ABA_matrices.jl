@@ -1,6 +1,6 @@
 # BA matrix ##################################################################
 struct BA_Matrix <: PowerNetworkMatrix{Float64}
-    data::SparseArrays.SparseMatrixCSC{Float64, Int32}
+    data::SparseArrays.SparseMatrixCSC{Float64, Int}
 end
 
 # create the BA matrix
@@ -16,14 +16,14 @@ end
 
 # ABA matrix #################################################################
 struct ABA_Matrix <: PowerNetworkMatrix{Float64}
-    data::SparseArrays.SparseMatrixCSC{Float64, Int32}
+    data::SparseArrays.SparseMatrixCSC{Float64, Int}
 end
 
 # create the ABA matrix
-function ABA_Matrix(A::SparseArrays.SparseMatrixCSC{Int8, Int32},
-    BA::SparseArrays.SparseMatrixCSC{T, Int32}
+function ABA_Matrix(A::SparseArrays.SparseMatrixCSC{Int8, Int},
+    BA::SparseArrays.SparseMatrixCSC{T, Int}
     where {T <: Union{Float32, Float64}},
-    ref_bus_positions::Vector{Int64})
-    data = calculate_ABA_matrix(A, BA, ref_bus_positions)
+    slack_positions::Vector{Int})
+    data = calculate_ABA_matrix(A, BA, slack_positions)
     return ABA_Matrix(data)
 end
