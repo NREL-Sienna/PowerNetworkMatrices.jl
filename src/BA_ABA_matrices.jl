@@ -7,10 +7,10 @@ end
 function BA_Matrix(sys::PSY.System)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
-    slack_positions = find_slack_positions(buses)
+    ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
 
-    data = calculate_BA_matrix(branches, slack_positions, bus_lookup)
+    data = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
     return BA_Matrix(data)
 end
 
@@ -23,7 +23,7 @@ end
 function ABA_Matrix(A::SparseArrays.SparseMatrixCSC{Int8, Int32},
     BA::SparseArrays.SparseMatrixCSC{T, Int32}
     where {T <: Union{Float32, Float64}},
-    slack_positions::Vector{Int64})
-    data = calculate_ABA_matrix(A, BA, slack_positions)
+    ref_bus_positions::Vector{Int64})
+    data = calculate_ABA_matrix(A, BA, ref_bus_positions)
     return ABA_Matrix(data)
 end
