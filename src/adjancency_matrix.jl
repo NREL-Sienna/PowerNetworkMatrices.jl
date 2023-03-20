@@ -167,28 +167,32 @@ function find_connected_components(
     return Set(connected_components)
 end
 
-function find_subnetworks(A)
-    rows = rowvals(A.data)
-    _, n = size(A.data)
-    bus_numbers = A.axes[1]
+function find_subnetworks(M::AdjacencyMatrix)
+    return find_subnetworks(M.data)
+end
+
+function find_subnetworks(M)
+    rows = rowvals(M.data)
+    _, n = size(M.data)
+    bus_numbers = M.axes[1]
     touched = Set{Int}()
-    _bus_groups = Dict{Int, Set{Int}}()
+    bus_groups = Dict{Int, Set{Int}}()
 
     for j in 1:n
         row_ix = rows[j]
         if bus_numbers[row_ix] ∉ touched
             push!(touched, bus_numbers[row_ix])
-            _bus_groups[bus_numbers[row_ix]] = Set{Int}()
+            bus_groups[bus_numbers[row_ix]] = Set{Int}()
             dfs(row_ix, A, _bus_groups[bus_numbers[row_ix]], touched)
         end
     end
-    return _bus_groups
+    return bus_groups
 end
 
-function dfs(index, A, bus_group, touched)
-    bus_numbers = A.axes[1]
-    rows = rowvals(A.data)
-    for j in nzrange(A.data, index)
+function dfs(index::Int, M, bus_group::Set{Int}, touched::Set{Int})
+    bus_numbers = M.axes[1]
+    rows = rowvals(M.data)
+    for j in nzrange(M.data, index)
         row_ix = rows[j]
         if bus_numbers[row_ix] ∉ touched
             push!(touched, bus_numbers[row_ix])
