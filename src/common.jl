@@ -89,7 +89,7 @@ end
 # BA matrix evaluation #######################################################
 function calculate_BA_matrix(
     branches,
-    slack_positions::Vector{Int},
+    ref_bus_positions::Vector{Int},
     bus_lookup::Dict{Int, Int})
     BA_I = Int[]
     BA_J = Int[]
@@ -128,6 +128,6 @@ end
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}},
-    slack_positions::Vector{Int})
-    return A[:, setdiff(1:end, slack_positions[1])]' * BA
+    ref_bus_positions::Vector{Int})
+    return A[:, setdiff(1:end, ref_bus_positions)]' * BA
 end
