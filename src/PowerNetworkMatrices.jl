@@ -6,7 +6,7 @@ export IncidenceMatrix
 export BA_Matrix
 export Ybus
 export LODF
-export Adjacency
+export AdjacencyMatrix
 
 export dfs_connectivity
 export find_connected_components
@@ -37,11 +37,12 @@ import Pardiso
 include("PowerNetworkMatrix.jl")
 include("BA_ABA_matrices.jl")
 include("incedence_matrix.jl")
+include("adjancency_matrix.jl")
 include("common.jl")
 include("definitions.jl")
 include("ptdf_calculations.jl")
 include("ybus_calculations.jl")
 include("lodf_calculations.jl")
 include("virtual_ptdf_calculations.jl")
-
+include("system_utils.jl")
 end

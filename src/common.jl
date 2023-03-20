@@ -40,8 +40,8 @@ function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
     bus_lookup = make_ax_ref(nodes)
     slack_positions = find_slack_positions(nodes)
 
-    A_I = Int32[]
-    A_J = Int32[]
+    A_I = Int[]
+    A_J = Int[]
     A_V = Int8[]
 
     # build incidence matrix A (lines x buses)
@@ -61,13 +61,38 @@ function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
     return SparseArrays.sparse(A_I, A_J, A_V), slack_positions
 end
 
+function calculate_adjacency(branches, nodes::Vector{PSY.Bus})
+    bus_ax = PSY.get_number.(nodes)
+    return calculate_adjacency(branches, nodes, make_ax_ref(bus_ax))
+end
+
+function calculate_adjacency(
+    branches,
+    nodes::Vector{PSY.Bus},
+    bus_lookup::Dict{Int, Int},
+)
+    buscount = length(nodes)
+    a = SparseArrays.spzeros(Int8, buscount, buscount)
+
+    for b in branches
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+        a[fr_b, to_b] = 1
+        a[to_b, fr_b] = -1
+        a[fr_b, fr_b] = 1
+        a[to_b, to_b] = 1
+    end
+
+    # Return both for type stability
+    return a, bus_lookup
+end
+
 # BA matrix evaluation #######################################################
 function calculate_BA_matrix(
     branches,
-    slack_positions::Vector{Int64},
-    bus_lookup::Dict{Int64, Int64})
-    BA_I = Int32[]
-    BA_J = Int32[]
+    slack_positions::Vector{Int},
+    bus_lookup::Dict{Int, Int})
+    BA_I = Int[]
+    BA_J = Int[]
     BA_V = Float64[]
 
     for (ix, b) in enumerate(branches)
@@ -101,8 +126,8 @@ end
 
 # ABA matrix evaluation ######################################################
 function calculate_ABA_matrix(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int32},
-    BA::SparseArrays.SparseMatrixCSC{T, Int32} where {T <: Union{Float32, Float64}},
-    slack_positions::Vector{Int64})
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
+    BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}},
+    slack_positions::Vector{Int})
     return A[:, setdiff(1:end, slack_positions[1])]' * BA
 end
