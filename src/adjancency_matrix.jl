@@ -167,17 +167,11 @@ function find_connected_components(
     return Set(connected_components)
 end
 
-# TODO define type
 function find_subnetworks(M::AdjacencyMatrix)
     bus_numbers = M.axes[2]
     return find_subnetworks(M.data, bus_numbers)
 end
 
-function find_subnetworks(ABA::ABA_Matrix)
-    return ABA.subnetworks
-end
-
-# TODO define type
 function find_subnetworks(M, bus_numbers::Vector{Int})
     rows = SparseArrays.rowvals(M)
     _, n = size(M)
@@ -192,6 +186,9 @@ function find_subnetworks(M, bus_numbers::Vector{Int})
             dfs(row_ix, M, bus_numbers, bus_groups[bus_numbers[row_ix]], touched)
         end
     end
+
+    
+
     return bus_groups
 end
 
