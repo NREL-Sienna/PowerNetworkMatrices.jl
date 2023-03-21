@@ -8,6 +8,7 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     data::M
     axes::Ax
     lookup::L
+    subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
 end
 
@@ -75,6 +76,7 @@ function _calculate_PTDF_matrix_KLU(
     buscount = size(BA, 2)
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
+    # Here add the subnetwork detection
     K = klu(ABA)
     Ix = Matrix(1.0I, buscount, buscount)
     ABA_inv = zeros(Float64, buscount, buscount)
@@ -132,6 +134,7 @@ function _calculate_PTDF_matrix_DENSE(
 
     # Use dense calculation of ABA
     ABA = A[:, setdiff(1:end, ref_bus_positions)]' * BA
+    # Here add the subnetwork detection
     linecount = size(BA, 1)
     buscount = size(BA, 2)
     # get LU factorization matrices
@@ -192,6 +195,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     buscount = size(BA, 2)
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
+    # Here add the subnetwork detection
     Ix = Matrix(1.0I, buscount, buscount)
     ABA_inv = zeros(Float64, buscount, buscount)
     Pardiso.solve!(ps, ABA_inv, ABA, Ix)
