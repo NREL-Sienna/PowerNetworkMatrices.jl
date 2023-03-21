@@ -23,10 +23,10 @@ sys10 = get_10bus_test_system()
 # M = AdjacencyMatrix(sys5)
 BA = PowerNetworkMatrices.BA_Matrix(sys5)
 
+# break down function
 branches = PowerNetworkMatrices.get_ac_branches(sys5)
 buses = PowerNetworkMatrices.get_buses(sys5)
 ref_bus_positions = PowerNetworkMatrices.find_slack_positions(buses)
-
 bus_lookup = PowerNetworkMatrices.make_ax_ref(buses)
 line_ax = [PSY.get_name(branch) for branch in branches]
 bus_ax = [PSY.get_number(bus) for bus in setdiff(buses,ref_bus_positions)]
