@@ -143,7 +143,7 @@ function sparsify(dense_array::Matrix{Float64}, tol::Float64)
     return sparse_array
 end
 
-function drop_entries!(
+function make_entries_zero!(
     sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
     tol::Float64,
 )
@@ -152,7 +152,20 @@ function drop_entries!(
             sparse_array[i] = 0.0
         end
     end
-    return SparseArrays.dropzeros!(sparse_array)
+    SparseArrays.dropzeros!(sparse_array)
+    return
+end
+
+function make_entries_zero!(
+    dense_array::Matrix{Float64},
+    tol::Float64,
+)
+    for i in eachindex(dense_array)
+        if abs(dense_array[i]) <= tol
+            dense_array[i] = 0.0
+        end
+    end
+    return
 end
 
 function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
