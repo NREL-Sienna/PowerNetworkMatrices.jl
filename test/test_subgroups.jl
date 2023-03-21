@@ -21,7 +21,6 @@ include("testing_data.jl")
 
 sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
-
 ## compare M with ABA ########################################################
 
 # get M matrix and test if the sub_networks are the same

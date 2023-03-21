@@ -147,7 +147,6 @@ function calculate_BA_matrix_full(
         push!(BA_I, ix)
         push!(BA_J, to_b)
         push!(BA_V, -b_val)
-
     end
 
     BA = SparseArrays.sparse(BA_I, BA_J, BA_V)

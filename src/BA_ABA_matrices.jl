@@ -13,7 +13,7 @@ function BA_Matrix(sys::PSY.System)
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
     line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in setdiff(buses,ref_bus_positions)]
+    bus_ax = [PSY.get_number(bus) for bus in setdiff(buses, ref_bus_positions)]
     axes = (line_ax, bus_ax)
     lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
     data = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
@@ -43,7 +43,6 @@ function ABA_Matrix(A::SparseArrays.SparseMatrixCSC{Int8, Int},
 end
 
 function ABA_Matrix(sys::PSY.System)
-
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
     bus_lookup = make_ax_ref(buses)
@@ -54,14 +53,14 @@ function ABA_Matrix(sys::PSY.System)
 
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
-    axes = (line_ax, setdiff(bus_ax,ref_bus_positions))
+    axes = (line_ax, setdiff(bus_ax, ref_bus_positions))
     lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
     subnetworks = find_subnetworks(data, bus_ax)
 
     return ABA_Matrix(
-        data[setdiff(1:end, ref_bus_positions), setdiff(1:end, ref_bus_positions)], 
-        axes, 
-        lookup, 
+        data[setdiff(1:end, ref_bus_positions), setdiff(1:end, ref_bus_positions)],
+        axes,
+        lookup,
         ref_bus_positions,
         subnetworks)
 end

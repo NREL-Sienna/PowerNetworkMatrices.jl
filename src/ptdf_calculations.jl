@@ -23,7 +23,7 @@ end
 
 function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
     new_mat = sparsify(mat.data, tol)
-    return PTDF(new_mat, mat.axes, mat.lookup, Ref(tol))
+    return PTDF(new_mat, mat.axes, mat.lookup, mat.subnetworks, Ref(tol))
 end
 
 function _buildptdf(
@@ -256,7 +256,7 @@ function PTDF(
     if tol > eps()
         return PTDF(sparsify(S, tol), axes, look_up, Ref(tol))
     end
-    return PTDF(S, axes, look_up, Ref(tol))
+    return PTDF(S, axes, look_up, Dict{Int, Set{Int}}(), Ref(tol))
 end
 
 """
@@ -290,5 +290,7 @@ function PTDF(
     if tol > eps()
         return PTDF(sparsify(S, tol), axes, look_up, tol)
     end
-    return PTDF(S, A.axes, A.lookup, Ref(tol))
+    a, bus_lookup = calculate_adjacency(branches, nodes)
+
+    return PTDF(S, A.axes, A.lookup, Dict{Int, Set{Int}}(), Ref(tol))
 end
