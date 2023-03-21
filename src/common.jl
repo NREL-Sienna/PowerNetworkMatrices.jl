@@ -124,10 +124,54 @@ function calculate_BA_matrix(
     return BA
 end
 
+function calculate_BA_matrix_full(
+    branches,
+    bus_lookup::Dict{Int, Int})
+    BA_I = Int[]
+    BA_J = Int[]
+    BA_V = Float64[]
+
+    for (ix, b) in enumerate(branches)
+        if isa(b, PSY.DCBranch)
+            @warn("PTDF construction ignores DC-Lines")
+            continue
+        end
+
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+        b_val = PSY.get_series_susceptance(b)
+
+        push!(BA_I, ix)
+        push!(BA_J, fr_b)
+        push!(BA_V, b_val)
+
+        push!(BA_I, ix)
+        push!(BA_J, to_b)
+        push!(BA_V, -b_val)
+
+    end
+
+    BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
+
+    return BA
+end
+
 # ABA matrix evaluation ######################################################
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}},
     ref_bus_positions::Vector{Int})
     return A[:, setdiff(1:end, ref_bus_positions)]' * BA
+end
+
+function calculate_ABA_matrix_full(
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
+    BA_full::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}})
+
+    # do check on dimensions
+    if size(BA_full, 2) != size(A, 2)
+        error(
+            "BA must have the same column as A. Evaluate BA with 'calculate_BA_matrix_with_ref_buses'.")
+    end
+
+    return A' * BA_full
 end

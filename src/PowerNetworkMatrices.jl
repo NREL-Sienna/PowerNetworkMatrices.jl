@@ -4,6 +4,7 @@ export PTDF
 export VirtualPTDF
 export IncidenceMatrix
 export BA_Matrix
+export ABA_Matrix
 export Ybus
 export LODF
 export AdjacencyMatrix
