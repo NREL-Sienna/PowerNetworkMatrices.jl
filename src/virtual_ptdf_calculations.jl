@@ -6,7 +6,10 @@ struct RowCache
 end
 
 function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
-    max_num_keys = floor(Int, max_cache_size / row_size)
+    if length(persistent_rows)*row_size > ROW_PERSISTENT_CACHE_WARN
+        @warn("The minimum cache size for the persisted row is over 1 GiB. This specification will cause large memory usage")
+    end
+    max_num_keys = max(length(persistent_rows), floor(Int, max_cache_size / row_size), 1)
     return RowCache(
         sizehint!(Dict{Int, Array{Float64}}(), max_num_keys),
         persistent_rows,
@@ -28,6 +31,24 @@ function Base.empty!(cache::RowCache)
     return
 end
 
+function Base.haskey(cache::RowCache, key::Int)
+    return haskey(cache.temp_cache, key)
+end
+
+function Base.setindex!(cache::RowCache, val::Array{Float64}, key::Int)
+    check_cache_size!(cache)
+    cache.temp_cache[key] = val
+    return
+end
+
+function Base.getindex(cache::RowCache, key::Int)
+    return cache.temp_cache[key]
+end
+
+function Base.length(cache::RowCache)
+    return length(cache.temp_cache)
+end
+
 function purge!(cache::RowCache)
     for k in keys(cache.temp_cache)
         if k ∉ cache.persistent_cache_keys
@@ -39,7 +60,7 @@ function purge!(cache::RowCache)
 end
 
 function check_cache_size!(cache::RowCache)
-    if length(cache.temp_cache) > cache.max_num_keys
+    if length(cache.temp_cache) + 1 > cache.max_num_keys
         purge!(cache)
     end
     return
@@ -74,24 +95,31 @@ function VirtualPTDF(
     nodes::Vector{PSY.Bus};
     dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
-    max_cache_size::Int = MAX_CACHE_SIZE,
+    max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[])
 
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
-    look_up = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
+    line_ax_ref = make_ax_ref(line_ax)
+    bus_ax_ref = make_ax_ref(bus_ax)
+    look_up = (line_ax_ref, bus_ax_ref)
     A, ref_bus_positions = calculate_A_matrix(branches, nodes)
-    BA = calculate_BA_matrix(branches, ref_bus_positions, make_ax_ref(nodes))
+    BA = calculate_BA_matrix(branches, ref_bus_positions, bus_ax_ref)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     temp_data = zeros(length(bus_ax))
     if isempty(persistent_lines)
-        empty_cache = RowCache(max_cache_size, Set{Int}(), length(bus_ax) * sizeof(Float64))
-    else
-        init_persistent_dict = Set{Int}()
         empty_cache =
-            RowCache(max_cache_size, init_persistent_dict, length(bus_ax) * sizeof(Float64))
+            RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
+    else
+        init_persistent_dict = Set{Int}(line_ax_ref[k] for k in persistent_lines)
+        empty_cache =
+            RowCache(
+                max_cache_size * MiB,
+                init_persistent_dict,
+                length(bus_ax) * sizeof(Float64),
+            )
     end
     return VirtualPTDF(
         klu(ABA),
@@ -181,7 +209,6 @@ function _getindex(
     if haskey(vptdf.cache, row)
         return vptdf.cache[row][column]
     else
-        check_cache_size!(vptdf)
         # evaluate the value for the PTDF column
         vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .=
             KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
