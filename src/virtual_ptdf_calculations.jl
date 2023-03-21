@@ -1,4 +1,44 @@
-# TODO: add descriptions to functions
+struct RowCache
+    temp_cache::Dict{Int, Array{Float64}}
+    persistent_cache_keys::Set{Int}
+    max_cache_size::Int
+    max_num_keys::Int
+end
+
+function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size::Float64)
+    max_num_keys = floor(Int, max_cache_size / row_size)
+    return RowCache(
+        sizehint!(Dict{Int, Array{Float64}}(), max_num_keys),
+        persistent_rows,
+        max_cache_size,
+        max_num_keys,
+    )
+end
+
+function Base.isempty(cache::RowCache)
+    return isempty(cache.persistent_cache_keys) && isempty(cache.temp_cache)
+end
+
+function flush!(cache::RowCache)
+    if isempty(cache.persistent_cache_keys)
+        empty!(cache.temp_cache)
+    else
+        for k in keys(cache.temp_cache)
+            if k ∈ cache.persistent_cache_keys
+                continue
+            end
+            delete!(cache.temp_cache, k)
+        end
+    end
+    return
+end
+
+function check_cache_size!(cache::RowCache)
+    if length(cache.temp_cache) > cache.max_num_keys
+        flush!(cache)
+    end
+    return
+end
 
 """
 Power Transfer Distribution Factors (PTDF) indicate the incremental change in real power that occurs on transmission lines due to real power injections changes at the buses.
@@ -13,7 +53,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     axes::Ax
     lookup::L
     temp_data::Vector{Float64}
-    cache::Dict{Int, Array{Float64}}
+    cache::RowCache
     tol::Float64
 end
 
@@ -26,9 +66,11 @@ Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF 
 """
 function VirtualPTDF(
     branches,
-    nodes::Vector{PSY.Bus},
-    dist_slack::Vector{Float64} = [0.1],
-    tol::Float64 = eps())
+    nodes::Vector{PSY.Bus};
+    dist_slack::Vector{Float64} = Float64[],
+    tol::Float64 = eps(),
+    max_cache_size::Int = MAX_CACHE_SIZE,
+    persistent_lines::Vector{String} = String[])
 
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
@@ -38,8 +80,14 @@ function VirtualPTDF(
     A, ref_bus_positions = calculate_A_matrix(branches, nodes)
     BA = calculate_BA_matrix(branches, ref_bus_positions, make_ax_ref(nodes))
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-    empty_cache = Dict{Int, Array{Float64}}()
     temp_data = zeros(length(bus_ax))
+    if isempty(persistent_lines)
+        empty_cache = RowCache(max_cache_size, Set{Int}(), length(bus_ax) * sizeof(Float64))
+    else
+        init_persistent_dict = Set{Int}()
+        empty_cache =
+            RowCache(max_cache_size, init_persistent_dict, length(bus_ax) * sizeof(Float64))
+    end
     return VirtualPTDF(
         klu(ABA),
         BA,
@@ -61,12 +109,11 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
     The distributed slack vector has to be the same length as the number of buses
 """
 function VirtualPTDF(
-    sys::PSY.System,
-    dist_slack::Vector{Float64} = [0.1])
+    sys::PSY.System; kwargs...)
     branches = get_ac_branches(sys)
     nodes = get_buses(sys)
 
-    return VirtualPTDF(branches, nodes, dist_slack)
+    return VirtualPTDF(branches, nodes; kwargs...)
 end
 
 # Overload Base functions
@@ -129,8 +176,10 @@ function _getindex(
     if haskey(vptdf.cache, row)
         return vptdf.cache[row][column]
     else
+        check_cache_size!(vptdf)
         # evaluate the value for the PTDF column
-        vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .= KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
+        vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .=
+            KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
         # add slack bus value (zero) and make copy of temp into the cache
         vptdf.cache[row] = deepcopy(vptdf.temp_data)
         return vptdf.cache[row][column]
