@@ -20,8 +20,31 @@ include("testing_data.jl")
 sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 sys10 = get_10bus_test_system()
 
+## check ABA matrix
+
+# new version
+ABA = ABA_Matrix(sys5)
+
+# old version
+BA = BA_Matrix(sys5)
+A = IncidenceMatrix(sys5)
+ABA = PowerNetworkMatrices.calculate_ABA_matrix(A.data, BA.data, A.ref_bus_positions)
+
+
+# get M matrix
 M = AdjacencyMatrix(sys5)
-BA = PowerNetworkMatrices.BA_matrix(sys5)
+
+BA = BA_Matrix(sys5)
+
+ABA = PowerNetworkMatrices.ABA_Matrix(sys5)
+
+# get BA matrix
+branches = PowerNetworkMatrices.get_ac_branches(sys5)
+A = IncidenceMatrix(sys5)
+BA = PowerNetworkMatrices.calculate_BA_matrix(
+    branches, A.ref_bus_positions, A.lookup[2])
+
+# that using first check 
 
 # break down function
 branches = PowerNetworkMatrices.get_ac_branches(sys5)
@@ -33,7 +56,6 @@ bus_ax = [PSY.get_number(bus) for bus in setdiff(buses,ref_bus_positions)]
 axes = (line_ax, bus_ax)
 data = PowerNetworkMatrices.calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
 
-typeof(axes)
 
 rows = SparseArrays.rowvals(M)
 _, n = size(M)

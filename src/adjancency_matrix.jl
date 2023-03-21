@@ -167,7 +167,7 @@ function find_connected_components(
     return Set(connected_components)
 end
 
-function find_subnetworks(M::AdjacencyMatrix)
+function find_subnetworks(M<:Union{AdjacencyMatrix, ABA_Matrix})
     bus_numbers = M.axes[1]
     return find_subnetworks(M.data, bus_numbers)
 end
