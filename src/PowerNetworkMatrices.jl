@@ -22,6 +22,7 @@ const IS = InfrastructureSystems
 const PSY = PowerSystems
 
 import SparseArrays
+import SparseArrays: rowvals, nzrange
 import KLU: klu
 import KLU
 import LinearAlgebra: LAPACK.getri!, LAPACK.getrf!, BLAS.gemm, BLAS.set_num_threads
