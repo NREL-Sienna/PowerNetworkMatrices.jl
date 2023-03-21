@@ -3,11 +3,26 @@ Power Transfer Distribution Factors (PTDF) indicate the incremental change in re
 
 The PTDF struct is indexed using the Bus numbers and branch names
 """
-struct PTDF{Ax, L <: NTuple{2, Dict}, T} <: PowerNetworkMatrix{T}
-    data::AbstractArray{T, 2}
+struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
+       PowerNetworkMatrix{Float64}
+    data::M
     axes::Ax
     lookup::L
-    tol::Float64
+    tol::Base.RefValue{Float64}
+end
+
+function drop_small_entries!(mat::PTDF, tol::Float64)
+    if tol > mat.tol[]
+        @info "Specified tolerance is smaller than the current tolerance."
+    end
+    make_entries_zero!(mat.data, tol)
+    mat.tol[] = tol
+    return
+end
+
+function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
+    new_mat = sparsify(mat.data, tol)
+    return PTDF(new_mat, mat.axes, mat.lookup, Ref(tol))
 end
 
 function _buildptdf(
@@ -223,17 +238,21 @@ Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF 
 """
 function PTDF(
     branches,
-    nodes::Vector{PSY.Bus},
-    dist_slack::Vector{Float64} = Float64[];
-    linear_solver::String = "Dense")
-
+    nodes::Vector{PSY.Bus};
+    dist_slack::Vector{Float64} = Float64[],
+    linear_solver::String = "Dense",
+    tol::Float64 = eps())
+    validate_linear_solver(linear_solver)
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
     look_up = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
     S, _ = _buildptdf(branches, nodes, look_up[2], dist_slack, linear_solver)
-    return PTDF(S, axes, look_up, eps())
+    if tol > eps()
+        return PTDF(sparsify(S, tol), axes, look_up, Ref(tol))
+    end
+    return PTDF(S, axes, look_up, Ref(tol))
 end
 
 """
@@ -246,25 +265,26 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 - `tol::Float64`: Tolerance to eliminate entries in the PTDF matrix (default eps())
 """
 function PTDF(
-    sys::PSY.System,
-    dist_slack::Vector{Float64} = Float64[];
-    linear_solver::String = "Dense")
+    sys::PSY.System;
+    kwargs...,
+)
     branches = get_ac_branches(sys)
     nodes = get_buses(sys)
-    validate_linear_solver(linear_solver)
-
-    return PTDF(branches, nodes, dist_slack; linear_solver)
+    return PTDF(branches, nodes; kwargs...)
 end
 
 # version 2: use BA and ABA fucntions created before #########################
 
 function PTDF(
     A::IncidenceMatrix,
-    BA::BA_Matrix,
-    dist_slack::Vector{Float64} = Float64[];
-    linear_solver = "Dense")
+    BA::BA_Matrix;
+    dist_slack::Vector{Float64} = Float64[],
+    linear_solver = "Dense",
+    tol::Float64 = eps())
     validate_linear_solver(linear_solver)
     S = _buildptdf_from_matrices(A, BA.data, dist_slack, linear_solver)
-
-    return PTDF(S, A.axes, A.lookup, eps())
+    if tol > eps()
+        return PTDF(sparsify(S, tol), axes, look_up, tol)
+    end
+    return PTDF(S, A.axes, A.lookup, Ref(tol))
 end
