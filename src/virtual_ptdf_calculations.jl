@@ -14,8 +14,8 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     lookup::L
     temp_data::Vector{Float64}
     cache::Dict{Int, Array{Float64}}
-    tol::Float64
     subnetworks::Dict{Int, Set{Int}}
+    tol::Base.RefValue{Float64}
 end
 
 """
@@ -51,7 +51,7 @@ function VirtualPTDF(
         look_up,
         temp_data,
         empty_cache,
-        tol,
+        Ref(tol),
     )
 end
 

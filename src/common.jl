@@ -158,20 +158,52 @@ end
 # ABA matrix evaluation ######################################################
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
-    BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}},
+    BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Vector{Int})
     return A[:, setdiff(1:end, ref_bus_positions)]' * BA
 end
 
-function calculate_ABA_matrix_full(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int},
-    BA_full::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}})
-
-    # do check on dimensions
-    if size(BA_full, 2) != size(A, 2)
-        error(
-            "BA must have the same column as A. Evaluate BA with 'calculate_BA_matrix_with_ref_buses'.")
+function sparsify(dense_array::Matrix{Float64}, tol::Float64)
+    m, n = size(dense_array)
+    sparse_array = SparseArrays.spzeros(m, n)
+    for i in 1:m, j in 1:n
+        if abs(dense_array[i, j]) > tol
+            sparse_array[i, j] = dense_array[i, j]
+        end
     end
+    return sparse_array
+end
 
-    return A' * BA_full
+function make_entries_zero!(
+    sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
+    tol::Float64,
+)
+    for i in eachindex(sparse_array)
+        if abs(sparse_array[i]) <= tol
+            sparse_array[i] = 0.0
+        end
+    end
+    SparseArrays.dropzeros!(sparse_array)
+    return
+end
+
+function make_entries_zero!(
+    dense_array::Matrix{Float64},
+    tol::Float64,
+)
+    for i in eachindex(dense_array)
+        if abs(dense_array[i]) <= tol
+            dense_array[i] = 0.0
+        end
+    end
+    return
+end
+
+function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
+    for i in eachindex(vector)
+        if abs(vector[i]) <= tol
+            vector[i] = 0.0
+        end
+    end
+    return vector
 end
