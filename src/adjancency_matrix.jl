@@ -189,7 +189,13 @@ function find_subnetworks(M, bus_numbers::Vector{Int})
     return bus_groups
 end
 
-function dfs(index::Int, M, bus_numbers::Vector{Int}, bus_group::Set{Int}, touched::Set{Int})
+function dfs(
+    index::Int,
+    M,
+    bus_numbers::Vector{Int},
+    bus_group::Set{Int},
+    touched::Set{Int},
+)
     rows = SparseArrays.rowvals(M)
     for j in SparseArrays.nzrange(M, index)
         row_ix = rows[j]

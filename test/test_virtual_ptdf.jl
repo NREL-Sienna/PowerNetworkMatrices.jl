@@ -39,7 +39,7 @@ end
         aa = ptdf_virtual.cache[i]
         bb = ptdf_virtual.cache[i + Int(branch_number / 2)]
         ptdf_first_area[i, :] .= aa[1:Int(bus_number / 2)]
-        ptdf_second_area[i, :] .= bb[Int(bus_number / 2)+1:end]
+        ptdf_second_area[i, :] .= bb[(Int(bus_number / 2) + 1):end]
     end
     @test isapprox(ptdf_first_area, ptdf_second_area, atol = 1e-6)
 end
