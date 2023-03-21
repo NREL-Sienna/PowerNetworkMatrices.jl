@@ -1,6 +1,7 @@
 # BA matrix ##################################################################
-struct BA_Matrix <: PowerNetworkMatrix{Float64}
+struct BA_Matrix{Ax <: NTuple{2, Dict}, T} <: PowerNetworkMatrix{T}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
+    axes::Ax
     ref_bus_positions::Vector{Int}
 end
 
@@ -10,9 +11,11 @@ function BA_Matrix(sys::PSY.System)
     buses = get_buses(sys)
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
-
+    line_ax = [PSY.get_name(branch) for branch in branches]
+    bus_ax = [PSY.get_number(bus) for bus in setdiff(buses,ref_bus_positions)]
+    axes = (line_ax, bus_ax)
     data = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
-    return BA_Matrix(data, ref_bus_positions)
+    return BA_Matrix(data, axes, ref_bus_positions)
 end
 
 # ABA matrix #################################################################
