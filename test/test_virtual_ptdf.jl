@@ -45,7 +45,7 @@ end
 end
 
 @testset "Test virtual PTDF cache" begin
-    RTS = build_system(PSITestSystems, "test_RTS_GMLC_sys");
+    RTS = build_system(PSITestSystems, "test_RTS_GMLC_sys")
     line_names = get_name.(get_components(Line, RTS))
     persist_lines = line_names[1:10]
 
@@ -55,5 +55,8 @@ end
         @test size(vptdf[l, :]) == (73,)
     end
 
-    @test length(vptdf.cache) == vptdf.cache.max_num_keys
+    @test length(vptdf.cache) == vptdf.cache.max_num_keys + 1
+    for l in persist_lines
+        @test vptdf.lookup[1][l] ∈ keys(vptdf.cache.temp_cache)
+    end
 end
