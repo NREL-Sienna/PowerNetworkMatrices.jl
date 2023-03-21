@@ -35,9 +35,10 @@ function VirtualPTDF(
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
-    look_up = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
+    M, bus_ax_ref = calculate_adjacency(branches, nodes)
+    look_up = (make_ax_ref(line_ax), bus_ax_ref)
     A, ref_bus_positions = calculate_A_matrix(branches, nodes)
-    BA = calculate_BA_matrix(branches, ref_bus_positions, make_ax_ref(nodes))
+    BA = calculate_BA_matrix(branches, ref_bus_positions, bus_ax_ref)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     # Here add the subnetwork detection
     empty_cache = Dict{Int, Array{Float64}}()
@@ -51,6 +52,7 @@ function VirtualPTDF(
         look_up,
         temp_data,
         empty_cache,
+        find_subnetworks(M, bus_ax),
         Ref(tol),
     )
 end
