@@ -127,7 +127,39 @@ end
 # ABA matrix evaluation ######################################################
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
-    BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}},
+    BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Vector{Int})
     return A[:, setdiff(1:end, ref_bus_positions)]' * BA
+end
+
+function drop_entries(dense_array::Matrix{Float64}, tol::Float64)
+    m, n = size(M)
+    sparse_array = spzeros(m, n)
+    for i in 1:m, j in 1:n
+        if abs(dense_[i, j]) > tol
+            sparse_array[i, j] = dense_array[i, j]
+        end
+    end
+    return sparse_array
+end
+
+function drop_entries!(
+    sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
+    tol::Float64,
+)
+    for i in eachindex(sparse_array)
+        if abs(sparse_array[i]) <= tol
+            sparse_array[i] = 0.0
+        end
+    end
+    return dropzeros!(sparse_array)
+end
+
+function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
+    for i in eachindex(vector)
+        if abs(vector[i]) <= tol
+            vector[i] = 0.0
+        end
+    end
+    return vector
 end
