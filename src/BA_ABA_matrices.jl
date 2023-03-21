@@ -47,5 +47,5 @@ function ABA_Matrix(sys::PSY.System)
         axes,
         lookup,
         ref_bus_positions,
-        )
+    )
 end
