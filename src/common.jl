@@ -132,11 +132,11 @@ function calculate_ABA_matrix(
     return A[:, setdiff(1:end, ref_bus_positions)]' * BA
 end
 
-function drop_entries(dense_array::Matrix{Float64}, tol::Float64)
-    m, n = size(M)
-    sparse_array = spzeros(m, n)
+function sparsify(dense_array::Matrix{Float64}, tol::Float64)
+    m, n = size(dense_array)
+    sparse_array = SparseArrays.spzeros(m, n)
     for i in 1:m, j in 1:n
-        if abs(dense_[i, j]) > tol
+        if abs(dense_array[i, j]) > tol
             sparse_array[i, j] = dense_array[i, j]
         end
     end
@@ -152,7 +152,7 @@ function drop_entries!(
             sparse_array[i] = 0.0
         end
     end
-    return dropzeros!(sparse_array)
+    return SparseArrays.dropzeros!(sparse_array)
 end
 
 function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
