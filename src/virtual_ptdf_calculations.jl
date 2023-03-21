@@ -5,7 +5,7 @@ struct RowCache
     max_num_keys::Int
 end
 
-function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size::Float64)
+function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
     max_num_keys = floor(Int, max_cache_size / row_size)
     return RowCache(
         sizehint!(Dict{Int, Array{Float64}}(), max_num_keys),
@@ -19,15 +19,20 @@ function Base.isempty(cache::RowCache)
     return isempty(cache.persistent_cache_keys) && isempty(cache.temp_cache)
 end
 
-function flush!(cache::RowCache)
-    if isempty(cache.persistent_cache_keys)
-        empty!(cache.temp_cache)
-    else
-        for k in keys(cache.temp_cache)
-            if k ∈ cache.persistent_cache_keys
-                continue
-            end
+function Base.empty!(cache::RowCache)
+    isempty(cache.temp_cache) && return
+    if !isempty(cache.persistent_cache_keys)
+        @warn("Calling empty! will delete entries for the persistent rows")
+    end
+    empty!(cache.temp_cache)
+    return
+end
+
+function purge!(cache::RowCache)
+    for k in keys(cache.temp_cache)
+        if k ∉ cache.persistent_cache_keys
             delete!(cache.temp_cache, k)
+            break
         end
     end
     return
@@ -35,7 +40,7 @@ end
 
 function check_cache_size!(cache::RowCache)
     if length(cache.temp_cache) > cache.max_num_keys
-        flush!(cache)
+        purge!(cache)
     end
     return
 end
