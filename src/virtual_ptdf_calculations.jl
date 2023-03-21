@@ -130,7 +130,8 @@ function _getindex(
         return vptdf.cache[row][column]
     else
         # evaluate the value for the PTDF column
-        vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .= KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
+        vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .=
+            KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
         # add slack bus value (zero) and make copy of temp into the cache
         vptdf.cache[row] = deepcopy(vptdf.temp_data)
         return vptdf.cache[row][column]
