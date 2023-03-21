@@ -6,10 +6,14 @@ struct RowCache
 end
 
 function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
-    if length(persistent_rows)*row_size > ROW_PERSISTENT_CACHE_WARN
-        @warn("The minimum cache size for the persisted row is over 1 GiB. This specification will cause large memory usage")
+    if (length(persistent_rows) + 1) * row_size > ROW_PERSISTENT_CACHE_WARN
+        @warn "The minimum cache size for the persisted row is over 1 GiB. This specification will cause large memory usage"
+    elseif (length(persistent_rows) + 1) * row_size > max_cache_size
+        @info "The minimum cache size for the persisted row is greater than the maximum cache size. Ignoring max_cache_size = $(max_cache_size) MiB value"
+    else
+        @debug "required cache for persisted values = $((length(persistent_rows) + 1)*row_size). Max cache specification = $(max_cache_size)"
     end
-    max_num_keys = max(length(persistent_rows), floor(Int, max_cache_size / row_size), 1)
+    max_num_keys = max(length(persistent_rows) + 1, floor(Int, max_cache_size / row_size))
     return RowCache(
         sizehint!(Dict{Int, Array{Float64}}(), max_num_keys),
         persistent_rows,
@@ -60,7 +64,7 @@ function purge!(cache::RowCache)
 end
 
 function check_cache_size!(cache::RowCache)
-    if length(cache.temp_cache) + 1 > cache.max_num_keys
+    if length(cache.temp_cache) > cache.max_num_keys
         purge!(cache)
     end
     return
