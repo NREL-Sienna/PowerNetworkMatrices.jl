@@ -187,8 +187,6 @@ function find_subnetworks(M, bus_numbers::Vector{Int})
         end
     end
 
-    
-
     return bus_groups
 end
 
