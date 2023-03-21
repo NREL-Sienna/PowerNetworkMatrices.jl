@@ -290,7 +290,6 @@ function PTDF(
     if tol > eps()
         return PTDF(sparsify(S, tol), axes, look_up, tol)
     end
-    a, bus_lookup = calculate_adjacency(branches, nodes)
 
     return PTDF(S, A.axes, A.lookup, Dict{Int, Set{Int}}(), Ref(tol))
 end
