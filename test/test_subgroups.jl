@@ -18,21 +18,30 @@ const DATA_DIR = PSB.DATA_DIR
 include("testing_data.jl")
 
 sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-sys10 = get_10bus_test_system()
 
-## check ABA matrix
+## check ABA matrix ##########################################################
 
 # new version
 ABA = ABA_Matrix(sys5)
-
 # old version
 BA = BA_Matrix(sys5)
 A = IncidenceMatrix(sys5)
-ABA = PowerNetworkMatrices.calculate_ABA_matrix(A.data, BA.data, A.ref_bus_positions)
+ABA_2 = PowerNetworkMatrices.calculate_ABA_matrix(A.data, BA.data, A.ref_bus_positions)
+@test isapprox(ABA.data, ABA_2, atol=1e-7)
 
+## compare M with ABA ########################################################
 
-# get M matrix
+# get M matrix and test if the sub_networks are the same
 M = AdjacencyMatrix(sys5)
+sub1 = find_subnetworks(M)
+sub2 = find_subnetworks(ABA)
+# check that the methods have the same keys and values
+@test keys(sub1) == keys(sub2)
+for key in keys(sub1)
+    @test setdiff(sub1[key], sub2[key]) == []
+end
+
+sys10 = get_10bus_test_system()
 
 BA = BA_Matrix(sys5)
 
