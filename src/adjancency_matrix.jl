@@ -168,13 +168,13 @@ function find_connected_components(
 end
 
 function find_subnetworks(M::AdjacencyMatrix)
-    return find_subnetworks(M.data)
+    bus_numbers = M.axes[1]
+    return find_subnetworks(M.data, bus_numbers)
 end
 
-function find_subnetworks(M)
-    rows = rowvals(M.data)
-    _, n = size(M.data)
-    bus_numbers = M.axes[1]
+function find_subnetworks(M, bus_numbers::Vector{Int})
+    rows = SparseArrays.rowvals(M)
+    _, n = size(M)
     touched = Set{Int}()
     bus_groups = Dict{Int, Set{Int}}()
 
@@ -183,21 +183,20 @@ function find_subnetworks(M)
         if bus_numbers[row_ix] ∉ touched
             push!(touched, bus_numbers[row_ix])
             bus_groups[bus_numbers[row_ix]] = Set{Int}()
-            dfs(row_ix, A, _bus_groups[bus_numbers[row_ix]], touched)
+            dfs(row_ix, M, bus_numbers, bus_groups[bus_numbers[row_ix]], touched)
         end
     end
     return bus_groups
 end
 
-function dfs(index::Int, M, bus_group::Set{Int}, touched::Set{Int})
-    bus_numbers = M.axes[1]
-    rows = rowvals(M.data)
-    for j in nzrange(M.data, index)
+function dfs(index::Int, M, bus_numbers::Vector{Int}, bus_group::Set{Int}, touched::Set{Int})
+    rows = SparseArrays.rowvals(M)
+    for j in SparseArrays.nzrange(M, index)
         row_ix = rows[j]
         if bus_numbers[row_ix] ∉ touched
             push!(touched, bus_numbers[row_ix])
             push!(bus_group, bus_numbers[row_ix])
-            dfs(row_ix, A, bus_group, touched)
+            dfs(row_ix, M, bus_numbers, bus_group, touched)
         end
     end
     return
