@@ -15,6 +15,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     temp_data::Vector{Float64}
     cache::Dict{Int, Array{Float64}}
     tol::Float64
+    subnetworks::Dict{Int, Set{Int}}
 end
 
 """
@@ -38,6 +39,7 @@ function VirtualPTDF(
     A, ref_bus_positions = calculate_A_matrix(branches, nodes)
     BA = calculate_BA_matrix(branches, ref_bus_positions, make_ax_ref(nodes))
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
+    # Here add the subnetwork detection
     empty_cache = Dict{Int, Array{Float64}}()
     temp_data = zeros(length(bus_ax))
     return VirtualPTDF(
