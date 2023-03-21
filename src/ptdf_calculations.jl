@@ -237,7 +237,7 @@ function PTDF(
     axes = (line_ax, bus_ax)
     look_up = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
     S, _ = _buildptdf(branches, nodes, look_up[2], dist_slack, linear_solver)
-    return PTDF(S, axes, look_up, eps())
+    return PTDF(S, axes, look_up, eps(), Dict{Int, Set{Int}}())
 end
 
 """
