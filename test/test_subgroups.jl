@@ -20,8 +20,8 @@ include("testing_data.jl")
 sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 sys10 = get_10bus_test_system()
 
-# M = AdjacencyMatrix(sys5)
-BA = PowerNetworkMatrices.BA_Matrix(sys5)
+M = AdjacencyMatrix(sys5)
+BA = PowerNetworkMatrices.BA_matrix(sys5)
 
 # break down function
 branches = PowerNetworkMatrices.get_ac_branches(sys5)
@@ -33,11 +33,7 @@ bus_ax = [PSY.get_number(bus) for bus in setdiff(buses,ref_bus_positions)]
 axes = (line_ax, bus_ax)
 data = PowerNetworkMatrices.calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
 
-A = IncidenceMatrix(sys5)
-typeof(A.axes) <: NTuple{2, Dict}
-
-PTDF(sys5)
-PTDF(branches, buses)
+typeof(axes)
 
 rows = SparseArrays.rowvals(M)
 _, n = size(M)
