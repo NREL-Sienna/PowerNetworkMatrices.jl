@@ -145,66 +145,7 @@ function dfs_connectivity(M::SparseArrays.SparseMatrixCSC,
     return connected
 end
 
-function find_connected_components(
-    M::SparseArrays.SparseMatrixCSC,
-    bus_lookup::Dict{Int, Int},
-)
-    pm_buses = Dict([i => Dict("bus_type" => 1, "bus_i" => b) for (i, b) in bus_lookup])
-
-    arcs = findall((LinearAlgebra.UpperTriangular(M) - LinearAlgebra.I) .!= 0)
-    pm_branches = Dict([
-        i => Dict("f_bus" => a[1], "t_bus" => a[2], "br_status" => 1) for
-        (i, a) in enumerate(arcs)
-    ],)
-
-    data = Dict("bus" => pm_buses, "branch" => pm_branches)
-    cc = PSY.calc_connected_components(data)
-    bus_decode = Dict(value => key for (key, value) in bus_lookup)
-    connected_components = Vector{Set{Int}}()
-    for c in cc
-        push!(connected_components, Set([bus_decode[b] for b in c]))
-    end
-    return Set(connected_components)
-end
-
 function find_subnetworks(M::AdjacencyMatrix)
     bus_numbers = M.axes[2]
     return find_subnetworks(M.data, bus_numbers)
-end
-
-function find_subnetworks(M, bus_numbers::Vector{Int})
-    rows = SparseArrays.rowvals(M)
-    _, n = size(M)
-    touched = Set{Int}()
-    bus_groups = Dict{Int, Set{Int}}()
-
-    for j in 1:n
-        row_ix = rows[j]
-        if bus_numbers[row_ix] ∉ touched
-            push!(touched, bus_numbers[row_ix])
-            bus_groups[bus_numbers[row_ix]] = Set{Int}()
-            dfs(row_ix, M, bus_numbers, bus_groups[bus_numbers[row_ix]], touched)
-        end
-    end
-
-    return bus_groups
-end
-
-function dfs(
-    index::Int,
-    M,
-    bus_numbers::Vector{Int},
-    bus_group::Set{Int},
-    touched::Set{Int},
-)
-    rows = SparseArrays.rowvals(M)
-    for j in SparseArrays.nzrange(M, index)
-        row_ix = rows[j]
-        if bus_numbers[row_ix] ∉ touched
-            push!(touched, bus_numbers[row_ix])
-            push!(bus_group, bus_numbers[row_ix])
-            dfs(row_ix, M, bus_numbers, bus_group, touched)
-        end
-    end
-    return
 end
