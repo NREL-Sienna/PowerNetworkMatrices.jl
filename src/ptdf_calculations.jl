@@ -31,10 +31,10 @@ function _buildptdf(
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
-    linear_solver::String = "Dense")
+    linear_solver::String = "KLU")
     if linear_solver == "KLU"
         PTDFm, A = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
-    elseif linear_solver == "Dense"
+    elseif linear_solver == "KLU"
         PTDFm, A = calculate_PTDF_matrix_DENSE(branches, nodes, bus_lookup, dist_slack)
     elseif linear_solver == "MKLPardiso"
         PTDFm, A = calculate_PTDF_matrix_MKLPardiso(branches, nodes, bus_lookup, dist_slack)
@@ -50,7 +50,7 @@ function _buildptdf_from_matrices(
     linear_solver::String)
     if linear_solver == "KLU"
         PTDFm = _calculate_PTDF_matrix_KLU(A.data, BA, A.ref_bus_positions, dist_slack)
-    elseif linear_solver == "Dense"
+    elseif linear_solver == "KLU"
         # Convert SparseMatrices to Dense
         PTDFm = _calculate_PTDF_matrix_DENSE(
             Matrix(A.data),
@@ -244,19 +244,21 @@ function PTDF(
     branches,
     nodes::Vector{PSY.Bus};
     dist_slack::Vector{Float64} = Float64[],
-    linear_solver::String = "Dense",
+    linear_solver::String = "KLU",
     tol::Float64 = eps())
     validate_linear_solver(linear_solver)
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
-    look_up = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
+    M, bus_ax_ref = calculate_adjacency(branches, nodes)
+    subnetworks = find_subnetworks(M, bus_ax)
+    look_up = (make_ax_ref(line_ax), bus_ax_ref)
     S, _ = _buildptdf(branches, nodes, look_up[2], dist_slack, linear_solver)
     if tol > eps()
         return PTDF(sparsify(S, tol), axes, look_up, Ref(tol))
     end
-    return PTDF(S, axes, look_up, Dict{Int, Set{Int}}(), Ref(tol))
+    return PTDF(S, axes, look_up, subnetworks, Ref(tol))
 end
 
 """
@@ -283,7 +285,7 @@ function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
     dist_slack::Vector{Float64} = Float64[],
-    linear_solver = "Dense",
+    linear_solver = "KLU",
     tol::Float64 = eps())
     validate_linear_solver(linear_solver)
     S = _buildptdf_from_matrices(A, BA.data, dist_slack, linear_solver)
