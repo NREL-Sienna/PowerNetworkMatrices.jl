@@ -4,12 +4,14 @@ export PTDF
 export VirtualPTDF
 export IncidenceMatrix
 export BA_Matrix
+export ABA_Matrix
 export Ybus
 export LODF
 export AdjacencyMatrix
 
 export dfs_connectivity
 export find_connected_components
+export find_subnetworks
 export validate_connectivity
 
 using DocStringExtensions
@@ -21,6 +23,7 @@ const IS = InfrastructureSystems
 const PSY = PowerSystems
 
 import SparseArrays
+import SparseArrays: rowvals, nzrange
 import KLU: klu
 import KLU
 import LinearAlgebra: LAPACK.getri!, LAPACK.getrf!, BLAS.gemm, BLAS.set_num_threads

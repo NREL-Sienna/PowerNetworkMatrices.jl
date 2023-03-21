@@ -124,6 +124,37 @@ function calculate_BA_matrix(
     return BA
 end
 
+function calculate_BA_matrix_full(
+    branches,
+    bus_lookup::Dict{Int, Int})
+    BA_I = Int[]
+    BA_J = Int[]
+    BA_V = Float64[]
+
+    for (ix, b) in enumerate(branches)
+        if isa(b, PSY.DCBranch)
+            @warn("PTDF construction ignores DC-Lines")
+            continue
+        end
+
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+        b_val = PSY.get_series_susceptance(b)
+
+        push!(BA_I, ix)
+        push!(BA_J, fr_b)
+        push!(BA_V, b_val)
+
+        push!(BA_I, ix)
+        push!(BA_J, to_b)
+        push!(BA_V, -b_val)
+
+    end
+
+    BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
+
+    return BA
+end
+
 # ABA matrix evaluation ######################################################
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
