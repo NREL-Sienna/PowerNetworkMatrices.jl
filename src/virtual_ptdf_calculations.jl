@@ -85,7 +85,8 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     lookup::L
     temp_data::Vector{Float64}
     cache::RowCache
-    tol::Float64
+    subnetworks::Dict{Int, Set{Int}}
+    tol::Base.RefValue{Float64}
 end
 
 """
@@ -107,12 +108,18 @@ function VirtualPTDF(
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
+    M, bus_ax_ref = calculate_adjacency(branches, nodes)
     line_ax_ref = make_ax_ref(line_ax)
-    bus_ax_ref = make_ax_ref(bus_ax)
     look_up = (line_ax_ref, bus_ax_ref)
     A, ref_bus_positions = calculate_A_matrix(branches, nodes)
     BA = calculate_BA_matrix(branches, ref_bus_positions, bus_ax_ref)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
+    ref_bus_positions = find_slack_positions(nodes)
+    subnetworks = find_subnetworks(M, bus_ax)
+    if length(subnetworks) > 1
+        @info "Network is not connected, using subnetworks"
+        subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
+    end
     temp_data = zeros(length(bus_ax))
     if isempty(persistent_lines)
         empty_cache =
@@ -135,7 +142,8 @@ function VirtualPTDF(
         look_up,
         temp_data,
         empty_cache,
-        tol,
+        subnetworks,
+        Ref(tol),
     )
 end
 

@@ -127,7 +127,117 @@ end
 # ABA matrix evaluation ######################################################
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
-    BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}},
+    BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Vector{Int})
     return A[:, setdiff(1:end, ref_bus_positions)]' * BA
+end
+
+function sparsify(dense_array::Matrix{Float64}, tol::Float64)
+    m, n = size(dense_array)
+    sparse_array = SparseArrays.spzeros(m, n)
+    for i in 1:m, j in 1:n
+        if abs(dense_array[i, j]) > tol
+            sparse_array[i, j] = dense_array[i, j]
+        end
+    end
+    return sparse_array
+end
+
+function make_entries_zero!(
+    sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
+    tol::Float64,
+)
+    for i in eachindex(sparse_array)
+        if abs(sparse_array[i]) <= tol
+            sparse_array[i] = 0.0
+        end
+    end
+    SparseArrays.dropzeros!(sparse_array)
+    return
+end
+
+function make_entries_zero!(
+    dense_array::Matrix{Float64},
+    tol::Float64,
+)
+    for i in eachindex(dense_array)
+        if abs(dense_array[i]) <= tol
+            dense_array[i] = 0.0
+        end
+    end
+    return
+end
+
+function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
+    for i in eachindex(vector)
+        if abs(vector[i]) <= tol
+            vector[i] = 0.0
+        end
+    end
+    return vector
+end
+
+function assing_reference_buses(
+    subnetworks::Dict{Int, Set{Int}},
+    ref_bus_positions::Vector{Int},
+)
+    bus_groups = Dict{Int, Set{Int}}()
+    for (bus_key, subnetwork_buses) in subnetworks
+        ref_bus = intersect(ref_bus_positions, subnetwork_buses)
+        if length(ref_bus) == 1
+            bus_groups[ref_bus[1]] = pop!(subnetworks, bus_key)
+            continue
+        elseif length(ref_bus) == 0
+            @error "No reference bus in the subnetwork associated with bus $bus_key"
+        elseif length(ref_bus) > 1
+            error(
+                "More than one reference bus in the subnetwork associated with bus $bus_key",
+            )
+        else
+            @assert false
+        end
+    end
+    return bus_groups
+end
+
+function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
+    rows = SparseArrays.rowvals(M)
+    touched = Set{Int}()
+    subnetworks = Dict{Int, Set{Int}}()
+    for (ix, bus_number) in enumerate(bus_numbers)
+        neighbors = SparseArrays.nzrange(M, ix)
+        if length(neighbors) < 1
+            @warn "Bus $bus_number is islanded"
+            subnetworks[bus_number] = Set{Int}(bus_number)
+            continue
+        end
+        for j in SparseArrays.nzrange(M, ix)
+            row_ix = rows[j]
+            if bus_number ∉ touched
+                push!(touched, bus_number)
+                subnetworks[bus_number] = Set{Int}(bus_number)
+                _dfs(row_ix, M, bus_numbers, subnetworks[bus_number], touched)
+            end
+        end
+    end
+    return subnetworks
+end
+
+function _dfs(
+    index::Int,
+    M::SparseArrays.SparseMatrixCSC,
+    bus_numbers::Vector{Int},
+    bus_group::Set{Int},
+    touched::Set{Int},
+)
+    rows = SparseArrays.rowvals(M)
+    for j in SparseArrays.nzrange(M, index)
+        row_ix = rows[j]
+        if bus_numbers[row_ix] ∉ touched
+            push!(touched, bus_numbers[row_ix])
+            push!(bus_group, bus_numbers[row_ix])
+            _dfs(row_ix, M, bus_numbers, bus_group, touched)
+        end
+    end
+    return
 end
