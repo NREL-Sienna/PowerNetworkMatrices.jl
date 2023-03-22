@@ -40,6 +40,8 @@ function VirtualPTDF(
     A, ref_bus_positions = calculate_A_matrix(branches, nodes)
     BA = calculate_BA_matrix(branches, ref_bus_positions, bus_ax_ref)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
+    ref_bus_positions = find_slack_positions(nodes)
+    subnetworks = find_subnetworks(M, bus_ax, ref_bus_positions)
     # Here add the subnetwork detection
     empty_cache = Dict{Int, Array{Float64}}()
     temp_data = zeros(length(bus_ax))
@@ -52,7 +54,7 @@ function VirtualPTDF(
         look_up,
         temp_data,
         empty_cache,
-        find_subnetworks(M, bus_ax),
+        subnetworks,
         Ref(tol),
     )
 end
