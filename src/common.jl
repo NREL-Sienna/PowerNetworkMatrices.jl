@@ -80,7 +80,6 @@ function calculate_adjacency(
         a[to_b, fr_b] = -1
         a[fr_b, fr_b] = 1
         a[to_b, to_b] = 1
-        
     end
 
     # Return both for type stability
