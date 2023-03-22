@@ -13,7 +13,8 @@ function validate_connectivity(sys::PSY.System)
         by = x -> PSY.get_number(x),
     )
     branches = get_ac_branches(sys)
+    @info "Validating connectivity with depth first search (network traversal)"
     M, bus_lookup = calculate_adjacency(branches, nodes)
     sbn = find_subnetworks(M, collect(keys(bus_lookup)))
-    return sbn == 1
+    return length(sbn) == 1
 end
