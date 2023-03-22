@@ -12,5 +12,10 @@ end
 @testset "Test disconnected networks" begin
     sys = PSB.build_system(PSB.MatpowerTestSystems, "matpower_case5_sys")
     remove_components!(sys, Line)
-    @test validate_connectivity(sys) == false
+    @test(
+        @test_logs (
+            :warn,
+            "Bus 1 is islanded",
+        ) match_mode = :any validate_connectivity(sys) == false
+    )
 end
