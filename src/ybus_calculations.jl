@@ -164,7 +164,6 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 
 # Keyword arguments
 - `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
-- `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
 """
 function Ybus(
     branches::Vector,
@@ -189,13 +188,12 @@ end
 Builds a Ybus from the system. The return is a Ybus Array indexed with the bus numbers and the branch names.
 
 # Keyword arguments
-- `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
-- `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
+- `check_connectivity::Bool`: Checks connectivity of the network
 """
 function Ybus(sys::PSY.System; kwargs...)
     branches = get_ac_branches(sys)
-    nodes = PSY.get_components(PSY.Bus, sys)
-    fixed_admittances = PSY.get_components(PSY.FixedAdmittance, sys)
+    nodes = collect(PSY.get_components(PSY.Bus, sys))
+    fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
     return Ybus(
         branches,
         nodes,
