@@ -31,7 +31,7 @@ function _buildptdf(
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
-    linear_solver::String = "KLU")
+    linear_solver::String)
     if linear_solver == "KLU"
         PTDFm, A = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
     elseif linear_solver == "Dense"
