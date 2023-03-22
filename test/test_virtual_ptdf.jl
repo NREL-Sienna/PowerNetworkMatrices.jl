@@ -59,4 +59,3 @@ end
         @test vptdf.lookup[1][l] ∈ keys(vptdf.cache.temp_cache)
     end
 end
-
