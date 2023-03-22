@@ -34,7 +34,7 @@ function _buildptdf(
     linear_solver::String = "KLU")
     if linear_solver == "KLU"
         PTDFm, A = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
-    elseif linear_solver == "KLU"
+    elseif linear_solver == "Dense"
         PTDFm, A = calculate_PTDF_matrix_DENSE(branches, nodes, bus_lookup, dist_slack)
     elseif linear_solver == "MKLPardiso"
         PTDFm, A = calculate_PTDF_matrix_MKLPardiso(branches, nodes, bus_lookup, dist_slack)
@@ -50,7 +50,7 @@ function _buildptdf_from_matrices(
     linear_solver::String)
     if linear_solver == "KLU"
         PTDFm = _calculate_PTDF_matrix_KLU(A.data, BA, A.ref_bus_positions, dist_slack)
-    elseif linear_solver == "KLU"
+    elseif linear_solver == "Dense"
         # Convert SparseMatrices to Dense
         PTDFm = _calculate_PTDF_matrix_DENSE(
             Matrix(A.data),
@@ -252,7 +252,8 @@ function PTDF(
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
     M, bus_ax_ref = calculate_adjacency(branches, nodes)
-    subnetworks = find_subnetworks(M, bus_ax)
+    ref_bus_positions = find_slack_positions(nodes)
+    subnetworks = find_subnetworks(M, bus_ax, ref_bus_positions)
     look_up = (make_ax_ref(line_ax), bus_ax_ref)
     S, _ = _buildptdf(branches, nodes, look_up[2], dist_slack, linear_solver)
     if tol > eps()
@@ -292,6 +293,6 @@ function PTDF(
     if tol > eps()
         return PTDF(sparsify(S, tol), axes, look_up, tol)
     end
-
+    @warn "PTDF creates via other matrices doesn't compute the subnetworks"
     return PTDF(S, A.axes, A.lookup, Dict{Int, Set{Int}}(), Ref(tol))
 end
