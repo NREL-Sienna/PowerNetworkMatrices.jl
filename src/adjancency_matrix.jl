@@ -30,7 +30,7 @@ function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwarg
         );
         by = x -> PSY.get_number(x),
     )
-    branches = PSY.get_components(PSY.get_available, PSY.Branch, sys)
+    branches = get_ac_branches(sys)
     return AdjacencyMatrix(
         branches,
         nodes;
@@ -51,101 +51,26 @@ function AdjacencyMatrix(
     check_connectivity::Bool = true,
     kwargs...,
 )
-    a, bus_lookup = calculate_adjacency(branches, nodes)
+    M, bus_lookup = calculate_adjacency(branches, nodes)
     bus_ax = PSY.get_number.(nodes)
     axes = (bus_ax, bus_ax)
     look_up = (bus_lookup, bus_lookup)
+    ref_bus_positions = find_slack_positions(nodes)
 
     if check_connectivity
-        connected = _validate_connectivity(a, bus_lookup, dfs_connectivity(a, bus_lookup))
-        !connected && throw(DataFormatError("Network not connected"))
+        sub_nets = find_subnetworks(M, bus_ax, ref_bus_positions)
+        length(sub_nets) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
 
-    return AdjacencyMatrix(a, axes, look_up, find_slack_positions(nodes))
+    return AdjacencyMatrix(M, axes, look_up, find_slack_positions(nodes))
 end
 
-function validate_connectivity(
-    M::AdjacencyMatrix;
-    connectivity_method::Function = goderya_connectivity,
-)
-    return _validate_connectivity(M.data, M.lookup[1], connectivity_method)
-end
-
-function _validate_connectivity(
-    M::SparseArrays.SparseMatrixCSC{Int8, Int},
-    bus_lookup::Dict{Int, Int},
-    connectivity_method::Function,
-)
-    connected = connectivity_method(M, bus_lookup)
-    return connected
-end
-
-function _goderya(ybus::SparseArrays.SparseMatrixCSC)
-    node_count = size(ybus)[1]
-    max_I = node_count^2
-    I, J, val = SparseArrays.findnz(ybus)
-    T = SparseArrays.sparse(I, J, ones(Int8, length(val)))
-    T_ = T * T
-    for n in 1:(node_count - 1)
-        I, _, _ = SparseArrays.findnz(T_)
-        if length(I) == max_I
-            @info "The System has no islands"
-            break
-        elseif length(I) < max_I
-            temp = T_ * T
-            I_temp, _, _ = SparseArrays.findnz(temp)
-            if all(I_temp == I)
-                @warn "The system contains islands" maxlog = 1
-            end
-            T_ = temp
-        else
-            error("Invalid connectivity condition")
-        end
-        #@assert n < node_count - 1
-    end
-    return I
-end
-
-function goderya_connectivity(M::SparseArrays.SparseMatrixCSC{Int8, Int},
-    bus_lookup::Dict{Int, Int})
-    @info "Validating connectivity with Goderya algorithm"
-    node_count = length(bus_lookup)
-
-    if node_count > GODERYA_MAX_PERFORMANCE_NODE
-        @warn "The Goderya algorithm is memory intensive on large networks and may not scale well, try `connectivity_method = dfs_connectivity"
-    end
-
-    I = _goderya(M)
-
-    connections = Dict(i => count(x -> x == i, I) for i in Set(I))
-
-    if length(Set(I)) == node_count
-        connected = true
-        if any(values(connections) .!= node_count)
-            cc = Set(values(connections))
-            @warn "Network has at least $(length(cc)) connected components with $cc nodes"
-            connected = false
-        end
-    else
-        connected = false
-    end
-    return connected
-end
-
-function dfs_connectivity(M::SparseArrays.SparseMatrixCSC,
-    bus_lookup::Dict{Int, Int})
-    @info "Validating connectivity with depth first search (network traversal)"
-    cc = find_connected_components(M, bus_lookup)
-    if length(cc) != 1
-        @warn "Network has at least $(length(cc)) connected components with $(length.(cc)) nodes"
-        connected = false
-    else
-        connected = true
-    end
-    return connected
+function validate_connectivity(M::AdjacencyMatrix)
+    sub_nets = find_subnetworks(M)
+    return length(sub_nets) == 1
 end
 
 function find_subnetworks(M::AdjacencyMatrix)
     bus_numbers = M.axes[2]
-    return find_subnetworks(M.data, bus_numbers)
+    return find_subnetworks(M.data, bus_numbers, M.ref_bus_positions)
 end
