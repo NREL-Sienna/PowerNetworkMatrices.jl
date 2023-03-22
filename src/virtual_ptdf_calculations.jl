@@ -6,10 +6,9 @@ struct RowCache
 end
 
 function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
-    if (length(persistent_rows) + 1) * row_size > ROW_PERSISTENT_CACHE_WARN
-        @warn "The minimum cache size for the persisted row is over 1 GiB. This specification will cause large memory usage"
-    elseif (length(persistent_rows) + 1) * row_size > max_cache_size
-        @info "The minimum cache size for the persisted row is greater than the maximum cache size. Ignoring max_cache_size = $(max_cache_size) MiB value"
+    persisten_data_size = (length(persistent_rows) + 1) * row_size
+    if  persisten_data_size > max_cache_size
+        error("The required cache size for the persisted row is larger than the max cache size. Persistent data size = $(persisten_data_size), max cache size = $(max_cache_size)")
     else
         @debug "required cache for persisted values = $((length(persistent_rows) + 1)*row_size). Max cache specification = $(max_cache_size)"
     end
@@ -23,7 +22,7 @@ function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
 end
 
 function Base.isempty(cache::RowCache)
-    return isempty(cache.persistent_cache_keys) && isempty(cache.temp_cache)
+    return isempty(cache.temp_cache)
 end
 
 function Base.empty!(cache::RowCache)
@@ -53,7 +52,7 @@ function Base.length(cache::RowCache)
     return length(cache.temp_cache)
 end
 
-function purge!(cache::RowCache)
+functionpurge_one!(cache::RowCache)
     for k in keys(cache.temp_cache)
         if k ∉ cache.persistent_cache_keys
             delete!(cache.temp_cache, k)
@@ -65,7 +64,7 @@ end
 
 function check_cache_size!(cache::RowCache)
     if length(cache.temp_cache) > cache.max_num_keys
-        purge!(cache)
+       purge_one!(cache)
     end
     return
 end

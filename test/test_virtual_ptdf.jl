@@ -49,13 +49,12 @@ end
     line_names = get_name.(get_components(Line, RTS))
     persist_lines = line_names[1:10]
 
-    vptdf = VirtualPTDF(RTS; max_cache_size = 0, persistent_lines = persist_lines)
+    vptdf = VirtualPTDF(RTS; max_cache_size = 1, persistent_lines = persist_lines)
 
     for l in line_names
         @test size(vptdf[l, :]) == (73,)
     end
 
-    @test length(vptdf.cache) == vptdf.cache.max_num_keys + 1
     for l in persist_lines
         @test vptdf.lookup[1][l] ∈ keys(vptdf.cache.temp_cache)
     end
