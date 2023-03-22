@@ -6,10 +6,10 @@ struct RowCache
 end
 
 function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
-    persisten_data_size = (length(persistent_rows) + 1) * row_size
-    if persisten_data_size > max_cache_size
+    persistent_data_size = (length(persistent_rows) + 1) * row_size
+    if persistent_data_size > max_cache_size
         error(
-            "The required cache size for the persisted row is larger than the max cache size. Persistent data size = $(persisten_data_size), max cache size = $(max_cache_size)",
+            "The required cache size for the persisted row is larger than the max cache size. Persistent data size = $(persistent_data_size), max cache size = $(max_cache_size)",
         )
     else
         @debug "required cache for persisted values = $((length(persistent_rows) + 1)*row_size). Max cache specification = $(max_cache_size)"
