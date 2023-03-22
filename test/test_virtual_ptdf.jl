@@ -43,3 +43,20 @@ end
     end
     @test isapprox(ptdf_first_area, ptdf_second_area, atol = 1e-6)
 end
+
+@testset "Test virtual PTDF cache" begin
+    RTS = build_system(PSITestSystems, "test_RTS_GMLC_sys")
+    line_names = get_name.(get_components(Line, RTS))
+    persist_lines = line_names[1:10]
+
+    vptdf = VirtualPTDF(RTS; max_cache_size = 1, persistent_lines = persist_lines)
+
+    for l in line_names
+        @test size(vptdf[l, :]) == (73,)
+    end
+
+    for l in persist_lines
+        @test vptdf.lookup[1][l] ∈ keys(vptdf.cache.temp_cache)
+    end
+end
+

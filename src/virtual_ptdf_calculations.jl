@@ -1,4 +1,75 @@
-# TODO: add descriptions to functions
+struct RowCache
+    temp_cache::Dict{Int, Array{Float64}}
+    persistent_cache_keys::Set{Int}
+    max_cache_size::Int
+    max_num_keys::Int
+end
+
+function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
+    persistent_data_size = (length(persistent_rows) + 1) * row_size
+    if persistent_data_size > max_cache_size
+        error(
+            "The required cache size for the persisted row is larger than the max cache size. Persistent data size = $(persistent_data_size), max cache size = $(max_cache_size)",
+        )
+    else
+        @debug "required cache for persisted values = $((length(persistent_rows) + 1)*row_size). Max cache specification = $(max_cache_size)"
+    end
+    max_num_keys = max(length(persistent_rows) + 1, floor(Int, max_cache_size / row_size))
+    return RowCache(
+        sizehint!(Dict{Int, Array{Float64}}(), max_num_keys),
+        persistent_rows,
+        max_cache_size,
+        max_num_keys,
+    )
+end
+
+function Base.isempty(cache::RowCache)
+    return isempty(cache.temp_cache)
+end
+
+function Base.empty!(cache::RowCache)
+    isempty(cache.temp_cache) && return
+    if !isempty(cache.persistent_cache_keys)
+        @warn("Calling empty! will delete entries for the persistent rows")
+    end
+    empty!(cache.temp_cache)
+    return
+end
+
+function Base.haskey(cache::RowCache, key::Int)
+    return haskey(cache.temp_cache, key)
+end
+
+function Base.setindex!(cache::RowCache, val::Array{Float64}, key::Int)
+    check_cache_size!(cache)
+    cache.temp_cache[key] = val
+    return
+end
+
+function Base.getindex(cache::RowCache, key::Int)
+    return cache.temp_cache[key]
+end
+
+function Base.length(cache::RowCache)
+    return length(cache.temp_cache)
+end
+
+function purge_one!(cache::RowCache)
+    for k in keys(cache.temp_cache)
+        if k ∉ cache.persistent_cache_keys
+            delete!(cache.temp_cache, k)
+            break
+        end
+    end
+    return
+end
+
+function check_cache_size!(cache::RowCache)
+    if length(cache.temp_cache) > cache.max_num_keys
+        purge_one!(cache)
+    end
+    return
+end
 
 """
 Power Transfer Distribution Factors (PTDF) indicate the incremental change in real power that occurs on transmission lines due to real power injections changes at the buses.
@@ -13,7 +84,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     axes::Ax
     lookup::L
     temp_data::Vector{Float64}
-    cache::Dict{Int, Array{Float64}}
+    cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
 end
@@ -27,9 +98,11 @@ Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF 
 """
 function VirtualPTDF(
     branches,
-    nodes::Vector{PSY.Bus},
-    dist_slack::Vector{Float64} = [0.1],
-    tol::Float64 = eps())
+    nodes::Vector{PSY.Bus};
+    dist_slack::Vector{Float64} = Float64[],
+    tol::Float64 = eps(),
+    max_cache_size::Int = MAX_CACHE_SIZE_MiB,
+    persistent_lines::Vector{String} = String[])
 
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
@@ -46,9 +119,19 @@ function VirtualPTDF(
         @info "Network is not connected, using subnetworks"
         subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
     end
-    # Here add the subnetwork detection
-    empty_cache = Dict{Int, Array{Float64}}()
     temp_data = zeros(length(bus_ax))
+    if isempty(persistent_lines)
+        empty_cache =
+            RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
+    else
+        init_persistent_dict = Set{Int}(line_ax_ref[k] for k in persistent_lines)
+        empty_cache =
+            RowCache(
+                max_cache_size * MiB,
+                init_persistent_dict,
+                length(bus_ax) * sizeof(Float64),
+            )
+    end
     return VirtualPTDF(
         klu(ABA),
         BA,
@@ -71,12 +154,11 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
     The distributed slack vector has to be the same length as the number of buses
 """
 function VirtualPTDF(
-    sys::PSY.System,
-    dist_slack::Vector{Float64} = [0.1])
+    sys::PSY.System; kwargs...)
     branches = get_ac_branches(sys)
     nodes = get_buses(sys)
 
-    return VirtualPTDF(branches, nodes, dist_slack)
+    return VirtualPTDF(branches, nodes; kwargs...)
 end
 
 # Overload Base functions
