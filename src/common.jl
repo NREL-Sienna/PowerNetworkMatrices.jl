@@ -234,12 +234,19 @@ function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{I
     rows = SparseArrays.rowvals(M)
     touched = Set{Int}()
     subnetworks = Dict{Int, Set{Int}}()
-    for (ix, bus_number) in enumerate(bus_numbers), j in SparseArrays.nzrange(M, ix)
-        row_ix = rows[j]
-        if bus_number ∉ touched
-            push!(touched, bus_number)
+    for (ix, bus_number) in enumerate(bus_numbers)
+        neighbors = SparseArrays.nzrange(M, ix)
+        if length(neighbors) < 1
             subnetworks[bus_number] = Set{Int}(bus_number)
-            _dfs(row_ix, M, bus_numbers, subnetworks[bus_number], touched)
+            continue
+        end
+        for j in SparseArrays.nzrange(M, ix)
+            row_ix = rows[j]
+            if bus_number ∉ touched
+                push!(touched, bus_number)
+                subnetworks[bus_number] = Set{Int}(bus_number)
+                _dfs(row_ix, M, bus_numbers, subnetworks[bus_number], touched)
+            end
         end
     end
     return subnetworks

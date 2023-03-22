@@ -179,7 +179,7 @@ function Ybus(
     look_up = (bus_lookup, bus_lookup)
     ybus = _buildybus(branches, nodes, fixed_admittances)
     if check_connectivity && length(nodes) > 1
-        islands = find_subnetworks(ybus, bus_ax, find_slack_positions(nodes))
+        islands = find_subnetworks(ybus, bus_ax)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
     return Ybus(ybus, axes, look_up)
