@@ -6,7 +6,7 @@
     subnetworks = find_subnetworks(M)
     @test length(subnetworks) == 1
 
-    M = AdjacencyMatrix(sys10)
+    M = AdjacencyMatrix(sys10; check_connectivity = false)
     subnetworks = find_subnetworks(M)
     @test length(subnetworks) == 2
 end
