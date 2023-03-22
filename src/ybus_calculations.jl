@@ -131,11 +131,20 @@ function _ybus!(
 )
     bus = PSY.get_bus(fa)
     bus_no = num_bus[PSY.get_number(bus)]
+    if !isfinite(fa.Y)
+        error(
+            "Data in $(PSY.get_name(fa)) is incorrect. Y = $(fa.Y)",
+        )
+    end
     ybus[bus_no, bus_no] += fa.Y
     return
 end
 
-function _buildybus(branches, nodes, fixed_admittances)
+function _buildybus(
+    branches,
+    nodes::Vector{PSY.Bus},
+    fixed_admittances::Vector{PSY.FixedAdmittance},
+)
     buscount = length(nodes)
     num_bus = Dict{Int, Int}()
 
@@ -160,14 +169,12 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 
 # Keyword arguments
 - `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
-- `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
 """
 function Ybus(
-    branches,
-    nodes,
-    fixed_admittances = Vector{PSY.FixedAdmittance}();
+    branches::Vector,
+    nodes::Vector{PSY.Bus},
+    fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}();
     check_connectivity::Bool = true,
-    kwargs...,
 )
     nodes = sort!(collect(nodes); by = x -> PSY.get_number(x))
     bus_ax = PSY.get_number.(nodes)
@@ -176,8 +183,8 @@ function Ybus(
     look_up = (bus_lookup, bus_lookup)
     ybus = _buildybus(branches, nodes, fixed_admittances)
     if check_connectivity && length(nodes) > 1
-        connected = dfs_connectivity(ybus, bus_lookup)
-        !connected && throw(IS.DataFormatError("Network not connected"))
+        islands = find_subnetworks(ybus, bus_ax)
+        length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
     return Ybus(ybus, axes, look_up)
 end
@@ -186,18 +193,16 @@ end
 Builds a Ybus from the system. The return is a Ybus Array indexed with the bus numbers and the branch names.
 
 # Keyword arguments
-- `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
-- `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
+- `check_connectivity::Bool`: Checks connectivity of the network
 """
-function Ybus(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
-    branches = PSY.get_components(PSY.ACBranch, sys)
-    nodes = PSY.get_components(PSY.Bus, sys)
-    fixed_admittances = PSY.get_components(PSY.FixedAdmittance, sys)
+function Ybus(sys::PSY.System; kwargs...)
+    branches = get_ac_branches(sys)
+    nodes = collect(PSY.get_components(PSY.Bus, sys))
+    fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
     return Ybus(
         branches,
         nodes,
         fixed_admittances;
-        check_connectivity = check_connectivity,
         kwargs...,
     )
 end

@@ -3,11 +3,27 @@ Power Transfer Distribution Factors (PTDF) indicate the incremental change in re
 
 The PTDF struct is indexed using the Bus numbers and branch names
 """
-struct PTDF{Ax, L <: NTuple{2, Dict}, T} <: PowerNetworkMatrix{T}
-    data::AbstractArray{T, 2}
+struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
+       PowerNetworkMatrix{Float64}
+    data::M
     axes::Ax
     lookup::L
-    tol::Float64
+    subnetworks::Dict{Int, Set{Int}}
+    tol::Base.RefValue{Float64}
+end
+
+function drop_small_entries!(mat::PTDF, tol::Float64)
+    if tol > mat.tol[]
+        @info "Specified tolerance is smaller than the current tolerance."
+    end
+    make_entries_zero!(mat.data, tol)
+    mat.tol[] = tol
+    return
+end
+
+function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
+    new_mat = sparsify(mat.data, tol)
+    return PTDF(new_mat, mat.axes, mat.lookup, mat.subnetworks, Ref(tol))
 end
 
 function _buildptdf(
@@ -15,7 +31,7 @@ function _buildptdf(
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
-    linear_solver::String = "Dense")
+    linear_solver::String)
     if linear_solver == "KLU"
         PTDFm, A = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
     elseif linear_solver == "Dense"
@@ -60,6 +76,7 @@ function _calculate_PTDF_matrix_KLU(
     buscount = size(BA, 2)
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
+    # Here add the subnetwork detection
     K = klu(ABA)
     Ix = Matrix(1.0I, buscount, buscount)
     ABA_inv = zeros(Float64, buscount, buscount)
@@ -117,6 +134,7 @@ function _calculate_PTDF_matrix_DENSE(
 
     # Use dense calculation of ABA
     ABA = A[:, setdiff(1:end, ref_bus_positions)]' * BA
+    # Here add the subnetwork detection
     linecount = size(BA, 1)
     buscount = size(BA, 2)
     # get LU factorization matrices
@@ -177,6 +195,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     buscount = size(BA, 2)
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
+    # Here add the subnetwork detection
     Ix = Matrix(1.0I, buscount, buscount)
     ABA_inv = zeros(Float64, buscount, buscount)
     Pardiso.solve!(ps, ABA_inv, ABA, Ix)
@@ -223,17 +242,28 @@ Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF 
 """
 function PTDF(
     branches,
-    nodes::Vector{PSY.Bus},
-    dist_slack::Vector{Float64} = Float64[];
-    linear_solver::String = "Dense")
-
+    nodes::Vector{PSY.Bus};
+    dist_slack::Vector{Float64} = Float64[],
+    linear_solver::String = "KLU",
+    tol::Float64 = eps())
+    validate_linear_solver(linear_solver)
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in nodes]
     axes = (line_ax, bus_ax)
-    look_up = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
+    M, bus_ax_ref = calculate_adjacency(branches, nodes)
+    ref_bus_positions = find_slack_positions(nodes)
+    subnetworks = find_subnetworks(M, bus_ax)
+    if length(subnetworks) > 1
+        @info "Network is not connected, using subnetworks"
+        subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
+    end
+    look_up = (make_ax_ref(line_ax), bus_ax_ref)
     S, _ = _buildptdf(branches, nodes, look_up[2], dist_slack, linear_solver)
-    return PTDF(S, axes, look_up, eps())
+    if tol > eps()
+        return PTDF(sparsify(S, tol), axes, look_up, Ref(tol))
+    end
+    return PTDF(S, axes, look_up, subnetworks, Ref(tol))
 end
 
 """
@@ -246,25 +276,27 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 - `tol::Float64`: Tolerance to eliminate entries in the PTDF matrix (default eps())
 """
 function PTDF(
-    sys::PSY.System,
-    dist_slack::Vector{Float64} = Float64[];
-    linear_solver::String = "Dense")
+    sys::PSY.System;
+    kwargs...,
+)
     branches = get_ac_branches(sys)
     nodes = get_buses(sys)
-    validate_linear_solver(linear_solver)
-
-    return PTDF(branches, nodes, dist_slack; linear_solver)
+    return PTDF(branches, nodes; kwargs...)
 end
 
 # version 2: use BA and ABA fucntions created before #########################
 
 function PTDF(
     A::IncidenceMatrix,
-    BA::BA_Matrix,
-    dist_slack::Vector{Float64} = Float64[];
-    linear_solver = "Dense")
+    BA::BA_Matrix;
+    dist_slack::Vector{Float64} = Float64[],
+    linear_solver = "KLU",
+    tol::Float64 = eps())
     validate_linear_solver(linear_solver)
     S = _buildptdf_from_matrices(A, BA.data, dist_slack, linear_solver)
-
-    return PTDF(S, A.axes, A.lookup, eps())
+    if tol > eps()
+        return PTDF(sparsify(S, tol), axes, look_up, tol)
+    end
+    @warn "PTDF creates via other matrices doesn't compute the subnetworks"
+    return PTDF(S, A.axes, A.lookup, Dict{Int, Set{Int}}(), Ref(tol))
 end
