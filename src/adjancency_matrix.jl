@@ -57,7 +57,7 @@ function AdjacencyMatrix(
     look_up = (bus_lookup, bus_lookup)
 
     if check_connectivity
-        connected = _validate_connectivity(a, bus_lookup, dfs_connectivity)
+        connected = _validate_connectivity(a, bus_lookup, dfs_connectivity(a, bus_lookup))
         !connected && throw(DataFormatError("Network not connected"))
     end
 
