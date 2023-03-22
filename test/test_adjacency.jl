@@ -53,3 +53,32 @@ M, bus_ax_ref = PowerNetworkMatrices.calculate_adjacency(branches, nodes)
 a10.ref_bus_positions
 ptdf10.subnetworks
 vptdf10.subnetworks
+
+bus_numbers = [PSY.get_number(bus) for bus in nodes]
+touched = []
+bus_groups = Dict{Int, Vector{Int}}()
+
+for i in axes(M, 1)
+    if i ∉ touched
+        # take bus numbers that are in the row
+        cols = bus_numbers[M[i, :] .!= 0]
+        if length(cols) == 1
+            # islanded bus
+            push!(touched, i)
+            bus_groups[cols[1]] = cols
+        elseif length(cols) > 1
+            # subnetwork
+            push!(touched, i)
+            bus_groups[cols[1]] = cols
+            for j in setdiff(axes(M, 1), touched)
+                cols2 = bus_numbers[M[j, :] .!= 0]
+                if length(cols2) > 1
+                    if length(intersect(bus_groups[i], cols2)) != 0
+                        push!(touched, j)
+                        append!(bus_groups[i], setdiff(cols2, bus_groups[i]))
+                    end
+                end
+            end
+        end
+    end
+end
