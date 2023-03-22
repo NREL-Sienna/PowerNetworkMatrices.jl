@@ -9,8 +9,6 @@ export Ybus
 export LODF
 export AdjacencyMatrix
 
-export dfs_connectivity
-export find_connected_components
 export find_subnetworks
 export validate_connectivity
 
