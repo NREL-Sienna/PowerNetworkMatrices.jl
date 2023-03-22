@@ -38,7 +38,7 @@ import Pardiso
 include("PowerNetworkMatrix.jl")
 include("BA_ABA_matrices.jl")
 include("incedence_matrix.jl")
-include("adjancency_matrix.jl")
+include("adjacency_matrix.jl")
 include("common.jl")
 include("definitions.jl")
 include("ptdf_calculations.jl")

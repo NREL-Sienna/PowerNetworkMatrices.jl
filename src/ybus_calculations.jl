@@ -131,6 +131,11 @@ function _ybus!(
 )
     bus = PSY.get_bus(fa)
     bus_no = num_bus[PSY.get_number(bus)]
+    if !isfinite(fa.Y)
+        error(
+            "Data in $(PSY.get_name(fa)) is incorrect. Y = $(fa.Y)",
+        )
+    end
     ybus[bus_no, bus_no] += fa.Y
     return
 end
