@@ -7,8 +7,10 @@ end
 
 function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
     persisten_data_size = (length(persistent_rows) + 1) * row_size
-    if  persisten_data_size > max_cache_size
-        error("The required cache size for the persisted row is larger than the max cache size. Persistent data size = $(persisten_data_size), max cache size = $(max_cache_size)")
+    if persisten_data_size > max_cache_size
+        error(
+            "The required cache size for the persisted row is larger than the max cache size. Persistent data size = $(persisten_data_size), max cache size = $(max_cache_size)",
+        )
     else
         @debug "required cache for persisted values = $((length(persistent_rows) + 1)*row_size). Max cache specification = $(max_cache_size)"
     end
@@ -52,7 +54,7 @@ function Base.length(cache::RowCache)
     return length(cache.temp_cache)
 end
 
-functionpurge_one!(cache::RowCache)
+function purge_one!(cache::RowCache)
     for k in keys(cache.temp_cache)
         if k ∉ cache.persistent_cache_keys
             delete!(cache.temp_cache, k)
@@ -64,7 +66,7 @@ end
 
 function check_cache_size!(cache::RowCache)
     if length(cache.temp_cache) > cache.max_num_keys
-       purge_one!(cache)
+        purge_one!(cache)
     end
     return
 end
