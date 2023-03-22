@@ -21,7 +21,6 @@ Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix
 
 # Keyword arguments
 - `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
-- `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
 """
 function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     nodes = sort!(
@@ -55,10 +54,9 @@ function AdjacencyMatrix(
     bus_ax = PSY.get_number.(nodes)
     axes = (bus_ax, bus_ax)
     look_up = (bus_lookup, bus_lookup)
-    ref_bus_positions = find_slack_positions(nodes)
 
     if check_connectivity
-        sub_nets = find_subnetworks(M, bus_ax, ref_bus_positions)
+        sub_nets = find_subnetworks(M, bus_ax)
         length(sub_nets) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
 
@@ -72,5 +70,5 @@ end
 
 function find_subnetworks(M::AdjacencyMatrix)
     bus_numbers = M.axes[2]
-    return find_subnetworks(M.data, bus_numbers, M.ref_bus_positions)
+    return find_subnetworks(M.data, bus_numbers)
 end

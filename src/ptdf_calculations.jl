@@ -253,7 +253,11 @@ function PTDF(
     axes = (line_ax, bus_ax)
     M, bus_ax_ref = calculate_adjacency(branches, nodes)
     ref_bus_positions = find_slack_positions(nodes)
-    subnetworks = find_subnetworks(M, bus_ax, ref_bus_positions)
+    subnetworks = find_subnetworks(M, bus_ax)
+    if length(subnetworks) > 1
+        @info "Network is not connected, using subnetworks"
+        subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
+    end
     look_up = (make_ax_ref(line_ax), bus_ax_ref)
     S, _ = _buildptdf(branches, nodes, look_up[2], dist_slack, linear_solver)
     if tol > eps()
