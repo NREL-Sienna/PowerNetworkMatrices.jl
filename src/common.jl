@@ -207,27 +207,15 @@ function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
     return vector
 end
 
-function find_subnetworks(
-    M::SparseArrays.SparseMatrixCSC,
-    bus_numbers::Vector{Int},
+function assing_reference_buses(
+    subnetworks::Dict{Int, Set{Int}},
     ref_bus_positions::Vector{Int},
 )
-    rows = SparseArrays.rowvals(M)
-    touched = Set{Int}()
-    bus_groups_ = Dict{Int, Set{Int}}()
-    for (ix, bus_number) in enumerate(bus_numbers), j in SparseArrays.nzrange(M, ix)
-        row_ix = rows[j]
-        if bus_number ∉ touched
-            push!(touched, bus_number)
-            bus_groups_[bus_number] = Set{Int}(bus_number)
-            dfs(row_ix, M, bus_numbers, bus_groups_[bus_number], touched)
-        end
-    end
     bus_groups = Dict{Int, Set{Int}}()
-    for (bus_key, subnetwork_buses) in bus_groups_
+    for (bus_key, subnetwork_buses) in subnetworks
         ref_bus = intersect(ref_bus_positions, subnetwork_buses)
         if length(ref_bus) == 1
-            bus_groups[ref_bus[1]] = pop!(bus_groups_, bus_key)
+            bus_groups[ref_bus[1]] = pop!(subnetworks, bus_key)
             continue
         elseif length(ref_bus) == 0
             @error "No reference bus in the subnetwork associated with bus $bus_key"
@@ -242,7 +230,22 @@ function find_subnetworks(
     return bus_groups
 end
 
-function dfs(
+function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
+    rows = SparseArrays.rowvals(M)
+    touched = Set{Int}()
+    subnetworks = Dict{Int, Set{Int}}()
+    for (ix, bus_number) in enumerate(bus_numbers), j in SparseArrays.nzrange(M, ix)
+        row_ix = rows[j]
+        if bus_number ∉ touched
+            push!(touched, bus_number)
+            subnetworks[bus_number] = Set{Int}(bus_number)
+            _dfs(row_ix, M, bus_numbers, subnetworks[bus_number], touched)
+        end
+    end
+    return subnetworks
+end
+
+function _dfs(
     index::Int,
     M::SparseArrays.SparseMatrixCSC,
     bus_numbers::Vector{Int},
@@ -255,7 +258,7 @@ function dfs(
         if bus_numbers[row_ix] ∉ touched
             push!(touched, bus_numbers[row_ix])
             push!(bus_group, bus_numbers[row_ix])
-            dfs(row_ix, M, bus_numbers, bus_group, touched)
+            _dfs(row_ix, M, bus_numbers, bus_group, touched)
         end
     end
     return

@@ -14,6 +14,6 @@ function validate_connectivity(sys::PSY.System)
     )
     branches = get_ac_branches(sys)
     M, bus_lookup = calculate_adjacency(branches, nodes)
-    sbn = find_subnetworks(M, collect(keys(bus_lookup)), Int[])
+    sbn = find_subnetworks(M, collect(keys(bus_lookup)))
     return sbn == 1
 end
