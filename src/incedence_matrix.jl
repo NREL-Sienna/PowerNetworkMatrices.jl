@@ -1,14 +1,17 @@
 """
 Incidence matrix: shows connection between buses, defining lines
-The structure contains:
-    - data: the actual Incidence matrix.
-    - axes: Tuple containing two vectors (the first one showing the branches names,
-            the second showing the buses numbers).
-    - lookup:
-            Tuple containing two discionaries, the first mapping the branches 
-            and buses with their enumerated indexes.
-    - ref_bus_positions:
-            vector containing the indexes of the referece slack buses.
+
+# Fields
+- `data::SparseArrays.SparseMatrixCSC{Int8, Int}`:
+        the actual Incidence matrix.
+- `axes<:NTuple{2, Dict}`:
+        Tuple containing two vectors (the first one showing the branches names,
+        the second showing the buses numbers).
+- `lookup<:NTuple{2, Dict}`:
+        Tuple containing two discionaries, the first mapping the branches 
+        and buses with their enumerated indexes.
+- `ref_bus_positions::Vector{Int}`:
+        vector containing the indexes of the referece slack buses.
 """
 struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}

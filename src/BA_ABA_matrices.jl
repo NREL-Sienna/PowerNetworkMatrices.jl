@@ -1,16 +1,19 @@
 """
 Structure containing the BA matrix andother relevant data.
-Fields:
-- data: the BA matrix cominfrom the product between the Incidence Matrix A and
+
+# Fields
+- `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
+        the BA matrix cominfrom the product between the Incidence Matrix A and
         the Matrix of Susceptance B
-- axes: Tuple containing two vectors, the first one contains the names of each 
+- `axes<:NTuple{2, Dict}`:
+        Tuple containing two vectors, the first one contains the names of each 
         line of the network (each one related to a row of the Matrix in "data"),
         the second one contains the names of each bus of the network (each one
         related to a column of the Matrix in "data")
-- lookup: 
+- `lookup<:NTuple{2, Dict}`:
         Tuple containing 2 Dictionaries mapping the number of rows and columns 
         with the names of branches and buses
-- ref_bus_positions:
+- `ref_bus_positions::Vector{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
 """
@@ -39,18 +42,21 @@ end
 
 """
 Structure containing the ABA matrix and other relevant data.
-Fields:
-- data: the ABA matrix cominfrom the product between the Incidence Matrix A and
+
+# Fields
+- `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
+        the ABA matrix cominfrom the product between the Incidence Matrix A and
         the Matrix BA
-- axes: Tuple containing two vectors, the first one contains the names of each 
+- `axes<:NTuple{2, Dict}`:
+        Tuple containing two vectors, the first one contains the names of each 
         line of the network (each one related to a row of the Matrix in "data"),
         the second one contains the names of each bus of the network (each one
         related to a column of the Matrix in "data")
-- lookup: 
+- `lookup<:NTuple{2, Dict}`:
         Tuple containing 2 Dictionaries mapping the number of rows and columns 
         with the names of branches and buses
-- ref_bus_positions:
-        Vector containing the indexes of the columns of the ABA matrix corresponding
+- `ref_bus_positions::Vector{Int}`:
+        Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
 """
 struct ABA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}

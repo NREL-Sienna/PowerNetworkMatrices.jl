@@ -3,7 +3,7 @@ Power Transfer Distribution Factors (PTDF) indicate the incremental change in re
 
 The PTDF struct is indexed using the Bus numbers and Branch names.
 
-The structure stores the following:
+# Fields
 - `data<:AbstractArray{Float64, 2}`:
         the actual Incidence matrix.
 - `axes<:NTuple{2, Dict}`:
