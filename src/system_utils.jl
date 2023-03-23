@@ -18,3 +18,16 @@ function validate_connectivity(sys::PSY.System)
     sbn = find_subnetworks(M, collect(keys(bus_lookup)))
     return length(sbn) == 1
 end
+
+function get_subnetworks(sys::PSY.System)
+    nodes = sort!(
+        collect(
+            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
+        );
+        by = x -> PSY.get_number(x),
+    )
+    branches = get_ac_branches(sys)
+    @info "Validating connectivity with depth first search (network traversal)"
+    M, bus_lookup = calculate_adjacency(branches, nodes)
+    return find_subnetworks(M, collect(keys(bus_lookup)))
+end
