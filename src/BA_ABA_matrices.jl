@@ -9,7 +9,7 @@ Fields:
         related to a column of the Matrix in "data")
 - lookup: 
         Tuple containing 2 Dictionaries mapping the number of rows and columns 
-        with the names of lines and buses
+        with the names of branches and buses
 - ref_bus_positions:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
@@ -48,7 +48,7 @@ Fields:
         related to a column of the Matrix in "data")
 - lookup: 
         Tuple containing 2 Dictionaries mapping the number of rows and columns 
-        with the names of lines and buses
+        with the names of branches and buses
 - ref_bus_positions:
         Vector containing the indexes of the columns of the ABA matrix corresponding
         to the refence buses
