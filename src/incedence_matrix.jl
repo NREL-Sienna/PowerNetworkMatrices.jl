@@ -1,8 +1,15 @@
 """
 Incidence matrix: shows connection between buses, defining lines
+The structure contains:
+    - data: the actual Incidence matrix.
+    - axes: Tuple containing two vectors (the first one showing the branches names,
+            the second showing the buses numbers).
+    - lookup:
+            Tuple containing two discionaries, the first mapping the branches 
+            and buses with their enumerated indexes.
+    - ref_bus_positions:
+            vector containing the indexes of the referece slack buses.
 """
-
-# define structure for incidence matrix A
 struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
@@ -15,7 +22,10 @@ get_axes(A::IncidenceMatrix) = A.axes
 get_lookup(A::IncidenceMatrix) = A.lookup
 get_slack_position(A::IncidenceMatrix) = A.ref_bus_positions
 
-# create the incidence matrix A
+"""
+Builds the Incidence matrix by evaluating the actual matrix and other relevant 
+values.
+"""
 function IncidenceMatrix(sys::PSY.System)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
