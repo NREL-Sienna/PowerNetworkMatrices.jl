@@ -63,11 +63,18 @@ function AdjacencyMatrix(
     return AdjacencyMatrix(M, axes, look_up, find_slack_positions(nodes))
 end
 
+"""
+Validates connectivity by checking that the number of subnetworks is 1 (fully connected network).
+"""
 function validate_connectivity(M::AdjacencyMatrix)
     sub_nets = find_subnetworks(M)
     return length(sub_nets) == 1
 end
 
+"""
+Evaluates subnetworks by looking for the subsets of nodes connected each other, 
+but not connected with nodes of other subsets.
+"""
 function find_subnetworks(M::AdjacencyMatrix)
     bus_numbers = M.axes[2]
     return find_subnetworks(M.data, bus_numbers)
