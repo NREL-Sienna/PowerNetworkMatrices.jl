@@ -364,7 +364,7 @@ Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF 
 
 # Keyword arguments
 - `dist_slack::Vector{Float64}`:
-        Vector of weights to be used as distributed slack bus.
+        vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses
 - `linear_solver::String`:
         Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
@@ -428,11 +428,11 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
         BA matrix (full structure)
 - `dist_slack::Vector{Float64}`:
         Vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses
+        The distributed slack vector has to be the same length as the number of buses.
 - `linear_solver::String`:
-        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
+        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso.
 - `tol::Float64`:
-        Tolerance to eliminate entries in the PTDF matrix (default eps())
+        Tolerance to eliminate entries in the PTDF matrix (default eps()).
 """
 function PTDF(
     A::IncidenceMatrix,
