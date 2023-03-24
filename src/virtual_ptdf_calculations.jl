@@ -1,3 +1,16 @@
+"""
+Structure used for saving the rows of the Virtual PTDF matrix.
+
+# Fields
+- `temp_cache::Dict{Int, Array{Float64}}`:
+        dictionay saving the row of the PTDF matrix
+- `persistent_cache_keys::Set{Int}`:
+        set listing the rows saved in `temp_cache`
+- `max_cache_size::Int`
+        defines the maximimum allowed cache size (rows*row_size)
+- `max_num_keys::Int`
+        defines the maximimum number of keys saved (rows of the matrix)
+"""
 struct RowCache
     temp_cache::Dict{Int, Array{Float64}}
     persistent_cache_keys::Set{Int}
@@ -5,6 +18,9 @@ struct RowCache
     max_num_keys::Int
 end
 
+"""
+
+"""
 function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
     persistent_data_size = (length(persistent_rows) + 1) * row_size
     if persistent_data_size > max_cache_size
@@ -23,10 +39,16 @@ function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
     )
 end
 
+"""
+Check if cache is empty.
+"""
 function Base.isempty(cache::RowCache)
     return isempty(cache.temp_cache)
 end
 
+"""
+Erase the cache.
+"""
 function Base.empty!(cache::RowCache)
     isempty(cache.temp_cache) && return
     if !isempty(cache.persistent_cache_keys)
@@ -36,10 +58,30 @@ function Base.empty!(cache::RowCache)
     return
 end
 
+"""
+Checks if `key` is present as a key of the dictionary in `cache`
+
+# Keyword arguments
+- `cache::RowCache`:
+        cache were data is stored.
+- `key::Int`:
+        row number (corresponds to the enumerated branch index).
+"""
 function Base.haskey(cache::RowCache, key::Int)
     return haskey(cache.temp_cache, key)
 end
 
+"""
+Allocates vector as row of the matrix saved in cache.
+
+# Keyword arguments
+- `cache::RowCache`:
+        cache were the row vector is going to be saved
+- `val::Array{Float64}`:
+        vector to be saves
+- `key::Int`:
+        row number (corresponding to the enumerated branch index) related to the input row vector
+"""
 function Base.setindex!(cache::RowCache, val::Array{Float64}, key::Int)
     check_cache_size!(cache)
     cache.temp_cache[key] = val
