@@ -3,7 +3,7 @@ Structure containing the BA matrix andother relevant data.
 
 # Fields
 - `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        the BA matrix cominfrom the product between the Incidence Matrix A and
+        the BA matrix coming from the product between the Incidence Matrix A and
         the Matrix of Susceptance B
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors, the first one contains the names of each 

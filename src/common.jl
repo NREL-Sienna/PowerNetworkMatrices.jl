@@ -1,6 +1,3 @@
-# ! adapt inputs here
-# ! use # Keyword arguments and same formatting as for the other files
-
 """
 Gets the AC branches from a given Systems.
 """
@@ -21,8 +18,9 @@ end
 
 """
 Gets the indeces of the reference (slack) buses.
-NOTE: the indeces corresponds to the columns of zeros belonging to the PTDF matrix.
-      BA and ABA matrix miss the columns related to the reference buses.
+NOTE:
+- the indeces corresponds to the columns of zeros belonging to the PTDF matrix.
+- BA and ABA matrix miss the columns related to the reference buses.
 """
 function find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
@@ -50,8 +48,16 @@ end
 
 """
 Evaluates the Incidence matrix A given the branches and node of a System.
-NOTE: the matrix features all the columns, including the ones related to the 
-      reference buses (each column is related to a system's bus).
+
+# Keyword arguments
+- `branches`:
+        vector containing the branches of the considered system (shuld be AC branches).
+- `buses::Vector{PSY.Bus}`:
+        vector containing the buses of the considered system.
+
+NOTE:
+- the matrix features all the columns, including the ones related to the 
+  reference buses (each column is related to a system's bus).
 """
 function calculate_A_matrix(branches, buses::Vector{PSY.Bus})
     bus_lookup = make_ax_ref(buses)
@@ -80,6 +86,12 @@ end
 
 """
 Evaluates the Adjacency matrix given the banches and buses of a given System.
+
+# Keyword arguments
+- `branches`:
+        vector containing the branches of the considered system (shuld be AC branches).
+- `buses::Vector{PSY.Bus}`:
+        vector containing the buses of the considered system.
 """
 function calculate_adjacency(branches, buses::Vector{PSY.Bus})
     bus_ax = PSY.get_number.(buses)
@@ -88,8 +100,10 @@ end
 
 """
 Evaluates the Adjacency matrix given the System's banches, buses and bus_lookup.
-NOTE: bus_lookup is a dictionary mapping the bus numbers (as shown in the Systems) 
-      with their enumerated indxes.
+
+NOTE:
+- bus_lookup is a dictionary mapping the bus numbers (as shown in the Systems) 
+  with their enumerated indxes.
 """
 function calculate_adjacency(
     branches,
@@ -113,11 +127,15 @@ end
 
 """
 Evaluates the BA matrix given the System's banches, reference bus positions and bus_lookup.
-NOTE:
-    - ref_bus_positions is a vector containing the positions (indexes) of the reference 
-      buses.
-    - bus_lookup is a dictionary mapping the bus numbers (as shown in the Systems) 
-      with their enumerated indxes.
+
+# Keyword arguments
+- `branches`:
+        vector containing the branches of the considered system (shuld be AC branches).
+- `ref_bus_positions::Vector{Int}`:
+        Vector containing the indexes of the columns of the BA matrix corresponding
+        to the refence buses
+- `bus_lookup::Dict{Int, Int}`:
+        dictionary mapping the bus numbers with their enumerated indexes.
 """
 function calculate_BA_matrix(
     branches,
@@ -159,11 +177,16 @@ end
 """
 Evaluates the ABA matrix given the System's Incidence matrix (A), BA matrix and 
 reference bus positions.
+
+# Keyword arguments
+- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
+        Incidence matrix.
+- `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`
+        BA matrix.
+
 NOTE:
-    - evaluates A with "calculate_A_matrix", or extract A.data (if A::IncidenceMatrix)
-    - evaluates BA with "calculate_BA_matrix", or extract BA.data (if A::BA_Matrix)
-    - ref_bus_positions is a vector containing the positions (indexes) of the reference 
-      buses.
+- evaluates A with "calculate_A_matrix", or extract A.data (if A::IncidenceMatrix)
+- evaluates BA with "calculate_BA_matrix", or extract BA.data (if A::BA_Matrix)
 """
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -173,7 +196,15 @@ function calculate_ABA_matrix(
 end
 
 """
-Sparsifies a dense matrix according to a certain tolarance.
+Return a sparse matrix given a dense one by dropping element whose absolute 
+value is above a certain tolarance.
+
+
+# Keyword arguments
+- dense_array::Matrix{Float64}`:
+        input matrix (e.g., PTDF matrix).
+- `tol::Float64`:
+        tolerance.
 """
 function sparsify(dense_array::Matrix{Float64}, tol::Float64)
     m, n = size(dense_array)
@@ -189,6 +220,12 @@ end
 """
 Sets to zero every element of a Sparse matrix if absolute values is below a 
 certain tolerance.
+
+# Keyword arguments
+- `sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int}`:
+        input sparse array.
+- `tol::Float64`:
+        tolerane.
 """
 function make_entries_zero!(
     sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
@@ -206,6 +243,12 @@ end
 """
 Sets to zero every element of a Dense matrix if absolute values is below a 
 certain tolerance.
+
+# Keyword arguments
+- `dense_array::Matrix{Float64}`:
+        input dense matrix.
+- `tol::Float64`:
+        tolerane.
 """
 function make_entries_zero!(
     dense_array::Matrix{Float64},
@@ -222,6 +265,12 @@ end
 """
 Sets to zero every element of a Dense vector if absolute values is below a 
 certain tolerance.
+
+# Keyword arguments
+- `vector::Vector{Float64}`: 
+        input dense vector.
+- `tol::Float64`:
+        tolerance.
 """
 function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
     for i in eachindex(vector)
@@ -262,6 +311,12 @@ end
 """
 Finds the subnetworks present in the considered System. This is evaluated by taking 
 a the ABA or Adjacency Matrix.
+
+# Keyword arguments
+- `M::SparseArrays.SparseMatrixCSC`:
+        input sparse matrix.
+- `bus_numbers::Vector{Int}`:
+        vector conteining the idexes of the system's buses.
 """
 function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
     rows = SparseArrays.rowvals(M)
@@ -288,12 +343,18 @@ end
 
 """
 Adds buses to the bus_group defining the sub-network of the system.
-Inputs:
-    - index: row index of either the ABA or Adjacency matrix. Corresponds to branch index.
-    - M: either ABA or Adjacency matrix
-    - bus_numbers: vector containing the indixes of the buses
-    - bus_groups: set containing the bus indexes defining the 
-    - touched: row indexes already evaluated
+
+# Keyword arguments
+- `index::Int`:
+        row index of either the ABA or Adjacency matrix. Corresponds to the enumerated branch index.
+- `M::SparseArrays.SparseMatrixCSC`:
+        either ABA or Adjacency matrix.
+- `bus_numbers::Vector{Int}`:
+        vector containing the enumerated indexes of the buses.
+- `bus_group::Set{Int}`:
+        set containing the bus indexes defining a certain sub-network.
+- `touched::Set{Int}`:
+        row indexes already evaluated.
 """
 function _dfs(
     index::Int,
