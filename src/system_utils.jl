@@ -23,7 +23,6 @@ function _find_subnetworks(sys::PSY.System)
     return find_subnetworks(M, collect(keys(bus_lookup))), find_slack_positions(nodes)
 end
 
-
 function find_subnetworks(sys::PSY.System)
     sbn, ref_bus_positions = _find_subnetworks(sys)
     return assing_reference_buses(sbn, ref_bus_positions)
