@@ -181,7 +181,7 @@ function assing_reference_buses(
     subnetworks::Dict{Int, Set{Int}},
     ref_bus_positions::Vector{Int},
 )
-    if isempty(ref_bus_positions) || length(ref_bus_positions) != keys(subnetworks)
+    if isempty(ref_bus_positions) || length(ref_bus_positions) != length(subnetworks)
         @warn "The reference bus positions are not consistent with the subnetworks. Can't continue"
         return subnetworks
     end
