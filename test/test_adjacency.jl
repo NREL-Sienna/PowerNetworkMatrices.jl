@@ -11,5 +11,5 @@
     @test all([6, 1] .∈ keys(subnetworks_m))
 
     subnetworks_sys = find_subnetworks(sys10)
-    @test all([4, 9] .∈ keys(subnetworks_m))
+    @test all([4, 9] .∈ keys(subnetworks_sys))
 end
