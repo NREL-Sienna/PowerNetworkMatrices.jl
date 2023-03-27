@@ -183,7 +183,7 @@ function assing_reference_buses(
 )
     if isempty(ref_bus_positions) || length(ref_bus_positions) != length(subnetworks)
         @warn "The reference bus positions are not consistent with the subnetworks. Can't continue"
-        return subnetworks
+        return deepcopy(subnetworks)
     end
     bus_groups = Dict{Int, Set{Int}}()
     for (bus_key, subnetwork_buses) in subnetworks
