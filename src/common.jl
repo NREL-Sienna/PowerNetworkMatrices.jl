@@ -14,7 +14,10 @@ end
 
 # get slack bus
 function find_slack_positions(nodes)
-    bus_lookup = make_ax_ref(nodes)
+    return find_slack_positions(nodes, make_ax_ref(nodes))
+end
+
+function find_slack_positions(nodes, bus_lookup::Dict{Int, Int})
     slack_position = sort([
         bus_lookup[PSY.get_number(n)]
         for n in nodes if PSY.get_bustype(n) == BusTypes.REF
