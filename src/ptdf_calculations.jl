@@ -52,6 +52,10 @@ end
 Computes the PTDF matrix given the System's branches and nodes.
 
 # Keyword arguments
+- `branches`:
+        vector of the System AC branches
+- `nodes::Vector{PSY.Bus}`:
+        vector of the System buses
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
 - `dist_slack::Vector{Float64}`:
@@ -80,6 +84,10 @@ end
 Computes the PTDF matrix given the System's Incidence and BA matrix.
 
 # Keyword arguments
+- `A::IncidenceMatrix`:
+        A matrix (full structure)
+- `BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}}`:
+        BA matrix
 - `dist_slack::Vector{Float64}`:
         vector containing the weights for the distributed slasks.
 - `linear_solver::String`:
@@ -109,7 +117,7 @@ function _buildptdf_from_matrices(
 end
 
 """
-Internal function.
+Funciton for internal use only.
 
 Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
 
@@ -199,7 +207,7 @@ function _binfo_check(binfo::Int)
 end
 
 """
-Internal function.
+Funciton for internal use only.
 
 Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
     
@@ -285,7 +293,7 @@ function calculate_PTDF_matrix_DENSE(
 end
 
 """
-Internal function.
+Funciton for internal use only.
 
 Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
     
@@ -363,6 +371,10 @@ end
 Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF array indexed with the bus numbers.
 
 # Keyword arguments
+- `branches`:
+        vector of the System AC branches
+- `nodes::Vector{PSY.Bus}`:
+        vector of the System buses
 - `dist_slack::Vector{Float64}`:
         vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses
@@ -401,13 +413,8 @@ end
 Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
 
 # Keyword arguments
-- `dist_slack::Vector{Float64}`:
-        Vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses
-- `linear_solver::String`:
-        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
-- `tol::Float64`:
-        Tolerance to eliminate entries in the PTDF matrix (default eps())
+- `sys::PSY.System`:
+        Power Systems system
 """
 function PTDF(
     sys::PSY.System;

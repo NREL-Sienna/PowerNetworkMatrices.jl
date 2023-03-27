@@ -1,6 +1,16 @@
 """
 Line Outage Distribution Factors (LODFs) are a sensitivity measure of how a change in
-a line’s flow affects the flows on other lines in the system.
+a line's flow affects the flows on other lines in the system.
+
+# Fields
+- `data<:AbstractArray{Float64, 2}`:
+        the actual Incidence matrix.
+- `axes<:NTuple{2, Dict}`:
+        Tuple containing two vectors (the first one showing the branches names,
+        the second showing the buses numbers).
+- `lookup<:NTuple{2, Dict}`:
+        Tuple containing two discionaries, the first mapping the branches 
+        and buses with their enumerated indexes.
 """
 struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     data::Array{Float64, 2}
@@ -8,6 +18,21 @@ struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     lookup::L
 end
 
+"""
+Funciton for internal use only.
+
+Computes the LODF function.
+
+# Keyword arguments
+- `branches`:
+        vector of the System AC branches
+- `nodes::Vector{PSY.Bus}`:
+        vector of the System buses
+- `bus_lookup::Dict{Int, Int}`:
+        dictionary mapping the bus numbers with their enumerated indexes.
+- `dist_slack::Vector{Float64}`:
+        vector containing the weights for the distributed slasks.
+"""
 function _buildlodf(
     branches,
     nodes::Vector{PSY.Bus},
@@ -18,6 +43,17 @@ function _buildlodf(
     return _buildlodf(a, ptdf)
 end
 
+"""
+Funciton for internal use only.
+
+Computes the LODF function.
+
+# Keyword arguments
+- `a::SparseArrays.SparseMatrixCSC{Int8, Int}`:
+        Incidence Matrix
+`- ptdf::Matrix{Float64}`:
+        PTDF matrix
+"""
 function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int}, ptdf::Matrix{Float64})
     linecount = size(ptdf, 1)
     ptdf_denominator = ptdf * transpose(a)
@@ -41,8 +77,14 @@ end
 Builds the LODF matrix from a group of branches and nodes. The return is a LOLDF array indexed with the branch name.
 
 # Keyword arguments
-- `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
-    The distributed slack vector has to be the same length as the number of buses
+- `branches`:
+        vector of the System AC branches
+- `nodes::Vector{PSY.Bus}`:
+        vector of the System buses
+- `dist_slack::Vector{Float64}`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
+
 """
 function LODF(branches, nodes::Vector{PSY.Bus}, dist_slack::Vector{Float64} = Float64[])
 
@@ -59,8 +101,11 @@ end
 Builds the LODF matrix from a system. The return is a LOLDF array indexed with the branch name.
 
 # Keyword arguments
-- `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
-    The distributed slack vector has to be the same length as the number of buses
+- `sys::PSY.System`:
+        Power Systems system
+- `dist_slack::Vector{Float64}`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
 """
 function LODF(sys::PSY.System, dist_slack::Vector{Float64} = Float64[])
     branches = sort!(
