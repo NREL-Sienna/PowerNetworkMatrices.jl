@@ -20,8 +20,8 @@ function _find_subnetworks(sys::PSY.System)
     branches = get_ac_branches(sys)
     @info "Validating connectivity with depth first search (network traversal)"
     M, bus_lookup = calculate_adjacency(branches, nodes)
-    return find_subnetworks(M, PSY.get_number.(nodes)),
-    find_slack_positions(nodes, bus_lookup)
+    slack_positions = find_slack_positions(nodes, bus_lookup)
+    return find_subnetworks(M, PSY.get_number.(nodes)), slack_positions
 end
 
 function find_subnetworks(sys::PSY.System)
