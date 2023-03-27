@@ -1,7 +1,6 @@
 @testset "PTDF matrices" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    for solver in ["KLU", "Dense", #"MKLPardiso"
-        ]
+    for solver in ["KLU", "Dense", "MKLPardiso"]
         for approach in ["standard", "separate_matrices"]
             nodes_5 = nodes5()
             branches_5 = branches5(nodes_5)
