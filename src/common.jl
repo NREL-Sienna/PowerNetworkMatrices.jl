@@ -14,7 +14,10 @@ end
 
 # get slack bus
 function find_slack_positions(nodes)
-    bus_lookup = make_ax_ref(nodes)
+    return find_slack_positions(nodes, make_ax_ref(nodes))
+end
+
+function find_slack_positions(nodes, bus_lookup::Dict{Int, Int})
     slack_position = sort([
         bus_lookup[PSY.get_number(n)]
         for n in nodes if PSY.get_bustype(n) == BusTypes.REF
@@ -181,6 +184,10 @@ function assing_reference_buses(
     subnetworks::Dict{Int, Set{Int}},
     ref_bus_positions::Vector{Int},
 )
+    if isempty(ref_bus_positions) || length(ref_bus_positions) != length(subnetworks)
+        @warn "The reference bus positions are not consistent with the subnetworks. Can't continue"
+        return deepcopy(subnetworks)
+    end
     bus_groups = Dict{Int, Set{Int}}()
     for (bus_key, subnetwork_buses) in subnetworks
         ref_bus = intersect(ref_bus_positions, subnetwork_buses)
@@ -188,7 +195,8 @@ function assing_reference_buses(
             bus_groups[ref_bus[1]] = pop!(subnetworks, bus_key)
             continue
         elseif length(ref_bus) == 0
-            @error "No reference bus in the subnetwork associated with bus $bus_key"
+            @warn "No reference bus in the subnetwork associated with bus $bus_key. Can't continue"
+            return subnetworks
         elseif length(ref_bus) > 1
             error(
                 "More than one reference bus in the subnetwork associated with bus $bus_key",
