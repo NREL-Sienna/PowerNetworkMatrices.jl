@@ -1,6 +1,6 @@
 @testset "test connected components" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    sys10 = get_10bus_test_system()
+    sys10 = PSB.build_system(PSISystems, "2Area 5 Bus System")
 
     M = AdjacencyMatrix(sys5)
     subnetworks = find_subnetworks(M)
