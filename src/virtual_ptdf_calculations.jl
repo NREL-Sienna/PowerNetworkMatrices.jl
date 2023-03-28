@@ -298,21 +298,6 @@ if isdefined(Base, :print_array) # 0.7 and later
     Base.print_array(io::IO, X::VirtualPTDF) = "VirtualPTDF"
 end
 
-"""
-Funciton for internal use only.
-
-Gets the value of the element of the PTDF matrix given the row and column indices
-corresponding to the branch and buses one respectively. If `column` is a Colon then 
-the entire row is returned.
-
-# Keyword Arguments
-- `vptdf::VirtualPTDF`:
-        VirtualPTDF struct where to evaluate and store the values.
-- `row::Int`:
-        Branch index.
-- `column::Union{Int, Colon}`:
-        Bus index. If Colon then get the values of the whole row.
-"""
 function _getindex(
     vptdf::VirtualPTDF,
     row::Int,

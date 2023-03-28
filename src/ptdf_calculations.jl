@@ -48,21 +48,6 @@ function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where
     return PTDF(new_mat, mat.axes, mat.lookup, mat.subnetworks, Ref(tol))
 end
 
-"""
-Computes the PTDF matrix given the System's branches and nodes.
-
-# Keyword arguments
-- `branches`:
-        vector of the System AC branches
-- `nodes::Vector{PSY.Bus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slasks.
-- `linear_solver::String`:
-        linear solver used to compute the PTDF matrix.
-"""
 function _buildptdf(
     branches,
     nodes::Vector{PSY.Bus},
@@ -80,19 +65,6 @@ function _buildptdf(
     return PTDFm, A
 end
 
-"""
-Computes the PTDF matrix given the System's Incidence and BA matrix.
-
-# Keyword arguments
-- `A::IncidenceMatrix`:
-        A matrix (full structure)
-- `BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}}`:
-        BA matrix
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slasks.
-- `linear_solver::String`:
-        linear solver used to compute the PTDF matrix.
-"""
 function _buildptdf_from_matrices(
     A::IncidenceMatrix,
     BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}},

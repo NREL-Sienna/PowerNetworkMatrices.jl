@@ -341,21 +341,6 @@ function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{I
     return subnetworks
 end
 
-"""
-Adds buses to the bus_group defining the sub-network of the system.
-
-# Keyword arguments
-- `index::Int`:
-        row index of either the ABA or Adjacency matrix. Corresponds to the enumerated branch index.
-- `M::SparseArrays.SparseMatrixCSC`:
-        either ABA or Adjacency matrix.
-- `bus_numbers::Vector{Int}`:
-        vector containing the enumerated indexes of the buses.
-- `bus_group::Set{Int}`:
-        set containing the bus indexes defining a certain sub-network.
-- `touched::Set{Int}`:
-        row indexes already evaluated.
-"""
 function _dfs(
     index::Int,
     M::SparseArrays.SparseMatrixCSC,

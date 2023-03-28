@@ -18,21 +18,6 @@ struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     lookup::L
 end
 
-"""
-Funciton for internal use only.
-
-Computes the LODF function.
-
-# Keyword arguments
-- `branches`:
-        vector of the System AC branches
-- `nodes::Vector{PSY.Bus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slasks.
-"""
 function _buildlodf(
     branches,
     nodes::Vector{PSY.Bus},
@@ -43,17 +28,6 @@ function _buildlodf(
     return _buildlodf(a, ptdf)
 end
 
-"""
-Funciton for internal use only.
-
-Computes the LODF function.
-
-# Keyword arguments
-- `a::SparseArrays.SparseMatrixCSC{Int8, Int}`:
-        Incidence Matrix
-`- ptdf::Matrix{Float64}`:
-        PTDF matrix
-"""
 function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int}, ptdf::Matrix{Float64})
     linecount = size(ptdf, 1)
     ptdf_denominator = ptdf * transpose(a)
