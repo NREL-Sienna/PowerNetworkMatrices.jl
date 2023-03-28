@@ -1,4 +1,22 @@
-# BA matrix ##################################################################
+"""
+Structure containing the BA matrix and other relevant data.
+
+# Arguments
+- `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
+        the BA matrix coming from the product between the Incidence Matrix A and
+        the Matrix of Susceptance B
+- `axes<:NTuple{2, Dict}`:
+        Tuple containing two vectors, the first one contains the names of each 
+        line of the network (each one related to a row of the Matrix in "data"),
+        the second one contains the names of each bus of the network (each one
+        related to a column of the Matrix in "data")
+- `lookup<:NTuple{2, Dict}`:
+        Tuple containing 2 Dictionaries mapping the number of rows and columns 
+        with the names of branches and buses
+- `ref_bus_positions::Vector{Int}`:
+        Vector containing the indexes of the columns of the BA matrix corresponding
+        to the refence buses
+"""
 struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
@@ -6,7 +24,9 @@ struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     ref_bus_positions::Vector{Int}
 end
 
-# create the BA matrix
+"""
+Build the BA matrix from a given System
+"""
 function BA_Matrix(sys::PSY.System)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
@@ -20,7 +40,25 @@ function BA_Matrix(sys::PSY.System)
     return BA_Matrix(data, axes, lookup, ref_bus_positions)
 end
 
-# ABA matrix #################################################################
+"""
+Structure containing the ABA matrix and other relevant data.
+
+# Arguments
+- `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
+        the ABA matrix coming from the product between the Incidence Matrix A and
+        the Matrix BA
+- `axes<:NTuple{2, Dict}`:
+        Tuple containing two vectors, the first one contains the names of each 
+        line of the network (each one related to a row of the Matrix in "data"),
+        the second one contains the names of each bus of the network (each one
+        related to a column of the Matrix in "data")
+- `lookup<:NTuple{2, Dict}`:
+        Tuple containing 2 Dictionaries mapping the number of rows and columns 
+        with the names of branches and buses
+- `ref_bus_positions::Vector{Int}`:
+        Vector containing the indexes of the columns of the BA matrix corresponding
+        to the refence buses
+"""
 struct ABA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
@@ -28,6 +66,9 @@ struct ABA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     ref_bus_positions::Vector{Int}
 end
 
+"""
+Builds the ABA matrix from a System
+"""
 function ABA_Matrix(sys::PSY.System)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)

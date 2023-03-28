@@ -1,7 +1,23 @@
 """
 Power Transfer Distribution Factors (PTDF) indicate the incremental change in real power that occurs on transmission lines due to real power injections changes at the buses.
 
-The PTDF struct is indexed using the Bus numbers and branch names
+The PTDF struct is indexed using the Bus numbers and Branch names.
+
+# Fields
+- `data<:AbstractArray{Float64, 2}`:
+        the actual Incidence matrix.
+- `axes<:NTuple{2, Dict}`:
+        Tuple containing two vectors (the first one showing the branches names,
+        the second showing the buses numbers).
+- `lookup<:NTuple{2, Dict}`:
+        Tuple containing two dictionaries, the first mapping the branches 
+        and buses with their enumerated indexes.
+- `subnetworks::Dict{Int, Set{Int}}`:
+        dictionary containing the set of bus indexes defining the subnetworks 
+        of the system.
+- `tol::Base.RefValue{Float64}`:  
+        tolerance used for sportifying the matrix (dropping element whose 
+        absolute value is below this threshold).
 """
 struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
        PowerNetworkMatrix{Float64}
@@ -12,6 +28,9 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     tol::Base.RefValue{Float64}
 end
 
+"""
+Elements whose values are below "tol" are set to zero (dropped in case of Sparse matrix).
+"""
 function drop_small_entries!(mat::PTDF, tol::Float64)
     if tol > mat.tol[]
         @info "Specified tolerance is smaller than the current tolerance."
@@ -21,6 +40,9 @@ function drop_small_entries!(mat::PTDF, tol::Float64)
     return
 end
 
+"""
+Makes the PTDF matrix sparse given a certain tolerance "tol".
+"""
 function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
     new_mat = sparsify(mat.data, tol)
     return PTDF(new_mat, mat.axes, mat.lookup, mat.subnetworks, Ref(tol))
@@ -66,7 +88,21 @@ function _buildptdf_from_matrices(
     return PTDFm
 end
 
-# PTDF evaluation ############################################################
+"""
+Funciton for internal use only.
+
+Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
+
+# Keyword arguments
+- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
+        Incidence Matrix
+- `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
+        BA matrix
+- `ref_bus_positions::Vector{Int}`:
+        vector containing the indexes of the reference slack buses.
+- `dist_slack::Vector{Float64}`:
+        vector containing the weights for the distributed slacks.
+"""
 function _calculate_PTDF_matrix_KLU(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
@@ -102,6 +138,19 @@ function _calculate_PTDF_matrix_KLU(
     return PTDFm
 end
 
+"""
+Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
+
+# Keyword arguments
+- `branches`:
+        vector of the System AC branches
+- `nodes::Vector{PSY.Bus}`:
+        vector of the System buses
+- `bus_lookup::Dict{Int, Int}`:
+        dictionary mapping the bus numbers with their enumerated indexes.
+- `dist_slack::Vector{Float64}`:
+        vector containing the weights for the distributed slacks.
+"""
 function calculate_PTDF_matrix_KLU(
     branches,
     nodes::Vector{PSY.Bus},
@@ -113,6 +162,9 @@ function calculate_PTDF_matrix_KLU(
     return PTDFm, A
 end
 
+"""
+!!! MISSING DOCUMENTATION !!!
+"""
 function _binfo_check(binfo::Int)
     if binfo != 0
         if binfo < 0
@@ -126,6 +178,21 @@ function _binfo_check(binfo::Int)
     return
 end
 
+"""
+Funciton for internal use only.
+
+Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
+    
+# Keyword arguments
+- `A::Matrix{Int8}`:
+        Incidence Matrix
+- `BA::Matrix{T} where {T <: Union{Float32, Float64}}`:
+        BA matrix
+- `ref_bus_positions::Vector{Int}`:
+        vector containing the indexes of the reference slack buses.
+- `dist_slack::Vector{Float64})`:
+        vector containing the weights for the distributed slacks.
+"""
 function _calculate_PTDF_matrix_DENSE(
     A::Matrix{Int8},
     BA::Matrix{T},
@@ -173,6 +240,19 @@ function _calculate_PTDF_matrix_DENSE(
     return PTDFm
 end
 
+"""
+Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
+
+# Keyword arguments
+- `branches`:
+        vector of the System AC branches
+- `nodes::Vector{PSY.Bus}`:
+        vector of the System buses
+- `bus_lookup::Dict{Int, Int}`:
+        dictionary mapping the bus numbers with their enumerated indexes.
+- `dist_slack::Vector{Float64}`:
+        vector containing the weights for the distributed slacks.
+"""
 function calculate_PTDF_matrix_DENSE(
     branches,
     nodes::Vector{PSY.Bus},
@@ -184,6 +264,21 @@ function calculate_PTDF_matrix_DENSE(
     return PTDFm, A
 end
 
+"""
+Funciton for internal use only.
+
+Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
+    
+# Keyword arguments
+- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
+        Incidence Matrix
+- `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
+        BA matrix
+- `ref_bus_positions::Vector{Int}`:
+        vector containing the indexes of the referece slack buses.
+- `dist_slack::Vector{Float64}`:
+        vector containing the weights for the distributed slacks.
+"""
 function _calculate_PTDF_matrix_MKLPardiso(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
@@ -220,6 +315,19 @@ function _calculate_PTDF_matrix_MKLPardiso(
     return PTDFm
 end
 
+"""
+Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
+    
+# Keyword arguments
+- `branches`:
+        vector of the System AC branches
+- `nodes::Vector{PSY.Bus}`:
+        vector of the System buses
+- `bus_lookup::Dict{Int, Int}`:
+        dictionary mapping the bus numbers with their enumerated indexes.
+- `dist_slack::Vector{Float64}`:
+        vector containing the weights for the distributed slacks.
+"""
 function calculate_PTDF_matrix_MKLPardiso(
     branches,
     nodes::Vector{PSY.Bus},
@@ -235,10 +343,17 @@ end
 Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF array indexed with the bus numbers.
 
 # Keyword arguments
-- `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
-    The distributed slack vector has to be the same length as the number of buses
-- `linear_solver::String`: Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
-- `tol::Float64`: Tolerance to eliminate entries in the PTDF matrix (default eps())
+- `branches`:
+        vector of the System AC branches
+- `nodes::Vector{PSY.Bus}`:
+        vector of the System buses
+- `dist_slack::Vector{Float64}`:
+        vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses
+- `linear_solver::String`:
+        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
+- `tol::Float64`:
+        Tolerance to eliminate entries in the PTDF matrix (default eps())
 """
 function PTDF(
     branches,
@@ -270,10 +385,8 @@ end
 Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
 
 # Keyword arguments
-- `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
-    The distributed slack vector has to be the same length as the number of buses
-- `linear_solver::String`: Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
-- `tol::Float64`: Tolerance to eliminate entries in the PTDF matrix (default eps())
+- `sys::PSY.System`:
+        Power Systems system
 """
 function PTDF(
     sys::PSY.System;
@@ -284,8 +397,22 @@ function PTDF(
     return PTDF(branches, nodes; kwargs...)
 end
 
-# version 2: use BA and ABA fucntions created before #########################
+"""
+Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
 
+# Keyword arguments
+- `A::IncidenceMatrix`:
+        Incidence Matrix (full structure)
+- `BA::BA_Matrix`:
+        BA matrix (full structure)
+- `dist_slack::Vector{Float64}`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
+- `linear_solver::String`:
+        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso.
+- `tol::Float64`:
+        Tolerance to eliminate entries in the PTDF matrix (default eps()).
+"""
 function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
