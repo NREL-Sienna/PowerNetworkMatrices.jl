@@ -17,6 +17,7 @@ makedocs(;
     sitename = "PowerNetworkMatrices.jl",
     authors = "Jose Daniel Lara, Sourabh Dalvi",
     pages = Any[p for p in pages],
+    clean = true,
 )
 
 deploydocs(;
