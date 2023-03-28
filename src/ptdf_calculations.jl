@@ -93,7 +93,7 @@ Funciton for internal use only.
 
 Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
 
-# Keyword arguments
+# Arguments
 - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
         Incidence Matrix
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
@@ -141,7 +141,7 @@ end
 """
 Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
 
-# Keyword arguments
+# Arguments
 - `branches`:
         vector of the System AC branches
 - `nodes::Vector{PSY.Bus}`:
@@ -183,7 +183,7 @@ Funciton for internal use only.
 
 Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
     
-# Keyword arguments
+# Arguments
 - `A::Matrix{Int8}`:
         Incidence Matrix
 - `BA::Matrix{T} where {T <: Union{Float32, Float64}}`:
@@ -243,7 +243,7 @@ end
 """
 Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
 
-# Keyword arguments
+# Arguments
 - `branches`:
         vector of the System AC branches
 - `nodes::Vector{PSY.Bus}`:
@@ -269,7 +269,7 @@ Funciton for internal use only.
 
 Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
     
-# Keyword arguments
+# Arguments
 - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
         Incidence Matrix
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
@@ -318,7 +318,7 @@ end
 """
 Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
     
-# Keyword arguments
+# Arguments
 - `branches`:
         vector of the System AC branches
 - `nodes::Vector{PSY.Bus}`:
@@ -342,7 +342,7 @@ end
 """
 Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF array indexed with the bus numbers.
 
-# Keyword arguments
+# Arguments
 - `branches`:
         vector of the System AC branches
 - `nodes::Vector{PSY.Bus}`:
@@ -384,7 +384,7 @@ end
 """
 Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
 
-# Keyword arguments
+# Arguments
 - `sys::PSY.System`:
         Power Systems system
 """
@@ -400,7 +400,7 @@ end
 """
 Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
 
-# Keyword arguments
+# Arguments
 - `A::IncidenceMatrix`:
         Incidence Matrix (full structure)
 - `BA::BA_Matrix`:

@@ -29,10 +29,10 @@ import LinearAlgebra: ldiv!, mul!, I
 import LinearAlgebra
 import Pardiso
 
-@template (FUNCTIONS, METHODS) = """
-                                 $(TYPEDSIGNATURES)
-                                 $(DOCSTRING)
-                                 """
+@template DEFAULT = """
+                    $(SIGNATURES)
+                    $(DOCSTRING)
+                    """
 
 # network calculations
 include("PowerNetworkMatrix.jl")
