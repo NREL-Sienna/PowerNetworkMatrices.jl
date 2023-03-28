@@ -26,5 +26,5 @@ deploydocs(;
     devurl = "dev",
     push_preview = true,
     forcepush = true,
-    versions = ["stable" => "v^", "v#.#", devurl => devurl],
+    versions = ["stable" => "v^", "v#.#"],
 )
