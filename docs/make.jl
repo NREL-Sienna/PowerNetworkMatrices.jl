@@ -23,8 +23,8 @@ deploydocs(;
     repo = "github.com/NREL-SIIP/PowerNetworkMatrices.jl.git",
     target = "build",
     branch = "gh-pages",
-    devbranch = "main",
     devurl = "dev",
     push_preview = true,
-    versions = ["stable" => "v^", "v#.#"],
+    forcepush = true,
+    versions = ["stable" => "v^", "v#.#", devurl => devurl],
 )
