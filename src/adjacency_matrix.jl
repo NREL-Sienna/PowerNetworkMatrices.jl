@@ -8,12 +8,12 @@ The AdjacencyMatrix Struct is indexed using the Bus Numbers, no need for them to
 - `data::SparseArrays.SparseMatrixCSC{Int8, Int}`:
         stores the incidence matrix
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors, the first one contains the names of each 
+        Tuple containing two vectors, the first one contains the names of each
         line of the network (each one related to a row of the Matrix in "data"),
         the second one contains the names of each bus of the network (each one
         related to a column of the Matrix in "data")
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing 2 Dictionaries mapping the number of rows and columns 
+        Tuple containing 2 Dictionaries mapping the number of rows and columns
         with the names of branches and buses
 - `ref_bus_positions::Vector{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
@@ -36,7 +36,7 @@ Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix
 
 # Arguments
 - `check_connectivity::Bool`:
-        Checks connectivity of the network using Goderya's algorithm
+        Checks connectivity of the network using Depth First Search (DFS) algorithm
 """
 function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     nodes = sort!(
@@ -59,7 +59,7 @@ Builds a AdjacencyMatrix from a collection of buses and branches. The return is 
 
 # Arguments
 - `check_connectivity::Bool`:
-        Checks connectivity of the network using Goderya's algorithm
+        Checks connectivity of the network using Depth First Search (DFS) algorithm
 """
 function AdjacencyMatrix(
     branches,
@@ -89,7 +89,7 @@ function validate_connectivity(M::AdjacencyMatrix)
 end
 
 """
-Evaluates subnetworks by looking for the subsets of nodes connected each other, 
+Evaluates subnetworks by looking for the subsets of nodes connected each other,
 but not connected with nodes of other subsets.
 """
 function find_subnetworks(M::AdjacencyMatrix)
