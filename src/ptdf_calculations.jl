@@ -10,13 +10,13 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
         Tuple containing two vectors (the first one showing the branches names,
         the second showing the buses numbers).
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two discionaries, the first mapping the branches 
+        Tuple containing two dictionaries, the first mapping the branches 
         and buses with their enumerated indexes.
 - `subnetworks::Dict{Int, Set{Int}}`:
         dictionary containing the set of bus indexes defining the subnetworks 
         of the system.
 - `tol::Base.RefValue{Float64}`:  
-        tolerance used for sparsifying the matrix (dropping element whose 
+        tolerance used for sportifying the matrix (dropping element whose 
         absolute value is below this threshold).
 """
 struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
@@ -99,9 +99,9 @@ Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrice
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix
 - `ref_bus_positions::Vector{Int}`:
-        vector containing the indexes of the referece slack buses.
+        vector containing the indexes of the reference slack buses.
 - `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slasks.
+        vector containing the weights for the distributed slacks.
 """
 function _calculate_PTDF_matrix_KLU(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -149,7 +149,7 @@ Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrice
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
 - `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slasks.
+        vector containing the weights for the distributed slacks.
 """
 function calculate_PTDF_matrix_KLU(
     branches,
@@ -189,9 +189,9 @@ Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense mat
 - `BA::Matrix{T} where {T <: Union{Float32, Float64}}`:
         BA matrix
 - `ref_bus_positions::Vector{Int}`:
-        vector containing the indexes of the referece slack buses.
+        vector containing the indexes of the reference slack buses.
 - `dist_slack::Vector{Float64})`:
-        vector containing the weights for the distributed slasks.
+        vector containing the weights for the distributed slacks.
 """
 function _calculate_PTDF_matrix_DENSE(
     A::Matrix{Int8},
@@ -251,7 +251,7 @@ Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense mat
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
 - `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slasks.
+        vector containing the weights for the distributed slacks.
 """
 function calculate_PTDF_matrix_DENSE(
     branches,
@@ -277,7 +277,7 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 - `ref_bus_positions::Vector{Int}`:
         vector containing the indexes of the referece slack buses.
 - `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slasks.
+        vector containing the weights for the distributed slacks.
 """
 function _calculate_PTDF_matrix_MKLPardiso(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -326,7 +326,7 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
 - `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slasks.
+        vector containing the weights for the distributed slacks.
 """
 function calculate_PTDF_matrix_MKLPardiso(
     branches,

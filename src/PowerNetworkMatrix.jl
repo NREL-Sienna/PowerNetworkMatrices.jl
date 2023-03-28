@@ -37,7 +37,7 @@ function make_ax_ref(buses::AbstractVector{PSY.Bus})
 end
 
 """
-Checkes if repetition are present in the dictionary mapping buses and branches.
+Checkes if repetitions are present in the dictionary mapping buses and branches.
 
 # Keyword Arguments
 - `ax::AbstractVector`:
@@ -68,14 +68,14 @@ Base.CartesianIndices(A::PowerNetworkMatrix) =
 Base.eachindex(A::PowerNetworkMatrix) = CartesianIndices(size(A.data))
 
 """
-Gets bus indeces  to a certain branch index
+Gets bus indices to a certain branch index
 """
 function lookup_index(i, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[i]
 end
 
 """
-Gets bus indeces  to a certain branch name
+Gets bus indices to a certain branch name
 
 #Keyword Arguments
 - `i::PSY.ACBranch`:
@@ -88,7 +88,7 @@ function lookup_index(i::PSY.ACBranch, lookup::Dict)
 end
 
 """
-Gets bus indeces  to a certain branch name
+Gets bus indices to a certain branch name
 
 #Keyword Arguments
 - `i::PSY.ACBranch`:
@@ -128,7 +128,7 @@ _to_index_tuple(idx::NTuple{0}, lookup::Tuple) = ()
 _to_index_tuple(idx::NTuple{0}, lookup::NTuple{0}) = ()
 
 """
-Given the indices, gets the values of the power network matrix considerd
+Given the indices, gets the values of the power network matrix considered
 """
 to_index(A::PowerNetworkMatrix, idx...) = _to_index_tuple(idx, A.lookup)
 
@@ -158,7 +158,7 @@ Structure to store the keys of a power network matrix
 
 # Fields
 - `I<:Tuple`:
-        turple containing the indeces of the matrix
+        turple containing the indices of the matrix
 """
 struct PowerNetworkMatrixKey{T <: Tuple}
     I::T

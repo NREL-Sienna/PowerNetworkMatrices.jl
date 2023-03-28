@@ -1,5 +1,5 @@
 """
-Structure containing the BA matrix andother relevant data.
+Structure containing the BA matrix and other relevant data.
 
 # Fields
 - `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
@@ -45,7 +45,7 @@ Structure containing the ABA matrix and other relevant data.
 
 # Fields
 - `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        the ABA matrix cominfrom the product between the Incidence Matrix A and
+        the ABA matrix coming from the product between the Incidence Matrix A and
         the Matrix BA
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors, the first one contains the names of each 

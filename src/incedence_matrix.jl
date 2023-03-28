@@ -8,10 +8,10 @@ Incidence matrix: shows connection between buses, defining lines
         Tuple containing two vectors (the first one showing the branches names,
         the second showing the buses numbers).
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two discionaries, the first mapping the branches 
+        Tuple containing two dictionaries, the first mapping the branches 
         and buses with their enumerated indexes.
 - `ref_bus_positions::Vector{Int}`:
-        vector containing the indexes of the referece slack buses.
+        vector containing the indices of the reference slack buses.
 """
 struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}

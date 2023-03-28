@@ -17,9 +17,9 @@ function get_buses(sys::PSY.System)::Vector{PSY.Bus}
 end
 
 """
-Gets the indeces of the reference (slack) buses.
+Gets the indices  of the reference (slack) buses.
 NOTE:
-- the indeces corresponds to the columns of zeros belonging to the PTDF matrix.
+- the indices  corresponds to the columns of zeros belonging to the PTDF matrix.
 - BA and ABA matrix miss the columns related to the reference buses.
 """
 function find_slack_positions(nodes)
@@ -54,7 +54,7 @@ Evaluates the Incidence matrix A given the branches and node of a System.
 
 # Keyword arguments
 - `branches`:
-        vector containing the branches of the considered system (shuld be AC branches).
+        vector containing the branches of the considered system (should be AC branches).
 - `buses::Vector{PSY.Bus}`:
         vector containing the buses of the considered system.
 
@@ -92,7 +92,7 @@ Evaluates the Adjacency matrix given the banches and buses of a given System.
 
 # Keyword arguments
 - `branches`:
-        vector containing the branches of the considered system (shuld be AC branches).
+        vector containing the branches of the considered system (should be AC branches).
 - `buses::Vector{PSY.Bus}`:
         vector containing the buses of the considered system.
 """
@@ -133,7 +133,7 @@ Evaluates the BA matrix given the System's banches, reference bus positions and 
 
 # Keyword arguments
 - `branches`:
-        vector containing the branches of the considered system (shuld be AC branches).
+        vector containing the branches of the considered system (should be AC branches).
 - `ref_bus_positions::Vector{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
@@ -200,7 +200,7 @@ end
 
 """
 Return a sparse matrix given a dense one by dropping element whose absolute 
-value is above a certain tolarance.
+value is above a certain tolerance.
 
 
 # Keyword arguments
@@ -228,7 +228,7 @@ certain tolerance.
 - `sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         input sparse array.
 - `tol::Float64`:
-        tolerane.
+        tolerance.
 """
 function make_entries_zero!(
     sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
@@ -251,7 +251,7 @@ certain tolerance.
 - `dense_array::Matrix{Float64}`:
         input dense matrix.
 - `tol::Float64`:
-        tolerane.
+        tolerance.
 """
 function make_entries_zero!(
     dense_array::Matrix{Float64},
@@ -324,7 +324,7 @@ a the ABA or Adjacency Matrix.
 - `M::SparseArrays.SparseMatrixCSC`:
         input sparse matrix.
 - `bus_numbers::Vector{Int}`:
-        vector conteining the idexes of the system's buses.
+        vector containing the indices of the system's buses.
 """
 function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
     rows = SparseArrays.rowvals(M)

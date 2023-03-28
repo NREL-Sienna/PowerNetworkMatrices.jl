@@ -7,9 +7,9 @@ Structure used for saving the rows of the Virtual PTDF matrix.
 - `persistent_cache_keys::Set{Int}`:
         Set listing the rows saved in `temp_cache`
 - `max_cache_size::Int`
-        Defines the maximimum allowed cache size (rows*row_size)
+        Defines the maximum allowed cache size (rows*row_size)
 - `max_num_keys::Int`
-        Defines the maximimum number of keys saved (rows of the matrix)
+        Defines the maximum number of keys saved (rows of the matrix)
 """
 struct RowCache
     temp_cache::Dict{Int, Array{Float64}}
@@ -19,15 +19,19 @@ struct RowCache
 end
 
 """
+Structure used for saving the rows of the Virtual PTDF matrix.
 
-# Keyword arguments
-- `max_cache_size::Int`:
-        maximum allowed cache size (rows*row_size)
-- `persistent_rows::Set{Int}`:
-        set of the PTDF row keys stored in `persistent_cache_keys`
-- `row_size`:
-        PTDF row size (length)
+# Fields
+- `temp_cache::Dict{Int, Array{Float64}}`:
+        Dictionay saving the row of the PTDF matrix
+- `persistent_cache_keys::Set{Int}`:
+        Set listing the rows saved in `temp_cache`
+- `max_cache_size::Int`
+        Defines the maximum allowed cache size (rows*row_size)
+- `max_num_keys::Int`
+        Defines the maximum number of keys saved (rows of the matrix)
 """
+
 function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
     persistent_data_size = (length(persistent_rows) + 1) * row_size
     if persistent_data_size > max_cache_size
@@ -54,7 +58,7 @@ function Base.isempty(cache::RowCache)
 end
 
 """
-Erase the cache.
+Erases the cache.
 """
 function Base.empty!(cache::RowCache)
     isempty(cache.temp_cache) && return
@@ -70,7 +74,7 @@ Checks if `key` is present as a key of the dictionary in `cache`
 
 # Keyword arguments
 - `cache::RowCache`:
-        cache were data is stored.
+        cache where data is stored.
 - `key::Int`:
         row number (corresponds to the enumerated branch index).
 """
@@ -83,7 +87,7 @@ Allocates vector as row of the matrix saved in cache.
 
 # Keyword arguments
 - `cache::RowCache`:
-        cache were the row vector is going to be saved
+        cache where the row vector is going to be saved
 - `val::Array{Float64}`:
         vector to be saved
 - `key::Int`:
@@ -100,7 +104,7 @@ Gets the row of the stored matrix in cache.
 
 # Keyword arguments
 - `cache::RowCache`:
-        cache were the row vector is going to be saved
+        cache where the row vector is going to be saved
 - `key::Int`:
         row number (corresponding to the enumerated branch index) related to the row vector.
 """
@@ -164,16 +168,16 @@ The PTDF struct is indexed using the Bus numbers and branch names.
         Tuple containing two vectors (the first one showing the branches names,
         the second showing the buses numbers).
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two discionaries, the first mapping the branches 
+        Tuple containing two dictionaries, the first mapping the branches 
         and buses with their enumerated indexes.
 - `temp_data::Vector{Float64}`:
         temporary vector for internal use.
 - `cache::RowCache`:
         cache were PTDF rows are stored.
 - `subnetworks::Dict{Int, Set{Int}}`:
-        dictionary containing the subsets of buses defining the differen subnetwork of the system.
+        dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
-        tolerance related to sparsification and values to drop.
+        tolerance related to scarification and values to drop.
 """
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
@@ -194,7 +198,7 @@ PTDF array indexed with the branch numbers.
 
 # Keyword arguments
 - `branches`:
-        Vector of the systems's AC branches.
+        Vector of the system's AC branches.
 - `buses::Vector{PSY.Bus}`:
         Vector of the system's buses.
 - `dist_slack::Vector{Float64} = Float64[]`:
@@ -205,7 +209,7 @@ PTDF array indexed with the branch numbers.
 - `max_cache_size::Int`:
         max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
-        line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vecrto of strings).
+        line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
 """
 function VirtualPTDF(
     branches,
@@ -271,7 +275,7 @@ function VirtualPTDF(
 end
 
 """
-Checkes if the any of the fileds of VirtualPTDF is empty.
+Checks if the any of the fields of VirtualPTDF is empty.
 """
 function Base.isempty(vptdf::VirtualPTDF)
     !isempty(vptdf.K.L) && return false
@@ -350,9 +354,11 @@ Base.setindex!(::VirtualPTDF, _, idx...) = error("Operation not supported by Vir
 Base.setindex!(::VirtualPTDF, _, ::CartesianIndex) =
     error("Operation not supported by VirtualPTDF")
 
-""" PTDF data is stored in the the cache
-    it is a nested vecotr containing an array for the names of each row,
-    the PTDF's matrices rows and how many times they were evaluated """
+"""
+PTDF data is stored in the the cache
+it is a nested vectOr containing an array for the names of each row,
+the PTDF's matrices rows and how many times they were evaluated
+"""
 
 # ! change it so to get only the non-empty values
 
