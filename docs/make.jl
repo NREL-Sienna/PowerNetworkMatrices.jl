@@ -15,7 +15,7 @@ makedocs(;
         mathengine = Documenter.MathJax(),
         prettyurls = haskey(ENV, "GITHUB_ACTIONS")),
     sitename = "PowerNetworkMatrices.jl",
-    authors = "Jose Daniel Lara, Sourabh Dalvi",
+    authors = "Jose Daniel Lara, Alessandro Castelli, Sourabh Dalvi",
     pages = Any[p for p in pages],
     clean = true,
 )
