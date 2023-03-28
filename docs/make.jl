@@ -11,7 +11,9 @@ pages = OrderedDict(
 
 makedocs(;
     modules = [PowerNetworkMatrices],
-    format = Documenter.HTML(; prettyurls = haskey(ENV, "GITHUB_ACTIONS")),
+    format = Documenter.HTML(;
+        mathengine = Documenter.MathJax(),
+        prettyurls = haskey(ENV, "GITHUB_ACTIONS")),
     sitename = "PowerNetworkMatrices.jl",
     authors = "Jose Daniel Lara, Sourabh Dalvi",
     pages = Any[p for p in pages],
