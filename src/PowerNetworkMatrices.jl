@@ -32,7 +32,6 @@ import Pardiso
 @template DEFAULT = """
                     $(SIGNATURES)
                     $(DOCSTRING)
-                    $(METHODLIST)
                     """
 
 # network calculations
