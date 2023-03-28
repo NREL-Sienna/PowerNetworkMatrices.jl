@@ -162,6 +162,10 @@ function VirtualPTDF(
     return VirtualPTDF(branches, nodes; kwargs...)
 end
 
+function get_tol(vptdf::VirtualPTDF)
+    return vptdf.tol[]
+end
+
 # Overload Base functions
 function Base.isempty(vptdf::VirtualPTDF)
     !isempty(vptdf.K.L) && return false
@@ -226,7 +230,11 @@ function _getindex(
         vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .=
             KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
         # add slack bus value (zero) and make copy of temp into the cache
-        vptdf.cache[row] = deepcopy(vptdf.temp_data)
+        if get_tol(vptdf) > eps()
+            vptdf.cache[row] = make_entries_zero!(deepcopy(vptdf.temp_data), get_tol(vptdf))
+        else
+            vptdf.cache[row] = deepcopy(vptdf.temp_data)
+        end
         return vptdf.cache[row][column]
     end
 end
