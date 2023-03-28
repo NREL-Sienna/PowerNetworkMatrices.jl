@@ -17,7 +17,7 @@ end
 
 @testset "Virtual PTDF matrices for 10 bus system with 2 reference buses" begin
     # get system
-    sys = get_10bus_test_system()   # get the system composed by 2 5-bus ones connected by a DC line
+    sys = PSB.build_system(PSISystems, "2Area 5 Bus System")   # get the system composed by 2 5-bus ones connected by a DC line
     # get PTDF matrix with KLU as reference
     ptdf_complete = PTDF(sys; linear_solver = "KLU")
     # check VirtualPTDF rows with the ones from KLU
