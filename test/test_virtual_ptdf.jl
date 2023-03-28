@@ -15,6 +15,14 @@
     @test length(ptdf_virtual.cache) == length(ptdf_virtual.axes[1])
 end
 
+@testset "Virtual PTDF matrices with tolerance" begin
+    sys = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys")
+    ptdf_virtual = VirtualPTDF(sys)
+    ptdf_virtual_with_tol = VirtualPTDF(sys; tol = 1e-3)
+    @test sum(abs.(ptdf_virtual["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", :])) >
+          sum(abs.(ptdf_virtual_with_tol["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", :]))
+end
+
 @testset "Virtual PTDF matrices for 10 bus system with 2 reference buses" begin
     # get system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")   # get the system composed by 2 5-bus ones connected by a DC line
