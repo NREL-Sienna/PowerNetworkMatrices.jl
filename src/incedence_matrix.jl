@@ -1,7 +1,7 @@
 """
 Incidence matrix: shows connection between buses, defining lines
 
-# Fields
+# Arguments
 - `data::SparseArrays.SparseMatrixCSC{Int8, Int}`:
         the actual Incidence matrix.
 - `axes<:NTuple{2, Dict}`:

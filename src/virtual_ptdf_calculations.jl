@@ -1,7 +1,7 @@
 """
 Structure used for saving the rows of the Virtual PTDF matrix.
 
-# Fields
+# Arguments
 - `temp_cache::Dict{Int, Array{Float64}}`:
         Dictionay saving the row of the PTDF matrix
 - `persistent_cache_keys::Set{Int}`:
@@ -21,7 +21,7 @@ end
 """
 Structure used for saving the rows of the Virtual PTDF matrix.
 
-# Fields
+# Arguments
 - `temp_cache::Dict{Int, Array{Float64}}`:
         Dictionay saving the row of the PTDF matrix
 - `persistent_cache_keys::Set{Int}`:
@@ -72,7 +72,7 @@ end
 """
 Checks if `key` is present as a key of the dictionary in `cache`
 
-# Keyword arguments
+# Arguments
 - `cache::RowCache`:
         cache where data is stored.
 - `key::Int`:
@@ -85,7 +85,7 @@ end
 """
 Allocates vector as row of the matrix saved in cache.
 
-# Keyword arguments
+# Arguments
 - `cache::RowCache`:
         cache where the row vector is going to be saved
 - `val::Array{Float64}`:
@@ -102,7 +102,7 @@ end
 """
 Gets the row of the stored matrix in cache.
 
-# Keyword arguments
+# Arguments
 - `cache::RowCache`:
         cache where the row vector is going to be saved
 - `key::Int`:
@@ -153,7 +153,7 @@ changes at the buses.
 
 The PTDF struct is indexed using the Bus numbers and branch names.
 
-# Fields
+# Arguments
 - `K::KLU.KLUFactorization{Float64, Int}`:
         LU factorization matrices of the ABA matrix, evaluated by means of KLU
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
@@ -196,7 +196,7 @@ end
 Builds the PTDF matrix from a group of branches and buses. The return is a 
 PTDF array indexed with the branch numbers.
 
-# Keyword arguments
+# Arguments
 - `branches`:
         Vector of the system's AC branches.
 - `buses::Vector{PSY.Bus}`:
@@ -356,7 +356,7 @@ Base.setindex!(::VirtualPTDF, _, ::CartesianIndex) =
 
 """
 PTDF data is stored in the the cache
-it is a nested vectOr containing an array for the names of each row,
+it is a nested vector containing an array for the names of each row,
 the PTDF's matrices rows and how many times they were evaluated
 """
 

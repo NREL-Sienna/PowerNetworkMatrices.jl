@@ -1,7 +1,7 @@
 """
 Structure containing the BA matrix and other relevant data.
 
-# Fields
+# Arguments
 - `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         the BA matrix coming from the product between the Incidence Matrix A and
         the Matrix of Susceptance B
@@ -43,7 +43,7 @@ end
 """
 Structure containing the ABA matrix and other relevant data.
 
-# Fields
+# Arguments
 - `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         the ABA matrix coming from the product between the Incidence Matrix A and
         the Matrix BA

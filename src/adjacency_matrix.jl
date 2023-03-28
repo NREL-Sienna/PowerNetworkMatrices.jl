@@ -4,7 +4,7 @@ Nodal incidence matrix (Adjacency) is an N x N matrix describing a power system 
 
 The AdjacencyMatrix Struct is indexed using the Bus Numbers, no need for them to be sequential
 
-# Fields
+# Arguments
 - `data::SparseArrays.SparseMatrixCSC{Int8, Int}`:
         stores the incidence matrix
 - `axes<:NTuple{2, Dict}`:
@@ -34,7 +34,7 @@ get_slack_position(A::AdjacencyMatrix) = A.ref_bus_positions
 """
 Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix Array indexed with the bus numbers.
 
-# Keyword arguments
+# Arguments
 - `check_connectivity::Bool`:
         Checks connectivity of the network using Goderya's algorithm
 """
@@ -57,7 +57,7 @@ end
 """
 Builds a AdjacencyMatrix from a collection of buses and branches. The return is an N x N AdjacencyMatrix Array indexed with the bus numbers.
 
-# Keyword arguments
+# Arguments
 - `check_connectivity::Bool`:
         Checks connectivity of the network using Goderya's algorithm
 """

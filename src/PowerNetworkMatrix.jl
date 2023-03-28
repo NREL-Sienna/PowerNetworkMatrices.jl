@@ -156,7 +156,7 @@ Base.IndexStyle(::Type{PowerNetworkMatrix}) = IndexAnyCartesian()
 """
 Structure to store the keys of a power network matrix
 
-# Fields
+# Arguments
 - `I<:Tuple`:
         turple containing the indices of the matrix
 """
@@ -169,7 +169,7 @@ Base.getindex(k::PowerNetworkMatrixKey, args...) = getindex(k.I, args...)
 """
 Structure to store the keys of a power network matrix
 
-# Fields
+# Arguments
 - `product_iter::Base.Iterators.ProductIterator{T} where T <: Tuple`:
         iterator of the indices of the network power matrix 
 """

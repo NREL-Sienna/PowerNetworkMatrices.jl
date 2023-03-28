@@ -2,7 +2,7 @@
 Line Outage Distribution Factors (LODFs) are a sensitivity measure of how a change in
 a line's flow affects the flows on other lines in the system.
 
-# Fields
+# Arguments
 - `data<:AbstractArray{Float64, 2}`:
         the actual Incidence matrix.
 - `axes<:NTuple{2, Dict}`:
@@ -50,7 +50,7 @@ end
 """
 Builds the LODF matrix from a group of branches and nodes. The return is a LOLDF array indexed with the branch name.
 
-# Keyword arguments
+# Arguments
 - `branches`:
         vector of the System AC branches
 - `nodes::Vector{PSY.Bus}`:
@@ -74,7 +74,7 @@ end
 """
 Builds the LODF matrix from a system. The return is a LOLDF array indexed with the branch name.
 
-# Keyword arguments
+# Arguments
 - `sys::PSY.System`:
         Power Systems system
 - `dist_slack::Vector{Float64}`:
