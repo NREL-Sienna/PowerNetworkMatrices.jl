@@ -52,7 +52,7 @@ end
 """
 Evaluates the Incidence matrix A given the branches and node of a System.
 
-# Keyword arguments
+# Arguments
 - `branches`:
         vector containing the branches of the considered system (should be AC branches).
 - `buses::Vector{PSY.Bus}`:
@@ -90,7 +90,7 @@ end
 """
 Evaluates the Adjacency matrix given the banches and buses of a given System.
 
-# Keyword arguments
+# Arguments
 - `branches`:
         vector containing the branches of the considered system (should be AC branches).
 - `buses::Vector{PSY.Bus}`:
@@ -131,7 +131,7 @@ end
 """
 Evaluates the BA matrix given the System's banches, reference bus positions and bus_lookup.
 
-# Keyword arguments
+# Arguments
 - `branches`:
         vector containing the branches of the considered system (should be AC branches).
 - `ref_bus_positions::Vector{Int}`:
@@ -181,7 +181,7 @@ end
 Evaluates the ABA matrix given the System's Incidence matrix (A), BA matrix and
 reference bus positions.
 
-# Keyword arguments
+# Arguments
 - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
         Incidence matrix.
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`
@@ -203,7 +203,7 @@ Return a sparse matrix given a dense one by dropping element whose absolute
 value is above a certain tolerance.
 
 
-# Keyword arguments
+# Arguments
 - dense_array::Matrix{Float64}`:
         input matrix (e.g., PTDF matrix).
 - `tol::Float64`:
@@ -224,7 +224,7 @@ end
 Sets to zero every element of a Sparse matrix if absolute values is below a
 certain tolerance.
 
-# Keyword arguments
+# Arguments
 - `sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         input sparse array.
 - `tol::Float64`:
@@ -247,7 +247,7 @@ end
 Sets to zero every element of a Dense matrix if absolute values is below a
 certain tolerance.
 
-# Keyword arguments
+# Arguments
 - `dense_array::Matrix{Float64}`:
         input dense matrix.
 - `tol::Float64`:
@@ -269,7 +269,7 @@ end
 Sets to zero every element of a Dense vector if absolute values is below a
 certain tolerance.
 
-# Keyword arguments
+# Arguments
 - `vector::Vector{Float64}`:
         input dense vector.
 - `tol::Float64`:
@@ -320,7 +320,7 @@ end
 Finds the subnetworks present in the considered System. This is evaluated by taking
 a the ABA or Adjacency Matrix.
 
-# Keyword arguments
+# Arguments
 - `M::SparseArrays.SparseMatrixCSC`:
         input sparse matrix.
 - `bus_numbers::Vector{Int}`:

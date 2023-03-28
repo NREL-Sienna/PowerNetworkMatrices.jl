@@ -336,7 +336,7 @@ Gets the value of the element of the PTDF matrix given the row and column indice
 corresponding to the branch and buses one respectively. If `column` is a Colon then 
 the entire row is returned.
 
-# Keyword Arguments
+# Arguments
 - `vptdf::VirtualPTDF`:
         VirtualPTDF struct where to evaluate and store the values.
 - `row`:
