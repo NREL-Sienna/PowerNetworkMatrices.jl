@@ -13,7 +13,7 @@ abstract type PowerNetworkMatrix{T} <: AbstractArray{T, 2} end
 """
 Evaluates the bus indices for the given branch.
 
-# Keyword Arguments
+# Arguments
 - `branch`:
         system's branch
 - `bus_lookup`:
@@ -28,7 +28,7 @@ end
 """
 Evaluates the map linking the system's buses and branches.
 
-# Keyword Arguments
+# Arguments
 - `buses::AbstractVector{PSY.Bus}`:
         system's buses
 """
@@ -39,7 +39,7 @@ end
 """
 Checkes if repetitions are present in the dictionary mapping buses and branches.
 
-# Keyword Arguments
+# Arguments
 - `ax::AbstractVector`:
         generic abstract vector
 """
@@ -77,7 +77,7 @@ end
 """
 Gets bus indices to a certain branch name
 
-#Keyword Arguments
+# Arguments
 - `i::PSY.ACBranch`:
         Power System AC branch
 - `lookup::Dict`:
@@ -90,7 +90,7 @@ end
 """
 Gets bus indices to a certain branch name
 
-#Keyword Arguments
+# Arguments
 - `i::PSY.ACBranch`:
         Power System AC branch
 - `lookup::Dict`:
