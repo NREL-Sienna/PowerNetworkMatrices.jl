@@ -1,6 +1,16 @@
 """
 Line Outage Distribution Factors (LODFs) are a sensitivity measure of how a change in
-a line’s flow affects the flows on other lines in the system.
+a line's flow affects the flows on other lines in the system.
+
+# Arguments
+- `data<:AbstractArray{Float64, 2}`:
+        the actual Incidence matrix.
+- `axes<:NTuple{2, Dict}`:
+        Tuple containing two vectors (the first one showing the branches names,
+        the second showing the buses numbers).
+- `lookup<:NTuple{2, Dict}`:
+        Tuple containing two dictionaries, the first mapping the branches 
+        and buses with their enumerated indexes.
 """
 struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     data::Array{Float64, 2}
@@ -40,9 +50,15 @@ end
 """
 Builds the LODF matrix from a group of branches and nodes. The return is a LOLDF array indexed with the branch name.
 
-# Keyword arguments
-- `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
-    The distributed slack vector has to be the same length as the number of buses
+# Arguments
+- `branches`:
+        vector of the System AC branches
+- `nodes::Vector{PSY.Bus}`:
+        vector of the System buses
+- `dist_slack::Vector{Float64}`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
+
 """
 function LODF(branches, nodes::Vector{PSY.Bus}, dist_slack::Vector{Float64} = Float64[])
 
@@ -58,9 +74,12 @@ end
 """
 Builds the LODF matrix from a system. The return is a LOLDF array indexed with the branch name.
 
-# Keyword arguments
-- `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
-    The distributed slack vector has to be the same length as the number of buses
+# Arguments
+- `sys::PSY.System`:
+        Power Systems system
+- `dist_slack::Vector{Float64}`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
 """
 function LODF(sys::PSY.System, dist_slack::Vector{Float64} = Float64[])
     branches = sort!(

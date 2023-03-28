@@ -1,23 +1,48 @@
+"""
+The container code for PowerNetworkMatrix is based in JuMP's Container in order to
+remove the limitations of AxisArrays and the doubts about long term maintenance
+https://github.com/JuliaOpt/JuMP.jl/blob/master/src/Containers/DenseAxisArray.jl
+JuMP'sCopyright 2017, Iain Dunning, Joey Huchette, Miles Lubin, and contributors
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0.
+"""
 
+""" Type PowerNetworkMatrix gathers all the different types of Matrices considered in this package """
 abstract type PowerNetworkMatrix{T} <: AbstractArray{T, 2} end
 
-#  The container code for PowerNetworkMatrix is based in JuMP's Container in order to
-#  remove the limitations of AxisArrays and the doubts about long term maintenance
-#  https://github.com/JuliaOpt/JuMP.jl/blob/master/src/Containers/DenseAxisArray.jl
-#  JuMP'sCopyright 2017, Iain Dunning, Joey Huchette, Miles Lubin, and contributors
-#  This Source Code Form is subject to the terms of the Mozilla Public
-#  License, v. 2.0.
+"""
+Evaluates the bus indices for the given branch.
 
+# Keyword Arguments
+- `branch`:
+        system's branch
+- `bus_lookup`:
+        dictionary mapping the system's buses and branches
+"""
 function get_bus_indices(branch, bus_lookup)
     fr_b = bus_lookup[PSY.get_number(PSY.get_from(PSY.get_arc(branch)))]
     to_b = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_arc(branch)))]
     return fr_b, to_b
 end
 
+"""
+Evaluates the map linking the system's buses and branches.
+
+# Keyword Arguments
+- `buses::AbstractVector{PSY.Bus}`:
+        system's buses
+"""
 function make_ax_ref(buses::AbstractVector{PSY.Bus})
     return make_ax_ref(PSY.get_number.(buses))
 end
 
+"""
+Checkes if repetitions are present in the dictionary mapping buses and branches.
+
+# Keyword Arguments
+- `ax::AbstractVector`:
+        generic abstract vector
+"""
 function make_ax_ref(ax::AbstractVector)
     ref = Dict{eltype(ax), Int}()
     for (ix, el) in enumerate(ax)
@@ -29,7 +54,7 @@ function make_ax_ref(ax::AbstractVector)
     return ref
 end
 
-# AbstractArray interface
+# AbstractArray interface: overloadig methods
 Base.isempty(A::PowerNetworkMatrix) = isempty(A.data)
 Base.size(A::PowerNetworkMatrix) = size(A.data)
 Base.LinearIndices(A::PowerNetworkMatrix) =
@@ -38,20 +63,39 @@ Base.axes(A::PowerNetworkMatrix) = A.axes
 Base.CartesianIndices(A::PowerNetworkMatrix) =
     error("PowerSystems.$(typeof(A)) does not support this operation.")
 
-############
-# Indexing #
-############
+# Indexing ###################################################################
 
 Base.eachindex(A::PowerNetworkMatrix) = CartesianIndices(size(A.data))
 
+"""
+Gets bus indices to a certain branch index
+"""
 function lookup_index(i, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[i]
 end
 
+"""
+Gets bus indices to a certain branch name
+
+#Keyword Arguments
+- `i::PSY.ACBranch`:
+        Power System AC branch
+- `lookup::Dict`:
+        Dictionary mapping branch and buses
+"""
 function lookup_index(i::PSY.ACBranch, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
 
+"""
+Gets bus indices to a certain branch name
+
+#Keyword Arguments
+- `i::PSY.ACBranch`:
+        Power System AC branch
+- `lookup::Dict`:
+        Dictionary mapping branches and buses
+"""
 function lookup_index(i::PSY.Bus, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
@@ -82,6 +126,10 @@ _to_index_tuple(idx::NTuple{0}, lookup::Tuple) = ()
 
 # Resolve ambiguity with the above two base cases
 _to_index_tuple(idx::NTuple{0}, lookup::NTuple{0}) = ()
+
+"""
+Given the indices, gets the values of the power network matrix considered
+"""
 to_index(A::PowerNetworkMatrix, idx...) = _to_index_tuple(idx, A.lookup)
 
 # Doing `Colon() in idx` is relatively slow because it involves
@@ -91,7 +139,7 @@ has_colon(idx::Tuple{}) = false
 has_colon(idx::Tuple) = isa(first(idx), Colon) || has_colon(Base.tail(idx))
 
 # TODO: better error (or just handle correctly) when user tries to index with a range like a:b
-# The only kind of slicing we support is dropping a dimension with colons
+# overloading other methods to consider PowerNetworkMatrix
 function Base.getindex(A::PowerNetworkMatrix, row, column)
     i, j = to_index(A, row, column)
     return A.data[i, j]
@@ -102,18 +150,34 @@ Base.setindex!(A::PowerNetworkMatrix, v, idx::CartesianIndex) = A.data[idx] = v
 
 Base.IndexStyle(::Type{PowerNetworkMatrix}) = IndexAnyCartesian()
 
-########
-# Keys #
-########
 
+# Keys #######################################################################
+
+"""
+Structure to store the keys of a power network matrix
+
+# Arguments
+- `I<:Tuple`:
+        turple containing the indices of the matrix
+"""
 struct PowerNetworkMatrixKey{T <: Tuple}
     I::T
 end
+
 Base.getindex(k::PowerNetworkMatrixKey, args...) = getindex(k.I, args...)
 
+"""
+Structure to store the keys of a power network matrix
+
+# Arguments
+- `product_iter::Base.Iterators.ProductIterator{T} where T <: Tuple`:
+        iterator of the indices of the network power matrix 
+"""
 struct PowerNetworkMatrixKeys{T <: Tuple}
     product_iter::Base.Iterators.ProductIterator{T}
 end
+
+# overloading methods
 Base.length(iter::PowerNetworkMatrixKeys) = length(iter.product_iter)
 function Base.eltype(iter::PowerNetworkMatrixKeys)
     return PowerNetworkMatrixKey{eltype(iter.product_iter)}

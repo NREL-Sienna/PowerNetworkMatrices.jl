@@ -1,4 +1,6 @@
-# get branches from system
+"""
+Gets the AC branches from a given Systems.
+"""
 function get_ac_branches(sys::PSY.System)
     # Filter out DC Branches here
     return sort!(
@@ -7,12 +9,19 @@ function get_ac_branches(sys::PSY.System)
     )
 end
 
-# get buses from system
+"""
+Gets the buses from a given System
+"""
 function get_buses(sys::PSY.System)::Vector{PSY.Bus}
     return sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
 end
 
-# get slack bus
+"""
+Gets the indices  of the reference (slack) buses.
+NOTE:
+- the indices  corresponds to the columns of zeros belonging to the PTDF matrix.
+- BA and ABA matrix miss the columns related to the reference buses.
+"""
 function find_slack_positions(nodes)
     return find_slack_positions(nodes, make_ax_ref(nodes))
 end
@@ -20,7 +29,7 @@ end
 function find_slack_positions(nodes, bus_lookup::Dict{Int, Int})
     slack_position = sort([
         bus_lookup[PSY.get_number(n)]
-        for n in nodes if PSY.get_bustype(n) == BusTypes.REF
+        for n in buses if PSY.get_bustype(n) == BusTypes.REF
     ])
     if length(slack_position) == 0
         error("Slack bus not identified in the Bus/Nodes list, can't build NetworkMatrix")
@@ -28,7 +37,9 @@ function find_slack_positions(nodes, bus_lookup::Dict{Int, Int})
     return slack_position
 end
 
-# validate solver so be used for
+"""
+Validates if the selected linear solver is supported.
+"""
 function validate_linear_solver(linear_solver::String)
     if linear_solver ∉ SUPPORTED_LINEAR_SOLVERS
         error(
@@ -38,10 +49,22 @@ function validate_linear_solver(linear_solver::String)
     return
 end
 
-# incidence matrix (A) evaluation ############################################
-function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
-    bus_lookup = make_ax_ref(nodes)
-    ref_bus_positions = find_slack_positions(nodes)
+"""
+Evaluates the Incidence matrix A given the branches and node of a System.
+
+# Keyword arguments
+- `branches`:
+        vector containing the branches of the considered system (should be AC branches).
+- `buses::Vector{PSY.Bus}`:
+        vector containing the buses of the considered system.
+
+NOTE:
+- the matrix features all the columns, including the ones related to the 
+  reference buses (each column is related to a system's bus).
+"""
+function calculate_A_matrix(branches, buses::Vector{PSY.Bus})
+    bus_lookup = make_ax_ref(buses)
+    ref_bus_positions = find_slack_positions(buses)
 
     A_I = Int[]
     A_J = Int[]
@@ -64,17 +87,33 @@ function calculate_A_matrix(branches, nodes::Vector{PSY.Bus})
     return SparseArrays.sparse(A_I, A_J, A_V), ref_bus_positions
 end
 
-function calculate_adjacency(branches, nodes::Vector{PSY.Bus})
-    bus_ax = PSY.get_number.(nodes)
-    return calculate_adjacency(branches, nodes, make_ax_ref(bus_ax))
+"""
+Evaluates the Adjacency matrix given the banches and buses of a given System.
+
+# Keyword arguments
+- `branches`:
+        vector containing the branches of the considered system (should be AC branches).
+- `buses::Vector{PSY.Bus}`:
+        vector containing the buses of the considered system.
+"""
+function calculate_adjacency(branches, buses::Vector{PSY.Bus})
+    bus_ax = PSY.get_number.(buses)
+    return calculate_adjacency(branches, buses, make_ax_ref(bus_ax))
 end
 
+"""
+Evaluates the Adjacency matrix given the System's banches, buses and bus_lookup.
+
+NOTE:
+- bus_lookup is a dictionary mapping the bus numbers (as shown in the Systems) 
+  with their enumerated indxes.
+"""
 function calculate_adjacency(
     branches,
-    nodes::Vector{PSY.Bus},
+    buses::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
 )
-    buscount = length(nodes)
+    buscount = length(buses)
     a = SparseArrays.spzeros(Int8, buscount, buscount)
 
     for b in branches
@@ -89,7 +128,18 @@ function calculate_adjacency(
     return a, bus_lookup
 end
 
-# BA matrix evaluation #######################################################
+"""
+Evaluates the BA matrix given the System's banches, reference bus positions and bus_lookup.
+
+# Keyword arguments
+- `branches`:
+        vector containing the branches of the considered system (should be AC branches).
+- `ref_bus_positions::Vector{Int}`:
+        Vector containing the indexes of the columns of the BA matrix corresponding
+        to the refence buses
+- `bus_lookup::Dict{Int, Int}`:
+        dictionary mapping the bus numbers with their enumerated indexes.
+"""
 function calculate_BA_matrix(
     branches,
     ref_bus_positions::Vector{Int},
@@ -127,7 +177,20 @@ function calculate_BA_matrix(
     return BA
 end
 
-# ABA matrix evaluation ######################################################
+"""
+Evaluates the ABA matrix given the System's Incidence matrix (A), BA matrix and 
+reference bus positions.
+
+# Keyword arguments
+- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
+        Incidence matrix.
+- `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`
+        BA matrix.
+
+NOTE:
+- evaluates A with "calculate_A_matrix", or extract A.data (if A::IncidenceMatrix)
+- evaluates BA with "calculate_BA_matrix", or extract BA.data (if A::BA_Matrix)
+"""
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
@@ -135,6 +198,17 @@ function calculate_ABA_matrix(
     return A[:, setdiff(1:end, ref_bus_positions)]' * BA
 end
 
+"""
+Return a sparse matrix given a dense one by dropping element whose absolute 
+value is above a certain tolerance.
+
+
+# Keyword arguments
+- dense_array::Matrix{Float64}`:
+        input matrix (e.g., PTDF matrix).
+- `tol::Float64`:
+        tolerance.
+"""
 function sparsify(dense_array::Matrix{Float64}, tol::Float64)
     m, n = size(dense_array)
     sparse_array = SparseArrays.spzeros(m, n)
@@ -146,6 +220,16 @@ function sparsify(dense_array::Matrix{Float64}, tol::Float64)
     return sparse_array
 end
 
+"""
+Sets to zero every element of a Sparse matrix if absolute values is below a 
+certain tolerance.
+
+# Keyword arguments
+- `sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int}`:
+        input sparse array.
+- `tol::Float64`:
+        tolerance.
+"""
 function make_entries_zero!(
     sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
     tol::Float64,
@@ -159,6 +243,16 @@ function make_entries_zero!(
     return
 end
 
+"""
+Sets to zero every element of a Dense matrix if absolute values is below a 
+certain tolerance.
+
+# Keyword arguments
+- `dense_array::Matrix{Float64}`:
+        input dense matrix.
+- `tol::Float64`:
+        tolerance.
+"""
 function make_entries_zero!(
     dense_array::Matrix{Float64},
     tol::Float64,
@@ -171,6 +265,16 @@ function make_entries_zero!(
     return
 end
 
+"""
+Sets to zero every element of a Dense vector if absolute values is below a 
+certain tolerance.
+
+# Keyword arguments
+- `vector::Vector{Float64}`: 
+        input dense vector.
+- `tol::Float64`:
+        tolerance.
+"""
 function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
     for i in eachindex(vector)
         if abs(vector[i]) <= tol
@@ -180,6 +284,9 @@ function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
     return vector
 end
 
+"""
+!!! MISSING DOCUMENTATION !!!
+"""
 function assing_reference_buses(
     subnetworks::Dict{Int, Set{Int}},
     ref_bus_positions::Vector{Int},
@@ -198,6 +305,7 @@ function assing_reference_buses(
             @warn "No reference bus in the subnetwork associated with bus $bus_key. Can't continue"
             return subnetworks
         elseif length(ref_bus) > 1
+            # TODO: still to implement
             error(
                 "More than one reference bus in the subnetwork associated with bus $bus_key",
             )
@@ -208,6 +316,16 @@ function assing_reference_buses(
     return bus_groups
 end
 
+"""
+Finds the subnetworks present in the considered System. This is evaluated by taking 
+a the ABA or Adjacency Matrix.
+
+# Keyword arguments
+- `M::SparseArrays.SparseMatrixCSC`:
+        input sparse matrix.
+- `bus_numbers::Vector{Int}`:
+        vector containing the indices of the system's buses.
+"""
 function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
     rows = SparseArrays.rowvals(M)
     touched = Set{Int}()
