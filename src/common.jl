@@ -224,11 +224,9 @@ end
 Sets to zero every element of a Sparse matrix if absolute values is below a
 certain tolerance.
 
-# Keyword arguments
-- `sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        input sparse array.
-- `tol::Float64`:
-        tolerance.
+# Arguments
+- `sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int}`: input sparse array.
+- `tol::Float64`: tolerance for removing entries in the PTDF matrix.
 """
 function make_entries_zero!(
     sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
@@ -247,11 +245,9 @@ end
 Sets to zero every element of a Dense matrix if absolute values is below a
 certain tolerance.
 
-# Keyword arguments
-- `dense_array::Matrix{Float64}`:
-        input dense matrix.
-- `tol::Float64`:
-        tolerance.
+# Arguments
+- `dense_array::Matrix{Float64}`: input dense matrix.
+- `tol::Float64`: tolerance.
 """
 function make_entries_zero!(
     dense_array::Matrix{Float64},
@@ -269,11 +265,9 @@ end
 Sets to zero every element of a Dense vector if absolute values is below a
 certain tolerance.
 
-# Keyword arguments
-- `vector::Vector{Float64}`:
-        input dense vector.
-- `tol::Float64`:
-        tolerance.
+# Arguments
+- `vector::Vector{Float64}`:input dense vector.
+- `tol::Float64`: tolerance.
 """
 function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
     for i in eachindex(vector)
@@ -320,7 +314,7 @@ end
 Finds the subnetworks present in the considered System. This is evaluated by taking
 a the ABA or Adjacency Matrix.
 
-# Keyword arguments
+# Arguments
 - `M::SparseArrays.SparseMatrixCSC`:
         input sparse matrix.
 - `bus_numbers::Vector{Int}`:
