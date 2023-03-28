@@ -26,7 +26,7 @@ function find_slack_positions(nodes)
     return find_slack_positions(nodes, make_ax_ref(nodes))
 end
 
-function find_slack_positions(nodes, bus_lookup::Dict{Int, Int})
+function find_slack_positions(buses, bus_lookup::Dict{Int, Int})
     slack_position = sort([
         bus_lookup[PSY.get_number(n)]
         for n in buses if PSY.get_bustype(n) == BusTypes.REF
@@ -59,7 +59,7 @@ Evaluates the Incidence matrix A given the branches and node of a System.
         vector containing the buses of the considered system.
 
 NOTE:
-- the matrix features all the columns, including the ones related to the 
+- the matrix features all the columns, including the ones related to the
   reference buses (each column is related to a system's bus).
 """
 function calculate_A_matrix(branches, buses::Vector{PSY.Bus})
@@ -105,7 +105,7 @@ end
 Evaluates the Adjacency matrix given the System's banches, buses and bus_lookup.
 
 NOTE:
-- bus_lookup is a dictionary mapping the bus numbers (as shown in the Systems) 
+- bus_lookup is a dictionary mapping the bus numbers (as shown in the Systems)
   with their enumerated indxes.
 """
 function calculate_adjacency(
@@ -178,7 +178,7 @@ function calculate_BA_matrix(
 end
 
 """
-Evaluates the ABA matrix given the System's Incidence matrix (A), BA matrix and 
+Evaluates the ABA matrix given the System's Incidence matrix (A), BA matrix and
 reference bus positions.
 
 # Keyword arguments
@@ -199,7 +199,7 @@ function calculate_ABA_matrix(
 end
 
 """
-Return a sparse matrix given a dense one by dropping element whose absolute 
+Return a sparse matrix given a dense one by dropping element whose absolute
 value is above a certain tolerance.
 
 
@@ -221,7 +221,7 @@ function sparsify(dense_array::Matrix{Float64}, tol::Float64)
 end
 
 """
-Sets to zero every element of a Sparse matrix if absolute values is below a 
+Sets to zero every element of a Sparse matrix if absolute values is below a
 certain tolerance.
 
 # Keyword arguments
@@ -244,7 +244,7 @@ function make_entries_zero!(
 end
 
 """
-Sets to zero every element of a Dense matrix if absolute values is below a 
+Sets to zero every element of a Dense matrix if absolute values is below a
 certain tolerance.
 
 # Keyword arguments
@@ -266,11 +266,11 @@ function make_entries_zero!(
 end
 
 """
-Sets to zero every element of a Dense vector if absolute values is below a 
+Sets to zero every element of a Dense vector if absolute values is below a
 certain tolerance.
 
 # Keyword arguments
-- `vector::Vector{Float64}`: 
+- `vector::Vector{Float64}`:
         input dense vector.
 - `tol::Float64`:
         tolerance.
@@ -317,7 +317,7 @@ function assing_reference_buses(
 end
 
 """
-Finds the subnetworks present in the considered System. This is evaluated by taking 
+Finds the subnetworks present in the considered System. This is evaluated by taking
 a the ABA or Adjacency Matrix.
 
 # Keyword arguments
