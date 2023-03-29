@@ -58,6 +58,8 @@ Structure containing the ABA matrix and other relevant data.
 - `ref_bus_positions::Vector{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
+- `K<:Union{Nothing, KLU.KLUFactorization{Float64, Int}}`:
+        either nothing or a container for KLU factorization matrices (LU factorization)
 """
 struct ABA_Matrix{
     Ax,
@@ -73,6 +75,13 @@ end
 
 """
 Builds the ABA matrix from a System
+
+# Arguments
+- `sys::PSY.System`:
+        system to consider
+        
+# Keyword arguments
+- `factorize`: if true populates ABA_Matrix.K with KLU factorization matrices
 """
 function ABA_Matrix(sys::PSY.System; factorize = false)
     branches = get_ac_branches(sys)
@@ -101,6 +110,13 @@ function ABA_Matrix(sys::PSY.System; factorize = false)
     )
 end
 
+"""
+Evaluates the LU factorization matrices of the ABA matrix, using KLU.
+
+# Arguments
+- `ABA::ABA_Matrix{Ax, L, Nothing} where {Ax, L <: NTuple{2, Dict}}`:
+        container for the ABA matrix, with ABA.K == nothing (LU matrices in K not evaluated)
+"""
 function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Dict}}
     return ABA_Matrix(
         deepcopy(ABA.data),
@@ -111,6 +127,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
     )
 end
 
+# checks if ABA has been factorized (if K contained LU matrices)
 is_factorized(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Dict}} = false
 is_factorized(
     ABA::ABA_Matrix{Ax, L, KLU.KLUFactorization{Float64, Int}},
