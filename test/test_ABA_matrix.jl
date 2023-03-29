@@ -9,8 +9,15 @@
         # at first let's see if factorization flag works
         ABA_no_lu = ABA_Matrix(sys)
         @test isnothing(ABA_no_lu.K)
+        # check the is_factorized function
+        @test is_factorized(ABA_no_lu) == false
+        # factorize the ABA matrix
+        ABA_no_lu = factorize(ABA_no_lu)
+        @test is_factorized(ABA_no_lu) == true
         # get the ABA matrix with the current method
         ABA_lu = ABA_Matrix(sys; factorize = true)
+        # check the is_factorized function
+        @test is_factorized(ABA_no_lu) == true
         # evaluate if the ABA matrix is correct
         A = IncidenceMatrix(sys)
         BA = BA_Matrix(sys)
