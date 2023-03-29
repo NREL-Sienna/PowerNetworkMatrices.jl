@@ -1,5 +1,6 @@
 using Test
 import Logging
+import LinearAlgebra: I
 using PowerNetworkMatrices
 using PowerSystems
 using InfrastructureSystems
