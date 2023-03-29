@@ -11,18 +11,21 @@ pages = OrderedDict(
 
 makedocs(;
     modules = [PowerNetworkMatrices],
-    format = Documenter.HTML(; prettyurls = haskey(ENV, "GITHUB_ACTIONS")),
+    format = Documenter.HTML(;
+        mathengine = Documenter.MathJax(),
+        prettyurls = haskey(ENV, "GITHUB_ACTIONS")),
     sitename = "PowerNetworkMatrices.jl",
-    authors = "Jose Daniel Lara, Sourabh Dalvi",
+    authors = "Jose Daniel Lara, Alessandro Castelli, Sourabh Dalvi",
     pages = Any[p for p in pages],
+    clean = true,
 )
 
 deploydocs(;
     repo = "github.com/NREL-SIIP/PowerNetworkMatrices.jl.git",
     target = "build",
     branch = "gh-pages",
-    devbranch = "main",
     devurl = "dev",
     push_preview = true,
+    forcepush = true,
     versions = ["stable" => "v^", "v#.#"],
 )

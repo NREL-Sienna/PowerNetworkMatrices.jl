@@ -1,9 +1,36 @@
+"""
+Structure used for saving the rows of the Virtual PTDF matrix.
+
+# Arguments
+- `temp_cache::Dict{Int, Array{Float64}}`:
+        Dictionay saving the row of the PTDF matrix
+- `persistent_cache_keys::Set{Int}`:
+        Set listing the rows saved in `temp_cache`
+- `max_cache_size::Int`
+        Defines the maximum allowed cache size (rows*row_size)
+- `max_num_keys::Int`
+        Defines the maximum number of keys saved (rows of the matrix)
+"""
 struct RowCache
     temp_cache::Dict{Int, Array{Float64}}
     persistent_cache_keys::Set{Int}
     max_cache_size::Int
     max_num_keys::Int
 end
+
+"""
+Structure used for saving the rows of the Virtual PTDF matrix.
+
+# Arguments
+- `temp_cache::Dict{Int, Array{Float64}}`:
+        Dictionay saving the row of the PTDF matrix
+- `persistent_cache_keys::Set{Int}`:
+        Set listing the rows saved in `temp_cache`
+- `max_cache_size::Int`
+        Defines the maximum allowed cache size (rows*row_size)
+- `max_num_keys::Int`
+        Defines the maximum number of keys saved (rows of the matrix)
+"""
 
 function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
     persistent_data_size = (length(persistent_rows) + 1) * row_size
@@ -23,10 +50,16 @@ function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
     )
 end
 
+"""
+Check if cache is empty.
+"""
 function Base.isempty(cache::RowCache)
     return isempty(cache.temp_cache)
 end
 
+"""
+Erases the cache.
+"""
 function Base.empty!(cache::RowCache)
     isempty(cache.temp_cache) && return
     if !isempty(cache.persistent_cache_keys)
@@ -36,24 +69,59 @@ function Base.empty!(cache::RowCache)
     return
 end
 
+"""
+Checks if `key` is present as a key of the dictionary in `cache`
+
+# Arguments
+- `cache::RowCache`:
+        cache where data is stored.
+- `key::Int`:
+        row number (corresponds to the enumerated branch index).
+"""
 function Base.haskey(cache::RowCache, key::Int)
     return haskey(cache.temp_cache, key)
 end
 
+"""
+Allocates vector as row of the matrix saved in cache.
+
+# Arguments
+- `cache::RowCache`:
+        cache where the row vector is going to be saved
+- `val::Array{Float64}`:
+        vector to be saved
+- `key::Int`:
+        row number (corresponding to the enumerated branch index) related to the input row vector
+"""
 function Base.setindex!(cache::RowCache, val::Array{Float64}, key::Int)
     check_cache_size!(cache)
     cache.temp_cache[key] = val
     return
 end
 
+"""
+Gets the row of the stored matrix in cache.
+
+# Arguments
+- `cache::RowCache`:
+        cache where the row vector is going to be saved
+- `key::Int`:
+        row number (corresponding to the enumerated branch index) related to the row vector.
+"""
 function Base.getindex(cache::RowCache, key::Int)
     return cache.temp_cache[key]
 end
 
+"""
+Shows the number of rows stored in cache
+"""
 function Base.length(cache::RowCache)
     return length(cache.temp_cache)
 end
 
+"""
+Deletes the row of of key `key` from the stored matrix in cache.
+"""
 function purge_one!(cache::RowCache)
     for k in keys(cache.temp_cache)
         if k ∉ cache.persistent_cache_keys
@@ -64,6 +132,9 @@ function purge_one!(cache::RowCache)
     return
 end
 
+"""
+Check saved rows in cache and deletes those ones that are not present in "persistent_cache_keys".
+"""
 function check_cache_size!(cache::RowCache)
     if length(cache.temp_cache) > cache.max_num_keys
         purge_one!(cache)
@@ -71,10 +142,42 @@ function check_cache_size!(cache::RowCache)
     return
 end
 
-"""
-Power Transfer Distribution Factors (PTDF) indicate the incremental change in real power that occurs on transmission lines due to real power injections changes at the buses.
+##############################################################################
+##############################################################################
+##############################################################################
 
-The PTDF struct is indexed using the Bus numbers and branch names
+"""
+Power Transfer Distribution Factors (PTDF) indicate the incremental change in 
+real power that occurs on transmission lines due to real power injections 
+changes at the buses.
+
+The PTDF struct is indexed using the Bus numbers and branch names.
+
+# Arguments
+- `K::KLU.KLUFactorization{Float64, Int}`:
+        LU factorization matrices of the ABA matrix, evaluated by means of KLU
+- `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
+        BA matric
+- `ref_bus_positions::Vector{Int}`:
+        Vector containing the indexes of the columns of the BA matrix corresponding
+        to the refence buses
+- `dist_slack::Vector{Float64}`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
+- `axes<:NTuple{2, Dict}`:
+        Tuple containing two vectors (the first one showing the branches names,
+        the second showing the buses numbers).
+- `lookup<:NTuple{2, Dict}`:
+        Tuple containing two dictionaries, the first mapping the branches 
+        and buses with their enumerated indexes.
+- `temp_data::Vector{Float64}`:
+        temporary vector for internal use.
+- `cache::RowCache`:
+        cache were PTDF rows are stored.
+- `subnetworks::Dict{Int, Set{Int}}`:
+        dictionary containing the subsets of buses defining the different subnetwork of the system.
+- `tol::Base.RefValue{Float64}`:
+        tolerance related to scarification and values to drop.
 """
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
@@ -90,15 +193,27 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
 end
 
 """
-Builds the PTDF matrix from a group of branches and nodes. The return is a PTDF array indexed with the bus numbers.
+Builds the PTDF matrix from a group of branches and buses. The return is a 
+PTDF array indexed with the branch numbers.
 
-# Keyword arguments
-- `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
-    The distributed slack vector has to be the same length as the number of buses
+# Arguments
+- `branches`:
+        Vector of the system's AC branches.
+- `buses::Vector{PSY.Bus}`:
+        Vector of the system's buses.
+- `dist_slack::Vector{Float64} = Float64[]`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
+- `tol::Float64 = eps()`:
+        Tolerance related to sparsification and values to drop.
+- `max_cache_size::Int`:
+        max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
+- `persistent_lines::Vector{String}`:
+        line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
 """
 function VirtualPTDF(
     branches,
-    nodes::Vector{PSY.Bus};
+    buses::Vector{PSY.Bus};
     dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
@@ -106,15 +221,15 @@ function VirtualPTDF(
 
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in nodes]
+    bus_ax = [PSY.get_number(bus) for bus in buses]
     axes = (line_ax, bus_ax)
-    M, bus_ax_ref = calculate_adjacency(branches, nodes)
+    M, bus_ax_ref = calculate_adjacency(branches, buses)
     line_ax_ref = make_ax_ref(line_ax)
     look_up = (line_ax_ref, bus_ax_ref)
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses)
     BA = calculate_BA_matrix(branches, ref_bus_positions, bus_ax_ref)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-    ref_bus_positions = find_slack_positions(nodes)
+    ref_bus_positions = find_slack_positions(buses)
     subnetworks = find_subnetworks(M, bus_ax)
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
@@ -148,21 +263,27 @@ function VirtualPTDF(
 end
 
 """
-Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
-
-# Keyword arguments
-- `dist_slack::Vector{Float64}`: Vector of weights to be used as distributed slack bus.
-    The distributed slack vector has to be the same length as the number of buses
+Builds the Virtual PTDF matrix from a system. The return is a VirtualPTDF 
+struct with an empty cache.
 """
 function VirtualPTDF(
     sys::PSY.System; kwargs...)
     branches = get_ac_branches(sys)
-    nodes = get_buses(sys)
+    buses = get_buses(sys)
 
-    return VirtualPTDF(branches, nodes; kwargs...)
+    return VirtualPTDF(branches, buses; kwargs...)
+end
+
+""" Gets the tolerance used for sparsifying the rows of the PTDF matrix"""
+function get_tol(vptdf::VirtualPTDF)
+    return vptdf.tol[]
 end
 
 # Overload Base functions
+
+"""
+Checks if the any of the fields of VirtualPTDF is empty.
+"""
 function Base.isempty(vptdf::VirtualPTDF)
     !isempty(vptdf.K.L) && return false
     !isempty(vptdf.K.U) && return false
@@ -174,34 +295,55 @@ function Base.isempty(vptdf::VirtualPTDF)
     !isempty(vptdf.temp_data) && return false
     return true
 end
-# Size related overload will work on the BA matrix
+
+"""
+Gives the size of the whole PTDF matrix, not the number of rows stored.
+"""
 Base.size(vptdf::VirtualPTDF) = size(vptdf.BA)
+"""
+Gives the cartesian indexes of the PTDF matrix (same as the BA one).
+"""
 Base.eachindex(vptdf::VirtualPTDF) = CartesianIndices(size(vptdf.BA))
 
 if isdefined(Base, :print_array) # 0.7 and later
     Base.print_array(io::IO, X::VirtualPTDF) = "VirtualPTDF"
 end
 
-# Get indices
-function _get_line_index(vptdf::VirtualPTDF, row::String)
-    row_ = findall(x -> x == row, vptdf.axes[1])
-    if length(row_) > 1
-        error("multiple lines with the same name $row in vptdf.axes[1]")
-    elseif length(row_) > 1
-        error("no line with name $row in vptdf.axes[1]")
+function _getindex(
+    vptdf::VirtualPTDF,
+    row::Int,
+    column::Union{Int, Colon},
+)
+    # check if value is in the cache
+    if haskey(vptdf.cache, row)
+        return vptdf.cache[row][column]
     else
-        row = row_[1]
+        # evaluate the value for the PTDF column
+        vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .=
+            KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
+        # add slack bus value (zero) and make copy of temp into the cache
+        if get_tol(vptdf) > eps()
+            vptdf.cache[row] = make_entries_zero!(deepcopy(vptdf.temp_data), get_tol(vptdf))
+        else
+            vptdf.cache[row] = deepcopy(vptdf.temp_data)
+        end
+        return vptdf.cache[row][column]
     end
-    return row
 end
 
-function _get_value(vptdf::VirtualPTDF, row::Int)
-    # get stored value if present in the dictionarr
-    if branch in keys(vptdf.data)
-        return vptdf.data[2][row]
-    end
-end
+"""
+Gets the value of the element of the PTDF matrix given the row and column indices
+corresponding to the branch and buses one respectively. If `column` is a Colon then 
+the entire row is returned.
 
+# Arguments
+- `vptdf::VirtualPTDF`:
+        VirtualPTDF struct where to evaluate and store the values.
+- `row`:
+        Branch index.
+- `column`:
+        Bus index. If Colon then get the values of the whole row.
+"""
 function Base.getindex(vptdf::VirtualPTDF, row, column)
     row_, column_ = to_index(vptdf, row, column)
     return _getindex(vptdf, row_, column_)
@@ -212,32 +354,22 @@ function Base.getindex(vptdf::VirtualPTDF, row::Integer, column::Integer)
     return _getindex(vptdf, row, column)
 end
 
-function _getindex(
-    vptdf::VirtualPTDF,
-    row::Int,
-    column::Union{Int, Colon},
-)
-
-    # check if value is in the cache
-    if haskey(vptdf.cache, row)
-        return vptdf.cache[row][column]
-    else
-        # evaluate the value for the PTDF column
-        vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .=
-            KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
-        # add slack bus value (zero) and make copy of temp into the cache
-        vptdf.cache[row] = deepcopy(vptdf.temp_data)
-        return vptdf.cache[row][column]
-    end
-end
-
+"""
+!!! STILL TO IMPLEMENT !!!
+"""
 Base.setindex!(::VirtualPTDF, _, idx...) = error("Operation not supported by VirtualPTDF")
+
+"""
+!!! STILL TO IMPLEMENT !!!
+"""
 Base.setindex!(::VirtualPTDF, _, ::CartesianIndex) =
     error("Operation not supported by VirtualPTDF")
 
-""" PTDF data is stored in the the cache
-    it is a nested vecotr containing an array for the names of each row,
-    the PTDF's matrices rows and how many times they were evaluated """
+"""
+PTDF data is stored in the the cache
+it is a nested vector containing an array for the names of each row,
+the PTDF's matrices rows and how many times they were evaluated
+"""
 
 # ! change it so to get only the non-empty values
 

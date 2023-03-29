@@ -167,8 +167,8 @@ end
 """
 Builds a Ybus from a collection of buses and branches. The return is a Ybus Array indexed with the bus numbers and the branch names.
 
-# Keyword arguments
-- `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
+# Arguments
+- `check_connectivity::Bool`: Checks connectivity of the network using Depth First Search (DFS)
 """
 function Ybus(
     branches::Vector,
@@ -192,7 +192,7 @@ end
 """
 Builds a Ybus from the system. The return is a Ybus Array indexed with the bus numbers and the branch names.
 
-# Keyword arguments
+# Arguments
 - `check_connectivity::Bool`: Checks connectivity of the network
 """
 function Ybus(sys::PSY.System; kwargs...)

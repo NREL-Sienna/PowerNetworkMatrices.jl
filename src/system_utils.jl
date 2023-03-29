@@ -1,11 +1,12 @@
 """
-Checks the network connectivity of the system.
-
-# Keyword arguments
-- `connectivity_method::Function = goderya_connectivity`: Specifies the method used as Goderya's algorithm (`goderya_connectivity`) or depth first search/network traversal (`dfs_connectivity`)
-* Note that the default Goderya method is more efficient, but is resource intensive and may not scale well on large networks.
+Checks the network connectivity of the system using Depth First Search (DFS)
 """
 function validate_connectivity(sys::PSY.System)
+    sbn, _ = _find_subnetworks(sys)
+    return length(sbn) == 1
+end
+
+function _find_subnetworks(sys::PSY.System)
     nodes = sort!(
         collect(
             PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
@@ -15,6 +16,15 @@ function validate_connectivity(sys::PSY.System)
     branches = get_ac_branches(sys)
     @info "Validating connectivity with depth first search (network traversal)"
     M, bus_lookup = calculate_adjacency(branches, nodes)
-    sbn = find_subnetworks(M, collect(keys(bus_lookup)))
-    return length(sbn) == 1
+    slack_positions = find_slack_positions(nodes, bus_lookup)
+    return find_subnetworks(M, PSY.get_number.(nodes)), slack_positions
+end
+
+"""
+Finds the subnetworks in a system using Depth First Search (DFS). Returns a dictionary keyed
+by the reference bus of the subnetworks if they exist
+"""
+function find_subnetworks(sys::PSY.System)
+    sbn, ref_bus_positions = _find_subnetworks(sys)
+    return assing_reference_buses(sbn, ref_bus_positions)
 end
