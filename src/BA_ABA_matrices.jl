@@ -118,13 +118,14 @@ Evaluates the LU factorization matrices of the ABA matrix, using KLU.
         container for the ABA matrix, with ABA.K == nothing (LU matrices in K not evaluated)
 """
 function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Dict}}
-    return ABA_Matrix(
+    ABA_lu = ABA_Matrix(
         deepcopy(ABA.data),
         deepcopy(ABA.axes),
         deepcopy(ABA.lookup),
         deepcopy(ABA.ref_bus_positions),
-        KLU(ABA.data),
+        klu(ABA.data),
     )
+    return ABA_lu
 end
 
 # checks if ABA has been factorized (if K contained LU matrices)
