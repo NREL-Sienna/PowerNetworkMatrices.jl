@@ -58,35 +58,78 @@ Structure containing the ABA matrix and other relevant data.
 - `ref_bus_positions::Vector{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
+- `K<:Union{Nothing, KLU.KLUFactorization{Float64, Int}}`:
+        either nothing or a container for KLU factorization matrices (LU factorization)
 """
-struct ABA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
+struct ABA_Matrix{
+    Ax,
+    L <: NTuple{2, Dict},
+    F <: Union{Nothing, KLU.KLUFactorization{Float64, Int}},
+} <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
     lookup::L
     ref_bus_positions::Vector{Int}
+    K::F
 end
 
 """
 Builds the ABA matrix from a System
+
+# Arguments
+- `sys::PSY.System`:
+        system to consider
+        
+# Keyword arguments
+- `factorize`: if true populates ABA_Matrix.K with KLU factorization matrices
 """
-function ABA_Matrix(sys::PSY.System)
+function ABA_Matrix(sys::PSY.System; factorize = false)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
     bus_lookup = make_ax_ref(buses)
 
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA_full = calculate_BA_matrix_full(branches, bus_lookup)
-    data = calculate_ABA_matrix_full(A, BA_full)
+    BA = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
+    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
 
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
     axes = (line_ax, setdiff(bus_ax, ref_bus_positions))
     lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
-
+    if factorize
+        K = klu(ABA)
+    else
+        K = nothing
+    end
     return ABA_Matrix(
-        data,
+        ABA,
         axes,
         lookup,
         ref_bus_positions,
+        K,
     )
 end
+
+"""
+Evaluates the LU factorization matrices of the ABA matrix, using KLU.
+
+# Arguments
+- `ABA::ABA_Matrix{Ax, L, Nothing} where {Ax, L <: NTuple{2, Dict}}`:
+        container for the ABA matrix, with ABA.K == nothing (LU matrices in K not evaluated)
+"""
+function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Dict}}
+    ABA_lu = ABA_Matrix(
+        deepcopy(ABA.data),
+        deepcopy(ABA.axes),
+        deepcopy(ABA.lookup),
+        deepcopy(ABA.ref_bus_positions),
+        klu(ABA.data),
+    )
+    return ABA_lu
+end
+
+# checks if ABA has been factorized (if K contained LU matrices)
+is_factorized(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Dict}} = false
+is_factorized(
+    ABA::ABA_Matrix{Ax, L, KLU.KLUFactorization{Float64, Int}},
+) where {Ax, L <: NTuple{2, Dict}} = true
