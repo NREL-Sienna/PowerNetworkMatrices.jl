@@ -1,6 +1,6 @@
 @testset "Test ABA matrix" begin
     # test on 5 and 14 bus system
-    for name in [ "c_sys5", "c_sys14"]
+    for name in ["c_sys5", "c_sys14"]
         sys = PSB.build_system(PSB.PSITestSystems, name)
         # at first let's see if factorization flag works
         ABA_no_lu = ABA_Matrix(sys)
