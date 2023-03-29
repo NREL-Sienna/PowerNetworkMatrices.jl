@@ -24,7 +24,7 @@ end
 """
 Build the BA matrix from a given System
 """
-function BA_Matrix(sys::PSY.System)
+function BA_Matrix(sys::PSY.System; factorize = false)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
     ref_bus_positions = find_slack_positions(buses)
@@ -37,6 +37,7 @@ function BA_Matrix(sys::PSY.System)
     return BA_Matrix(data, axes, lookup, ref_bus_positions)
 end
 
+# ! change this
 """
 Structure containing the ABA matrix and other relevant data.
 Fields:
@@ -53,34 +54,59 @@ Fields:
         Vector containing the indexes of the columns of the ABA matrix corresponding
         to the refence buses
 """
-struct ABA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
+struct ABA_Matrix{
+    Ax,
+    L <: NTuple{2, Dict},
+    F <: Union{Nothing, KLU.KLUFactorization{Float64, Int}},
+} <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
     lookup::L
     ref_bus_positions::Vector{Int}
+    K::F
 end
 
 """
 Builds the ABA matrix from a System
 """
-function ABA_Matrix(sys::PSY.System)
+function ABA_Matrix(sys::PSY.System; factorize = false)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
     bus_lookup = make_ax_ref(buses)
 
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA_full = calculate_BA_matrix_full(branches, bus_lookup)
-    data = calculate_ABA_matrix_full(A, BA_full)
+    BA = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
+    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
 
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
     axes = (line_ax, setdiff(bus_ax, ref_bus_positions))
     lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
-
+    if factorize
+        K = klu(ABA)
+    else
+        K = nothing
+    end
     return ABA_Matrix(
-        data,
+        ABA,
         axes,
         lookup,
         ref_bus_positions,
+        K,
     )
 end
+
+function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Dict}}
+    return ABA_Matrix(
+        deepcopy(ABA.data),
+        deepcopy(ABA.axes),
+        deepcopy(ABA.lookup),
+        deepcopy(ABA.ref_bus_positions),
+        KLU(ABA.data),
+    )
+end
+
+is_factorized(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Dict}} = false
+is_factorized(
+    ABA::ABA_Matrix{Ax, L, KLU.KLUFactorization{Float64, Int}},
+) where {Ax, L <: NTuple{2, Dict}} = true
