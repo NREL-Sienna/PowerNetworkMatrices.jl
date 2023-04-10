@@ -6,12 +6,12 @@ Structure containing the BA matrix and other relevant data.
         the BA matrix coming from the product between the Incidence Matrix A and
         the Matrix of Susceptance B
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors, the first one contains the names of each 
+        Tuple containing two vectors, the first one contains the names of each
         line of the network (each one related to a row of the Matrix in "data"),
         the second one contains the names of each bus of the network (each one
         related to a column of the Matrix in "data")
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing 2 Dictionaries mapping the number of rows and columns 
+        Tuple containing 2 Dictionaries mapping the number of rows and columns
         with the names of branches and buses
 - `ref_bus_positions::Vector{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
@@ -48,12 +48,12 @@ Structure containing the ABA matrix and other relevant data.
         the ABA matrix coming from the product between the Incidence Matrix A and
         the Matrix BA
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors, the first one contains the names of each 
+        Tuple containing two vectors, the first one contains the names of each
         line of the network (each one related to a row of the Matrix in "data"),
         the second one contains the names of each bus of the network (each one
         related to a column of the Matrix in "data")
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing 2 Dictionaries mapping the number of rows and columns 
+        Tuple containing 2 Dictionaries mapping the number of rows and columns
         with the names of branches and buses
 - `ref_bus_positions::Vector{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
@@ -79,7 +79,7 @@ Builds the ABA matrix from a System
 # Arguments
 - `sys::PSY.System`:
         system to consider
-        
+
 # Keyword arguments
 - `factorize`: if true populates ABA_Matrix.K with KLU factorization matrices
 """
@@ -92,10 +92,11 @@ function ABA_Matrix(sys::PSY.System; factorize = false)
     BA = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
 
-    line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
-    axes = (line_ax, setdiff(bus_ax, ref_bus_positions))
-    lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
+    bus_ax_ = setdiff(bus_ax, ref_bus_positions)
+    axes = (bus_ax_, bus_ax_)
+    bus_ax_ref = make_ax_ref(bus_ax)
+    lookup = (bus_ax_ref , bus_ax_ref)
     if factorize
         K = klu(ABA)
     else
