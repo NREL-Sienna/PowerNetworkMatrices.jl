@@ -63,8 +63,16 @@ NOTE:
   reference buses (each column is related to a system's bus).
 """
 function calculate_A_matrix(branches, buses::Vector{PSY.Bus})
-    bus_lookup = make_ax_ref(buses)
     ref_bus_positions = find_slack_positions(buses)
+    return calculate_A_matrix(branches, buses, ref_bus_positions)
+end
+
+function calculate_A_matrix(
+    branches,
+    buses::Vector{PSY.Bus},
+    ref_bus_positions::Vector{Int},
+)
+    bus_lookup = make_ax_ref(buses)
 
     A_I = Int[]
     A_J = Int[]
