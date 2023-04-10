@@ -9,7 +9,7 @@ a line's flow affects the flows on other lines in the system.
         Tuple containing two vectors (the first one showing the branches names,
         the second showing the buses numbers).
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries, the first mapping the branches 
+        Tuple containing two dictionaries, the first mapping the branches
         and buses with their enumerated indexes.
 """
 struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
@@ -24,7 +24,14 @@ function _buildlodf(
     bus_lookup::Dict{Int, Int},
     dist_slack::Array{Float64},
 )
-    ptdf, a = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
+    ref_bus_positions = find_slack_positions(nodes)
+    ptdf, a = calculate_PTDF_matrix_KLU(
+        branches,
+        nodes,
+        bus_lookup,
+        ref_bus_positions,
+        dist_slack,
+    )
     return _buildlodf(a, ptdf)
 end
 

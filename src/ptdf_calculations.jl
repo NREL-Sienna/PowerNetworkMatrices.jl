@@ -10,13 +10,13 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
         Tuple containing two vectors (the first one showing the branches names,
         the second showing the buses numbers).
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries, the first mapping the branches 
+        Tuple containing two dictionaries, the first mapping the branches
         and buses with their enumerated indexes.
 - `subnetworks::Dict{Int, Set{Int}}`:
-        dictionary containing the set of bus indexes defining the subnetworks 
+        dictionary containing the set of bus indexes defining the subnetworks
         of the system.
-- `tol::Base.RefValue{Float64}`:  
-        tolerance used for sportifying the matrix (dropping element whose 
+- `tol::Base.RefValue{Float64}`:
+        tolerance used for sportifying the matrix (dropping element whose
         absolute value is below this threshold).
 """
 struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
@@ -25,6 +25,7 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     axes::Ax
     lookup::L
     subnetworks::Dict{Int, Set{Int}}
+    ref_bus_positions::Vector{Int}
     tol::Base.RefValue{Float64}
 end
 
@@ -53,13 +54,32 @@ function _buildptdf(
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
+    ref_bus_positions::Vector{Int},
     linear_solver::String)
     if linear_solver == "KLU"
-        PTDFm, A = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
+        PTDFm, A = calculate_PTDF_matrix_KLU(
+            branches,
+            nodes,
+            bus_lookup,
+            ref_bus_positions,
+            dist_slack,
+        )
     elseif linear_solver == "Dense"
-        PTDFm, A = calculate_PTDF_matrix_DENSE(branches, nodes, bus_lookup, dist_slack)
+        PTDFm, A = calculate_PTDF_matrix_DENSE(
+            branches,
+            nodes,
+            bus_lookup,
+            ref_bus_positions,
+            dist_slack,
+        )
     elseif linear_solver == "MKLPardiso"
-        PTDFm, A = calculate_PTDF_matrix_MKLPardiso(branches, nodes, bus_lookup, dist_slack)
+        PTDFm, A = calculate_PTDF_matrix_MKLPardiso(
+            branches,
+            nodes,
+            bus_lookup,
+            ref_bus_positions,
+            dist_slack,
+        )
     end
 
     return PTDFm, A
@@ -155,8 +175,9 @@ function calculate_PTDF_matrix_KLU(
     branches,
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
+    ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes, ref_bus_positions)
     BA = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
     PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -182,7 +203,7 @@ end
 Funciton for internal use only.
 
 Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
-    
+
 # Arguments
 - `A::Matrix{Int8}`:
         Incidence Matrix
@@ -257,8 +278,9 @@ function calculate_PTDF_matrix_DENSE(
     branches,
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
+    ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes, ref_bus_positions)
     BA = Matrix(calculate_BA_matrix(branches, ref_bus_positions, bus_lookup))
     PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A), BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -268,7 +290,7 @@ end
 Funciton for internal use only.
 
 Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
-    
+
 # Arguments
 - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
         Incidence Matrix
@@ -317,7 +339,7 @@ end
 
 """
 Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
-    
+
 # Arguments
 - `branches`:
         vector of the System AC branches
@@ -332,8 +354,9 @@ function calculate_PTDF_matrix_MKLPardiso(
     branches,
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
+    ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes, ref_bus_positions)
     BA = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
     PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -374,11 +397,18 @@ function PTDF(
         subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
     end
     look_up = (make_ax_ref(line_ax), bus_ax_ref)
-    S, _ = _buildptdf(branches, nodes, look_up[2], dist_slack, linear_solver)
+    S, _ = _buildptdf(
+        branches,
+        nodes,
+        look_up[2],
+        dist_slack,
+        ref_bus_positions,
+        linear_solver,
+    )
     if tol > eps()
         return PTDF(sparsify(S, tol), axes, look_up, Ref(tol))
     end
-    return PTDF(S, axes, look_up, subnetworks, Ref(tol))
+    return PTDF(S, axes, look_up, subnetworks, ref_bus_positions, Ref(tol))
 end
 
 """
@@ -425,5 +455,5 @@ function PTDF(
         return PTDF(sparsify(S, tol), axes, look_up, tol)
     end
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
-    return PTDF(S, A.axes, A.lookup, Dict{Int, Set{Int}}(), Ref(tol))
+    return PTDF(S, A.axes, A.lookup, Dict{Int, Set{Int}}(), BA.ref_bus_positions, Ref(tol))
 end
