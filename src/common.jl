@@ -192,7 +192,8 @@ function calculate_ABA_matrix(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Vector{Int})
     tmp = transpose(A) * BA
-    return tmp[setdiff(1:end, ref_bus_positions), setdiff(1:end, ref_bus_positions)]
+    valid_ix = setdiff(1:size(tmp, 1), ref_bus_positions)
+    return tmp[valid_ix, valid_ix]
 end
 
 """

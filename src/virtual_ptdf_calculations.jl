@@ -323,7 +323,7 @@ function _getindex(
         valid_ix = setdiff(1:length(vptdf.temp_data), vptdf.ref_bus_positions)
         lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[row, valid_ix]))
 
-        for i in 1:length(vptdf.temp_data)-1
+        for i in eachindex(valid_ix)
             vptdf.temp_data[valid_ix[i]] = lin_solve[i]
         end
 
