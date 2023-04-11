@@ -224,42 +224,35 @@ function _calculate_PTDF_matrix_DENSE(
     ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64}) where {T <: Union{Float32, Float64}}
 
-    # Use dense calculation of ABA
-    ABA = A[:, setdiff(1:end, ref_bus_positions)]' * BA
-    # Here add the subnetwork detection
     linecount = size(BA, 1)
     buscount = size(BA, 2)
+    # Use dense calculation of ABA
+    valid_ixs = setdiff(1:buscount, ref_bus_positions)
+    ABA = zeros(Float64, length(valid_ixs), length(valid_ixs))
+    ABA[:] = (transpose(A) * BA)[valid_ixs, valid_ixs]
     # get LU factorization matrices
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
-    elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        (ABA, bipiv, binfo) = getrf!(ABA)
-        _binfo_check(binfo)
-        PTDFm = zeros(linecount, buscount + length(ref_bus_positions))
-        PTDFm[:, setdiff(1:end, ref_bus_positions)] = gemm(
-            'N',
-            'N',
-            BA,
-            getri!(ABA, bipiv),
-        )
-    elseif length(dist_slack) == buscount
+    end
+
+    (ABA, bipiv, binfo) = getrf!(ABA)
+    _binfo_check(binfo)
+    PTDFm = zeros(Float64, linecount, buscount)
+    PTDFm[:, valid_ixs] = gemm(
+        'N',
+        'N',
+        BA[:, valid_ixs],
+        getri!(ABA, bipiv),
+    )
+
+    if length(dist_slack) == buscount
         @info "Distributed bus"
-        (ABA, bipiv, binfo) = getrf!(ABA)
-        _binfo_check(binfo)
-        PTDFm[:, setdiff(1:end, ref_bus_positions)] = gemm(
-            'N',
-            'N',
-            BA,
-            getri!(ABA, bipiv),
-        )
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
         PTDFm =
             PTDFm - gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
-    else
-        error("Distributed bus specification doesn't match the number of buses")
     end
 
     return PTDFm
@@ -317,10 +310,14 @@ function _calculate_PTDF_matrix_MKLPardiso(
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     # Here add the subnetwork detection
-    Ix = Matrix(1.0I, buscount, buscount)
-    ABA_inv = zeros(Float64, buscount, buscount)
+    Ix = Matrix(
+        1.0I,
+        buscount - length(ref_bus_positions),
+        buscount - length(ref_bus_positions),
+    )
+    ABA_inv = zeros(Float64, size(Ix))
     Pardiso.solve!(ps, ABA_inv, ABA, Ix)
-    PTDFm = zeros(linecount, buscount + 1)
+    PTDFm = zeros(linecount, buscount)
 
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
