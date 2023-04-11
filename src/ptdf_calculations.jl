@@ -221,7 +221,6 @@ function _calculate_PTDF_matrix_DENSE(
     BA::Matrix{T},
     ref_bus_positions::Vector{Int},
     dist_slack::Vector{Float64}) where {T <: Union{Float32, Float64}}
-
     linecount = size(BA, 1)
     buscount = size(BA, 2)
     # Use dense calculation of ABA
