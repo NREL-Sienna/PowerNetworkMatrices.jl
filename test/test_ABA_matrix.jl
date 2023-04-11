@@ -18,7 +18,11 @@
         A = IncidenceMatrix(sys)
         BA = BA_Matrix(sys)
         ABA_2 = transpose(A.data) * BA.data
-        @test isapprox(ABA_lu.data, ABA_2[setdiff(1:end, A.ref_bus_positions), setdiff(1:end, A.ref_bus_positions)], atol = 1e-8)
+        @test isapprox(
+            ABA_lu.data,
+            ABA_2[setdiff(1:end, A.ref_bus_positions), setdiff(1:end, A.ref_bus_positions)],
+            atol = 1e-8,
+        )
 
         # evaluate if the LU factorization evaluates a correct PTDF matrix
         ptdf_1 = PTDF(sys)
