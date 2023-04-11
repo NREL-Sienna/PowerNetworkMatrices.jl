@@ -150,34 +150,22 @@ Evaluates the BA matrix given the System's banches, reference bus positions and 
 """
 function calculate_BA_matrix(
     branches,
-    ref_bus_positions::Vector{Int},
     bus_lookup::Dict{Int, Int})
     BA_I = Int[]
     BA_J = Int[]
     BA_V = Float64[]
 
     for (ix, b) in enumerate(branches)
-        if isa(b, PSY.DCBranch)
-            @warn("PTDF construction ignores DC-Lines")
-            continue
-        end
-
         (fr_b, to_b) = get_bus_indices(b, bus_lookup)
         b_val = PSY.get_series_susceptance(b)
 
-        if fr_b ∉ ref_bus_positions
-            check_ = sum(fr_b .> ref_bus_positions)
-            push!(BA_I, ix)
-            push!(BA_J, fr_b - check_)
-            push!(BA_V, b_val)
-        end
+        push!(BA_I, ix)
+        push!(BA_J, fr_b)
+        push!(BA_V, b_val)
 
-        if to_b ∉ ref_bus_positions
-            check_ = sum(to_b .> ref_bus_positions)
-            push!(BA_I, ix)
-            push!(BA_J, to_b - check_)
-            push!(BA_V, -b_val)
-        end
+        push!(BA_I, ix)
+        push!(BA_J, to_b)
+        push!(BA_V, -b_val)
     end
 
     BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
@@ -203,7 +191,8 @@ function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Vector{Int})
-    return A[:, setdiff(1:end, ref_bus_positions)]' * BA
+    tmp = transpose(A) * BA
+    return tmp[setdiff(1:end, ref_bus_positions), setdiff(1:end, ref_bus_positions)]
 end
 
 """
