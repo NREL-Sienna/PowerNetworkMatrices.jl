@@ -4,14 +4,18 @@ function A_mul_B!(
     B::Matrix{Float64},
     ref_bus_positions::Vector{Int},
 )
-    for n in 1:size(C, 2)
-        n in ref_bus_positions && continue
-        offset_1 = sum(n .> ref_bus_positions)
-        @inbounds for m in 1:size(A, 2)
-            offset_2 = sum(m .> ref_bus_positions)
-            B_val = B[m - offset_2, n - offset_1]
-            for k in A.colptr[m]:(A.colptr[m + 1] - 1)
-                C[A.rowval[k], n] += A.nzval[k] * B_val
+    nzv = SparseArrays.nonzeros(A)
+    rv = SparseArrays.rowvals(A)
+    colptr = SparseArrays.getcolptr(A)
+    for k in 1:size(C, 2)
+        k in ref_bus_positions && continue
+        offset_1 = sum(k .> ref_bus_positions)
+        for col in 1:size(A, 2)
+            col in ref_bus_positions && continue
+            offset_2 = sum(col .> ref_bus_positions)
+            B_val = B[col - offset_2, k - offset_1]
+            for j in colptr[col]:(colptr[col + 1] - 1)
+                C[rv[j], k] += nzv[j] * B_val
             end
         end
     end
