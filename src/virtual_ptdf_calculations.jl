@@ -147,8 +147,8 @@ end
 ##############################################################################
 
 """
-Power Transfer Distribution Factors (PTDF) indicate the incremental change in 
-real power that occurs on transmission lines due to real power injections 
+Power Transfer Distribution Factors (PTDF) indicate the incremental change in
+real power that occurs on transmission lines due to real power injections
 changes at the buses.
 
 The PTDF struct is indexed using the Bus numbers and branch names.
@@ -168,7 +168,7 @@ The PTDF struct is indexed using the Bus numbers and branch names.
         Tuple containing two vectors (the first one showing the branches names,
         the second showing the buses numbers).
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries, the first mapping the branches 
+        Tuple containing two dictionaries, the first mapping the branches
         and buses with their enumerated indexes.
 - `temp_data::Vector{Float64}`:
         temporary vector for internal use.
@@ -193,7 +193,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
 end
 
 """
-Builds the PTDF matrix from a group of branches and buses. The return is a 
+Builds the PTDF matrix from a group of branches and buses. The return is a
 PTDF array indexed with the branch numbers.
 
 # Arguments
@@ -227,7 +227,7 @@ function VirtualPTDF(
     line_ax_ref = make_ax_ref(line_ax)
     look_up = (line_ax_ref, bus_ax_ref)
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, ref_bus_positions, bus_ax_ref)
+    BA = calculate_BA_matrix(branches, bus_ax_ref)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     ref_bus_positions = find_slack_positions(buses)
     subnetworks = find_subnetworks(M, bus_ax)
@@ -263,7 +263,7 @@ function VirtualPTDF(
 end
 
 """
-Builds the Virtual PTDF matrix from a system. The return is a VirtualPTDF 
+Builds the Virtual PTDF matrix from a system. The return is a VirtualPTDF
 struct with an empty cache.
 """
 function VirtualPTDF(
@@ -319,8 +319,9 @@ function _getindex(
         return vptdf.cache[row][column]
     else
         # evaluate the value for the PTDF column
+        # Needs improvement
         vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .=
-            KLU.solve!(vptdf.K, Vector(vptdf.BA[row, :]))
+            KLU.solve!(vptdf.K, Vector(vptdf.BA[row, setdiff(1:end, vptdf.ref_bus_positions)]))
         # add slack bus value (zero) and make copy of temp into the cache
         if get_tol(vptdf) > eps()
             vptdf.cache[row] = make_entries_zero!(deepcopy(vptdf.temp_data), get_tol(vptdf))
@@ -333,7 +334,7 @@ end
 
 """
 Gets the value of the element of the PTDF matrix given the row and column indices
-corresponding to the branch and buses one respectively. If `column` is a Colon then 
+corresponding to the branch and buses one respectively. If `column` is a Colon then
 the entire row is returned.
 
 # Arguments
