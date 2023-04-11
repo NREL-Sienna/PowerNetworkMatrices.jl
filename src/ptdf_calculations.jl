@@ -142,7 +142,6 @@ function _calculate_PTDF_matrix_KLU(
     ABA_inv = zeros(Float64, size(Ix))
     ldiv!(ABA_inv, K, Ix)
     PTDFm = zeros(linecount, buscount)
-
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
@@ -158,7 +157,6 @@ function _calculate_PTDF_matrix_KLU(
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
-
     return PTDFm
 end
 
