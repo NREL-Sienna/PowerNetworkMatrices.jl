@@ -2,7 +2,7 @@
 Structure used for saving the rows of the Virtual PTDF matrix.
 
 # Arguments
-- `temp_cache::Dict{Int, Array{Float64}}`:
+- `temp_cache::Dict{Int, Vector{Float64}}`:
         Dictionay saving the row of the PTDF matrix
 - `persistent_cache_keys::Set{Int}`:
         Set listing the rows saved in `temp_cache`
@@ -12,7 +12,7 @@ Structure used for saving the rows of the Virtual PTDF matrix.
         Defines the maximum number of keys saved (rows of the matrix)
 """
 struct RowCache
-    temp_cache::Dict{Int, Array{Float64}}
+    temp_cache::Dict{Int, Vector{Float64}}
     persistent_cache_keys::Set{Int}
     max_cache_size::Int
     max_num_keys::Int
@@ -22,7 +22,7 @@ end
 Structure used for saving the rows of the Virtual PTDF matrix.
 
 # Arguments
-- `temp_cache::Dict{Int, Array{Float64}}`:
+- `temp_cache::Dict{Int, Vector{Float64}}`:
         Dictionay saving the row of the PTDF matrix
 - `persistent_cache_keys::Set{Int}`:
         Set listing the rows saved in `temp_cache`
@@ -43,7 +43,7 @@ function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
     end
     max_num_keys = max(length(persistent_rows) + 1, floor(Int, max_cache_size / row_size))
     return RowCache(
-        sizehint!(Dict{Int, Array{Float64}}(), max_num_keys),
+        sizehint!(Dict{Int, Vector{Float64}}(), max_num_keys),
         persistent_rows,
         max_cache_size,
         max_num_keys,
@@ -88,12 +88,12 @@ Allocates vector as row of the matrix saved in cache.
 # Arguments
 - `cache::RowCache`:
         cache where the row vector is going to be saved
-- `val::Array{Float64}`:
+- `val::Vector{Float64}`:
         vector to be saved
 - `key::Int`:
         row number (corresponding to the enumerated branch index) related to the input row vector
 """
-function Base.setindex!(cache::RowCache, val::Array{Float64}, key::Int)
+function Base.setindex!(cache::RowCache, val::Vector{Float64}, key::Int)
     check_cache_size!(cache)
     cache.temp_cache[key] = val
     return
@@ -108,7 +108,7 @@ Gets the row of the stored matrix in cache.
 - `key::Int`:
         row number (corresponding to the enumerated branch index) related to the row vector.
 """
-function Base.getindex(cache::RowCache, key::Int)
+function Base.getindex(cache::RowCache, key::Int)::Vector{Float64}
     return cache.temp_cache[key]
 end
 
@@ -320,8 +320,13 @@ function _getindex(
     else
         # evaluate the value for the PTDF column
         # Needs improvement
-        vptdf.temp_data[setdiff(1:end, vptdf.ref_bus_positions)] .=
-            KLU.solve!(vptdf.K, Vector(vptdf.BA[row, setdiff(1:end, vptdf.ref_bus_positions)]))
+        valid_ix = setdiff(1:length(vptdf.temp_data), vptdf.ref_bus_positions)
+        lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[row, valid_ix]))
+
+        for i in 1:length(vptdf.temp_data)-1
+            vptdf.temp_data[valid_ix[i]] = lin_solve[i]
+        end
+
         # add slack bus value (zero) and make copy of temp into the cache
         if get_tol(vptdf) > eps()
             vptdf.cache[row] = make_entries_zero!(deepcopy(vptdf.temp_data), get_tol(vptdf))
