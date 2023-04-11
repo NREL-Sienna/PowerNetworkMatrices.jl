@@ -36,7 +36,7 @@ function BA_Matrix(sys::PSY.System)
     bus_ax = [PSY.get_number(bus) for bus in setdiff(buses, ref_bus_positions)]
     axes = (line_ax, bus_ax)
     lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
-    data = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
+    data = calculate_BA_matrix(branches, bus_lookup)
     return BA_Matrix(data, axes, lookup, ref_bus_positions)
 end
 
@@ -89,14 +89,14 @@ function ABA_Matrix(sys::PSY.System; factorize = false)
     bus_lookup = make_ax_ref(buses)
 
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, ref_bus_positions, bus_lookup)
+    BA = calculate_BA_matrix(branches, bus_lookup)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
 
     bus_ax = [PSY.get_number(bus) for bus in buses]
     bus_ax_ = setdiff(bus_ax, ref_bus_positions)
     axes = (bus_ax_, bus_ax_)
     bus_ax_ref = make_ax_ref(bus_ax)
-    lookup = (bus_ax_ref , bus_ax_ref)
+    lookup = (bus_ax_ref, bus_ax_ref)
     if factorize
         K = klu(ABA)
     else
