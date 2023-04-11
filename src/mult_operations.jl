@@ -10,7 +10,7 @@ function A_mul_B!(
     for k in 1:size(C, 2)
         k in ref_bus_positions && continue
         offset_1 = sum(k .> ref_bus_positions)
-        for col in 1:size(A, 2)
+        @inbounds for col in 1:size(A, 2)
             col in ref_bus_positions && continue
             offset_2 = sum(col .> ref_bus_positions)
             B_val = B[col - offset_2, k - offset_1]
