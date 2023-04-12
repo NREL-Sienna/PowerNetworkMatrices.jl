@@ -8,16 +8,16 @@ Incidence matrix: shows connection between buses, defining lines
         Tuple containing two vectors (the first one showing the branches names,
         the second showing the buses numbers).
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries, the first mapping the branches 
+        Tuple containing two dictionaries, the first mapping the branches
         and buses with their enumerated indexes.
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         vector containing the indices of the reference slack buses.
 """
 struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
-    ref_bus_positions::Vector{Int}
+    ref_bus_positions::Set{Int}
 end
 
 # functions to get stored data
@@ -26,7 +26,7 @@ get_lookup(A::IncidenceMatrix) = A.lookup
 get_slack_position(A::IncidenceMatrix) = A.ref_bus_positions
 
 """
-Builds the Incidence matrix by evaluating the actual matrix and other relevant 
+Builds the Incidence matrix by evaluating the actual matrix and other relevant
 values.
 """
 function IncidenceMatrix(sys::PSY.System)

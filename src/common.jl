@@ -26,7 +26,7 @@ function find_slack_positions(nodes)
     return find_slack_positions(nodes, make_ax_ref(nodes))
 end
 
-function find_slack_positions(buses, bus_lookup::Dict{Int, Int})
+function find_slack_positions(buses, bus_lookup::Dict{Int, Int})::Set{Int}
     slack_position = sort([
         bus_lookup[PSY.get_number(n)]
         for n in buses if PSY.get_bustype(n) == BusTypes.REF
@@ -34,7 +34,7 @@ function find_slack_positions(buses, bus_lookup::Dict{Int, Int})
     if length(slack_position) == 0
         error("Slack bus not identified in the Bus/Nodes list, can't build NetworkMatrix")
     end
-    return slack_position
+    return Set{Int}(slack_position)
 end
 
 """
@@ -63,8 +63,16 @@ NOTE:
   reference buses (each column is related to a system's bus).
 """
 function calculate_A_matrix(branches, buses::Vector{PSY.Bus})
-    bus_lookup = make_ax_ref(buses)
     ref_bus_positions = find_slack_positions(buses)
+    return calculate_A_matrix(branches, buses, ref_bus_positions)
+end
+
+function calculate_A_matrix(
+    branches,
+    buses::Vector{PSY.Bus},
+    ref_bus_positions::Set{Int},
+)
+    bus_lookup = make_ax_ref(buses)
 
     A_I = Int[]
     A_J = Int[]
@@ -134,7 +142,7 @@ Evaluates the BA matrix given the System's banches, reference bus positions and 
 # Arguments
 - `branches`:
         vector containing the branches of the considered system (should be AC branches).
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
 - `bus_lookup::Dict{Int, Int}`:
@@ -142,34 +150,22 @@ Evaluates the BA matrix given the System's banches, reference bus positions and 
 """
 function calculate_BA_matrix(
     branches,
-    ref_bus_positions::Vector{Int},
     bus_lookup::Dict{Int, Int})
     BA_I = Int[]
     BA_J = Int[]
     BA_V = Float64[]
 
     for (ix, b) in enumerate(branches)
-        if isa(b, PSY.DCBranch)
-            @warn("PTDF construction ignores DC-Lines")
-            continue
-        end
-
         (fr_b, to_b) = get_bus_indices(b, bus_lookup)
         b_val = PSY.get_series_susceptance(b)
 
-        if fr_b ∉ ref_bus_positions
-            check_ = sum(fr_b .> ref_bus_positions)
-            push!(BA_I, ix)
-            push!(BA_J, fr_b - check_)
-            push!(BA_V, b_val)
-        end
+        push!(BA_I, ix)
+        push!(BA_J, fr_b)
+        push!(BA_V, b_val)
 
-        if to_b ∉ ref_bus_positions
-            check_ = sum(to_b .> ref_bus_positions)
-            push!(BA_I, ix)
-            push!(BA_J, to_b - check_)
-            push!(BA_V, -b_val)
-        end
+        push!(BA_I, ix)
+        push!(BA_J, to_b)
+        push!(BA_V, -b_val)
     end
 
     BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
@@ -194,8 +190,10 @@ NOTE:
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    ref_bus_positions::Vector{Int})
-    return A[:, setdiff(1:end, ref_bus_positions)]' * BA
+    ref_bus_positions::Set{Int})
+    tmp = transpose(A) * BA
+    valid_ix = setdiff(1:size(tmp, 1), ref_bus_positions)
+    return tmp[valid_ix, valid_ix]
 end
 
 """
@@ -283,7 +281,7 @@ end
 """
 function assing_reference_buses(
     subnetworks::Dict{Int, Set{Int}},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
 )
     if isempty(ref_bus_positions) || length(ref_bus_positions) != length(subnetworks)
         @warn "The reference bus positions are not consistent with the subnetworks. Can't continue"
@@ -293,7 +291,7 @@ function assing_reference_buses(
     for (bus_key, subnetwork_buses) in subnetworks
         ref_bus = intersect(ref_bus_positions, subnetwork_buses)
         if length(ref_bus) == 1
-            bus_groups[ref_bus[1]] = pop!(subnetworks, bus_key)
+            bus_groups[first(ref_bus)] = pop!(subnetworks, bus_key)
             continue
         elseif length(ref_bus) == 0
             @warn "No reference bus in the subnetwork associated with bus $bus_key. Can't continue"
