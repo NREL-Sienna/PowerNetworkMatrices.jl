@@ -300,7 +300,6 @@ function _calculate_PTDF_matrix_MKLPardiso(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-
     linecount = size(BA, 1)
     buscount = size(BA, 2)
 
