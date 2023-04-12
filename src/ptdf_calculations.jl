@@ -25,7 +25,7 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     axes::Ax
     lookup::L
     subnetworks::Dict{Int, Set{Int}}
-    ref_bus_positions::Vector{Int}
+    ref_bus_positions::Set{Int}
     tol::Base.RefValue{Float64}
 end
 
@@ -54,7 +54,7 @@ function _buildptdf(
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
     linear_solver::String)
     if linear_solver == "KLU"
         PTDFm, A = calculate_PTDF_matrix_KLU(
@@ -118,7 +118,7 @@ Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrice
         Incidence Matrix
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         vector containing the indexes of the reference slack buses.
 - `dist_slack::Vector{Float64}`:
         vector containing the weights for the distributed slacks.
@@ -126,7 +126,7 @@ Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrice
 function _calculate_PTDF_matrix_KLU(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
     linecount = size(BA, 1)
     buscount = size(BA, 2)
@@ -177,7 +177,7 @@ function calculate_PTDF_matrix_KLU(
     branches,
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, nodes, ref_bus_positions)
     BA = calculate_BA_matrix(branches, bus_lookup)
@@ -211,7 +211,7 @@ Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense mat
         Incidence Matrix
 - `BA::Matrix{T} where {T <: Union{Float32, Float64}}`:
         BA matrix
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         vector containing the indexes of the reference slack buses.
 - `dist_slack::Vector{Float64})`:
         vector containing the weights for the distributed slacks.
@@ -219,7 +219,7 @@ Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense mat
 function _calculate_PTDF_matrix_DENSE(
     A::Matrix{Int8},
     BA::Matrix{T},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64}) where {T <: Union{Float32, Float64}}
     linecount = size(BA, 1)
     buscount = size(BA, 2)
@@ -272,7 +272,7 @@ function calculate_PTDF_matrix_DENSE(
     branches,
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, nodes, ref_bus_positions)
     BA = Matrix(calculate_BA_matrix(branches, bus_lookup))
@@ -290,7 +290,7 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
         Incidence Matrix
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         vector containing the indexes of the referece slack buses.
 - `dist_slack::Vector{Float64}`:
         vector containing the weights for the distributed slacks.
@@ -298,9 +298,10 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 function _calculate_PTDF_matrix_MKLPardiso(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
     ps = Pardiso.MKLPardisoSolver()
+    Pardiso.set_msglvl!(solver, Pardiso.MESSAGE_LEVEL_ON)
 
     linecount = size(BA, 1)
     buscount = size(BA, 2)
@@ -352,7 +353,7 @@ function calculate_PTDF_matrix_MKLPardiso(
     branches,
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, nodes, ref_bus_positions)
     BA = calculate_BA_matrix(branches, bus_lookup)

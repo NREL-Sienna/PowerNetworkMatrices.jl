@@ -26,7 +26,7 @@ function find_slack_positions(nodes)
     return find_slack_positions(nodes, make_ax_ref(nodes))
 end
 
-function find_slack_positions(buses, bus_lookup::Dict{Int, Int})
+function find_slack_positions(buses, bus_lookup::Dict{Int, Int})::Set{Int}
     slack_position = sort([
         bus_lookup[PSY.get_number(n)]
         for n in buses if PSY.get_bustype(n) == BusTypes.REF
@@ -34,7 +34,7 @@ function find_slack_positions(buses, bus_lookup::Dict{Int, Int})
     if length(slack_position) == 0
         error("Slack bus not identified in the Bus/Nodes list, can't build NetworkMatrix")
     end
-    return slack_position
+    return Set{Int}(slack_position)
 end
 
 """
@@ -70,7 +70,7 @@ end
 function calculate_A_matrix(
     branches,
     buses::Vector{PSY.Bus},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
 )
     bus_lookup = make_ax_ref(buses)
 
@@ -142,7 +142,7 @@ Evaluates the BA matrix given the System's banches, reference bus positions and 
 # Arguments
 - `branches`:
         vector containing the branches of the considered system (should be AC branches).
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
 - `bus_lookup::Dict{Int, Int}`:
@@ -190,7 +190,7 @@ NOTE:
 function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    ref_bus_positions::Vector{Int})
+    ref_bus_positions::Set{Int})
     tmp = transpose(A) * BA
     valid_ix = setdiff(1:size(tmp, 1), ref_bus_positions)
     return tmp[valid_ix, valid_ix]
@@ -281,7 +281,7 @@ end
 """
 function assing_reference_buses(
     subnetworks::Dict{Int, Set{Int}},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
 )
     if isempty(ref_bus_positions) || length(ref_bus_positions) != length(subnetworks)
         @warn "The reference bus positions are not consistent with the subnetworks. Can't continue"
@@ -291,7 +291,7 @@ function assing_reference_buses(
     for (bus_key, subnetwork_buses) in subnetworks
         ref_bus = intersect(ref_bus_positions, subnetwork_buses)
         if length(ref_bus) == 1
-            bus_groups[ref_bus[1]] = pop!(subnetworks, bus_key)
+            bus_groups[first(ref_bus)] = pop!(subnetworks, bus_key)
             continue
         elseif length(ref_bus) == 0
             @warn "No reference bus in the subnetwork associated with bus $bus_key. Can't continue"
