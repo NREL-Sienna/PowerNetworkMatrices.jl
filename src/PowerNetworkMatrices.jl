@@ -26,7 +26,7 @@ import SparseArrays
 import SparseArrays: rowvals, nzrange
 import KLU: klu
 import KLU
-import LinearAlgebra: LAPACK.getri!, LAPACK.getrf!, BLAS.gemm, BLAS.set_num_threads
+import LinearAlgebra: LAPACK.getri!, LAPACK.getrf!, BLAS.gemm
 import LinearAlgebra: ldiv!, mul!, I
 import LinearAlgebra
 import Pardiso
@@ -47,5 +47,7 @@ include("ptdf_calculations.jl")
 include("ybus_calculations.jl")
 include("lodf_calculations.jl")
 include("virtual_ptdf_calculations.jl")
+include("mult_operations.jl")
 include("system_utils.jl")
+
 end
