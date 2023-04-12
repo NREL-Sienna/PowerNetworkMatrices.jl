@@ -13,7 +13,7 @@ Structure containing the BA matrix and other relevant data.
 - `lookup<:NTuple{2, Dict}`:
         Tuple containing 2 Dictionaries mapping the number of rows and columns
         with the names of branches and buses
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
 """
@@ -21,7 +21,7 @@ struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
     lookup::L
-    ref_bus_positions::Vector{Int}
+    ref_bus_positions::Set{Int}
 end
 
 """
@@ -55,7 +55,7 @@ Structure containing the ABA matrix and other relevant data.
 - `lookup<:NTuple{2, Dict}`:
         Tuple containing 2 Dictionaries mapping the number of rows and columns
         with the names of branches and buses
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
 - `K<:Union{Nothing, KLU.KLUFactorization{Float64, Int}}`:
@@ -69,7 +69,7 @@ struct ABA_Matrix{
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
     lookup::L
-    ref_bus_positions::Vector{Int}
+    ref_bus_positions::Set{Int}
     K::F
 end
 

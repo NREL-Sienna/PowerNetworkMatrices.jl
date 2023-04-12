@@ -158,7 +158,7 @@ The PTDF struct is indexed using the Bus numbers and branch names.
         LU factorization matrices of the ABA matrix, evaluated by means of KLU
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matric
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
 - `dist_slack::Vector{Float64}`:
@@ -182,7 +182,7 @@ The PTDF struct is indexed using the Bus numbers and branch names.
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
-    ref_bus_positions::Vector{Int}
+    ref_bus_positions::Set{Int}
     dist_slack::Vector{Float64}
     axes::Ax
     lookup::L

@@ -2,7 +2,7 @@ function A_mul_B!(
     C::Matrix{Float64},
     A::SparseArrays.SparseMatrixCSC{Float64, Int},
     B::Matrix{Float64},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
 )
     nzv = SparseArrays.nonzeros(A)
     rv = SparseArrays.rowvals(A)
@@ -30,7 +30,7 @@ function A_mul_B_2!(
     C::Matrix{Float64},
     A::SparseArrays.SparseMatrixCSC{Float64, Int},
     B::Matrix{Float64},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
 )
     # get sparse matrix values
     nzv = SparseArrays.nonzeros(A)

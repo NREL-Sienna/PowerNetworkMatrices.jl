@@ -15,7 +15,7 @@ The AdjacencyMatrix Struct is indexed using the Bus Numbers, no need for them to
 - `lookup<:NTuple{2, Dict}`:
         Tuple containing 2 Dictionaries mapping the number of rows and columns
         with the names of branches and buses
-- `ref_bus_positions::Vector{Int}`:
+- `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
 """
@@ -23,7 +23,7 @@ struct AdjacencyMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
-    ref_bus_positions::Vector{Int}
+    ref_bus_positions::Set{Int}
 end
 
 # functions to get stored data
