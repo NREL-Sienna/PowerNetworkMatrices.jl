@@ -9,14 +9,14 @@ jobs:
     steps:
       - uses: julia-actions/setup-julia@latest
       - uses: actions/checkout@v1
-      - name: Run Perfomance Test Branch
-        run: |
-          julia --project=test -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-          julia --project=test test/performance/performance_test.jl "This Branch"
       - name: Run Perfomance Test Main
         run: |
           julia --project=test -e 'using Pkg; Pkg.add(PackageSpec(name="PowerNetworkMatrices", rev="main")); Pkg.instantiate()'
           julia --project=test test/performance/performance_test.jl "Main"
+      - name: Run Perfomance Test Branch
+        run: |
+          julia --project=test -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+          julia --project=test test/performance/performance_test.jl ${{env.GITHUB_REF_NAME}}
       - name: Read precompile results
         id: precompile_results
         run: |
