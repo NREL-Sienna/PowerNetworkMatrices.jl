@@ -11,8 +11,8 @@ jobs:
       - uses: actions/checkout@v1
       - name: Run Perfomance Test Master
         run: |
-          julia --project=test -e 'using Pkg; Pkg.add(PackageSpec(name="PowerNetworkMatrices", rev="master")); Pkg.instantiate()'
-          julia --project=test test/performance/performance_test.jl "Master"
+          julia --project=test -e 'using Pkg; Pkg.add(PackageSpec(name="PowerNetworkMatrices", rev="main")); Pkg.instantiate()'
+          julia --project=test test/performance/performance_test.jl "Main"
       - name: Run Perfomance Test Branch
         run: |
           julia --project=test -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
