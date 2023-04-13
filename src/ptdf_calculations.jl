@@ -128,36 +128,34 @@ function _calculate_PTDF_matrix_KLU(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-    linecount = size(BA, 1)
-    buscount = size(BA, 2)
+    linecount = size(BA, 2)
+    buscount = size(BA, 1)
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-    # Here add the subnetwork detection
     K = klu(ABA)
-    Ix = Matrix(
-        1.0I,
-        buscount - length(ref_bus_positions),
-        buscount - length(ref_bus_positions),
-    )
-    ABA_inv = zeros(Float64, size(Ix))
-    ldiv!(ABA_inv, K, Ix)
-    PTDFm = zeros(linecount, buscount)
+    # inizialize matrices for evaluation
+    PTDFm_t = zeros(buscount, linecount)
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        A_mul_B!(PTDFm, BA, ABA_inv, ref_bus_positions)
+        @show size(PTDFm_t[setdiff(1:end, ref_bus_positions), :])
+        @show size(K)
+        @show size(BA[setdiff(1:end, ref_bus_positions), :])
+        ldiv!(PTDFm_t[setdiff(1:end, ref_bus_positions), :], K, BA[setdiff(1:end, ref_bus_positions), :])
+        # A_mul_B!(PTDFm, BA, ABA_inv, ref_bus_positions)
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        A_mul_B!(PTDFm, BA, ABA_inv, ref_bus_positions)
+        ldiv!(PTDFm_t, K, BA)
+        # A_mul_B!(PTDFm, BA, ABA_inv, ref_bus_positions)
         slack_array = dist_slack / sum(dist_slack)
-        slack_array = reshape(slack_array, buscount, 1)
-        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
+        slack_array = reshape(slack_array, 1, buscount)
+        PTDFm_t = PTDFm_t - (PTDFm_t * slack_array) * ones(1, buscount)
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
-    return PTDFm
+    return PTDFm_t
 end
 
 """

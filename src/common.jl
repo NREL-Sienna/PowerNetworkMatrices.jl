@@ -137,7 +137,7 @@ function calculate_adjacency(
 end
 
 """
-Evaluates the BA matrix given the System's banches, reference bus positions and bus_lookup.
+Evaluates the transposed BA matrix given the System's banches, reference bus positions and bus_lookup.
 
 # Arguments
 - `branches`:
@@ -159,13 +159,14 @@ function calculate_BA_matrix(
         (fr_b, to_b) = get_bus_indices(b, bus_lookup)
         b_val = PSY.get_series_susceptance(b)
 
-        push!(BA_I, ix)
-        push!(BA_J, fr_b)
+        push!(BA_I, fr_b)
+        push!(BA_J, ix)
         push!(BA_V, b_val)
 
-        push!(BA_I, ix)
-        push!(BA_J, to_b)
+        push!(BA_I, to_b)
+        push!(BA_J, ix)
         push!(BA_V, -b_val)
+
     end
 
     BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
@@ -191,7 +192,7 @@ function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int})
-    tmp = transpose(A) * BA
+    tmp = BA * A
     valid_ix = setdiff(1:size(tmp, 1), ref_bus_positions)
     return tmp[valid_ix, valid_ix]
 end
