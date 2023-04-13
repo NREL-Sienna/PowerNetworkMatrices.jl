@@ -4,7 +4,13 @@ open("precompile_time.txt", "a") do io
     write(io, "| $(ARGS[1]) | $(precompile.time) |\n")
 end
 
+using InfrastructureSystems
 using PowerSystemCaseBuilder
+using Logger
+
+const IS = InfrastructureSystems
+
+IS.get_logging_level(Logging.Error)
 
 sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys")
 
