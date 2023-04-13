@@ -140,10 +140,18 @@ function _calculate_PTDF_matrix_KLU(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        ldiv!(PTDFm_t[setdiff(1:end, ref_bus_positions), :], K, @view BA[setdiff(1:end, ref_bus_positions), :])
+        ldiv!(
+            PTDFm_t[setdiff(1:end, ref_bus_positions), :],
+            K,
+            @view BA[setdiff(1:end, ref_bus_positions), :]
+        )
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        ldiv!(PTDFm_t[setdiff(1:end, ref_bus_positions), :], K, @view BA[setdiff(1:end, ref_bus_positions), :])
+        ldiv!(
+            PTDFm_t[setdiff(1:end, ref_bus_positions), :],
+            K,
+            @view BA[setdiff(1:end, ref_bus_positions), :]
+        )
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
         PTDFm_t = PTDFm_t - (PTDFm_t * slack_array) * ones(1, buscount)

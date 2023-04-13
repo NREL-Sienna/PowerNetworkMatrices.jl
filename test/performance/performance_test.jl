@@ -8,7 +8,7 @@ using PowerSystems
 using PowerSystemCaseBuilder
 using Logging
 
-configure_logging(console_level = Logging.Error)
+configure_logging(; console_level = Logging.Error)
 
 sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys")
 
