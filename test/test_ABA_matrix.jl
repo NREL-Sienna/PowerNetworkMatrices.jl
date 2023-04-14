@@ -36,32 +36,3 @@
         )
     end
 end
-
-const PNM = PowerNetworkMatrices
-branches = PNM.get_ac_branches(sys)
-nodes = PNM.get_buses(sys)
-
-line_ax = [PSY.get_name(branch) for branch in branches]
-bus_ax = [PSY.get_number(bus) for bus in nodes]
-axes = (line_ax, bus_ax)
-M, bus_ax_ref = PNM.calculate_adjacency(branches, nodes)
-ref_bus_positions = PNM.find_slack_positions(nodes)
-look_up = (PNM.make_ax_ref(line_ax), bus_ax_ref)
-dist_slack = Float64[]
-
-A, ref_bus_positions = PNM.calculate_A_matrix(branches, nodes, ref_bus_positions)
-BA = PNM.calculate_BA_matrix(branches, look_up[2])
-
-linecount = size(BA, 2)
-buscount = size(BA, 1)
-
-using KLU
-using LinearAlgebra
-
-ABA = PNM.calculate_ABA_matrix(A, BA, ref_bus_positions)
-K = klu(ABA)
-# inizialize matrices for evaluation
-PTDFm_t = zeros(buscount, linecount)
-valid_ix = setdiff(1:size(PTDFm_t, 1), ref_bus_positions)
-copyto!(PTDFm_t, BA)
-KLU.solve!(K, PTDFm_t[valid_ix, :])
