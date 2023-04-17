@@ -473,6 +473,6 @@ function Base.getindex(A::PTDF, line_number::Union{Int, Colon}, bus_number::Unio
     return A.data[bus_number, line_number]
 end
 
-function getdata(ptdf::PTDF)
+function get_data(ptdf::PTDF)
     return transpose(ptdf.data)
 end

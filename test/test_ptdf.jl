@@ -6,6 +6,7 @@
             branches_5 = branches5(nodes_5)
             if approach == "standard"
                 P5 = PTDF(branches_5, nodes_5; linear_solver = solver)
+                P5_bis = PTDF(sys5; linear_solver = solver)
             elseif approach == "separate_matrices"
                 if solver == "Dense"
                     continue
@@ -15,9 +16,15 @@
                     P5 = PTDF(A, BA; linear_solver = solver)
                 end
             end
+
+            # test method with branches and buses
+            @test isapprox(maximum(P5.data), maximum(S5_slackB4), atol = 1e-3)
+            @test isapprox(P5[branches_5[1], nodes_5[1]], 0.1939166051164976)
+            # test method with whole system
             @test isapprox(maximum(P5.data), maximum(S5_slackB4), atol = 1e-3)
             @test isapprox(P5[branches_5[1], nodes_5[1]], 0.1939166051164976)
 
+            # additional test with other set of branches and buses
             nodes_14 = nodes14()
             branches_14 = branches14(nodes_14)
             P14 = PTDF(branches_14, nodes_14)
