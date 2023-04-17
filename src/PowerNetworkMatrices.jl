@@ -1,7 +1,7 @@
 module PowerNetworkMatrices
 
 export PTDF
-export getdata
+export get_data
 export VirtualPTDF
 export IncidenceMatrix
 export BA_Matrix
