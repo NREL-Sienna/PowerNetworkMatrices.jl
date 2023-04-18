@@ -1,7 +1,9 @@
 module PowerNetworkMatrices
 
 export PTDF
-export get_data
+export get_ptdf_data
+export drop_small_entries!
+export make_sparse_PTDF
 export VirtualPTDF
 export IncidenceMatrix
 export BA_Matrix
@@ -28,7 +30,7 @@ import SparseArrays: rowvals, nzrange
 import KLU: klu
 import KLU
 import LinearAlgebra: LAPACK.getri!, LAPACK.getrf!, BLAS.gemm
-import LinearAlgebra: ldiv!, mul!, I
+import LinearAlgebra: ldiv!, mul!, I, dot
 import LinearAlgebra
 import Pardiso
 

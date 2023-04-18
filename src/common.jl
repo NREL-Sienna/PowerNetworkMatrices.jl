@@ -230,10 +230,8 @@ function make_entries_zero!(
     sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
     tol::Float64,
 )
-    for i in eachindex(sparse_array)
-        if abs(sparse_array[i]) <= tol
-            sparse_array[i] = 0.0
-        end
+    for i in 1:size(sparse_array, 1)
+        sparse_array[i, abs.(sparse_array[i, :]) .<= tol] .= 0.0
     end
     SparseArrays.dropzeros!(sparse_array)
     return
@@ -251,10 +249,9 @@ function make_entries_zero!(
     dense_array::Matrix{Float64},
     tol::Float64,
 )
-    for i in eachindex(dense_array)
-        if abs(dense_array[i]) <= tol
-            dense_array[i] = 0.0
-        end
+    for i in 1:size(dense_array, 1)
+        @show sum(abs.(dense_array[i, :]) .<= tol)
+        dense_array[i, abs.(dense_array[i, :]) .<= tol] .= 0.0
     end
     return
 end
