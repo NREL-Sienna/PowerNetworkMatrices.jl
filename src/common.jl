@@ -250,7 +250,6 @@ function make_entries_zero!(
     tol::Float64,
 )
     for i in 1:size(dense_array, 1)
-        @show sum(abs.(dense_array[i, :]) .<= tol)
         dense_array[i, abs.(dense_array[i, :]) .<= tol] .= 0.0
     end
     return

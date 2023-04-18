@@ -37,17 +37,12 @@ end
 
 function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int}, ptdf::Matrix{Float64})
     linecount = size(ptdf, 2)   # ptdf is buses * lines
-    @show size(a)
-    @show size(ptdf)
     ptdf_denominator = transpose(ptdf) * transpose(a)
-    @show size(ptdf_denominator)
     for iline in 1:linecount
         if (1.0 - ptdf_denominator[iline, iline]) < 1.0E-06
             ptdf_denominator[iline, iline] = 0.0
         end
     end
-    @show size(Matrix{Float64}(1.0I, linecount, linecount))
-    @show size(Array(LinearAlgebra.Diagonal(ptdf_denominator)))
     (Dem, dipiv, dinfo) = getrf!(
         Matrix{Float64}(1.0I, linecount, linecount) -
         Array(LinearAlgebra.Diagonal(ptdf_denominator)),
