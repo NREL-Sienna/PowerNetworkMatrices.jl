@@ -3,10 +3,10 @@
     ptdf_complete = PTDF(sys; linear_solver = "KLU")
     ptdf_virtual = VirtualPTDF(sys)
 
-    for i in axes(ptdf_complete, 1)
+    for i in axes(ptdf_complete, 2)
         comp = ptdf_complete[i, :]
         virtual = ptdf_virtual[i, :]
-        for j in axes(ptdf_complete, 2)
+        for j in axes(ptdf_complete, 1)
             # check values using PTDFs axes
             @test isapprox(ptdf_complete[i, j], ptdf_virtual[i, j]; atol = 1e-10)
         end
@@ -18,7 +18,7 @@ end
 @testset "Virtual PTDF matrices with tolerance" begin
     sys = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys")
     ptdf_virtual = VirtualPTDF(sys)
-    ptdf_virtual_with_tol = VirtualPTDF(sys; tol = 1e-3)
+    ptdf_virtual_with_tol = VirtualPTDF(sys; tol = 1e-2)
     @test sum(abs.(ptdf_virtual["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", :])) >
           sum(abs.(ptdf_virtual_with_tol["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", :]))
 end
