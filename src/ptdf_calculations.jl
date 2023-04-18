@@ -479,6 +479,7 @@ end
 
 # PTDF stores the transposed matrix. Overload indexing and how data is exported.
 function Base.getindex(A::PTDF, line, bus)
+    i, j = to_index(A, bus, line)
     return A.data[i, j]
 end
 
