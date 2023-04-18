@@ -144,13 +144,13 @@ function _calculate_PTDF_matrix_KLU(
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         copyto!(PTDFm_t, BA)
         PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
-        PTDFm_t[collect(ref_bus_positions), :] = zeros(size(PTDFm_t, 2))
+        PTDFm_t[collect(ref_bus_positions), :] .= 0.0
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
         copyto!(PTDFm_t, BA)
         PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
-        PTDFm_t[ref_bus_positions, :] = zeros(size(PTDFm_t, 2))
+        PTDFm_t[ref_bus_positions, :] .= 0.0
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
         return PTDFm_t - (PTDFm_t * slack_array) * ones(1, buscount)
