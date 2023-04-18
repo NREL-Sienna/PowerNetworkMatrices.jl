@@ -3,7 +3,6 @@ module PowerNetworkMatrices
 export PTDF
 export get_ptdf_data
 export drop_small_entries!
-export make_sparse_PTDF
 export VirtualPTDF
 export IncidenceMatrix
 export BA_Matrix
@@ -50,7 +49,6 @@ include("ptdf_calculations.jl")
 include("ybus_calculations.jl")
 include("lodf_calculations.jl")
 include("virtual_ptdf_calculations.jl")
-include("mult_operations.jl")
 include("system_utils.jl")
 
 end
