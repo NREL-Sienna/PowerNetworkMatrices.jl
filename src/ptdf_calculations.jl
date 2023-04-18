@@ -41,13 +41,14 @@ function drop_small_entries!(mat::PTDF, tol::Float64)
     return
 end
 
-"""
-Makes the PTDF matrix sparse given a certain tolerance "tol".
-"""
-function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
-    new_mat = sparsify(mat.data, tol)
-    return PTDF(new_mat, mat.axes, mat.lookup, mat.subnetworks, Ref(tol))
-end
+# !!! COMMENTED SINCE NOT NEEDED
+# """
+# Makes the PTDF matrix sparse given a certain tolerance "tol".
+# """
+# function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
+#     new_mat = sparsify(mat.data, tol)
+#     return PTDF(new_mat, mat.axes, mat.lookup, ref_bus_positions, mat.subnetworks, Ref(tol))
+# end
 
 function _buildptdf(
     branches,
@@ -128,7 +129,6 @@ function _calculate_PTDF_matrix_KLU(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-
     linecount = size(BA, 2)
     buscount = size(BA, 1)
 
@@ -157,7 +157,6 @@ function _calculate_PTDF_matrix_KLU(
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
-    return PTDFm_aux
 end
 
 """
@@ -221,38 +220,39 @@ function _calculate_PTDF_matrix_DENSE(
     BA::Matrix{T},
     ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64}) where {T <: Union{Float32, Float64}}
-    linecount = size(BA, 1)
-    buscount = size(BA, 2)
+    linecount = size(BA, 2)
+    buscount = size(BA, 1)
     # Use dense calculation of ABA
     valid_ixs = setdiff(1:buscount, ref_bus_positions)
-    ABA = zeros(Float64, length(valid_ixs), length(valid_ixs))
-    ABA[:] = (transpose(A) * transpose(BA))[valid_ixs, valid_ixs]
+    ABA = transpose(A[:, valid_ixs]) * transpose(BA[valid_ixs, :])
     # get LU factorization matrices
+    (ABA, bipiv, binfo) = getrf!(ABA)
+    _binfo_check(binfo)
+    PTDFm_t = zeros(buscount, linecount)
+
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
-    end
-
-    (ABA, bipiv, binfo) = getrf!(ABA)
-    _binfo_check(binfo)
-    PTDFm = zeros(Float64, linecount, buscount)
-    PTDFm[:, valid_ixs] = gemm(
-        'T',
-        'N',
-        BA[valid_ixs, :],
-        getri!(ABA, bipiv),
-    )
-
-    if length(dist_slack) == buscount
+    elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
+        PTDFm_t[valid_ixs, :] = gemm(
+            'N',
+            'N',
+            getri!(ABA, bipiv),
+            BA[valid_ixs, :],
+        )
+        return PTDFm_t
+    elseif length(dist_slack) == buscount
         @info "Distributed bus"
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
-        PTDFm =
-            PTDFm - gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
+        return PTDFm_t -
+               gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
+    else
+        error("Distributed bus specification doesn't match the number of buses.")
     end
 
-    return PTDFm
+    return PTDFm_t
 end
 
 """
@@ -300,8 +300,8 @@ function _calculate_PTDF_matrix_MKLPardiso(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-    linecount = size(BA, 1)
-    buscount = size(BA, 2)
+    linecount = size(BA, 2)
+    buscount = size(BA, 1)
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     # Here add the subnetwork detection
@@ -317,25 +317,26 @@ function _calculate_PTDF_matrix_MKLPardiso(
     Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
 
     Pardiso.solve!(ps, ABA_inv, ABA, Ix)
-    PTDFm = zeros(linecount, buscount)
+    PTDFm_t = zeros(buscount, linecount)
+    row_idx = setdiff(1:size(PTDFm_t, 1), ref_bus_positions)
 
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        A_mul_B!(PTDFm, BA, ABA_inv, ref_bus_positions)
+        PTDFm_t[row_idx, :] = ABA_inv * @view BA[row_idx, :]
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        A_mul_B!(PTDFm, BA, ABA_inv, ref_bus_positions)
+        PTDFm_t[row_idx, :] = ABA_inv * @view BA[row_idx, :]
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
-        PTDFm = PTDFm - (PTDFm * slack_array) * ones(1, buscount)
+        PTDFm_t = PTDFm_t - (PTDFm_t * slack_array) * ones(1, buscount)
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
 
-    return PTDFm
+    return PTDFm_t
 end
 
 """
@@ -407,7 +408,14 @@ function PTDF(
         linear_solver,
     )
     if tol > eps()
-        return PTDF(sparsify(S, tol), axes, look_up, Ref(tol))
+        return PTDF(
+            sparsify(S, tol),
+            axes,
+            look_up,
+            subnetworks,
+            ref_bus_positions,
+            Ref(tol),
+        )
     end
     return PTDF(S, axes, look_up, subnetworks, ref_bus_positions, Ref(tol))
 end
@@ -454,25 +462,35 @@ function PTDF(
     S = _buildptdf_from_matrices(A, BA.data, dist_slack, linear_solver)
     axes = (A.axes[2], A.axes[1])
     lookup = (A.lookup[2], A.lookup[1])
-    if tol > eps()
-        return PTDF(sparsify(S, tol), axes, look_up, tol)
-    end
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
-    return PTDF(S, axes, lookup, Dict{Int, Set{Int}}(), BA.ref_bus_positions, Ref(tol))
+    if tol > eps()
+        return PTDF(
+            sparsify(S, tol),
+            axes,
+            lookup,
+            Dict{Int, Set{Int}}(),
+            BA.ref_bus_positions,
+            Ref(tol),
+        )
+    else
+        return PTDF(S, axes, lookup, Dict{Int, Set{Int}}(), BA.ref_bus_positions, Ref(tol))
+    end
 end
 
 # PTDF stores the transposed matrix. Overload indexing and how data is exported.
-
-# ! da sistemare
 function Base.getindex(A::PTDF, line, bus)
     @show i, j = to_index(A, bus, line)
     return A.data[i, j]
 end
 
-function Base.getindex(A::PTDF, line_number::Union{Int, Colon}, bus_number::Union{Int, Colon})
+function Base.getindex(
+    A::PTDF,
+    line_number::Union{Int, Colon},
+    bus_number::Union{Int, Colon},
+)
     return A.data[bus_number, line_number]
 end
 
-function get_data(ptdf::PTDF)
+function get_ptdf_data(ptdf::PTDF)
     return transpose(ptdf.data)
 end
