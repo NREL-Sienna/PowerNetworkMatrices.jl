@@ -36,8 +36,8 @@ function _buildlodf(
 end
 
 function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int}, ptdf::Matrix{Float64})
-    linecount = size(ptdf, 1)
-    ptdf_denominator = ptdf * transpose(a)
+    linecount = size(ptdf, 2)   # ptdf is buses * lines
+    ptdf_denominator = transpose(ptdf) * transpose(a)
     for iline in 1:linecount
         if (1.0 - ptdf_denominator[iline, iline]) < 1.0E-06
             ptdf_denominator[iline, iline] = 0.0
@@ -102,7 +102,6 @@ function LODF(
     A::IncidenceMatrix,
     PTDFm::PTDF,
 )
-    _buildlodf(A.data, PTDFm.data)
     ax_ref = make_ax_ref(A.axes[1])
     return LODF(_buildlodf(A.data, PTDFm.data), (A.axes[1], A.axes[1]), (ax_ref, ax_ref))
 end
