@@ -494,3 +494,11 @@ end
 function get_ptdf_data(ptdf::PTDF)
     return transpose(ptdf.data)
 end
+
+function get_branch_ax(ptdf::PTDF)
+    return ptdf.axes[2]
+end
+
+function get_bus_ax(ptdf::PTDF)
+    return ptdf.axes[1]
+end
