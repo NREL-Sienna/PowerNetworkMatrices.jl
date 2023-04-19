@@ -137,7 +137,7 @@ function calculate_adjacency(
 end
 
 """
-Evaluates the BA matrix given the System's banches, reference bus positions and bus_lookup.
+Evaluates the transposed BA matrix given the System's banches, reference bus positions and bus_lookup.
 
 # Arguments
 - `branches`:
@@ -159,12 +159,12 @@ function calculate_BA_matrix(
         (fr_b, to_b) = get_bus_indices(b, bus_lookup)
         b_val = PSY.get_series_susceptance(b)
 
-        push!(BA_I, ix)
-        push!(BA_J, fr_b)
+        push!(BA_I, fr_b)
+        push!(BA_J, ix)
         push!(BA_V, b_val)
 
-        push!(BA_I, ix)
-        push!(BA_J, to_b)
+        push!(BA_I, to_b)
+        push!(BA_J, ix)
         push!(BA_V, -b_val)
     end
 
@@ -191,7 +191,7 @@ function calculate_ABA_matrix(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int})
-    tmp = transpose(A) * BA
+    tmp = BA * A
     valid_ix = setdiff(1:size(tmp, 1), ref_bus_positions)
     return tmp[valid_ix, valid_ix]
 end
@@ -230,10 +230,8 @@ function make_entries_zero!(
     sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
     tol::Float64,
 )
-    for i in eachindex(sparse_array)
-        if abs(sparse_array[i]) <= tol
-            sparse_array[i] = 0.0
-        end
+    for i in 1:size(sparse_array, 1)
+        sparse_array[i, abs.(sparse_array[i, :]) .<= tol] .= 0.0
     end
     SparseArrays.dropzeros!(sparse_array)
     return
@@ -251,10 +249,8 @@ function make_entries_zero!(
     dense_array::Matrix{Float64},
     tol::Float64,
 )
-    for i in eachindex(dense_array)
-        if abs(dense_array[i]) <= tol
-            dense_array[i] = 0.0
-        end
+    for i in 1:size(dense_array, 1)
+        dense_array[i, abs.(dense_array[i, :]) .<= tol] .= 0.0
     end
     return
 end
