@@ -380,3 +380,11 @@ the PTDF's matrices rows and how many times they were evaluated
 # ! change it so to get only the non-empty values
 
 get_data(mat::VirtualPTDF) = mat.cache
+
+function get_branch_ax(ptdf::VirtualPTDF)
+    return ptdf.axes[1]
+end
+
+function get_bus_ax(ptdf::VirtualPTDF)
+    return ptdf.axes[2]
+end
