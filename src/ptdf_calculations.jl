@@ -30,6 +30,14 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
 end
 
 """
+Deserialize a PTDF from an HDF5 file.
+
+# Arguments
+- `filename::AbstractString`: File containing a serialized PTDF.
+"""
+PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
+
+"""
 Elements whose values are below "tol" are set to zero (dropped in case of Sparse matrix).
 """
 function drop_small_entries!(mat::PTDF, tol::Float64)
