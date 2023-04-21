@@ -14,7 +14,7 @@ using Logging
 configure_logging(; console_level = Logging.Error)
 
 @error "Reading system data"
-sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys")
+sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg2000_sys")
 
 @error "Testing PTDF"
 
