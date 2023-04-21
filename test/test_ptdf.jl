@@ -112,12 +112,14 @@ end
     P5 = PTDF(branches_5, nodes_5; linear_solver = "KLU")
     P5_sparse = PTDF(branches_5, nodes_5; linear_solver = "KLU", tol = 1e-3)
     for ptdf in (P5, P5_sparse)
-        path = mktempdir()
-        filename = joinpath(path, "ptdf.h5")
-        @test !isfile(filename)
-        to_hdf5(ptdf, filename)
-        @test isfile(filename)
-        ptdf2 = PTDF(filename)
-        @test ptdf == ptdf2
+        for compress in (true, false)
+            path = mktempdir()
+            filename = joinpath(path, "ptdf.h5")
+            @test !isfile(filename)
+            to_hdf5(ptdf, filename; compress = compress)
+            @test isfile(filename)
+            ptdf2 = PTDF(filename)
+            @test ptdf == ptdf2
+        end
     end
 end
