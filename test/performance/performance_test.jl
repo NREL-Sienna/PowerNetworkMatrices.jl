@@ -10,7 +10,10 @@ using Logging
 
 configure_logging(; console_level = Logging.Error)
 
+@info "Reading system data"
 sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys")
+
+@info "Testing PTDF"
 
 try
     _, time_build_ptdf1, _, _ = @timed PTDF(sys)
@@ -28,6 +31,7 @@ catch e
     end
 end
 
+@info "Testing Ybus"
 try
     _, time_build_ybus1, _, _ = @timed Ybus(sys)
     open("execute_time.txt", "a") do io
@@ -44,6 +48,7 @@ catch e
     end
 end
 
+@info "Testing LODF"
 try
     _, time_build_LODF1, _, _ = @timed LODF(sys)
     open("execute_time.txt", "a") do io
