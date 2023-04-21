@@ -12,7 +12,8 @@ export is_factorized
 export Ybus
 export LODF
 export AdjacencyMatrix
-
+export to_hdf5
+export from_hdf5
 export find_subnetworks
 export validate_connectivity
 
@@ -26,6 +27,7 @@ const PSY = PowerSystems
 
 import SparseArrays
 import SparseArrays: rowvals, nzrange
+import HDF5
 import KLU: klu
 import KLU
 import LinearAlgebra: LAPACK.getri!, LAPACK.getrf!, BLAS.gemm
@@ -50,5 +52,6 @@ include("ybus_calculations.jl")
 include("lodf_calculations.jl")
 include("virtual_ptdf_calculations.jl")
 include("system_utils.jl")
+include("serialization.jl")
 
 end

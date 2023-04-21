@@ -104,3 +104,22 @@ end
     ]
     @test isapprox(ptdf_first_area, ptdf_second_area, atol = 1e-6)
 end
+
+@testset "Test serialization of PTDF matrices to HDF5" begin
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    nodes_5 = nodes5()
+    branches_5 = branches5(nodes_5)
+    P5 = PTDF(branches_5, nodes_5; linear_solver = "KLU")
+    P5_sparse = PTDF(branches_5, nodes_5; linear_solver = "KLU", tol = 1e-3)
+    for ptdf in (P5, P5_sparse)
+        for compress in (true, false)
+            path = mktempdir()
+            filename = joinpath(path, "ptdf.h5")
+            @test !isfile(filename)
+            to_hdf5(ptdf, filename; compress = compress)
+            @test isfile(filename)
+            ptdf2 = PTDF(filename)
+            @test ptdf == ptdf2
+        end
+    end
+end
