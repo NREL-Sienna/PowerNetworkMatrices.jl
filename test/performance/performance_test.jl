@@ -2,7 +2,9 @@
 precompile = @timed using PowerNetworkMatrices
 
 open("precompile_time.txt", "a") do io
+    @error "write file"
     write(io, "| $(ARGS[1]) | $(precompile.time) |\n")
+    @error "wrote file"
 end
 
 using PowerSystems
@@ -11,10 +13,10 @@ using Logging
 
 configure_logging(; console_level = Logging.Error)
 
-@info "Reading system data"
+@error "Reading system data"
 sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys")
 
-@info "Testing PTDF"
+@error "Testing PTDF"
 
 try
     _, time_build_ptdf1, _, _ = @timed PTDF(sys)
