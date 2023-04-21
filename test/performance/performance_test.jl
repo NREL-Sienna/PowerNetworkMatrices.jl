@@ -1,9 +1,7 @@
 precompile = @timed using PowerNetworkMatrices
 
 open("precompile_time.txt", "a") do io
-    @error "write file"
     write(io, "| $(ARGS[1]) | $(precompile.time) |\n")
-    @error "wrote file"
 end
 
 using PowerSystems
