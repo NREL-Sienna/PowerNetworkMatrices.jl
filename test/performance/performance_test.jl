@@ -10,7 +10,7 @@ using Logging
 
 configure_logging(; console_level = Logging.Error)
 
-sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys")
+sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg2000_sys")
 
 try
     _, time_build_ptdf1, _, _ = @timed PTDF(sys)
