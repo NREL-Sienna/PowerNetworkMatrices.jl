@@ -1,3 +1,4 @@
+@error "enter Julia"
 precompile = @timed using PowerNetworkMatrices
 
 open("precompile_time.txt", "a") do io
