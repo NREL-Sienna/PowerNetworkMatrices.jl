@@ -1,4 +1,3 @@
-@error "enter Julia"
 precompile = @timed using PowerNetworkMatrices
 
 open("precompile_time.txt", "a") do io
@@ -13,10 +12,7 @@ using Logging
 
 configure_logging(; console_level = Logging.Error)
 
-@error "Reading system data"
 sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg2000_sys")
-
-@error "Testing PTDF"
 
 try
     _, time_build_ptdf1, _, _ = @timed PTDF(sys)
@@ -34,7 +30,6 @@ catch e
     end
 end
 
-@info "Testing Ybus"
 try
     _, time_build_ybus1, _, _ = @timed Ybus(sys)
     open("execute_time.txt", "a") do io
@@ -51,7 +46,6 @@ catch e
     end
 end
 
-@info "Testing LODF"
 try
     _, time_build_LODF1, _, _ = @timed LODF(sys)
     open("execute_time.txt", "a") do io
