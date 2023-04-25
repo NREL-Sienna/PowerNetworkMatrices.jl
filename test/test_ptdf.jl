@@ -123,3 +123,70 @@ end
         end
     end
 end
+
+# @test "Test system with isolated buses" begin
+    
+# get simple systems
+sys_1 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+sys_2 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+
+buses_2 = PNM.get_buses(sys_2)
+
+# case 1: islanded buses are added at the end (zero columns )
+PSY.add_component!(
+    sys_1,
+    PSY.Bus(;
+        number = 6,
+        name = "isolated_node_1",
+        bustype = PSY.BusTypes.ISOLATED,
+        angle = 0.0,
+        magnitude = 1.1,
+        voltage_limits = (min = 0.9, max = 1.1),
+        base_voltage = 230.0,
+    ),
+)
+PSY.add_component!(
+    sys_1,
+    PSY.Bus(;
+        number = 7,
+        name = "isolated_node_2",
+        bustype = PSY.BusTypes.ISOLATED,
+        angle = 0.0,
+        magnitude = 1.1,
+        voltage_limits = (min = 0.9, max = 1.1),
+        base_voltage = 230.0,
+    ),
+)
+
+# case 2: islanded buses are not added at the end (zero columns in the middle of the matrices)
+
+set_name!(sys_2, buses_2[2], "isolated_node_1")
+set_name!(sys_2, buses_2[3], "isolated_node_2")
+
+PSY.add_component!(
+    sys_2,
+    PSY.Bus(;
+        number = 6,
+        name = "nodeB",
+        bustype = PSY.BusTypes.ISOLATED,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.9, max = 1.1),
+        base_voltage = 230.0,
+    ),
+)
+
+PSY.add_component!(
+    sys_2,
+    PSY.Bus(;
+        number = 7,
+        name = "nodeC",
+        bustype = PSY.BusTypes.ISOLATED,
+        angle = 0.0,
+        magnitude = 1.1,
+        voltage_limits = (min = 0.9, max = 1.1),
+        base_voltage = 230.0,
+    ),
+)
+    
+# end
