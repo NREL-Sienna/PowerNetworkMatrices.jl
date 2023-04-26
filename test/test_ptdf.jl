@@ -131,6 +131,11 @@ sys_1 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 sys_2 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
 buses_2 = PNM.get_buses(sys_2)
+branches_2 = PNM.get_ac_branches(sys_2)
+
+"""
+reference bus: 4 (nodeD)
+"""
 
 # case 1: islanded buses are added at the end (zero columns )
 PSY.add_component!(
@@ -160,17 +165,19 @@ PSY.add_component!(
 
 # case 2: islanded buses are not added at the end (zero columns in the middle of the matrices)
 
-set_name!(sys_2, buses_2[2], "isolated_node_1")
-set_name!(sys_2, buses_2[3], "isolated_node_2")
+"""
+adding 2 isolated buses in position 6 and 7
+adding 1 connected bus in position 8
+"""
 
 PSY.add_component!(
     sys_2,
     PSY.Bus(;
         number = 6,
-        name = "nodeB",
+        name = "isolated_node_1",
         bustype = PSY.BusTypes.ISOLATED,
         angle = 0.0,
-        magnitude = 1.0,
+        magnitude = 1.1,
         voltage_limits = (min = 0.9, max = 1.1),
         base_voltage = 230.0,
     ),
@@ -180,7 +187,7 @@ PSY.add_component!(
     sys_2,
     PSY.Bus(;
         number = 7,
-        name = "nodeC",
+        name = "isolated_node_2",
         bustype = PSY.BusTypes.ISOLATED,
         angle = 0.0,
         magnitude = 1.1,
@@ -188,5 +195,59 @@ PSY.add_component!(
         base_voltage = 230.0,
     ),
 )
-    
+
+PSY.add_component!(
+    sys_2,
+    PSY.Bus(;
+        number = 8,
+        name = "nodeF",
+        bustype = buses_2[2].bustype,
+        angle = buses_2[2].angle,
+        magnitude = buses_2[2].magnitude,
+        voltage_limits = buses_2[2].voltage_limits,
+        base_voltage = buses_2[2].base_voltage,
+    ),
+)
+
+add_component!(
+    sys_2,
+    PSY.Line(;
+        name = "7",
+        available = branches_2[2].available,
+        active_power_flow = branches_2[2].active_power_flow,
+        reactive_power_flow = branches_2[2].reactive_power_flow,
+        arc = PSY.Arc(;
+            from = PSY.get_component(PSY.Bus, sys_2, "nodeA"),
+            to = PSY.get_component(PSY.Bus, sys_2, "nodeF"),
+        ),
+        r = branches_2[2].r,
+        x = branches_2[2].x,
+        b = branches_2[2].b,
+        rate = branches_2[2].rate,
+        angle_limits = branches_2[2].angle_limits,
+    )
+)
+
+# CASE 1
+ptdf_1 = PTDF(sys_1)
+
+# ! (FAIL) CASE 2
+ptdf_2 = PTDF(sys_2)
+
+# (ok!) check isolated nodes and subnetworks
+branches = PNM.get_ac_branches(sys_2)
+nodes = PNM.get_buses(sys_2)
+line_ax = [PSY.get_name(branch) for branch in branches]
+bus_ax = [PSY.get_number(bus) for bus in nodes]
+axes = (bus_ax, line_ax)
+M, bus_ax_ref = PNM.calculate_adjacency(branches, nodes)
+ref_bus_positions = PNM.find_slack_positions(nodes)
+subnetworks = PNM.find_subnetworks(M, bus_ax)
+
+# check the cration of the A and BA matrices
+A = IncidenceMatrix(sys_2)
+BA = BA_Matrix(sys_2)
+
+
+
 # end
