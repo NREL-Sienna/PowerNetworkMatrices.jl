@@ -70,7 +70,6 @@ function _buildptdf(
             branches,
             nodes,
             bus_lookup,
-            ref_bus_positions,
             dist_slack,
         )
     elseif linear_solver == "Dense"
@@ -78,7 +77,6 @@ function _buildptdf(
             branches,
             nodes,
             bus_lookup,
-            ref_bus_positions,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
@@ -86,7 +84,6 @@ function _buildptdf(
             branches,
             nodes,
             bus_lookup,
-            ref_bus_positions,
             dist_slack,
         )
     end
@@ -184,9 +181,8 @@ function calculate_PTDF_matrix_KLU(
     branches,
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes, ref_bus_positions)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
     BA = calculate_BA_matrix(branches, bus_lookup)
     PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -280,9 +276,8 @@ function calculate_PTDF_matrix_DENSE(
     branches,
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes, ref_bus_positions)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
     BA = Matrix(calculate_BA_matrix(branches, bus_lookup))
     PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A), BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -364,9 +359,8 @@ function calculate_PTDF_matrix_MKLPardiso(
     branches,
     nodes::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes, ref_bus_positions)
+    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
     BA = calculate_BA_matrix(branches, bus_lookup)
     PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A

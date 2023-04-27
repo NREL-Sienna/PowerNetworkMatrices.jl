@@ -11,6 +11,9 @@ const IS = InfrastructureSystems
 const PSY = PowerSystems
 const PSB = PowerSystemCaseBuilder
 
+# ! temp
+const PNM = PowerNetworkMatrices
+
 const BASE_DIR = dirname(dirname(Base.find_package("PowerSystems")))
 const DATA_DIR = PSB.DATA_DIR
 
