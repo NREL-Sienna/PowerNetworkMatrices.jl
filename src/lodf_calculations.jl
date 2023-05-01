@@ -21,15 +21,64 @@ end
 function _buildlodf(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
-    linear_solver = "KLU",
+    linear_solver::String = "KLU",
 )
     if linear_solver == "KLU"
         lodf_t = _calculate_LODF_matrix_KLU(a, ptdf)
     elseif linear_solver == "Dense"
         lodf_t = _calculate_LODF_matrix_DENSE(a, ptdf)
+    else
+        error("MKLPardiso still to be implemented")
     end
 
     return lodf_t
+end
+
+function _buildlodf(
+    a::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    k::KLU.KLUFactorization{Float64, Int64},
+    ba::SparseArrays.SparseMatrixCSC{Float64, Int64},
+    ref_bus_positions::Vector{Int},
+    linear_solver::String,
+)
+    if linear_solver == "KLU"
+        lodf_t = _calculate_LODF_matrix_KLU(a, k, ba, ref_bus_positions)
+    else
+        error("Other methods still to be implemented.")
+    end
+    return lodf_t
+end
+
+function _calculate_LODF_matrix_KLU(
+    a::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    k::KLU.KLUFactorization{Float64, Int64},
+    ba::SparseArrays.SparseMatrixCSC{Float64, Int64},
+    ref_bus_positions::Set{Int64},
+)
+    linecount = size(ba, 2)
+    # get inverse of aba
+    first = zeros(size(a, 2), size(a, 1))
+    valid_ix = setdiff(1:size(a, 2), ref_bus_positions)
+    copyto!(first, transpose(a))
+    first[valid_ix, :] = KLU.solve!(k, first[valid_ix, :])
+    first[collect(ref_bus_positions), :] .= 0.0
+    ptdf_denominator = first' * ba
+
+    m_I = Int[]
+    m_V = Float64[]
+    for iline in 1:linecount
+        if (1.0 - ptdf_denominator[iline, iline]) < 1.0E-06
+            push!(m_I, iline)
+            push!(m_V, 1.0)
+        else
+            push!(m_I, iline)
+            push!(m_V, 1 - ptdf_denominator[iline, iline])
+        end
+    end
+    Dem_LU = klu(SparseArrays.sparse(m_I, m_I, m_V))
+    lodf = Dem_LU \ ptdf_denominator
+    lodf[SparseArrays.diagind(lodf)] .= -1
+    return lodf
 end
 
 function _calculate_LODF_matrix_KLU(
@@ -56,6 +105,30 @@ function _calculate_LODF_matrix_KLU(
     lodf_t = Dem_LU \ ptdf_denominator_t
     lodf_t[SparseArrays.diagind(lodf_t)] .= -1
 
+    return lodf_t
+end
+
+# ! temp for evaluation
+function _calculate_LODF_matrix_KLU2(
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    ptdf::Matrix{Float64},
+)
+    ptdf_denominator_t = a * ptdf
+    linecount = size(ptdf, 2)
+    lodf_t = zeros(linecount, linecount)
+    for i in 1:linecount
+        for j in 1:linecount
+            if i == j
+                lodf_t[i, i] = -1.0
+            else
+                if (1.0 - ptdf_denominator_t[i, i]) < 1.0E-06
+                    lodf_t[i, j] = ptdf_denominator_t[i, j]
+                else
+                    lodf_t[i, j] = ptdf_denominator_t[i, j] / (1 - ptdf_denominator_t[i, i])
+                end
+            end
+        end
+    end
     return lodf_t
 end
 
@@ -130,6 +203,7 @@ function LODF(
     linear_solver::String = "KLU",
     dist_slack::Vector{Float64} = Float64[],
 )
+    validate_linear_solver(linear_solver)
     branches = get_ac_branches(sys)
     nodes = get_buses(sys)
     return LODF(branches, nodes, linear_solver, dist_slack)
@@ -140,9 +214,25 @@ function LODF(
     PTDFm::PTDF,
     linear_solver::String = "KLU",
 )
+    validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
     return LODF(
         _buildlodf(A.data, PTDFm.data, linear_solver),
+        (A.axes[1], A.axes[1]),
+        (ax_ref, ax_ref),
+    )
+end
+
+function LODF(
+    A::IncidenceMatrix,
+    ABA::ABA_Matrix,
+    BA::BA_Matrix,
+    linear_solver::String = "KLU",
+)
+    validate_linear_solver(linear_solver)
+    ax_ref = make_ax_ref(A.axes[1])
+    return LODF(
+        _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
     )
