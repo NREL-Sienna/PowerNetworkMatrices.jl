@@ -5,11 +5,11 @@
 
     # get system
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    nodes_5 = nodes5()
-    branches_5 = branches5(nodes_5)
+    buses_5 = nodes5()
+    branches_5 = branches5(buses_5)
 
     # get LODF
-    L5 = LODF(branches_5, nodes_5)
+    L5 = LODF(branches_5, buses_5)
     @test isapprox(maximum(L5.data), maximum(Lodf_5), atol = 1e-3)
     @test isapprox(L5[branches_5[2], branches_5[1]], 0.3447946513849093)
 
@@ -19,9 +19,9 @@
     lodf_t_3 = PNM._calculate_LODF_matrix_KLU2(a.data, ptdf.data)
     @test isapprox(lodf_t_3, L5.data, atol = 1e-5)
 
-    nodes_14 = nodes14()
-    branches_14 = branches14(nodes_14)
-    L14 = LODF(branches_14, nodes_14)
+    buses_14 = nodes14()
+    branches_14 = branches14(buses_14)
+    L14 = LODF(branches_14, buses_14)
     @test isapprox(maximum(L14.data), maximum(Lodf_14), atol = 1e-3)
 
     L5NS = LODF(sys5)

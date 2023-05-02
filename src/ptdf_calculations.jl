@@ -180,7 +180,7 @@ function calculate_PTDF_matrix_KLU(
     buses::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses)
     BA = calculate_BA_matrix(branches, bus_lookup)
     PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -275,7 +275,7 @@ function calculate_PTDF_matrix_DENSE(
     buses::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses)
     BA = Matrix(calculate_BA_matrix(branches, bus_lookup))
     PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A), BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -358,7 +358,7 @@ function calculate_PTDF_matrix_MKLPardiso(
     buses::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, nodes)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses)
     BA = calculate_BA_matrix(branches, bus_lookup)
     PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A

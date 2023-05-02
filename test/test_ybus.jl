@@ -1,11 +1,11 @@
 @testset "Ybus Matrix" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    nodes_5 = nodes5()
-    branches_5 = branches5(nodes_5)
-    nodes_14 = nodes14()
-    branches_14 = branches14(nodes_14)
+    buses_5 = nodes5()
+    branches_5 = branches5(buses_5)
+    buses_14 = nodes14()
+    branches_14 = branches14(buses_14)
 
-    Ybus5 = Ybus(branches_5, nodes_5)
+    Ybus5 = Ybus(branches_5, buses_5)
 
     I, J, V = findnz(Ybus5.data)
     indices = collect(zip(I, J))
@@ -14,7 +14,7 @@
         @test isapprox(Ybus5[i[1], i[2]], Ybus5_matpower[i[1], i[2]], atol = 1e-2)
     end
 
-    Ybus14 = Ybus(branches_14, nodes_14)
+    Ybus14 = Ybus(branches_14, buses_14)
     I, J, V = findnz(Ybus14.data)
     indices = collect(zip(I, J))
 
@@ -27,19 +27,19 @@
     Y5NS = Ybus(sys)
     @test isapprox(Y5NS[10, 4], -3.3336667 + 33.336667im, atol = 1e-4)
 
-    Y5NS = Ybus([branches_5[b] for b in Br5NS_ids], [nodes_5[b] for b in Bu5NS_ids])
+    Y5NS = Ybus([branches_5[b] for b in Br5NS_ids], [buses_5[b] for b in Bu5NS_ids])
     for buf in Bu5NS_ids, but in Bu5NS_ids
         @test isapprox(Y5NS[buf, but], Ybus5_matpower[buf, but], atol = 1e-3)
     end
 
-    @test Ybus5[nodes_5[1], nodes_5[2]] == (-3.5234840209999647 + 35.234840209999646im)
+    @test Ybus5[buses_5[1], buses_5[2]] == (-3.5234840209999647 + 35.234840209999646im)
 
     c_sys5_re() = System(
         100.0,
-        nodes_5,
-        thermal_generators5(nodes_5),
-        loads5(nodes_5),
-        branches5(nodes_5),
+        buses_5,
+        thermal_generators5(buses_5),
+        loads5(buses_5),
+        branches5(buses_5),
     )
 
     t_sys5_re = c_sys5_re()

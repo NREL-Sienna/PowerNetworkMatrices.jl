@@ -20,8 +20,8 @@ end
 @testset "Virtual LODF functions" begin
     # get system
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    nodes_5 = nodes5()
-    branches_5 = branches5(nodes_5)
+    buses_5 = nodes5()
+    branches_5 = branches5(buses_5)
     vlodf = VirtualLODF(sys5)
     # properties
     @test size(vlodf) == (length(branches_5), length(branches_5))
