@@ -190,7 +190,7 @@ Builds the LODF matrix from a system. The return is a LOLDF array indexed with t
         The distributed slack vector has to be the same length as the number of buses.
 """
 function LODF(
-    sys::PSY.System,
+    sys::PSY.System;
     linear_solver::String = "KLU",
     dist_slack::Vector{Float64} = Float64[],
 )
