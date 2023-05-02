@@ -10,20 +10,24 @@ function get_ac_branches(sys::PSY.System)
 end
 
 """
-Gets the buses from a given System
+Gets the non-isolated buses from a given System
 """
 function get_buses(sys::PSY.System)::Vector{PSY.Bus}
-    return sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
+    return sort!(
+        collect(
+            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
+        );
+        by = x -> PSY.get_number(x),
+    )
 end
-
 """
 Gets the indices  of the reference (slack) buses.
 NOTE:
 - the indices  corresponds to the columns of zeros belonging to the PTDF matrix.
 - BA and ABA matrix miss the columns related to the reference buses.
 """
-function find_slack_positions(nodes)
-    return find_slack_positions(nodes, make_ax_ref(nodes))
+function find_slack_positions(buses)
+    return find_slack_positions(buses, make_ax_ref(buses))
 end
 
 function find_slack_positions(buses, bus_lookup::Dict{Int, Int})::Set{Int}
@@ -32,7 +36,7 @@ function find_slack_positions(buses, bus_lookup::Dict{Int, Int})::Set{Int}
         for n in buses if PSY.get_bustype(n) == BusTypes.REF
     ])
     if length(slack_position) == 0
-        error("Slack bus not identified in the Bus/Nodes list, can't build NetworkMatrix")
+        error("Slack bus not identified in the Bus/buses list, can't build NetworkMatrix")
     end
     return Set{Int}(slack_position)
 end
