@@ -39,16 +39,11 @@ Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix
         Checks connectivity of the network using Depth First Search (DFS) algorithm
 """
 function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
-    nodes = sort!(
-        collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
-        );
-        by = x -> PSY.get_number(x),
-    )
+    buses = get_buses(sys)
     branches = get_ac_branches(sys)
     return AdjacencyMatrix(
         branches,
-        nodes;
+        buses;
         check_connectivity = check_connectivity,
         kwargs...,
     )
@@ -63,12 +58,12 @@ Builds a AdjacencyMatrix from a collection of buses and branches. The return is 
 """
 function AdjacencyMatrix(
     branches,
-    nodes::Vector{PSY.Bus};
+    buses::Vector{PSY.Bus};
     check_connectivity::Bool = true,
     kwargs...,
 )
-    M, bus_lookup = calculate_adjacency(branches, nodes)
-    bus_ax = PSY.get_number.(nodes)
+    M, bus_lookup = calculate_adjacency(branches, buses)
+    bus_ax = PSY.get_number.(buses)
     axes = (bus_ax, bus_ax)
     look_up = (bus_lookup, bus_lookup)
 
@@ -77,7 +72,7 @@ function AdjacencyMatrix(
         length(sub_nets) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
 
-    return AdjacencyMatrix(M, axes, look_up, find_slack_positions(nodes))
+    return AdjacencyMatrix(M, axes, look_up, find_slack_positions(buses))
 end
 
 """
@@ -89,8 +84,8 @@ function validate_connectivity(M::AdjacencyMatrix)
 end
 
 """
-Evaluates subnetworks by looking for the subsets of nodes connected each other,
-but not connected with nodes of other subsets.
+Evaluates subnetworks by looking for the subsets of buses connected each other,
+but not connected with buses of other subsets.
 """
 function find_subnetworks(M::AdjacencyMatrix)
     bus_numbers = M.axes[2]

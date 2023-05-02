@@ -20,14 +20,14 @@ end
 
 function _buildlodf(
     branches,
-    nodes::Vector{PSY.Bus},
+    buses::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Array{Float64},
 )
-    ref_bus_positions = find_slack_positions(nodes)
+    ref_bus_positions = find_slack_positions(buses)
     ptdf, a = calculate_PTDF_matrix_KLU(
         branches,
-        nodes,
+        buses,
         bus_lookup,
         ref_bus_positions,
         dist_slack,
@@ -55,26 +55,26 @@ function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int}, ptdf::Matrix{Flo
 end
 
 """
-Builds the LODF matrix from a group of branches and nodes. The return is a LOLDF array indexed with the branch name.
+Builds the LODF matrix from a group of branches and buses. The return is a LOLDF array indexed with the branch name.
 
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `nodes::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.Bus}`:
         vector of the System buses
 - `dist_slack::Vector{Float64}`:
         Vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses.
 
 """
-function LODF(branches, nodes::Vector{PSY.Bus}, dist_slack::Vector{Float64} = Float64[])
+function LODF(branches, buses::Vector{PSY.Bus}, dist_slack::Vector{Float64} = Float64[])
 
     #Get axis names
     line_ax = [branch.name for branch in branches]
     axes = (line_ax, line_ax)
     look_up = (make_ax_ref(line_ax), make_ax_ref(line_ax))
-    bus_ax = [PSY.get_number(bus) for bus in nodes]
-    lodf = _buildlodf(branches, nodes, make_ax_ref(bus_ax), dist_slack)
+    bus_ax = [PSY.get_number(bus) for bus in buses]
+    lodf = _buildlodf(branches, buses, make_ax_ref(bus_ax), dist_slack)
     return LODF(lodf, axes, look_up)
 end
 
@@ -89,13 +89,9 @@ Builds the LODF matrix from a system. The return is a LOLDF array indexed with t
         The distributed slack vector has to be the same length as the number of buses.
 """
 function LODF(sys::PSY.System, dist_slack::Vector{Float64} = Float64[])
-    branches = sort!(
-        collect(PSY.get_components(PSY.ACBranch, sys));
-        by = x ->
-            (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
-    )
-    nodes = sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
-    return LODF(branches, nodes, dist_slack)
+    branches = get_ac_branches(sys)
+    buses = get_buses(sys)
+    return LODF(branches, buses, dist_slack)
 end
 
 function LODF(

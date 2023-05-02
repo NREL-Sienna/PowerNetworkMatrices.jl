@@ -7,17 +7,12 @@ function validate_connectivity(sys::PSY.System)
 end
 
 function _find_subnetworks(sys::PSY.System)
-    nodes = sort!(
-        collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
-        );
-        by = x -> PSY.get_number(x),
-    )
+    buses = get_buses(sys)
     branches = get_ac_branches(sys)
     @info "Validating connectivity with depth first search (network traversal)"
-    M, bus_lookup = calculate_adjacency(branches, nodes)
-    slack_positions = find_slack_positions(nodes, bus_lookup)
-    return find_subnetworks(M, PSY.get_number.(nodes)), slack_positions
+    M, bus_lookup = calculate_adjacency(branches, buses)
+    slack_positions = find_slack_positions(buses, bus_lookup)
+    return find_subnetworks(M, PSY.get_number.(buses)), slack_positions
 end
 
 """
