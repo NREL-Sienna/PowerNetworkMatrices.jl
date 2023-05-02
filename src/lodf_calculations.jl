@@ -168,14 +168,23 @@ Builds the LODF matrix from a group of branches and buses. The return is a LOLDF
         The distributed slack vector has to be the same length as the number of buses.
 
 """
-function LODF(branches, buses::Vector{PSY.Bus}, dist_slack::Vector{Float64} = Float64[])
+function LODF(
+    branches,
+    nodes::Vector{PSY.Bus},
+    linera_solver::String = "KLU",
+    dist_slack::Vector{Float64} = Float64[],
+)
 
     # get axis names
     line_ax = [branch.name for branch in branches]
     axes = (line_ax, line_ax)
     look_up = (make_ax_ref(line_ax), make_ax_ref(line_ax))
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    lodf = _buildlodf(branches, buses, make_ax_ref(bus_ax), dist_slack)
+    bus_ax = [PSY.get_number(bus) for bus in nodes]
+    bus_lookup = make_ax_ref(bus_ax)
+    # get network matrices
+    ptdf, a = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
+
+    lodf = _buildlodf(a, ptdf, linera_solver)
     return LODF(lodf, axes, look_up)
 end
 
