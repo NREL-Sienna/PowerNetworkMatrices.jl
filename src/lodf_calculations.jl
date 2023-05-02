@@ -170,7 +170,7 @@ Builds the LODF matrix from a group of branches and buses. The return is a LOLDF
 """
 function LODF(
     branches,
-    nodes::Vector{PSY.Bus},
+    buses::Vector{PSY.Bus},
     linera_solver::String = "KLU",
     dist_slack::Vector{Float64} = Float64[],
 )
@@ -179,10 +179,10 @@ function LODF(
     line_ax = [branch.name for branch in branches]
     axes = (line_ax, line_ax)
     look_up = (make_ax_ref(line_ax), make_ax_ref(line_ax))
-    bus_ax = [PSY.get_number(bus) for bus in nodes]
+    bus_ax = [PSY.get_number(bus) for bus in buses]
     bus_lookup = make_ax_ref(bus_ax)
     # get network matrices
-    ptdf, a = calculate_PTDF_matrix_KLU(branches, nodes, bus_lookup, dist_slack)
+    ptdf, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, dist_slack)
 
     lodf = _buildlodf(a, ptdf, linera_solver)
     return LODF(lodf, axes, look_up)
@@ -205,8 +205,8 @@ function LODF(
 )
     validate_linear_solver(linear_solver)
     branches = get_ac_branches(sys)
-    nodes = get_buses(sys)
-    return LODF(branches, nodes, linear_solver, dist_slack)
+    buses = get_buses(sys)
+    return LODF(branches, buses, linear_solver, dist_slack)
 end
 
 function LODF(
