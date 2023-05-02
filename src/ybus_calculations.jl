@@ -142,13 +142,13 @@ end
 
 function _buildybus(
     branches,
-    nodes::Vector{PSY.Bus},
+    buses::Vector{PSY.Bus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
 )
-    buscount = length(nodes)
+    buscount = length(buses)
     num_bus = Dict{Int, Int}()
 
-    for (ix, b) in enumerate(nodes)
+    for (ix, b) in enumerate(buses)
         num_bus[PSY.get_number(b)] = ix
     end
     ybus = SparseArrays.spzeros(ComplexF64, buscount, buscount)
@@ -172,17 +172,16 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 """
 function Ybus(
     branches::Vector,
-    nodes::Vector{PSY.Bus},
+    buses::Vector{PSY.Bus},
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}();
     check_connectivity::Bool = true,
 )
-    nodes = sort!(collect(nodes); by = x -> PSY.get_number(x))
-    bus_ax = PSY.get_number.(nodes)
+    bus_ax = PSY.get_number.(buses)
     axes = (bus_ax, bus_ax)
     bus_lookup = make_ax_ref(bus_ax)
     look_up = (bus_lookup, bus_lookup)
-    ybus = _buildybus(branches, nodes, fixed_admittances)
-    if check_connectivity && length(nodes) > 1
+    ybus = _buildybus(branches, buses, fixed_admittances)
+    if check_connectivity && length(buses) > 1
         islands = find_subnetworks(ybus, bus_ax)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
@@ -197,11 +196,11 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 """
 function Ybus(sys::PSY.System; kwargs...)
     branches = get_ac_branches(sys)
-    nodes = collect(PSY.get_components(PSY.Bus, sys))
+    buses =  get_buses(sys)
     fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
     return Ybus(
         branches,
-        nodes,
+        buses,
         fixed_admittances;
         kwargs...,
     )
