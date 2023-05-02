@@ -126,11 +126,6 @@ function VirtualPTDF(
     return VirtualPTDF(branches, buses; kwargs...)
 end
 
-""" Gets the tolerance used for sparsifying the rows of the PTDF matrix"""
-function get_tol(vptdf::VirtualPTDF)
-    return vptdf.tol[]
-end
-
 # Overload Base functions
 
 """
@@ -174,6 +169,8 @@ function _getindex(
         # Needs improvement
         valid_ix = setdiff(1:length(vptdf.temp_data), vptdf.ref_bus_positions)
         lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[valid_ix, row]))
+
+        # ! missing dist_slack case
 
         for i in eachindex(valid_ix)
             vptdf.temp_data[valid_ix[i]] = lin_solve[i]

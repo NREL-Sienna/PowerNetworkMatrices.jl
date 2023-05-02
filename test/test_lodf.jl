@@ -13,6 +13,12 @@
     @test isapprox(maximum(L5.data), maximum(Lodf_5), atol = 1e-3)
     @test isapprox(L5[branches_5[2], branches_5[1]], 0.3447946513849093)
 
+    # get LODF with second method
+    a = IncidenceMatrix(sys5)
+    ptdf = PTDF(sys5)
+    lodf_t_3 = PNM._calculate_LODF_matrix_KLU2(a.data, ptdf.data)
+    @test isapprox(lodf_t_3, L5.data, atol = 1e-5)
+
     nodes_14 = nodes14()
     branches_14 = branches14(nodes_14)
     L14 = LODF(branches_14, nodes_14)
