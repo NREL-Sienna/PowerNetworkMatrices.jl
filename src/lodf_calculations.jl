@@ -19,39 +19,67 @@ struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
 end
 
 function _buildlodf(
-    branches,
-    buses::Vector{PSY.Bus},
-    bus_lookup::Dict{Int, Int},
-    dist_slack::Array{Float64},
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    ptdf::Matrix{Float64},
+    linear_solver = "KLU",
 )
-    ref_bus_positions = find_slack_positions(buses)
-    ptdf, a = calculate_PTDF_matrix_KLU(
-        branches,
-        buses,
-        bus_lookup,
-        ref_bus_positions,
-        dist_slack,
-    )
-    return _buildlodf(a, ptdf)
+    if linear_solver == "KLU"
+        lodf_t = _calculate_LODF_matrix_KLU(a, ptdf)
+    elseif linear_solver == "Dense"
+        lodf_t = _calculate_LODF_matrix_DENSE(a, ptdf)
+    end
+
+    return lodf_t
 end
 
-function _buildlodf(a::SparseArrays.SparseMatrixCSC{Int8, Int}, ptdf::Matrix{Float64})
-    linecount = size(ptdf, 2)   # ptdf is buses * lines
-    ptdf_denominator = transpose(ptdf) * transpose(a)
+function _calculate_LODF_matrix_KLU(
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    ptdf::Matrix{Float64},
+)
+    linecount = size(ptdf, 2)
+    ptdf_denominator_t = a * ptdf
+    m_I = Int[]
+    m_J = Int[]
+    m_V = Float64[]
     for iline in 1:linecount
-        if (1.0 - ptdf_denominator[iline, iline]) < 1.0E-06
-            ptdf_denominator[iline, iline] = 0.0
+        if (1.0 - ptdf_denominator_t[iline, iline]) < 1.0E-06
+            push!(m_I, iline)
+            push!(m_J, iline)
+            push!(m_V, 1.0)
+        else
+            push!(m_I, iline)
+            push!(m_J, iline)
+            push!(m_V, 1 - ptdf_denominator_t[iline, iline])
+        end
+    end
+    Dem_LU = klu(SparseArrays.sparse(m_I, m_J, m_V))
+    lodf_t = Dem_LU \ ptdf_denominator_t
+    lodf_t[SparseArrays.diagind(lodf_t)] .= -1
+
+    return lodf_t
+end
+
+function _calculate_LODF_matrix_DENSE(
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    ptdf::Matrix{Float64},
+)
+    linecount = size(ptdf, 2)
+    ptdf_denominator_t = a * ptdf
+    for iline in 1:linecount
+        if (1.0 - ptdf_denominator_t[iline, iline]) < 1.0E-06
+            ptdf_denominator_t[iline, iline] = 0.0
         end
     end
     (Dem, dipiv, dinfo) = getrf!(
         Matrix{Float64}(1.0I, linecount, linecount) -
-        Array(LinearAlgebra.Diagonal(ptdf_denominator)),
+        Array(LinearAlgebra.Diagonal(ptdf_denominator_t)),
     )
-    lodf = gemm('N', 'N', ptdf_denominator, getri!(Dem, dipiv))
-    lodf =
-        lodf - Array(LinearAlgebra.Diagonal(lodf)) -
+    lodf_t = gemm('N', 'N', getri!(Dem, dipiv), ptdf_denominator_t)
+    lodf_t =
+        lodf_t - Array(LinearAlgebra.Diagonal(lodf_t)) -
         Matrix{Float64}(1.0I, linecount, linecount)
-    return lodf
+
+    return lodf_t
 end
 
 """
@@ -69,7 +97,7 @@ Builds the LODF matrix from a group of branches and buses. The return is a LOLDF
 """
 function LODF(branches, buses::Vector{PSY.Bus}, dist_slack::Vector{Float64} = Float64[])
 
-    #Get axis names
+    # get axis names
     line_ax = [branch.name for branch in branches]
     axes = (line_ax, line_ax)
     look_up = (make_ax_ref(line_ax), make_ax_ref(line_ax))
@@ -88,16 +116,25 @@ Builds the LODF matrix from a system. The return is a LOLDF array indexed with t
         Vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses.
 """
-function LODF(sys::PSY.System, dist_slack::Vector{Float64} = Float64[])
+function LODF(
+    sys::PSY.System,
+    linear_solver::String = "KLU",
+    dist_slack::Vector{Float64} = Float64[],
+)
     branches = get_ac_branches(sys)
-    buses = get_buses(sys)
-    return LODF(branches, buses, dist_slack)
+    nodes = get_buses(sys)
+    return LODF(branches, nodes, linear_solver, dist_slack)
 end
 
 function LODF(
     A::IncidenceMatrix,
     PTDFm::PTDF,
+    linear_solver::String = "KLU",
 )
     ax_ref = make_ax_ref(A.axes[1])
-    return LODF(_buildlodf(A.data, PTDFm.data), (A.axes[1], A.axes[1]), (ax_ref, ax_ref))
+    return LODF(
+        _buildlodf(A.data, PTDFm.data, linear_solver),
+        (A.axes[1], A.axes[1]),
+        (ax_ref, ax_ref),
+    )
 end

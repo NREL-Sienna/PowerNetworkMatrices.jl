@@ -1,21 +1,22 @@
 module PowerNetworkMatrices
 
-export PTDF
-export get_ptdf_data
-export drop_small_entries!
-export VirtualPTDF
-export IncidenceMatrix
-export BA_Matrix
 export ABA_Matrix
-export factorize
-export is_factorized
-export Ybus
-export LODF
 export AdjacencyMatrix
-export to_hdf5
-export from_hdf5
+export BA_Matrix
+export drop_small_entries!
+export factorize
 export find_subnetworks
+export from_hdf5
+export get_ptdf_data
+export IncidenceMatrix
+export is_factorized
+export LODF
+export PTDF
+export to_hdf5
 export validate_connectivity
+export VirtualLODF
+export VirtualPTDF
+export Ybus
 
 using DocStringExtensions
 import InfrastructureSystems
@@ -49,9 +50,9 @@ include("common.jl")
 include("definitions.jl")
 include("ptdf_calculations.jl")
 include("ybus_calculations.jl")
-include("lodf_calculations.jl")
 include("row_cache.jl")
 include("virtual_ptdf_calculations.jl")
+include("lodf_calculations.jl")
 include("virtual_lodf_calculations.jl")
 include("system_utils.jl")
 include("serialization.jl")
