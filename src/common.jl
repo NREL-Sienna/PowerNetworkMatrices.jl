@@ -301,7 +301,7 @@ function assing_reference_buses(
     ref_bus_positions::Set{Int},
 )
     if isempty(ref_bus_positions) || length(ref_bus_positions) != length(subnetworks)
-        @warn "The reference bus positions are not consistent with the subnetworks. Can't continue"
+        @warn "The reference bus positions are not consistent with the subnetworks. References buses will be assigned arbitrarily"
         return deepcopy(subnetworks)
     end
     bus_groups = Dict{Int, Set{Int}}()
@@ -311,7 +311,7 @@ function assing_reference_buses(
             bus_groups[first(ref_bus)] = pop!(subnetworks, bus_key)
             continue
         elseif length(ref_bus) == 0
-            @warn "No reference bus in the subnetwork associated with bus $bus_key. Can't continue"
+            @warn "No reference bus in the subnetwork associated with bus $bus_key. References buses will be assigned arbitrarily"
             return subnetworks
         elseif length(ref_bus) > 1
             # TODO: still to implement
