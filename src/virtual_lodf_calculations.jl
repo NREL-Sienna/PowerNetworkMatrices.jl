@@ -148,7 +148,7 @@ function VirtualLODF(
         K,
         BA,
         A,
-        1.0 ./ (1.0 .- PTDF_A_diag),
+        1.0 ./ (1.0 .- PTDF_diag),
         ref_bus_positions,
         dist_slack,
         axes,
