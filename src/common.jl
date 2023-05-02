@@ -2,28 +2,49 @@
 Gets the AC branches from a given Systems.
 """
 function get_ac_branches(sys::PSY.System)
-    # Filter out DC Branches here
-    return sort!(
-        collect(PSY.get_components(PSY.get_available, PSY.ACBranch, sys));
+    collection = Vector{PSY.ACBranch}()
+    for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
+        arc = PSY.get_arc(br)
+        if PSY.get_bustype(arc.from) == BusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.from))",
+                ),
+            )
+        end
+        if PSY.get_bustype(arc.to) == BusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.to))",
+                ),
+            )
+        end
+        push!(collection, br)
+    end
+    return sort!(collection;
         by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
     )
 end
 
 """
-Gets the buses from a given System
+Gets the non-isolated buses from a given System
 """
 function get_buses(sys::PSY.System)::Vector{PSY.Bus}
-    return sort!(collect(PSY.get_components(PSY.Bus, sys)); by = x -> PSY.get_number(x))
+    return sort!(
+        collect(
+            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
+        );
+        by = x -> PSY.get_number(x),
+    )
 end
-
 """
 Gets the indices  of the reference (slack) buses.
 NOTE:
 - the indices  corresponds to the columns of zeros belonging to the PTDF matrix.
 - BA and ABA matrix miss the columns related to the reference buses.
 """
-function find_slack_positions(nodes)
-    return find_slack_positions(nodes, make_ax_ref(nodes))
+function find_slack_positions(buses)
+    return find_slack_positions(buses, make_ax_ref(buses))
 end
 
 function find_slack_positions(buses, bus_lookup::Dict{Int, Int})::Set{Int}
@@ -32,7 +53,7 @@ function find_slack_positions(buses, bus_lookup::Dict{Int, Int})::Set{Int}
         for n in buses if PSY.get_bustype(n) == BusTypes.REF
     ])
     if length(slack_position) == 0
-        error("Slack bus not identified in the Bus/Nodes list, can't build NetworkMatrix")
+        error("Slack bus not identified in the Bus/buses list, can't build NetworkMatrix")
     end
     return Set{Int}(slack_position)
 end
@@ -280,7 +301,7 @@ function assing_reference_buses(
     ref_bus_positions::Set{Int},
 )
     if isempty(ref_bus_positions) || length(ref_bus_positions) != length(subnetworks)
-        @warn "The reference bus positions are not consistent with the subnetworks. Can't continue"
+        @warn "The reference bus positions are not consistent with the subnetworks. References buses will be assigned arbitrarily"
         return deepcopy(subnetworks)
     end
     bus_groups = Dict{Int, Set{Int}}()
@@ -290,7 +311,7 @@ function assing_reference_buses(
             bus_groups[first(ref_bus)] = pop!(subnetworks, bus_key)
             continue
         elseif length(ref_bus) == 0
-            @warn "No reference bus in the subnetwork associated with bus $bus_key. Can't continue"
+            @warn "No reference bus in the subnetwork associated with bus $bus_key. References buses will be assigned arbitrarily"
             return subnetworks
         elseif length(ref_bus) > 1
             # TODO: still to implement
