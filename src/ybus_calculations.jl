@@ -196,7 +196,7 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 """
 function Ybus(sys::PSY.System; kwargs...)
     branches = get_ac_branches(sys)
-    buses =  get_buses(sys)
+    buses = get_buses(sys)
     fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
     return Ybus(
         branches,

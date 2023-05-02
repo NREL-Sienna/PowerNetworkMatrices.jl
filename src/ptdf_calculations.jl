@@ -440,7 +440,7 @@ function PTDF(
     kwargs...,
 )
     branches = get_ac_branches(sys)
-    buses =  get_buses(sys)
+    buses = get_buses(sys)
     return PTDF(branches, buses; kwargs...)
 end
 

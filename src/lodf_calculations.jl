@@ -90,7 +90,7 @@ Builds the LODF matrix from a system. The return is a LOLDF array indexed with t
 """
 function LODF(sys::PSY.System, dist_slack::Vector{Float64} = Float64[])
     branches = get_ac_branches(sys)
-    buses =  get_buses(sys)
+    buses = get_buses(sys)
     return LODF(branches, buses, dist_slack)
 end
 

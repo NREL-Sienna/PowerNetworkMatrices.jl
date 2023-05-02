@@ -2,9 +2,26 @@
 Gets the AC branches from a given Systems.
 """
 function get_ac_branches(sys::PSY.System)
-    # Filter out DC Branches here
-    return sort!(
-        collect(PSY.get_components(PSY.get_available, PSY.ACBranch, sys));
+    collection = Vector{PSY.ACBranch}()
+    for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
+        arc = PSY.get_arc(br)
+        if PSY.get_bustype(arc.from) == BusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.from))",
+                ),
+            )
+        end
+        if PSY.get_bustype(arc.to) == BusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.to))",
+                ),
+            )
+        end
+        push!(collection, br)
+    end
+    return sort!(collection;
         by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
     )
 end
