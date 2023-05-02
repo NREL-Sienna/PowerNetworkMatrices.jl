@@ -35,7 +35,7 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     A::SparseArrays.SparseMatrixCSC{Int8, Int}
-    PTDF_A_diag::Vector{Float64}
+    inv_PTDF_A_diag::Vector{Float64}
     ref_bus_positions::Set{Int}
     dist_slack::Vector{Float64}
     axes::Ax
@@ -148,7 +148,7 @@ function VirtualLODF(
         K,
         BA,
         A,
-        PTDF_diag,
+        1.0 ./ (1.0 .- PTDF_A_diag),
         ref_bus_positions,
         dist_slack,
         axes,
@@ -216,7 +216,7 @@ function _getindex(
         for i in eachindex(vlodf.valid_ix)
             vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
         end
-        lodf_row = (vlodf.A * vlodf.temp_data) ./ (1 .- vlodf.PTDF_A_diag)
+        lodf_row = (vlodf.A * vlodf.temp_data) .* vlodf.inv_PTDF_A_diag
         lodf_row[row] = -1.0
         # add slack bus value (zero) and make copy of temp into the cache
         if get_tol(vlodf) > eps()

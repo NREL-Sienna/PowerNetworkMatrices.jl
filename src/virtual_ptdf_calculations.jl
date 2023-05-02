@@ -39,6 +39,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     axes::Ax
     lookup::L
     temp_data::Vector{Float64}
+    valid_ix::Vector{Int}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
@@ -108,6 +109,7 @@ function VirtualPTDF(
         axes,
         look_up,
         temp_data,
+        setdiff(1:length(temp_data), ref_bus_positions),
         empty_cache,
         subnetworks,
         Ref(tol),
@@ -167,7 +169,7 @@ function _getindex(
     else
         # evaluate the value for the PTDF column
         # Needs improvement
-        valid_ix = setdiff(1:length(vptdf.temp_data), vptdf.ref_bus_positions)
+        valid_ix = vptdf.valid_ix
         lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[valid_ix, row]))
 
         # ! missing dist_slack case
