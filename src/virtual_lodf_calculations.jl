@@ -63,11 +63,33 @@ function _get_PTDF_A_diag(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        copyto!(PTDFm_t, BA)
-        PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
-        PTDFm_t[collect(ref_bus_positions), :] .= 0.0
-        return LinearAlgebra.diag(A * PTDFm_t)
+
+        # get inverse of ABA
+        Ix = SparseArrays.sparse(I, size(K, 1), size(K, 1))
+        ABA_inv = zeros(Float64, size(Ix))
+        ldiv!(ABA_inv, K, Ix)
+        # multiply the matrix just for some elements
+        diag_ = zeros(size(BA, 2))
+        for i in 1:size(BA, 2) # per each column
+            for j in BA.rowval[BA.colptr[i]:(BA.colptr[i + 1] - 1)]
+                check_1 = sum(j .> ref_bus_positions)
+                for k in BA.colptr[i]:(BA.colptr[i + 1] - 1)
+                    if BA.rowval[k] ∉ ref_bus_positions && j ∉ ref_bus_positions
+                        check_2 = sum(BA.rowval[k] .> ref_bus_positions)
+                        diag_[i] +=
+                            A[i, j] *
+                            (BA.nzval[k] * ABA_inv[j - check_1, BA.rowval[k] - check_2])
+                    end
+                end
+            end
+        end
+
+        return diag_
+
     elseif length(dist_slack) == buscount
+
+        # TODO still to implement as above
+
         @info "Distributed bus"
         copyto!(PTDFm_t, BA)
         PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
