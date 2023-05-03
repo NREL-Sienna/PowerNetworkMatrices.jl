@@ -2,12 +2,12 @@
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     for solver in ["KLU", "Dense", "MKLPardiso"]
         for approach in ["standard", "separate_matrices"]
-            nodes_5 = nodes5()
-            branches_5 = branches5(nodes_5)
+            buses_5 = nodes5()
+            branches_5 = branches5(buses_5)
             if approach == "standard"
-                P5 = PTDF(branches_5, nodes_5; linear_solver = solver)
+                P5 = PTDF(branches_5, buses_5; linear_solver = solver)
                 P5_bis = PTDF(sys5; linear_solver = solver)
-                P5_sparse = PTDF(branches_5, nodes_5; linear_solver = solver, tol = 1e-3)
+                P5_sparse = PTDF(branches_5, buses_5; linear_solver = solver, tol = 1e-3)
             elseif approach == "separate_matrices"
                 if solver == "Dense"
                     continue
@@ -21,21 +21,21 @@
 
             # test method with branches and buses
             @test isapprox(maximum(P5.data), maximum(S5_slackB4), atol = 1e-3)
-            @test isapprox(P5[branches_5[1], nodes_5[1]], 0.1939166051164976)
+            @test isapprox(P5[branches_5[1], buses_5[1]], 0.1939166051164976)
             # test method with whole system
             if approach == "standard"
                 @test isapprox(maximum(P5_bis.data), maximum(S5_slackB4), atol = 1e-3)
-                @test isapprox(P5_bis[branches_5[1], nodes_5[1]], 0.1939166051164976)
+                @test isapprox(P5_bis[branches_5[1], buses_5[1]], 0.1939166051164976)
             end
 
             # additional test with other set of branches and buses
-            nodes_14 = nodes14()
-            branches_14 = branches14(nodes_14)
-            P14 = PTDF(branches_14, nodes_14)
+            buses_14 = nodes14()
+            branches_14 = branches14(buses_14)
+            P14 = PTDF(branches_14, buses_14)
             @test isapprox(maximum(P14.data), maximum(S14_slackB1), atol = 1e-3)
 
             # check getindex (line name and bus number)
-            P5NS = PTDF([branches_5[b] for b in Br5NS_ids], [nodes_5[b] for b in Bu5NS_ids])
+            P5NS = PTDF([branches_5[b] for b in Br5NS_ids], [buses_5[b] for b in Bu5NS_ids])
             for br in Br5NS_ids, b in Bu5NS_ids
                 @test isapprox(
                     getindex(P5NS, string(br), b),
@@ -107,10 +107,10 @@ end
 
 @testset "Test serialization of PTDF matrices to HDF5" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    nodes_5 = nodes5()
-    branches_5 = branches5(nodes_5)
-    P5 = PTDF(branches_5, nodes_5; linear_solver = "KLU")
-    P5_sparse = PTDF(branches_5, nodes_5; linear_solver = "KLU", tol = 1e-3)
+    buses_5 = nodes5()
+    branches_5 = branches5(buses_5)
+    P5 = PTDF(branches_5, buses_5; linear_solver = "KLU")
+    P5_sparse = PTDF(branches_5, buses_5; linear_solver = "KLU", tol = 1e-3)
     for ptdf in (P5, P5_sparse)
         for compress in (true, false)
             path = mktempdir()

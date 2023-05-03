@@ -49,28 +49,25 @@ function drop_small_entries!(mat::PTDF, tol::Float64)
     return
 end
 
-# !!! COMMENTED SINCE NOT NEEDED
-# """
-# Makes the PTDF matrix sparse given a certain tolerance "tol".
-# """
-# function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
-#     new_mat = sparsify(mat.data, tol)
-#     return PTDF(new_mat, mat.axes, mat.lookup, ref_bus_positions, mat.subnetworks, Ref(tol))
-# end
+"""
+Takes and existing PTDF and makes it sparse given a certain tolerance "tol".
+"""
+function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
+    new_mat = sparsify(mat.data, tol)
+    return PTDF(new_mat, mat.axes, mat.lookup, ref_bus_positions, mat.subnetworks, Ref(tol))
+end
 
 function _buildptdf(
     branches,
     buses::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
-    ref_bus_positions::Set{Int},
     linear_solver::String)
     if linear_solver == "KLU"
         PTDFm, A = calculate_PTDF_matrix_KLU(
             branches,
             buses,
             bus_lookup,
-            ref_bus_positions,
             dist_slack,
         )
     elseif linear_solver == "Dense"
@@ -78,7 +75,6 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
-            ref_bus_positions,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
@@ -86,7 +82,6 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
-            ref_bus_positions,
             dist_slack,
         )
     end
@@ -184,9 +179,8 @@ function calculate_PTDF_matrix_KLU(
     branches,
     buses::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses, ref_bus_positions)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses)
     BA = calculate_BA_matrix(branches, bus_lookup)
     PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -280,9 +274,8 @@ function calculate_PTDF_matrix_DENSE(
     branches,
     buses::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses, ref_bus_positions)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses)
     BA = Matrix(calculate_BA_matrix(branches, bus_lookup))
     PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A), BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -364,9 +357,8 @@ function calculate_PTDF_matrix_MKLPardiso(
     branches,
     buses::Vector{PSY.Bus},
     bus_lookup::Dict{Int, Int},
-    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses, ref_bus_positions)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses)
     BA = calculate_BA_matrix(branches, bus_lookup)
     PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
@@ -412,7 +404,6 @@ function PTDF(
         buses,
         look_up[1],
         dist_slack,
-        ref_bus_positions,
         linear_solver,
     )
     if tol > eps()
