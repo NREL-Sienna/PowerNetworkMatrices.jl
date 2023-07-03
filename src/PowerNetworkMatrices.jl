@@ -21,7 +21,7 @@ export Ybus
 using DocStringExtensions
 import InfrastructureSystems
 import PowerSystems
-import PowerSystems: BusTypes
+import PowerSystems: ACBusTypes
 
 const IS = InfrastructureSystems
 const PSY = PowerSystems
