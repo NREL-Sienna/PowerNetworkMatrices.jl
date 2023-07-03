@@ -5,14 +5,14 @@ function get_ac_branches(sys::PSY.System)
     collection = Vector{PSY.ACBranch}()
     for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
         arc = PSY.get_arc(br)
-        if PSY.get_bustype(arc.from) == BusTypes.ISOLATED
+        if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
                     "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.from))",
                 ),
             )
         end
-        if PSY.get_bustype(arc.to) == BusTypes.ISOLATED
+        if PSY.get_bustype(arc.to) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
                     "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.to))",
@@ -32,7 +32,7 @@ Gets the non-isolated buses from a given System
 function get_buses(sys::PSY.System)::Vector{PSY.Bus}
     return sort!(
         collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
+            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.Bus, sys),
         );
         by = x -> PSY.get_number(x),
     )
@@ -50,7 +50,7 @@ end
 function find_slack_positions(buses, bus_lookup::Dict{Int, Int})::Set{Int}
     slack_position = sort([
         bus_lookup[PSY.get_number(n)]
-        for n in buses if PSY.get_bustype(n) == BusTypes.REF
+        for n in buses if PSY.get_bustype(n) == ACBusTypes.REF
     ])
     if length(slack_position) == 0
         error("Slack bus not identified in the Bus/buses list, can't build NetworkMatrix")
