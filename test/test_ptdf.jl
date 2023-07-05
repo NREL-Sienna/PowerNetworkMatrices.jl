@@ -133,10 +133,10 @@ end
     sys_1 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     PSY.add_component!(
         sys_1,
-        PSY.Bus(;
+        PSY.ACBus(;
             number = 6,
             name = "isolated_node_1",
-            bustype = PSY.BusTypes.ISOLATED,
+            bustype = PSY.ACBusTypes.ISOLATED,
             angle = 0.0,
             magnitude = 1.1,
             voltage_limits = (min = 0.9, max = 1.1),
@@ -145,10 +145,10 @@ end
     )
     PSY.add_component!(
         sys_1,
-        PSY.Bus(;
+        PSY.ACBus(;
             number = 7,
             name = "isolated_node_2",
-            bustype = PSY.BusTypes.ISOLATED,
+            bustype = PSY.ACBusTypes.ISOLATED,
             angle = 0.0,
             magnitude = 1.1,
             voltage_limits = (min = 0.9, max = 1.1),
@@ -164,10 +164,10 @@ end
 
     PSY.add_component!(
         sys_2,
-        PSY.Bus(;
+        PSY.ACBus(;
             number = 6,
             name = "isolated_node_1",
-            bustype = PSY.BusTypes.ISOLATED,
+            bustype = PSY.ACBusTypes.ISOLATED,
             angle = 0.0,
             magnitude = 1.1,
             voltage_limits = (min = 0.9, max = 1.1),
@@ -183,8 +183,8 @@ end
             active_power_flow = branches_2[2].active_power_flow,
             reactive_power_flow = branches_2[2].reactive_power_flow,
             arc = PSY.Arc(;
-                from = PSY.get_component(PSY.Bus, sys_2, "nodeA"),
-                to = PSY.get_component(PSY.Bus, sys_2, "isolated_node_1"),
+                from = PSY.get_component(PSY.ACBus, sys_2, "nodeA"),
+                to = PSY.get_component(PSY.ACBus, sys_2, "isolated_node_1"),
             ),
             r = branches_2[2].r,
             x = branches_2[2].x,

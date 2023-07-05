@@ -58,7 +58,7 @@ Builds a AdjacencyMatrix from a collection of buses and branches. The return is 
 """
 function AdjacencyMatrix(
     branches,
-    buses::Vector{PSY.Bus};
+    buses::Vector{PSY.ACBus};
     check_connectivity::Bool = true,
     kwargs...,
 )

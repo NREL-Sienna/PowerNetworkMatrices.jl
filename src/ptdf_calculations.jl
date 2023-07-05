@@ -42,7 +42,7 @@ PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
 
 function _buildptdf(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
     linear_solver::String)
@@ -154,7 +154,7 @@ Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrice
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
@@ -163,7 +163,7 @@ Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrice
 """
 function calculate_PTDF_matrix_KLU(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
@@ -282,7 +282,7 @@ Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense mat
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
@@ -291,7 +291,7 @@ Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense mat
 """
 function calculate_PTDF_matrix_DENSE(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
@@ -366,7 +366,7 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
@@ -375,7 +375,7 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 """
 function calculate_PTDF_matrix_MKLPardiso(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
@@ -390,7 +390,7 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `dist_slack::Vector{Float64}`:
         vector of weights to be used as distributed slack bus.
@@ -402,7 +402,7 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
 """
 function PTDF(
     branches,
-    buses::Vector{PSY.Bus};
+    buses::Vector{PSY.ACBus};
     dist_slack::Vector{Float64} = Float64[],
     linear_solver::String = "KLU",
     tol::Float64 = eps())

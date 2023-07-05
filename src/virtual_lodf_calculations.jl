@@ -1,8 +1,8 @@
 """
 The Virtual Line Outage Distribution Factor (VirtualLODF) structure gathers
-the rows of the LODF matrix as they are evaluated on-the-go. These rows are 
-evalauted independently, cached in the structure and do not require the 
-computation of the whole matrix (therefore significantly reducing the 
+the rows of the LODF matrix as they are evaluated on-the-go. These rows are
+evalauted independently, cached in the structure and do not require the
+computation of the whole matrix (therefore significantly reducing the
 computational requirements).
 
 The VirtualLODF is initialized with no row stored.
@@ -20,12 +20,12 @@ The VirtualLODF struct is indexed using branch names.
         Vector contiaining the element-wise reciprocal of the diagonal elements
         coming from multuiplying the PTDF matrix with th Incidence matrix
 - `ref_bus_positions::Set{Int}`:
-        Vector containing the indexes of the rows of the transposed BA matrix 
+        Vector containing the indexes of the rows of the transposed BA matrix
         corresponding to the refence buses.
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors showing the branch names.
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries, mapping the branches names 
+        Tuple containing two dictionaries, mapping the branches names
         the enumerated row indexes indexes.
 - `valid_ix::Vector{Int}`:
         Vector containing the row/columns indices of matrices related the buses
@@ -101,7 +101,8 @@ end
 
 function VirtualLODF(
     branches,
-    buses::Vector{PSY.Bus};
+    buses::Vector{PSY.ACBus};
+    dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
