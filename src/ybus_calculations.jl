@@ -142,7 +142,7 @@ end
 
 function _buildybus(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
 )
     buscount = length(buses)
@@ -172,7 +172,7 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 """
 function Ybus(
     branches::Vector,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}();
     check_connectivity::Bool = true,
 )
@@ -258,7 +258,7 @@ Builds a Adjacency from the system. The return is an N x N Adjacency Array index
 function Adjacency(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     nodes = sort!(
         collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.Bus, sys),
+            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.ACBus, sys),
         );
         by = x -> PSY.get_number(x),
     )
@@ -305,7 +305,7 @@ function validate_connectivity(
 )
     nodes = sort!(
         collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.Bus, sys),
+            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.ACBus, sys),
         );
         by = x -> PSY.get_number(x),
     )
@@ -322,7 +322,7 @@ end
 
 function validate_connectivity(
     M,
-    nodes::Vector{PSY.Bus},
+    nodes::Vector{PSY.ACBus},
     bus_lookup::Dict{Int64, Int64};
     connectivity_method::Function = goderya_connectivity,
 )
@@ -330,7 +330,7 @@ function validate_connectivity(
     return connected
 end
 
-function goderya_connectivity(M, nodes::Vector{PSY.Bus}, bus_lookup::Dict{Int64, Int64})
+function goderya_connectivity(M, nodes::Vector{PSY.ACBus}, bus_lookup::Dict{Int64, Int64})
     @info "Validating connectivity with Goderya algorithm"
     length(nodes) > 15_000 &&
         @warn "The Goderya algorithm is memory intensive on large networks and may not scale well, try `connectivity_method = dfs_connectivity"
@@ -384,7 +384,7 @@ function find_connected_components(M, bus_lookup::Dict{Int64, Int64})
     return Set(connected_components)
 end
 
-function dfs_connectivity(M, ::Vector{PSY.Bus}, bus_lookup::Dict{Int64, Int64})
+function dfs_connectivity(M, ::Vector{PSY.ACBus}, bus_lookup::Dict{Int64, Int64})
     @info "Validating connectivity with depth first search (network traversal)"
     cc = find_connected_components(M, bus_lookup)
     if length(cc) != 1
