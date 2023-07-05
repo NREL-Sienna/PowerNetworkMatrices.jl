@@ -29,10 +29,10 @@ end
 """
 Gets the non-isolated buses from a given System
 """
-function get_buses(sys::PSY.System)::Vector{PSY.Bus}
+function get_buses(sys::PSY.System)::Vector{PSY.ACBus}
     return sort!(
         collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.Bus, sys),
+            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.ACBus, sys),
         );
         by = x -> PSY.get_number(x),
     )
@@ -76,7 +76,7 @@ Evaluates the Incidence matrix A given the branches and node of a System.
 # Arguments
 - `branches`:
         vector containing the branches of the considered system (should be AC branches).
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector containing the buses of the considered system.
 
 NOTE:
@@ -85,7 +85,7 @@ NOTE:
 """
 function calculate_A_matrix(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
 )
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
@@ -117,10 +117,10 @@ Evaluates the Adjacency matrix given the banches and buses of a given System.
 # Arguments
 - `branches`:
         vector containing the branches of the considered system (should be AC branches).
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector containing the buses of the considered system.
 """
-function calculate_adjacency(branches, buses::Vector{PSY.Bus})
+function calculate_adjacency(branches, buses::Vector{PSY.ACBus})
     bus_ax = PSY.get_number.(buses)
     return calculate_adjacency(branches, buses, make_ax_ref(bus_ax))
 end
@@ -134,7 +134,7 @@ NOTE:
 """
 function calculate_adjacency(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
 )
     buscount = length(buses)

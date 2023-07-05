@@ -29,10 +29,10 @@ end
 Evaluates the map linking the system's buses and branches.
 
 # Arguments
-- `buses::AbstractVector{PSY.Bus}`:
+- `buses::AbstractVector{PSY.ACBus}`:
         system's buses
 """
-function make_ax_ref(buses::AbstractVector{PSY.Bus})
+function make_ax_ref(buses::AbstractVector{PSY.ACBus})
     return make_ax_ref(PSY.get_number.(buses))
 end
 
@@ -96,7 +96,7 @@ Gets bus indices to a certain branch name
 - `lookup::Dict`:
         Dictionary mapping branches and buses
 """
-function lookup_index(i::PSY.Bus, lookup::Dict)
+function lookup_index(i::PSY.ACBus, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
 
@@ -170,7 +170,7 @@ Structure to store the keys of a power network matrix
 
 # Arguments
 - `product_iter::Base.Iterators.ProductIterator{T} where T <: Tuple`:
-        iterator of the indices of the network power matrix 
+        iterator of the indices of the network power matrix
 """
 struct PowerNetworkMatrixKeys{T <: Tuple}
     product_iter::Base.Iterators.ProductIterator{T}
@@ -311,7 +311,7 @@ function Base.show(io::IO, array::PowerNetworkMatrix)
     return
 end
 
-Base.to_index(b::PSY.Bus) = PSY.get_number(b)
+Base.to_index(b::PSY.ACBus) = PSY.get_number(b)
 Base.to_index(b::T) where {T <: PSY.ACBranch} = PSY.get_name(b)
 
 """returns the raw array data of the `PowerNetworkMatrix`"""

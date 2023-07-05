@@ -161,7 +161,7 @@ Builds the LODF matrix from a group of branches and buses. The return is a LOLDF
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `dist_slack::Vector{Float64}`:
         Vector of weights to be used as distributed slack bus.
@@ -170,7 +170,7 @@ Builds the LODF matrix from a group of branches and buses. The return is a LOLDF
 """
 function LODF(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     linera_solver::String = "KLU",
     dist_slack::Vector{Float64} = Float64[],
 )

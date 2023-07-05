@@ -115,7 +115,7 @@ end
 
 function VirtualLODF(
     branches,
-    buses::Vector{PSY.Bus};
+    buses::Vector{PSY.ACBus};
     dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
