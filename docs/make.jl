@@ -4,7 +4,9 @@ import DataStructures: OrderedDict
 pages = OrderedDict(
     "Welcome Page" => "index.md",
     "Quick Start Guide" => "quick_start_guide.md",
-    "Tutorials" => "tutorials/intro_page.md",
+    "Tutorials" => Any[
+        "Incidence, BA and ABA matrices" => "tutorials/tutorial_Incidence_BA_ABA_matrices.md",
+    ],
     "Public API Reference" => "api/public.md",
     "Internal API Reference" => "api/internal.md",
 )
@@ -15,7 +17,7 @@ makedocs(;
         mathengine = Documenter.MathJax(),
         prettyurls = haskey(ENV, "GITHUB_ACTIONS")),
     sitename = "PowerNetworkMatrices.jl",
-    authors = "Jose Daniel Lara, Alessandro Castelli, Sourabh Dalvi",
+    authors = "Jose Daniel Lara, Alessandro Francesco Castelli, Sourabh Dalvi",
     pages = Any[p for p in pages],
     clean = true,
 )
