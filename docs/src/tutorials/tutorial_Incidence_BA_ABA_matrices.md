@@ -44,7 +44,7 @@ incidence_matrix.data
 incidence_matrix.axes
 
 # ref_bus_positions: set containing the positions of the reference buses.
-# this represents the positions where to add the column of zeros. Please refere to the 
+# this represents the positions where to add the column of zeros. Please refer to the 
 # exaple in the BA matrix for more details.
 incidence_matrix.ref_bus_positions
 ```
