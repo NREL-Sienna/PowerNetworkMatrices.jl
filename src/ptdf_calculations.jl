@@ -153,10 +153,10 @@ function _calculate_PTDF_matrix_KLU(
         @info "Distributed bus"
         copyto!(PTDFm_t, BA)
         PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
-        PTDFm_t[ref_bus_positions, :] .= 0.0
+        PTDFm_t[collect(ref_bus_positions), :] .= 0.0
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
-        return PTDFm_t - (PTDFm_t * slack_array) * ones(1, buscount)
+        return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
@@ -246,10 +246,16 @@ function _calculate_PTDF_matrix_DENSE(
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
+        PTDFm_t[valid_ixs, :] = gemm(
+            'N',
+            'N',
+            getri!(ABA, bipiv),
+            BA[valid_ixs, :],
+        )
         slack_array = dist_slack / sum(dist_slack)
-        slack_array = reshape(slack_array, buscount, 1)
+        slack_array = reshape(slack_array, 1, buscount)
         return PTDFm_t -
-               gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
+               gemm('N', 'N', ones(buscount, 1), gemm('N', 'N', slack_array, PTDFm_t))
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
