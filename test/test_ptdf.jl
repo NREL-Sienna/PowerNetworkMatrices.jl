@@ -193,7 +193,7 @@ end
     @test_throws IS.ConflictingInputsError ptdf_2 = PTDF(sys_2)
 end
 
-@test "PTDF matrices with distributed slack" begin
+@testset "PTDF matrices with distributed slack" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
     bus_number = length(PNM.get_buses(sys))
