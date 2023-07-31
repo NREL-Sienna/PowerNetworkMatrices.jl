@@ -196,7 +196,7 @@ end
 @testset "PTDF matrices with distributed slack" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
-    bus_number = length(PNM.get_buses(sys))
+    bus_number = length(PNM.get_buses(sys5))
 
     dist_slack = 1 / bus_number * ones(bus_number)
     slack_array = dist_slack / sum(dist_slack)
