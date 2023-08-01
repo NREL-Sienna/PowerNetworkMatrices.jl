@@ -194,7 +194,6 @@ end
 end
 
 @testset "PTDF matrices with distributed slack" begin
-
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
     buscount = length(PNM.get_buses(sys5))
@@ -209,5 +208,4 @@ end
     @assert isapprox(P5_1.data, P5_2.data, atol = 1e-5)
     @assert isapprox(P5_1.data, P5_3.data, atol = 1e-5)
     @assert isapprox(P5_2.data, P5_3.data, atol = 1e-5)
-
 end
