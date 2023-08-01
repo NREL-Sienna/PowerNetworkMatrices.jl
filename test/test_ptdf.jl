@@ -194,19 +194,20 @@ end
 end
 
 @testset "PTDF matrices with distributed slack" begin
+
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
     buscount = length(PNM.get_buses(sys5))
 
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = dist_slack / sum(dist_slack)
-    slack_array = reshape(slack_array, 1, buscount)
 
-    P5_1 = PTDF(sys5; slack_array = slack_array, linear_solver = "KLU")
-    P5_2 = PTDF(sys5; slack_array = slack_array, linear_solver = "Dense")
-    P5_3 = PTDF(sys5; slack_array = slack_array, linear_solver = "MKLPardiso")
+    P5_1 = PTDF(sys5; dist_slack = slack_array, linear_solver = "KLU")
+    P5_2 = PTDF(sys5; dist_slack = slack_array, linear_solver = "Dense")
+    P5_3 = PTDF(sys5; dist_slack = slack_array, linear_solver = "MKLPardiso")
 
     @assert isapprox(P5_1.data, P5_2.data, atol = 1e-5)
     @assert isapprox(P5_1.data, P5_3.data, atol = 1e-5)
     @assert isapprox(P5_2.data, P5_3.data, atol = 1e-5)
+
 end
