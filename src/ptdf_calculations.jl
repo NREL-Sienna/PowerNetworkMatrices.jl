@@ -160,6 +160,8 @@ function _calculate_PTDF_matrix_KLU(
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
+
+    return
 end
 
 """
@@ -260,7 +262,7 @@ function _calculate_PTDF_matrix_DENSE(
         error("Distributed bus specification doesn't match the number of buses.")
     end
 
-    return PTDFm_t
+    return
 end
 
 """
@@ -333,17 +335,18 @@ function _calculate_PTDF_matrix_MKLPardiso(
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         PTDFm_t[row_idx, :] = ABA_inv * @view BA[row_idx, :]
+        return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
         PTDFm_t[row_idx, :] = ABA_inv * @view BA[row_idx, :]
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, buscount, 1)
-        PTDFm_t = PTDFm_t - (PTDFm_t * slack_array) * ones(1, buscount)
+        return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
 
-    return PTDFm_t
+    return
 end
 
 """
