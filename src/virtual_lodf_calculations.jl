@@ -242,10 +242,9 @@ function _getindex(
         lodf_row[row] = -1.0
         # add slack bus value (zero) and make copy of temp into the cache
         if get_tol(vlodf) > eps()
-            vlodf.cache[row] = make_entries_zero!(deepcopy(lodf_row), get_tol(vlodf))
-        else
-            vlodf.cache[row] = deepcopy(lodf_row)
+            make_entries_zero!(lodf_row, get_tol(vlodf))
         end
+        vlodf.cache[row] = deepcopy(lodf_row)
         return vlodf.cache[row][column]
     end
 end

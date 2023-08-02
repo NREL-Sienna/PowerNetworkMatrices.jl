@@ -71,10 +71,12 @@ end
 @testset "Test virtual PTDF with distributed slack" begin
     # get 5 bus system
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    bus_number = length(PNM.get_buses(sys))
+    dist_slack = 1 / bus_number * ones(bus_number)
     # compute full PTDF
-    ptdf = PTDF(sys; dist_slack = slack_array)
+    ptdf = PTDF(sys; dist_slack = dist_slack)
     # compute each row of the virtual PTDF and compare values
-    vptdf = VirtualPTDF(sys; dist_slack = slack_array)
+    vptdf = VirtualPTDF(sys; dist_slack = dist_slack)
     for row in 1:size(ptdf.data, 2)
         # evaluate the column (just needs one element)
         vptdf[row, 1]
