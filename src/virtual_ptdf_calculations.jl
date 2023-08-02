@@ -71,6 +71,9 @@ function VirtualPTDF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[])
+    if length(dist_slack) != 0
+        @info "Distributed bus"
+    end
 
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
@@ -171,19 +174,35 @@ function _getindex(
         # Needs improvement
         valid_ix = vptdf.valid_ix
         lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[valid_ix, row]))
+        buscount = size(vptdf, 1)
 
-        # ! missing dist_slack case
-
-        for i in eachindex(valid_ix)
-            vptdf.temp_data[valid_ix[i]] = lin_solve[i]
+        if !isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) != 1
+            error(
+                "Distibuted slack is not supported for systems with multiple reference buses.",
+            )
+        elseif isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) < buscount
+            for i in eachindex(valid_ix)
+                vptdf.temp_data[valid_ix[i]] = lin_solve[i]
+            end
+            vptdf.cache[row] = deepcopy(vptdf.temp_data)
+        elseif length(vptdf.dist_slack) == buscount
+            for i in eachindex(valid_ix)
+                vptdf.temp_data[valid_ix[i]] = lin_solve[i]
+            end
+            slack_array = vptdf.dist_slack / sum(vptdf.dist_slack)
+            slack_array = reshape(slack_array, buscount)
+            vptdf.cache[row] =
+                deepcopy(vptdf.temp_data .- dot(vptdf.temp_data, slack_array))
+        else
+            error("Distributed bus specification doesn't match the number of buses.")
         end
 
         # add slack bus value (zero) and make copy of temp into the cache
         if get_tol(vptdf) > eps()
-            vptdf.cache[row] = make_entries_zero!(deepcopy(vptdf.temp_data), get_tol(vptdf))
-        else
-            vptdf.cache[row] = deepcopy(vptdf.temp_data)
+            # vptdf.cache[row] = make_entries_zero!(deepcopy(vptdf.temp_data), get_tol(vptdf))
+            make_entries_zero!(vptdf.cache[row], get_tol(vptdf))
         end
+
         return vptdf.cache[row][column]
     end
 end
