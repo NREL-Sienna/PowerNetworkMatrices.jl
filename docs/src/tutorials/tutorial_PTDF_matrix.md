@@ -4,7 +4,6 @@ In this tutorial the methods for computing the Power Transfer Distribution Facto
 Three different methods case be chosen:
 - `Dense`: considers functions for dense matrix multiplication and inversion
 - `KLU`: considers functions for sparse matrix multiplication and inversion
-- `MKLPardiso`: uses MKLPardiso for matrix multiplication and inversion
 
 The abovementioned methods are shortly presented in the following sections.
 
