@@ -285,7 +285,7 @@ function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
             vector[i] = 0.0
         end
     end
-    return vector
+    return
 end
 
 """

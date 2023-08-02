@@ -140,6 +140,7 @@ function _calculate_PTDF_matrix_KLU(
     # inizialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
+
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
@@ -153,13 +154,15 @@ function _calculate_PTDF_matrix_KLU(
         @info "Distributed bus"
         copyto!(PTDFm_t, BA)
         PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
-        PTDFm_t[ref_bus_positions, :] .= 0.0
+        PTDFm_t[collect(ref_bus_positions), :] .= 0.0
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
-        return PTDFm_t - (PTDFm_t * slack_array) * ones(1, buscount)
+        return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
+
+    return
 end
 
 """
@@ -246,15 +249,21 @@ function _calculate_PTDF_matrix_DENSE(
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
+        PTDFm_t[valid_ixs, :] = gemm(
+            'N',
+            'N',
+            getri!(ABA, bipiv),
+            BA[valid_ixs, :],
+        )
         slack_array = dist_slack / sum(dist_slack)
-        slack_array = reshape(slack_array, buscount, 1)
+        slack_array = reshape(slack_array, 1, buscount)
         return PTDFm_t -
-               gemm('N', 'N', gemm('N', 'N', PTDFm, slack_array), ones(1, buscount))
+               gemm('N', 'N', ones(buscount, 1), gemm('N', 'N', slack_array, PTDFm_t))
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
 
-    return PTDFm_t
+    return
 end
 
 """
@@ -316,28 +325,29 @@ function _calculate_PTDF_matrix_MKLPardiso(
     ps = Pardiso.MKLPardisoSolver()
     Pardiso.set_iparm!(ps, 59, 2)
     Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-
     Pardiso.solve!(ps, ABA_inv, ABA, Ix)
+    # inizialize matrices for evaluation
+    valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
-    row_idx = setdiff(1:size(PTDFm_t, 1), ref_bus_positions)
 
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
-    elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        PTDFm_t[row_idx, :] = ABA_inv * @view BA[row_idx, :]
+    elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
+        PTDFm_t[valid_ix, :] = ABA_inv * @view BA[valid_ix, :]
+        return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        PTDFm_t[row_idx, :] = ABA_inv * @view BA[row_idx, :]
+        PTDFm_t[valid_ix, :] = ABA_inv * @view BA[valid_ix, :]
         slack_array = dist_slack / sum(dist_slack)
-        slack_array = reshape(slack_array, buscount, 1)
-        PTDFm_t = PTDFm_t - (PTDFm_t * slack_array) * ones(1, buscount)
+        slack_array = reshape(slack_array, 1, buscount)
+        return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
 
-    return PTDFm_t
+    return
 end
 
 """
