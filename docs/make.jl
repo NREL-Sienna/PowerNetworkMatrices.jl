@@ -6,6 +6,7 @@ pages = OrderedDict(
     "Quick Start Guide" => "quick_start_guide.md",
     "Tutorials" => Any[
         "Incidence, BA and ABA matrices" => "tutorials/tutorial_Incidence_BA_ABA_matrices.md",
+        "PTDF matrix" => "tutorials/tutorial_PTDF_matrix.md",
     ],
     "Public API Reference" => "api/public.md",
     "Internal API Reference" => "api/internal.md",
