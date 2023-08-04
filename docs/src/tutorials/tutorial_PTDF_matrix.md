@@ -1,12 +1,7 @@
 # PTDF matrix
 
 In this tutorial the methods for computing the Power Transfer Distribution Factors (`PTDF`) are presented.
-Before diving into this tutorial we encourage the user to load `PowerNetworkMatrices`, if the `?` key in the REPL terminal and look for the documentiont of the different different `PTDF` methods avialable.
-
-``` julia
-using PowerNetworkMatrices
-?PTDF
-```
+Before diving into this tutorial we encourage the user to load `PowerNetworkMatrices`, hif the `?` key in the REPL terminal and look for the documentiont of the different `PTDF` methods avialable.
 
 ## Evaluation of the `PTDF` matrix
 
