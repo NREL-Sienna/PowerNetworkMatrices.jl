@@ -66,6 +66,7 @@ Please note that either the `KLU` or `Dense` method isi used, the resultig `PTDF
 Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus. To do so, a vecotr of type `Vector{Float64}` needs to be defined, specifying the weights for each bus of the system. These weights identify how the load on the slakc bus is redistributed accross the system.
 
 ``` @repl tutorial_PTDF_matrix
+# consider equal distribution accross each bus for this example
 buscount = length(PNM.get_buses(sys));
 dist_slack = 1 / buscount * ones(buscount);
 dist_slack_array = dist_slack / sum(dist_slack);
