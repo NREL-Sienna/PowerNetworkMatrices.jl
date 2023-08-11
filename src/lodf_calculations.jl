@@ -80,12 +80,12 @@ function _calculate_LODF_matrix_KLU(
 )
     linecount = size(ba, 2)
     # get inverse of aba
-    first = zeros(size(a, 2), size(a, 1))
+    first_ = zeros(size(a, 2), size(a, 1))
     valid_ix = setdiff(1:size(a, 2), ref_bus_positions)
-    copyto!(first, transpose(a))
-    first[valid_ix, :] = KLU.solve!(k, first[valid_ix, :])
-    first[collect(ref_bus_positions), :] .= 0.0
-    ptdf_denominator = first' * ba
+    copyto!(first_, transpose(a))
+    first_[valid_ix, :] = KLU.solve!(k, first_[valid_ix, :])
+    first_[collect(ref_bus_positions), :] .= 0.0
+    ptdf_denominator = first_' * ba
 
     m_I = Int[]
     m_V = Float64[]
@@ -111,20 +111,17 @@ function _calculate_LODF_matrix_KLU(
     linecount = size(ptdf, 2)
     ptdf_denominator_t = a * ptdf
     m_I = Int[]
-    m_J = Int[]
     m_V = Float64[]
     for iline in 1:linecount
         if (1.0 - ptdf_denominator_t[iline, iline]) < 1.0E-06
             push!(m_I, iline)
-            push!(m_J, iline)
             push!(m_V, 1.0)
         else
             push!(m_I, iline)
-            push!(m_J, iline)
             push!(m_V, 1 - ptdf_denominator_t[iline, iline])
         end
     end
-    Dem_LU = klu(SparseArrays.sparse(m_I, m_J, m_V))
+    Dem_LU = klu(SparseArrays.sparse(m_I, m_I, m_V))
     lodf_t = Dem_LU \ ptdf_denominator_t
     lodf_t[SparseArrays.diagind(lodf_t)] .= -1
 
@@ -293,6 +290,8 @@ end
 """
 Builds the LODF matrix given the Incidence Matrix and the PTDF matrix of the system.
 
+NOTE: this method does not support distributed slack bus.
+
 # Arguments
 - `A::IncidenceMatrix`:
         Structure containing the Incidence matrix of the system.
@@ -302,9 +301,6 @@ Builds the LODF matrix given the Incidence Matrix and the PTDF matrix of the sys
         Structure containing the transposed BA matrix of the system.
 - `linear_solver::String`:
         Linear solver to be used. Options are "Dense" and "KLU".
-- `dist_slack::Vector{Float64}`:
-    Vector of weights to be used as distributed slack bus.
-    The distributed slack vector has to be the same length as the number of buses.
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps()).
 """
@@ -313,7 +309,6 @@ function LODF(
     ABA::ABA_Matrix,
     BA::BA_Matrix;
     linear_solver::String = "KLU",
-    dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
 )
     validate_linear_solver(linear_solver)

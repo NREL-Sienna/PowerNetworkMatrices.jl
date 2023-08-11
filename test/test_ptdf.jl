@@ -194,6 +194,11 @@ end
 end
 
 @testset "PTDF matrices with distributed slack" begin
+    """
+    CAUTION: this test just test that all the matrices are the same, but there 
+    are no reference values.
+    """
+
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
     buscount = length(PNM.get_buses(sys5))

@@ -76,3 +76,29 @@ end
     @test isapprox(Matrix(L5NS_1.data), L5NS_3.data, atol = 1e-3)
     @test isapprox(Matrix(L5NS_1.data), L5NS_4.data, atol = 1e-3)
 end
+
+@testset "LODF matrices with distributed slack" begin
+    """
+    CAUTION: this test just test that all the matrices are the same, but there 
+    are no reference values.
+    """
+
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+
+    buscount = length(PNM.get_buses(sys5))
+
+    dist_slack = 1 / buscount * ones(buscount)
+    slack_array = dist_slack / sum(dist_slack)
+
+    P5_1 = PTDF(sys5; dist_slack = slack_array, linear_solver = "KLU")
+
+    # method with A and PTDF, PTDF already evaluated with distributed slack bus
+    A = IncidenceMatrix(sys5)
+    LODF_ref = LODF(A, P5_1)
+
+    # base case with system data
+    LODF_1 = LODF(sys5; dist_slack = slack_array)
+
+    # tests
+    @test isapprox(LODF_ref.data, LODF_1.data, atol = 1e-5)
+end
