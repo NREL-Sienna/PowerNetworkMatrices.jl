@@ -36,3 +36,17 @@
     total_error = abs.(L5NS_from_ptdf.data' .- Lodf_5)
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
 end
+
+@testset "Sparse LODF matrix" begin
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    L5NS = LODF(sys5, tol=0.4)
+    L5NS_bis = LODF(sys5)
+    drop_small_entries!(L5NS_bis, 0.4)
+
+    ref_sparse_Lodf_5 = deepcopy(Lodf_5')
+    ref_sparse_Lodf_5[abs.(ref_sparse_Lodf_5) .< 0.4] .= 0
+    
+    @test isapprox(Matrix(L5NS.data), ref_sparse_Lodf_5, atol=1e-3)
+    @test isapprox(Matrix(L5NS.data), L5NS_bis.data, atol=1e-3)
+
+end

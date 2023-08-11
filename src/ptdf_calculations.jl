@@ -16,7 +16,7 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
         dictionary containing the set of bus indexes defining the subnetworks
         of the system.
 - `tol::Base.RefValue{Float64}`:
-        tolerance used for sportifying the matrix (dropping element whose
+        tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
 """
 struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
