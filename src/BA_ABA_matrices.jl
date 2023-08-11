@@ -154,9 +154,11 @@ end
 # NOTE: bus_1, bus_2 are bus numbers not row and column indices!
 function Base.getindex(A::ABA_Matrix, bus_1, bus_2)
     if bus_1 in A.ref_bus_positions || bus_2 in A.ref_bus_positions
-        err_msg = string(" Rows and columns related to slack buses are not defined for the ABA matrix. \n",
+        err_msg = string(
+            " Rows and columns related to slack buses are not defined for the ABA matrix. \n",
             "Indices must be referred to any bus number that is not a slack one. \n",
-            "For the current Systems the reference slack buses are: ", collect(A.ref_bus_positions), ". \n")
+            "For the current Systems the reference slack buses are: ",
+            collect(A.ref_bus_positions), ". \n")
         error(err_msg)
     else
         i, j = to_index(A, bus_1, bus_2)

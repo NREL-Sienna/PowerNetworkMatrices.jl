@@ -15,7 +15,7 @@ of how a change in a line's flow affects the flows on other lines in the system.
         tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
 """
-struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <: 
+struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
        PowerNetworkMatrix{Float64}
     data::M
     axes::Ax
@@ -197,7 +197,7 @@ function LODF(
     buses::Vector{PSY.Bus};
     linera_solver::String = "KLU",
     dist_slack::Vector{Float64} = Float64[],
-    tol::Float64 = eps()
+    tol::Float64 = eps(),
 )
 
     # get axis names
@@ -216,8 +216,8 @@ function LODF(
         _buildlodf(a, ptdf_t, linera_solver),
         axes,
         look_up,
-        Ref(tol)
-        )
+        Ref(tol),
+    )
 end
 
 """
@@ -260,13 +260,15 @@ function LODF(
     A::IncidenceMatrix,
     PTDFm::PTDF;
     linear_solver::String = "KLU",
-    tol::Float64 = eps()
+    tol::Float64 = eps(),
 )
     validate_linear_solver(linear_solver)
 
     if PTDFm.tol.x > 1e-15
-        err_msg = string("The argument `tol` in the PTDF matrix was set to a value dirrent than the default one.\n",
-                         "The PTDF matrix used as imput of the LODF matrix must have the default `tol` value.\n")
+        err_msg = string(
+            "The argument `tol` in the PTDF matrix was set to a value dirrent than the default one.\n",
+            "The PTDF matrix used as imput of the LODF matrix must have the default `tol` value.\n",
+        )
         error(err_msg)
     end
 
@@ -277,14 +279,14 @@ function LODF(
             sparsify(lodf_t, tol),
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
-            Ref(tol)
+            Ref(tol),
         )
     end
     return LODF(
         _buildlodf(A.data, PTDFm.data, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
-        Ref(tol)
+        Ref(tol),
     )
 end
 
@@ -312,24 +314,24 @@ function LODF(
     BA::BA_Matrix;
     linear_solver::String = "KLU",
     dist_slack::Vector{Float64} = Float64[],
-    tol::Float64 = eps()
+    tol::Float64 = eps(),
 )
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
     if tol > eps()
         lodf_t = _buildlodf(A.data, ABA.K, BA.data,
-                            A.ref_bus_positions, linear_solver)
+            A.ref_bus_positions, linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
-            Ref(tol)
+            Ref(tol),
         )
     end
     return LODF(
         _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
-        Ref(tol)
+        Ref(tol),
     )
 end
