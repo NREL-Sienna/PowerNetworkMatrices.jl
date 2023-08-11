@@ -54,7 +54,6 @@ function _buildlodf(
     else
         error("MKLPardiso still to be implemented")
     end
-
     return lodf_t
 end
 
@@ -62,7 +61,7 @@ function _buildlodf(
     a::SparseArrays.SparseMatrixCSC{Int8, Int64},
     k::KLU.KLUFactorization{Float64, Int64},
     ba::SparseArrays.SparseMatrixCSC{Float64, Int64},
-    ref_bus_positions::Vector{Int},
+    ref_bus_positions::Set{Int},
     linear_solver::String,
 )
     if linear_solver == "KLU"
@@ -100,9 +99,9 @@ function _calculate_LODF_matrix_KLU(
         end
     end
     Dem_LU = klu(SparseArrays.sparse(m_I, m_I, m_V))
-    lodf = Dem_LU \ ptdf_denominator
-    lodf[SparseArrays.diagind(lodf)] .= -1
-    return lodf
+    lodf_t = Dem_LU \ ptdf_denominator
+    lodf_t[SparseArrays.diagind(lodf_t)] .= -1
+    return lodf_t
 end
 
 function _calculate_LODF_matrix_KLU(
@@ -180,7 +179,7 @@ function _calculate_LODF_matrix_DENSE(
 end
 
 """
-Builds the LODF matrix from a group of branches and buses. The return is a LOLDF array indexed with the branch name.
+Builds the LODF matrix given the data of branches and buses of the system.
 
 # Arguments
 - `branches`:
@@ -208,18 +207,21 @@ function LODF(
     bus_ax = [PSY.get_number(bus) for bus in buses]
     bus_lookup = make_ax_ref(bus_ax)
     # get network matrices
-    ptdf, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, dist_slack)
-
-    lodf = _buildlodf(a, ptdf, linera_solver)
-
+    ptdf_t, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, dist_slack)
     if tol > eps()
-        return LODF(sparsify(lodf, tol), axes, look_up, Ref(tol))
+        lodf_t = _buildlodf(a, ptdf_t, linera_solver)
+        return LODF(sparsify(lodf_t, tol), axes, look_up, Ref(tol))
     end
-    return LODF(lodf, axes, look_up, Ref(tol))
+    return LODF(
+        _buildlodf(a, ptdf_t, linera_solver),
+        axes,
+        look_up,
+        Ref(tol)
+        )
 end
 
 """
-Builds the LODF matrix from a system. The return is a LOLDF array indexed with the branch name.
+Builds the LODF matrix from a system.
 
 # Arguments
 - `sys::PSY.System`:
@@ -234,6 +236,26 @@ function LODF(
     return LODF(branches, buses; kwargs...)
 end
 
+"""
+Builds the LODF matrix given the Incidence Matrix and the PTDF matrix of the system.
+
+NOTE (1): if the LODF with distributed slack is wanted, then a PTDF matrix computed with 
+distributed slack is needed.
+
+NOTE (2): tol is referred to the LODF sparsification, not the PTDF one. PTDF matrix 
+must be considered as NON sparsified ("tol" argument not specified when calling 
+the PTDF method).
+
+# Arguments
+- `A::IncidenceMatrix`:
+        Structure containing the Incidence matrix of the system.
+- `PTDFm::PTDF`:
+        Strucutre containing the transposed PTDF matrix of the system.
+- `linear_solver::String`:
+        Linear solver to be used. Options are "Dense" and "KLU".
+- `tol::Float64`:
+        Tolerance to eliminate entries in the LODF matrix (default eps()).
+"""
 function LODF(
     A::IncidenceMatrix,
     PTDFm::PTDF;
@@ -241,28 +263,73 @@ function LODF(
     tol::Float64 = eps()
 )
     validate_linear_solver(linear_solver)
+
+    if PTDFm.tol.x > 1e-15
+        err_msg = string("The argument `tol` in the PTDF matrix was set to a value dirrent than the default one.\n",
+                         "The PTDF matrix used as imput of the LODF matrix must have the default `tol` value.\n")
+        error(err_msg)
+    end
+
     ax_ref = make_ax_ref(A.axes[1])
+    if tol > eps()
+        lodf_t = _buildlodf(A.data, PTDFm.data, linear_solver)
+        return LODF(
+            sparsify(lodf_t, tol),
+            (A.axes[1], A.axes[1]),
+            (ax_ref, ax_ref),
+            Ref(tol)
+        )
+    end
     return LODF(
         _buildlodf(A.data, PTDFm.data, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
-        tol
+        Ref(tol)
     )
 end
 
+"""
+Builds the LODF matrix given the Incidence Matrix and the PTDF matrix of the system.
+
+# Arguments
+- `A::IncidenceMatrix`:
+        Structure containing the Incidence matrix of the system.
+- `ABA::ABA_Matrix`:
+        Structure containing the ABA matrix of the system.
+- `BA::BA_Matrix`:
+        Structure containing the transposed BA matrix of the system.
+- `linear_solver::String`:
+        Linear solver to be used. Options are "Dense" and "KLU".
+- `dist_slack::Vector{Float64}`:
+    Vector of weights to be used as distributed slack bus.
+    The distributed slack vector has to be the same length as the number of buses.
+- `tol::Float64`:
+        Tolerance to eliminate entries in the LODF matrix (default eps()).
+"""
 function LODF(
     A::IncidenceMatrix,
     ABA::ABA_Matrix,
     BA::BA_Matrix;
     linear_solver::String = "KLU",
+    dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps()
 )
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
+    if tol > eps()
+        lodf_t = _buildlodf(A.data, ABA.K, BA.data,
+                            A.ref_bus_positions, linear_solver)
+        return LODF(
+            sparsify(lodf_t, tol),
+            (A.axes[1], A.axes[1]),
+            (ax_ref, ax_ref),
+            Ref(tol)
+        )
+    end
     return LODF(
         _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
-        tol
+        Ref(tol)
     )
 end
