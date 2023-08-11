@@ -38,7 +38,14 @@ Deserialize a PTDF from an HDF5 file.
 PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
 
 """
-Elements whose values are below "tol" are set to zero (dropped in case of Sparse matrix).
+Sets to zero those elements whose absolute values is below the threshold
+specified by the field "tol".
+
+# Arguments
+- `mat::PTDF`:
+        PTDF structure
+- `tol::Float64`:
+        tolerance
 """
 function drop_small_entries!(mat::PTDF, tol::Float64)
     if tol > mat.tol[]
