@@ -5,10 +5,10 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
 
 # Arguments
 - `data<:AbstractArray{Float64, 2}`:
-        the actual Incidence matrix.
+        the transposed PTDF matrix.
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors (the first one showing the branches names,
-        the second showing the buses numbers).
+        Tuple containing two vectors: the first one showing the branches names,
+        the second showing the buses numbers.
 - `lookup<:NTuple{2, Dict}`:
         Tuple containing two dictionaries, the first mapping the branches
         and buses with their enumerated indexes.
