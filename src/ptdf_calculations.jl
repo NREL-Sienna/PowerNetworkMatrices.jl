@@ -188,9 +188,6 @@ function calculate_PTDF_matrix_KLU(
     return PTDFm, A
 end
 
-"""
-!!! MISSING DOCUMENTATION !!!
-"""
 function _binfo_check(binfo::Int)
     if binfo != 0
         if binfo < 0

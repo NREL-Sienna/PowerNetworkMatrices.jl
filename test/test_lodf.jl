@@ -29,24 +29,51 @@
     total_error = abs.(L5NS.data' .- Lodf_5)
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
 
+    # A and PTDF case
     A = IncidenceMatrix(sys5)
     P5 = PTDF(sys5)
     L5NS_from_ptdf = LODF(A, P5)
     @test getindex(L5NS_from_ptdf, "6", "5") - -0.3071 <= 1e-4
     total_error = abs.(L5NS_from_ptdf.data' .- Lodf_5)
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
+
+    # A, ABA, and BA case
+    ABA = ABA_Matrix(sys5, factorize=true)
+    BA = BA_Matrix(sys5)
+    L5NS_from_ba_aba = LODF(A, ABA, BA)
+    @test getindex(L5NS_from_ba_aba, "6", "5") - -0.3071 <= 1e-4
+    total_error = abs.(L5NS_from_ba_aba.data' .- Lodf_5)
+    @test isapprox(sum(total_error), 0.0, atol = 1e-3)
+
 end
 
 @testset "Sparse LODF matrix" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    L5NS = LODF(sys5, tol=0.4)
-    L5NS_bis = LODF(sys5)
-    drop_small_entries!(L5NS_bis, 0.4)
+    
+    # basic case: system
+    L5NS_1 = LODF(sys5, tol=0.4)
 
+    # basic case: system but sparsification is done afterwards
+    L5NS_2 = LODF(sys5)
+    drop_small_entries!(L5NS_2, 0.4)
+
+    # A and PTDF case
+    a_matrix = IncidenceMatrix(sys5)
+    ptdf_matrix = PTDF(sys5)
+    L5NS_3 = LODF(a_matrix, ptdf_matrix, tol=0.4)
+
+    # A, ABA, and BA case
+    aba_matrix = ABA_Matrix(sys5, factorize=true)
+    ba_matrix = BA_Matrix(sys5)
+    L5NS_4 = LODF(a_matrix, aba_matrix, ba_matrix, tol=0.4)
+
+    # reference value
     ref_sparse_Lodf_5 = deepcopy(Lodf_5')
     ref_sparse_Lodf_5[abs.(ref_sparse_Lodf_5) .< 0.4] .= 0
     
-    @test isapprox(Matrix(L5NS.data), ref_sparse_Lodf_5, atol=1e-3)
-    @test isapprox(Matrix(L5NS.data), L5NS_bis.data, atol=1e-3)
-
+    # tests
+    @test isapprox(Matrix(L5NS_1.data), ref_sparse_Lodf_5, atol=1e-3)
+    @test isapprox(Matrix(L5NS_1.data), L5NS_2.data, atol=1e-3)
+    @test isapprox(Matrix(L5NS_1.data), L5NS_3.data, atol=1e-3)
+    @test isapprox(Matrix(L5NS_1.data), L5NS_4.data, atol=1e-3)
 end
