@@ -18,6 +18,25 @@ struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     lookup::L
 end
 
+"""
+Sets to zero those elements of the LODF matrix whose absolute values is below
+the threshold specified by the field "tol".
+
+# Arguments
+- `mat::LODF`:
+        LODF structure
+- `tol::Float64`:
+        tolerance
+"""
+function drop_small_entries!(mat::LODF, tol::Float64)
+    if tol > mat.tol[]
+        @info "Specified tolerance is smaller than the current tolerance."
+    end
+    make_entries_zero!(mat.data, tol)
+    mat.tol[] = tol
+    return
+end
+
 function _buildlodf(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
