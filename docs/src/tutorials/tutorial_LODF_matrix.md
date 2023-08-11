@@ -1,15 +1,15 @@
-# PTDF matrix
+# LODF matrix
 
-In this tutorial the methods for computing the Power Transfer Distribution Factors (`PTDF`) are presented.
-Before diving into this tutorial we encourage the user to load `PowerNetworkMatrices`, hit the `?` key in the REPL terminal and look for the documentiont of the different `PTDF` methods avialable.
+In this tutorial the methods for computing the Line Outage Distribution Factor (`LODF`) are presented.
+Before diving into this tutorial we encourage the user to load `PowerNetworkMatrices`, hit the `?` key in the REPL terminal and look for the documentiont of the different `LODF` methods avialable.
 
-## Evaluation of the `PTDF` matrix
+## Evaluation of the `LODF` matrix
 
-The `PTDF` matrix can be evaluated according to two different approaches:
+As for the `PTDF` matrix, the `LODF` one can be evaluated according to two different approaches:
 - `Dense`: considers functions for dense matrix multiplication and inversion
-- `KLU`: considers functions for sparse matrix multiplication and inversion (**default**)
+- `KLU`: considers functions for sparse matrix multiplication  and inversion(**default**)
 
-The evaluation of the `PTDF` matrix can be easily performed starting from importing the system's data and then by simply calling the `PTDF` method.
+The evaluation of the `LODF` matrix can be easily performed starting from importing the system's data and then by simply calling the `LODF` method.
 
 ``` @repl tutorial_PTDF_matrix
 using PowerNetworkMatrices
@@ -18,11 +18,16 @@ using PowerSystemCaseBuilder
 const PNM = PowerNetworkMatrices
 const PSB = PowerSystemCaseBuilder
 
+# get the System data
 sys = PSB.build_system(PSB.PSITestSystems, "c_sys5");
 
-ptdf_1 = PTDF(sys);
+# compute the LODF matrix
+lodf_1 = LODF(sys);
 
-get_ptdf_data(ptdf_1)
+lodf_2 = LODF(sys, linear_solver="Dense");
+
+# show matrix
+
 ```
 
 Advanced users might be interested in computing the `PTDF` matrix starting from either the data contained in the `IncidenceMatrix` and `BA_matrix` structures, or by the information related to the `branches` and `buses` of the system.

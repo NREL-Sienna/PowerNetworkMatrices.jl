@@ -8,6 +8,8 @@ pages = OrderedDict(
         "Incidence, BA and ABA matrices" => "tutorials/tutorial_Incidence_BA_ABA_matrices.md",
         "PTDF matrix" => "tutorials/tutorial_PTDF_matrix.md",
         "VirtualPTDF matrix" => "tutorials/tutorial_VirtualPTDF_matrix.md",
+        "LODF matrix" => "tutorials/tutorial_LODF_matrix.md",
+        "VirtualLODF matrix" => "tutorials/tutorial_VirtualLODF_matrix.md",
     ],
     "Public API Reference" => "api/public.md",
     "Internal API Reference" => "api/internal.md",
