@@ -6,17 +6,18 @@ of how a change in a line's flow affects the flows on other lines in the system.
 - `data<:AbstractArray{Float64, 2}`:
         the transposed LODF matrix.
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors (the first one showing the branches names,
-        the second showing the buses numbers).
+        Tuple containing two identical vectors containing the names of the 
+        branches related to each row/column.
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries, the first mapping the branches
-        and buses with their enumerated indexes.
+        Tuple containing two identical dictionaries mapping the branches
+         their enumerated indexes (row and column numbers).
 - `tol::Base.RefValue{Float64}`:
-        tolerance used for sportifying the matrix (dropping element whose
+        tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
 """
-struct LODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
-    data::Array{Float64, 2}
+struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <: 
+       PowerNetworkMatrix{Float64}
+    data::M
     axes::Ax
     lookup::L
     tol::Base.RefValue{Float64}
@@ -189,13 +190,15 @@ Builds the LODF matrix from a group of branches and buses. The return is a LOLDF
 - `dist_slack::Vector{Float64}`:
         Vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses.
-
+- `tol::Float64`:
+        Tolerance to eliminate entries in the LODF matrix (default eps())
 """
 function LODF(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.Bus};
     linera_solver::String = "KLU",
     dist_slack::Vector{Float64} = Float64[],
+    tol::Float64 = eps()
 )
 
     # get axis names
@@ -208,7 +211,11 @@ function LODF(
     ptdf, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, dist_slack)
 
     lodf = _buildlodf(a, ptdf, linera_solver)
-    return LODF(lodf, axes, look_up)
+
+    if tol > eps()
+        return LODF(sparsify(lodf, tol), axes, look_up, Ref(tol))
+    end
+    return LODF(lodf, axes, look_up, Ref(tol))
 end
 
 """
@@ -217,25 +224,21 @@ Builds the LODF matrix from a system. The return is a LOLDF array indexed with t
 # Arguments
 - `sys::PSY.System`:
         Power Systems system
-- `dist_slack::Vector{Float64}`:
-        Vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses.
 """
 function LODF(
     sys::PSY.System;
-    linear_solver::String = "KLU",
-    dist_slack::Vector{Float64} = Float64[],
+    kwargs...,
 )
-    validate_linear_solver(linear_solver)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
-    return LODF(branches, buses, linear_solver, dist_slack)
+    return LODF(branches, buses; kwargs...)
 end
 
 function LODF(
     A::IncidenceMatrix,
-    PTDFm::PTDF,
+    PTDFm::PTDF;
     linear_solver::String = "KLU",
+    tol::Float64 = eps()
 )
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
@@ -243,14 +246,16 @@ function LODF(
         _buildlodf(A.data, PTDFm.data, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
+        tol
     )
 end
 
 function LODF(
     A::IncidenceMatrix,
     ABA::ABA_Matrix,
-    BA::BA_Matrix,
+    BA::BA_Matrix;
     linear_solver::String = "KLU",
+    tol::Float64 = eps()
 )
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
@@ -258,5 +263,6 @@ function LODF(
         _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
+        tol
     )
 end
