@@ -38,8 +38,8 @@ Deserialize a PTDF from an HDF5 file.
 PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
 
 """
-Sets to zero those elements whose absolute values is below the threshold
-specified by the field "tol".
+Sets to zero those elements of the PTDF matrix whose absolute values is below
+the threshold specified by the field "tol".
 
 # Arguments
 - `mat::PTDF`:
