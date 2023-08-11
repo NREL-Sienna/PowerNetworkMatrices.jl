@@ -56,14 +56,6 @@ function drop_small_entries!(mat::PTDF, tol::Float64)
     return
 end
 
-"""
-Takes and existing PTDF and makes it sparse given a certain tolerance "tol".
-"""
-function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
-    new_mat = sparsify(mat.data, tol)
-    return PTDF(new_mat, mat.axes, mat.lookup, ref_bus_positions, mat.subnetworks, Ref(tol))
-end
-
 function _buildptdf(
     branches,
     buses::Vector{PSY.Bus},
