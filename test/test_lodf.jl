@@ -102,3 +102,28 @@ end
     # tests
     @test isapprox(LODF_ref.data, LODF_1.data, atol = 1e-5)
 end
+
+@test "LODF getindex and get_lodf_data" begin
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+
+    # get the LODF matrix
+    lodf_ = LODF(sys)
+
+    # test get_lodf_data
+    lodf_t = lodf_.data'
+    @test isapprox(lodf_t, get_lodf_data(lodf_))
+
+    # test getindex
+    for name1 in PNM.get_branch_ax(lodf_)       # selected line
+        for name2 in PNM.get_branch_ax(lodf_)   # outage line
+            i = lodf_.lookup[1][name1]
+            j = lodf_.lookup[2][name2]
+            element_1 = lodf_[name1, name2]
+            element_2 = lodf_[i, j]
+            element_3 = lodf_t[i, j]
+            @test isapprox(element_1, element_2, atol = 1e-5)
+            @test isapprox(element_1, element_3, atol = 1e-5)
+            @test isapprox(element_2, element_3, atol = 1e-5)
+        end
+    end
+end

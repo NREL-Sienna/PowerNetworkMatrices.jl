@@ -8,6 +8,7 @@ export factorize
 export find_subnetworks
 export from_hdf5
 export get_ptdf_data
+export get_lodf_data
 export IncidenceMatrix
 export is_factorized
 export LODF

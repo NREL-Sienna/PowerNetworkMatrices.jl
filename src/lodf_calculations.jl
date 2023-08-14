@@ -330,3 +330,28 @@ function LODF(
         Ref(tol),
     )
 end
+
+############################################################
+# auxiliary functions for getting data from LODF structure #
+############################################################
+
+function Base.getindex(A::LODF, selected_line, outage_line)
+    i, j = to_index(A, outage_line, selected_line)
+    return A.data[i, j]
+end
+
+function Base.getindex(
+    A::LODF,
+    selected_line_number::Union{Int, Colon},
+    outage_line_number::Union{Int, Colon},
+)
+    return A.data[outage_line_number, selected_line_number]
+end
+
+function get_lodf_data(lodf::LODF)
+    return transpose(lodf.data)
+end
+
+function get_branch_ax(lodf::LODF)
+    return lodf.axes[1]
+end
