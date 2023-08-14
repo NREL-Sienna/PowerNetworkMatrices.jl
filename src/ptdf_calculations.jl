@@ -507,3 +507,7 @@ end
 function get_bus_ax(ptdf::PTDF)
     return ptdf.axes[1]
 end
+
+function get_tol(ptdf::PTDF)
+    return ptdf.tol
+end
