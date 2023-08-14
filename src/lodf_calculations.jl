@@ -355,3 +355,7 @@ end
 function get_branch_ax(lodf::LODF)
     return lodf.axes[1]
 end
+
+function get_tol(lodf::LODF)
+    return lodf.tol
+end
