@@ -36,34 +36,6 @@ end
           sum(abs.(lodf_virtual_with_tol["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", :]))
 end
 
-@testset "Virtual LODF matrix with distributed slack bus" begin
-    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-
-    buscount = length(PNM.get_buses(sys5))
-
-    dist_slack = 1 / buscount * ones(buscount)
-    slack_array = dist_slack / sum(dist_slack)
-
-    # initialize Virtual LODF
-    vlodf = VirtualLODF(sys5, dist_slack = slack_array)
-    vlodf1 = VirtualLODF(sys5)
-    # Standard Virtual LODF with distributed slack bus
-    lodf = LODF(sys5, dist_slack = slack_array)
-    lodf1 = LODF(sys5)
-
-
-
-    for row in 1:size(lodf.data, 1)
-        # evaluate the column (just needs one element)
-        vlodf[row, 1]
-        vlodf1[row, 1]
-        @assert isapprox(vlodf.cache[row], lodf[row, :], atol = 1e-5)
-        @assert isapprox(vlodf.cache[row], vlodf1.cache[row], atol = 1e-5)
-        @assert isapprox(lodf[row, :], lodf1[row, :], atol = 1e-5)
-    end
-
-end
-
 @testset "Virtual LODF matrices for 10 bus system with 2 reference buses" begin
     # get system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")   # get the system composed by 2 5-bus ones connected by a DC line
@@ -72,7 +44,7 @@ end
     # check VirtualPTDF rows with the ones from KLU
     lodf_virtual = VirtualLODF(sys)
     for i in axes(lodf_complete, 2)
-        comp = lodf_complete[:, i]
+        comp = lodf_complete[i, :]
         virtual = lodf_virtual[i, :]
         # check values using PTDFs axes
         @test isapprox(comp, virtual; atol = 1e-10)

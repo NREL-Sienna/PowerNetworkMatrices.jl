@@ -22,9 +22,6 @@ The VirtualLODF struct is indexed using branch names.
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the rows of the transposed BA matrix 
         corresponding to the refence buses.
-- `dist_slack::Vector{Float64}`:
-        Vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses.
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors (the first one showing the branches names,
         the second showing the buses numbers).
@@ -49,7 +46,6 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     A::SparseArrays.SparseMatrixCSC{Int8, Int}
     inv_PTDF_A_diag::Vector{Float64}
     ref_bus_positions::Set{Int}
-    dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
     valid_ix::Vector{Int}
@@ -64,68 +60,27 @@ function _get_PTDF_A_diag(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
     ref_bus_positions::Set{Int},
-    valid_ix::Vector{Int},
-    dist_slack::Vector{Float64},
-    temp_data::Vector{Float64} = []
 )
-    buscount, linecount = size(BA)
-    
-    if !isempty(dist_slack) && length(ref_bus_positions) != 1
-        error(
-            "Distibuted slack is not supported for systems with multiple reference buses.",
-        )
-    elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-
-        # get inverse of ABA
-        Ix = SparseArrays.sparse(I, size(K, 1), size(K, 1))
-        ABA_inv = zeros(Float64, size(Ix))
-        ldiv!(ABA_inv, K, Ix)
-        # multiply the matrix just for some elements
-        diag_ = zeros(size(BA, 2))
-        for i in 1:size(BA, 2) # per each column
-            for j in BA.rowval[BA.colptr[i]:(BA.colptr[i + 1] - 1)]
-                check_1 = sum(j .> ref_bus_positions)
-                for k in BA.colptr[i]:(BA.colptr[i + 1] - 1)
-                    if BA.rowval[k] ∉ ref_bus_positions && j ∉ ref_bus_positions
-                        check_2 = sum(BA.rowval[k] .> ref_bus_positions)
-                        diag_[i] +=
-                            A[i, j] *
-                            (BA.nzval[k] * ABA_inv[j - check_1, BA.rowval[k] - check_2])
-                    end
+    # get inverse of ABA
+    Ix = SparseArrays.sparse(I, size(K, 1), size(K, 1))
+    ABA_inv = zeros(Float64, size(Ix))
+    ldiv!(ABA_inv, K, Ix)
+    # multiply the matrix just for some elements
+    diag_ = zeros(size(BA, 2))
+    for i in 1:size(BA, 2) # per each column
+        for j in BA.rowval[BA.colptr[i]:(BA.colptr[i + 1] - 1)]
+            check_1 = sum(j .> ref_bus_positions)
+            for k in BA.colptr[i]:(BA.colptr[i + 1] - 1)
+                if BA.rowval[k] ∉ ref_bus_positions && j ∉ ref_bus_positions
+                    check_2 = sum(BA.rowval[k] .> ref_bus_positions)
+                    diag_[i] +=
+                        A[i, j] *
+                        (BA.nzval[k] * ABA_inv[j - check_1, BA.rowval[k] - check_2])
                 end
             end
         end
-
-        return diag_
-
-    elseif length(dist_slack) == buscount
-
-        # TODO still to implement as above
-
-        @info "Distributed bus"
-
-        slack_array = dist_slack / sum(dist_slack)
-        slack_array = reshape(slack_array, buscount)
-        diag_ = zeros(size(BA, 2))
-        for row in 1:linecount
-            # evaluate PTDF row
-            lin_solve = KLU.solve!(K, Vector(BA[valid_ix, row]));
-            for j in eachindex(valid_ix)
-                temp_data[valid_ix[j]] = lin_solve[j]
-            end
-            temp_data[:] .= temp_data .- dot(temp_data, slack_array)
-            for j in BA.rowval[BA.colptr[row]:(BA.colptr[row + 1] - 1)]
-                diag_[row] += temp_data[j] * A[row, j]
-            end
-            temp_data[collect(ref_bus_positions)] .= 0
-        end
-
-        return diag_
-
-    else
-        error("Distributed bus specification doesn't match the number of buses.")
     end
-    return
+    return diag_
 end
 
 function VirtualLODF(
@@ -140,7 +95,6 @@ end
 function VirtualLODF(
     branches,
     buses::Vector{PSY.Bus};
-    dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
@@ -173,9 +127,6 @@ function VirtualLODF(
         BA,
         A,
         ref_bus_positions,
-        valid_ix,
-        dist_slack,
-        temp_data
     )
     PTDF_diag[PTDF_diag .> 1 - 1e-6] .= 0.0
     # initialize structure
@@ -198,7 +149,6 @@ function VirtualLODF(
         A,
         1.0 ./ (1.0 .- PTDF_diag),
         ref_bus_positions,
-        dist_slack,
         axes,
         look_up,
         valid_ix,
@@ -221,12 +171,9 @@ function Base.isempty(vlodf::VirtualLODF)
     !isempty(vlodf.A) && return false
     !isempty(vlodf.inv_PTDF_A_diag) && return false
     !isempty(vlodf.ref_bus_positions) && return false
-    !isempty(vlodf.dist_slack) && return false
     !isempty(vlodf.axes) && return false
     !isempty(vlodf.lookup) && return false
-    !isempty(vlodf.valid_ix) && return false
     !isempty(vlodf.cache) && return false
-    !isempty(vlodf.temp_data) && return false
     !isempty(subnetworks) && return false
     !isempty(tol) && return false
     return true
@@ -258,33 +205,12 @@ function _getindex(
 
         # evaluate the value for the LODF column
         
-        # TODO: Needs improvement (not much found...)
+        # TODO: needs improvement to speed up computation (not much found...)
 
-        buscount, _ = size(vlodf.BA)
-
-        if !isempty(vlodf.dist_slack) && length(vlodf.ref_bus_positions) != 1
-            error(
-                "Distibuted slack is not supported for systems with multiple reference buses.",
-            )
-        elseif isempty(vlodf.dist_slack) && length(vlodf.ref_bus_positions) < buscount
-            lin_solve = KLU.solve!(vlodf.K, Vector(vlodf.BA[vlodf.valid_ix, row]))
-            # get full lodf row
-            for i in eachindex(vlodf.valid_ix)
-                vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
-            end
-        elseif length(vlodf.dist_slack) == buscount
-            lin_solve = KLU.solve!(vlodf.K, Vector(vlodf.BA[vlodf.valid_ix, row]))
-            # get full lodf row
-            for i in eachindex(vlodf.valid_ix)
-                vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
-            end
-            vlodf.temp_data[collect(vlodf.ref_bus_positions)] .= 0
-            # change vector due to distributed slack weights
-            slack_array = vlodf.dist_slack / sum(vlodf.dist_slack)
-            vlodf.temp_data[:] .= 
-                deepcopy(vlodf.temp_data .- dot(vlodf.temp_data, slack_array))
-        else
-            error("Distributed bus specification doesn't match the number of buses.")
+        lin_solve = KLU.solve!(vlodf.K, Vector(vlodf.BA[vlodf.valid_ix, row]))
+        # get full lodf row
+        for i in eachindex(vlodf.valid_ix)
+            vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
         end
 
         # now get the LODF row
