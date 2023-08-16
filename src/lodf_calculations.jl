@@ -183,9 +183,6 @@ Builds the LODF matrix given the data of branches and buses of the system.
         vector of the System AC branches
 - `buses::Vector{PSY.Bus}`:
         vector of the System buses
-- `dist_slack::Vector{Float64}`:
-        Vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses.
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps())
 """
@@ -193,7 +190,6 @@ function LODF(
     branches,
     buses::Vector{PSY.Bus};
     linera_solver::String = "KLU",
-    dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
 )
 
@@ -204,7 +200,7 @@ function LODF(
     bus_ax = [PSY.get_number(bus) for bus in buses]
     bus_lookup = make_ax_ref(bus_ax)
     # get network matrices
-    ptdf_t, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, dist_slack)
+    ptdf_t, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, Float64[])
     if tol > eps()
         lodf_t = _buildlodf(a, ptdf_t, linera_solver)
         return LODF(sparsify(lodf_t, tol), axes, look_up, Ref(tol))
@@ -236,10 +232,7 @@ end
 """
 Builds the LODF matrix given the Incidence Matrix and the PTDF matrix of the system.
 
-NOTE (1): if the LODF with distributed slack is wanted, then a PTDF matrix computed with 
-distributed slack is needed.
-
-NOTE (2): tol is referred to the LODF sparsification, not the PTDF one. PTDF matrix 
+NOTE: tol is referred to the LODF sparsification, not the PTDF one. PTDF matrix 
 must be considered as NON sparsified ("tol" argument not specified when calling 
 the PTDF method).
 
