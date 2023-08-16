@@ -254,29 +254,23 @@ end
 """
 !!! STILL TO IMPLEMENT !!!
 """
-Base.setindex!(::VirtualLODF, _, idx...) = error("Operation not supported by VirtualPTDF")
+Base.setindex!(::VirtualLODF, _, idx...) = error("Operation not supported by VirtualLODF")
 
 """
 !!! STILL TO IMPLEMENT !!!
 """
 Base.setindex!(::VirtualLODF, _, ::CartesianIndex) =
-    error("Operation not supported by VirtualPTDF")
-
-"""
-PTDF data is stored in the the cache
-it is a nested vector containing an array for the names of each row,
-the PTDF's matrices rows and how many times they were evaluated
-"""
+    error("Operation not supported by VirtualLODF")
 
 # ! change it so to get only the non-empty values
 
 get_lodf_data(mat::VirtualLODF) = mat.cache
 
-function get_branch_ax(ptdf::VirtualLODF)
-    return ptdf.axes[1]
+function get_branch_ax(mat::VirtualLODF)
+    return mat.axes[1]
 end
 
 """ Gets the tolerance used for sparsifying the rows of the VirtualLODF matrix"""
-function get_tol(vlodf::VirtualLODF)
-    return vlodf.tol[]
+function get_tol(mat::VirtualLODF)
+    return mat.tol[]
 end
