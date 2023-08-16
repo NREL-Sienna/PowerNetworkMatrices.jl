@@ -259,7 +259,7 @@ function LODF(
     if PTDFm.tol.x > 1e-15
         err_msg = string(
             "The argument `tol` in the PTDF matrix was set to a value dirrent than the default one.\n",
-            "The PTDF matrix used as imput of the LODF matrix must have the default `tol` value.\n",
+            "The PTDF matrix used as input of the LODF matrix must have the default `tol` value.\n",
         )
         error(err_msg)
     end
