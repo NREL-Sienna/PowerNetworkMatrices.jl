@@ -3,15 +3,15 @@
     NOTE: LODF is transposed
     """
 
-    # get system
+    # get 5 bus system
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     buses_5 = nodes5()
     branches_5 = branches5(buses_5)
 
-    # get LODF
+    # get LODF with buses and branches
     L5 = LODF(branches_5, buses_5)
     @test isapprox(maximum(L5.data), maximum(Lodf_5), atol = 1e-3)
-    @test isapprox(L5[branches_5[2], branches_5[1]], 0.3447946513849093)
+    @test isapprox(L5[branches_5[1], branches_5[2]], 0.3447946513849093)
 
     # get LODF with second method
     a = IncidenceMatrix(sys5)
@@ -19,13 +19,9 @@
     lodf_t_3 = PNM._calculate_LODF_matrix_KLU2(a.data, ptdf.data)
     @test isapprox(lodf_t_3, L5.data, atol = 1e-5)
 
-    buses_14 = nodes14()
-    branches_14 = branches14(buses_14)
-    L14 = LODF(branches_14, buses_14)
-    @test isapprox(maximum(L14.data), maximum(Lodf_14), atol = 1e-3)
-
+    # get LODF with system
     L5NS = LODF(sys5)
-    @test getindex(L5NS, "6", "5") - -0.3071 <= 1e-4
+    @test getindex(L5NS, "5", "6") - -0.3071 <= 1e-4
     total_error = abs.(L5NS.data' .- Lodf_5)
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
 
@@ -33,7 +29,7 @@
     A = IncidenceMatrix(sys5)
     P5 = PTDF(sys5)
     L5NS_from_ptdf = LODF(A, P5)
-    @test getindex(L5NS_from_ptdf, "6", "5") - -0.3071 <= 1e-4
+    @test getindex(L5NS_from_ptdf, "5", "6") - -0.3071 <= 1e-4
     total_error = abs.(L5NS_from_ptdf.data' .- Lodf_5)
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
 
@@ -41,9 +37,23 @@
     ABA = ABA_Matrix(sys5; factorize = true)
     BA = BA_Matrix(sys5)
     L5NS_from_ba_aba = LODF(A, ABA, BA)
-    @test getindex(L5NS_from_ba_aba, "6", "5") - -0.3071 <= 1e-4
+    @test getindex(L5NS_from_ba_aba, "5", "6") - -0.3071 <= 1e-4
     total_error = abs.(L5NS_from_ba_aba.data' .- Lodf_5)
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
+
+    for i in axes(Lodf_5, 1)
+        @test isapprox(L5[i, :], Lodf_5[i, :], atol=1e-3)
+        @test isapprox(L5NS[i, :], Lodf_5[i, :], atol=1e-3)
+        @test isapprox(L5NS_from_ptdf[i, :], Lodf_5[i, :], atol=1e-3)
+        @test isapprox(L5NS_from_ba_aba[i, :], Lodf_5[i, :], atol=1e-3) 
+    end
+
+    # get 14 bus system
+    buses_14 = nodes14()
+    branches_14 = branches14(buses_14)
+    L14 = LODF(branches_14, buses_14)
+    @test isapprox(maximum(L14.data), maximum(Lodf_14), atol = 1e-3)
+
 end
 
 @testset "Sparse LODF matrix" begin

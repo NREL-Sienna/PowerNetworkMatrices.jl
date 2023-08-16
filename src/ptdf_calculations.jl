@@ -156,7 +156,7 @@ function _calculate_PTDF_matrix_KLU(
         PTDFm_t[collect(ref_bus_positions), :] .= 0.0
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
-        return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
+        return PTDFm_t .- (slack_array * PTDFm_t)
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end

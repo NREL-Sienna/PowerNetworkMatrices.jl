@@ -70,7 +70,7 @@ end
 
 @testset "Test virtual PTDF with distributed slack" begin
     # get 5 bus system
-    sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     bus_number = length(PNM.get_buses(sys))
     dist_slack = 1 / bus_number * ones(bus_number)
     # compute full PTDF

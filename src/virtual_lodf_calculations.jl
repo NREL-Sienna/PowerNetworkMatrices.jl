@@ -1,18 +1,27 @@
 """
-Power Transfer Distribution Factors (PTDF) indicate the incremental change in
-real power that occurs on transmission lines due to real power injections
-changes at the buses.
+The Virtual Line Outage Distribution Factor (VirtualLODF) structure gathers
+the rows of the LODF matrix as they are evaluated on-the-go. These rows are 
+evalauted independently, cached in the structure and do not require the 
+computation of the whole matrix (therefore significantly reducing the 
+computational requirements).
 
-The PTDF struct is indexed using the Bus numbers and branch names.
+The VirtualLODF is initialized with no row stored.
+
+The VirtualLODF struct is indexed using branch names.
 
 # Arguments
 - `K::KLU.KLUFactorization{Float64, Int}`:
-        LU factorization matrices of the ABA matrix, evaluated by means of KLU
+        LU factorization matrices of the ABA matrix, evaluated by means of KLU.
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        BA matric
+        BA matrix.
+- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
+        Incidence matrix.
+- `inv_PTDF_A_diag::Vector{Float64}`:
+        Vector contiaining the element-wise reciprocal of the diagonal elements
+        coming from multuiplying the PTDF matrix with th Incidence matrix
 - `ref_bus_positions::Set{Int}`:
-        Vector containing the indexes of the columns of the BA matrix corresponding
-        to the refence buses
+        Vector containing the indexes of the rows of the transposed BA matrix 
+        corresponding to the refence buses.
 - `dist_slack::Vector{Float64}`:
         Vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses.
@@ -22,14 +31,17 @@ The PTDF struct is indexed using the Bus numbers and branch names.
 - `lookup<:NTuple{2, Dict}`:
         Tuple containing two dictionaries, the first mapping the branches
         and buses with their enumerated indexes.
+- `valid_ix::Vector{Int}`:
+        Vector containing the row/columns indices of matrices related the buses
+        which are not slack ones.
 - `temp_data::Vector{Float64}`:
-        temporary vector for internal use.
+        Temporary vector for internal use.
 - `cache::RowCache`:
-        cache were PTDF rows are stored.
+        Cache were LODF rows are stored.
 - `subnetworks::Dict{Int, Set{Int}}`:
-        dictionary containing the subsets of buses defining the different subnetwork of the system.
+        Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
-        tolerance related to scarification and values to drop.
+        Tolerance related to scarification and values to drop.
 """
 struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
@@ -52,12 +64,12 @@ function _get_PTDF_A_diag(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
     ref_bus_positions::Set{Int},
+    valid_ix::Vector{Int},
     dist_slack::Vector{Float64},
+    temp_data::Vector{Float64} = []
 )
     buscount, linecount = size(BA)
-    # inizialize matrices for evaluation
-    valid_ix = setdiff(1:buscount, ref_bus_positions)
-    PTDFm_t = zeros(buscount, linecount)
+    
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
@@ -91,17 +103,29 @@ function _get_PTDF_A_diag(
         # TODO still to implement as above
 
         @info "Distributed bus"
-        copyto!(PTDFm_t, BA)
-        PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
-        PTDFm_t[ref_bus_positions, :] .= 0.0
+
         slack_array = dist_slack / sum(dist_slack)
-        slack_array = reshape(slack_array, 1, buscount)
-        return LinearAlgebra.diag(
-            A * (PTDFm_t - (PTDFm_t * slack_array) * ones(1, buscount)),
-        )
+        slack_array = reshape(slack_array, buscount)
+        diag_ = zeros(size(BA, 2))
+        for row in 1:linecount
+            # evaluate PTDF row
+            lin_solve = KLU.solve!(K, Vector(BA[valid_ix, row]));
+            for j in eachindex(valid_ix)
+                temp_data[valid_ix[j]] = lin_solve[j]
+            end
+            temp_data[:] .= temp_data .- dot(temp_data, slack_array)
+            for j in BA.rowval[BA.colptr[row]:(BA.colptr[row + 1] - 1)]
+                diag_[row] += temp_data[j] * A[row, j]
+            end
+            temp_data[collect(ref_bus_positions)] .= 0
+        end
+
+        return diag_
+
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
+    return
 end
 
 function VirtualLODF(
@@ -142,17 +166,19 @@ function VirtualLODF(
         subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
     end
     # get diagonal of PTDF
+    temp_data = zeros(length(bus_ax))
+    valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
     PTDF_diag = _get_PTDF_A_diag(
         K,
         BA,
         A,
         ref_bus_positions,
+        valid_ix,
         dist_slack,
+        temp_data
     )
     PTDF_diag[PTDF_diag .> 1 - 1e-6] .= 0.0
     # initialize structure
-    temp_data = zeros(length(bus_ax))
-    valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
     if isempty(persistent_lines)
         empty_cache =
             RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
@@ -186,15 +212,14 @@ end
 # Overload Base functions
 
 """
-Checks if the any of the fields of VirtualPTDF is empty.
+Checks if the any of the fields of VirtualLODF is empty.
 """
-# ! does not check as expected: if first line is true it does not check the others
 function Base.isempty(vlodf::VirtualLODF)
     !isempty(vlodf.K.L) && return false
     !isempty(vlodf.K.U) && return false
     !isempty(vlodf.BA) && return false
     !isempty(vlodf.A) && return false
-    !isempty(vlodf.PTDF_A_diag) && return false
+    !isempty(vlodf.inv_PTDF_A_diag) && return false
     !isempty(vlodf.ref_bus_positions) && return false
     !isempty(vlodf.dist_slack) && return false
     !isempty(vlodf.axes) && return false
@@ -208,12 +233,12 @@ function Base.isempty(vlodf::VirtualLODF)
 end
 
 """
-Gives the size of the whole PTDF matrix, not the number of rows stored.
+Shows the size of the whole LODF matrix, not the number of rows stored.
 """
 # ! test
 Base.size(vlodf::VirtualLODF) = (size(vlodf.BA, 2), size(vlodf.BA, 2))
 """
-Gives the cartesian indexes of the PTDF matrix (same as the BA one).
+Gives the cartesian indexes of the LODF matrix.
 """
 Base.eachindex(vlodf::VirtualLODF) = CartesianIndices(size(vlodf))
 
@@ -223,45 +248,73 @@ end
 
 function _getindex(
     vlodf::VirtualLODF,
-    row::Int,
+    row::Int, 
     column::Union{Int, Colon},
 )
     # check if value is in the cache
     if haskey(vlodf.cache, row)
         return vlodf.cache[row][column]
     else
-        # evaluate the value for the PTDF column
-        # Needs improvement (not much found...)
 
-        lin_solve = KLU.solve!(vlodf.K, Vector(vlodf.BA[vlodf.valid_ix, row]))
-        # get full ptdf row
-        for i in eachindex(vlodf.valid_ix)
-            vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
+        # evaluate the value for the LODF column
+        
+        # TODO: Needs improvement (not much found...)
+
+        buscount, _ = size(vlodf.BA)
+
+        if !isempty(vlodf.dist_slack) && length(vlodf.ref_bus_positions) != 1
+            error(
+                "Distibuted slack is not supported for systems with multiple reference buses.",
+            )
+        elseif isempty(vlodf.dist_slack) && length(vlodf.ref_bus_positions) < buscount
+            lin_solve = KLU.solve!(vlodf.K, Vector(vlodf.BA[vlodf.valid_ix, row]))
+            # get full lodf row
+            for i in eachindex(vlodf.valid_ix)
+                vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
+            end
+        elseif length(vlodf.dist_slack) == buscount
+            lin_solve = KLU.solve!(vlodf.K, Vector(vlodf.BA[vlodf.valid_ix, row]))
+            # get full lodf row
+            for i in eachindex(vlodf.valid_ix)
+                vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
+            end
+            vlodf.temp_data[collect(vlodf.ref_bus_positions)] .= 0
+            # change vector due to distributed slack weights
+            slack_array = vlodf.dist_slack / sum(vlodf.dist_slack)
+            vlodf.temp_data[:] .= 
+                deepcopy(vlodf.temp_data .- dot(vlodf.temp_data, slack_array))
+        else
+            error("Distributed bus specification doesn't match the number of buses.")
         end
+
+        # now get the LODF row
         lodf_row = (vlodf.A * vlodf.temp_data) .* vlodf.inv_PTDF_A_diag
         lodf_row[row] = -1.0
-        # add slack bus value (zero) and make copy of temp into the cache
+
+        # ! should be sparse if done here ! consider function "sparsify"
         if get_tol(vlodf) > eps()
             make_entries_zero!(lodf_row, get_tol(vlodf))
         end
+
         vlodf.cache[row] = deepcopy(lodf_row)
         return vlodf.cache[row][column]
     end
 end
 
 """
-Gets the value of the element of the PTDF matrix given the row and column indices
+Gets the value of the element of the LODF matrix given the row and column indices
 corresponding to the branch and buses one respectively. If `column` is a Colon then
 the entire row is returned.
 
 # Arguments
-- `vptdf::VirtualPTDF`:
-        VirtualPTDF struct where to evaluate and store the values.
+- `vlodf::VirtualLODF`:
+VirtualLODF struct where to evaluate and store the values.
 - `row`:
         Branch index.
 - `column`:
         Bus index. If Colon then get the values of the whole row.
 """
+# ! check if indexing is correct
 function Base.getindex(vlodf::VirtualLODF, row, column)
     row_, column_ = to_index(vlodf, row, column)
     return _getindex(vlodf, row_, column_)
@@ -291,13 +344,13 @@ the PTDF's matrices rows and how many times they were evaluated
 
 # ! change it so to get only the non-empty values
 
-get_data(mat::VirtualLODF) = mat.cache
+get_lodf_data(mat::VirtualLODF) = mat.cache
 
 function get_branch_ax(ptdf::VirtualLODF)
     return ptdf.axes[1]
 end
 
-""" Gets the tolerance used for sparsifying the rows of the PTDF matrix"""
-function get_tol(vptdf::Union{VirtualPTDF, VirtualLODF})
-    return vptdf.tol[]
+""" Gets the tolerance used for sparsifying the rows of the VirtualLODF matrix"""
+function get_tol(vlodf::VirtualLODF)
+    return vlodf.tol[]
 end

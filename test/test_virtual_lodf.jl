@@ -6,14 +6,14 @@
     # data
     for (idx, name) in enumerate(vlodf.axes[1])
         # compare
-        @test isapprox(vlodf[name, :], LODF_ref.data[:, idx], atol = 1e-6)
+        @test isapprox(vlodf[name, :], LODF_ref[idx, :], atol = 1e-6)
     end
 
     # check dicionary with rows
-    data_dict = PNM.get_data(vlodf)
+    data_dict = get_lodf_data(vlodf)
     for i in 1:length(vlodf.axes[1])
         # compare
-        @test isapprox(data_dict.temp_cache[i], LODF_ref.data[:, i], atol = 1e-6)
+        @test isapprox(data_dict.temp_cache[i], LODF_ref[i, :], atol = 1e-6)
     end
 end
 
@@ -36,7 +36,35 @@ end
           sum(abs.(lodf_virtual_with_tol["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", :]))
 end
 
-@testset "Virtual PTDF matrices for 10 bus system with 2 reference buses" begin
+@testset "Virtual LODF matrix with distributed slack bus" begin
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+
+    buscount = length(PNM.get_buses(sys5))
+
+    dist_slack = 1 / buscount * ones(buscount)
+    slack_array = dist_slack / sum(dist_slack)
+
+    # initialize Virtual LODF
+    vlodf = VirtualLODF(sys5, dist_slack = slack_array)
+    vlodf1 = VirtualLODF(sys5)
+    # Standard Virtual LODF with distributed slack bus
+    lodf = LODF(sys5, dist_slack = slack_array)
+    lodf1 = LODF(sys5)
+
+
+
+    for row in 1:size(lodf.data, 1)
+        # evaluate the column (just needs one element)
+        vlodf[row, 1]
+        vlodf1[row, 1]
+        @assert isapprox(vlodf.cache[row], lodf[row, :], atol = 1e-5)
+        @assert isapprox(vlodf.cache[row], vlodf1.cache[row], atol = 1e-5)
+        @assert isapprox(lodf[row, :], lodf1[row, :], atol = 1e-5)
+    end
+
+end
+
+@testset "Virtual LODF matrices for 10 bus system with 2 reference buses" begin
     # get system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")   # get the system composed by 2 5-bus ones connected by a DC line
     # get PTDF matrix with KLU as reference
@@ -65,7 +93,7 @@ end
     @test isapprox(ptdf_first_area, ptdf_second_area, atol = 1e-6)
 end
 
-@testset "Test virtual PTDF cache" begin
+@testset "Test virtual LODF cache" begin
     RTS = build_system(PSITestSystems, "test_RTS_GMLC_sys")
     line_names = get_name.(PNM.get_ac_branches(RTS))
     persist_lines = line_names[1:10]

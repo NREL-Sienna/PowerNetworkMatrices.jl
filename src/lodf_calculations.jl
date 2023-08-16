@@ -335,6 +335,8 @@ end
 # auxiliary functions for getting data from LODF structure #
 ############################################################
 
+# NOTE: the LODF matrix is saved as transposed!
+
 function Base.getindex(A::LODF, selected_line, outage_line)
     i, j = to_index(A, outage_line, selected_line)
     return A.data[i, j]

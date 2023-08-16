@@ -1,9 +1,13 @@
 """
-Power Transfer Distribution Factors (PTDF) indicate the incremental change in
-real power that occurs on transmission lines due to real power injections
-changes at the buses.
+The Virtual Power Transfer Distribution Factor (VirtualPTDF) structure gathers
+the rows of the PTDF matrix as they are evaluated on-the-go. These rows are 
+evalauted independently, cached in the structure and do not require the 
+computation of the whole matrix (therefore significantly reducing the 
+computational requirements).
 
-The PTDF struct is indexed using the Bus numbers and branch names.
+The VirtualPTDF is initialized with no row stored. 
+
+The VirtualPTDF struct is indexed using the Bus numbers and branch names.
 
 # Arguments
 - `K::KLU.KLUFactorization{Float64, Int}`:
@@ -23,13 +27,16 @@ The PTDF struct is indexed using the Bus numbers and branch names.
         Tuple containing two dictionaries, the first mapping the branches
         and buses with their enumerated indexes.
 - `temp_data::Vector{Float64}`:
-        temporary vector for internal use.
+        Temporary vector for internal use.
+- `valid_ix::Vector{Int}`:
+        Vector containing the row/columns indices of matrices related the buses
+        which are not slack ones.
 - `cache::RowCache`:
-        cache were PTDF rows are stored.
+        Cache were PTDF rows are stored.
 - `subnetworks::Dict{Int, Set{Int}}`:
-        dictionary containing the subsets of buses defining the different subnetwork of the system.
+        Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
-        tolerance related to scarification and values to drop.
+        Tolerance related to scarification and values to drop.
 """
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
@@ -140,11 +147,13 @@ function Base.isempty(vptdf::VirtualPTDF)
     !isempty(vptdf.K.L) && return false
     !isempty(vptdf.K.U) && return false
     !isempty(vptdf.BA) && return false
-    !isempty(vptdf.dist_slack) && return false
+    !isempty(vptdf.ref_bus_positions) && return false
     !isempty(vptdf.axes) && return false
     !isempty(vptdf.lookup) && return false
-    !isempty(vptdf.cache) && return false
     !isempty(vptdf.temp_data) && return false
+    !isempty(vptdf.valid_ix) && return false
+    !isempty(vptdf.cache) && return false
+    !isempty(vptdf.subnetworks) && return false
     return true
 end
 
@@ -249,7 +258,7 @@ the PTDF's matrices rows and how many times they were evaluated
 
 # ! change it so to get only the non-empty values
 
-get_data(mat::VirtualPTDF) = mat.cache
+get_ptdf_data(mat::VirtualPTDF) = mat.cache
 
 function get_branch_ax(ptdf::VirtualPTDF)
     return ptdf.axes[1]
@@ -257,4 +266,9 @@ end
 
 function get_bus_ax(ptdf::VirtualPTDF)
     return ptdf.axes[2]
+end
+
+""" Gets the tolerance used for sparsifying the rows of the VirtualPTDF matrix"""
+function get_tol(vptdf::VirtualPTDF)
+    return vptdf.tol[]
 end
