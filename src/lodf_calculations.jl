@@ -189,7 +189,7 @@ Builds the LODF matrix given the data of branches and buses of the system.
 function LODF(
     branches,
     buses::Vector{PSY.Bus};
-    linera_solver::String = "KLU",
+    linear_solver::String = "KLU",
     tol::Float64 = eps(),
 )
 
@@ -202,15 +202,17 @@ function LODF(
     # get network matrices
     ptdf_t, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, Float64[])
     if tol > eps()
-        lodf_t = _buildlodf(a, ptdf_t, linera_solver)
+        lodf_t = _buildlodf(a, ptdf_t, linear_solver)
         return LODF(sparsify(lodf_t, tol), axes, look_up, Ref(tol))
+    else
+        return LODF(
+            _buildlodf(a, ptdf_t, linear_solver),
+            axes,
+            look_up,
+            Ref(tol),
+        )
     end
-    return LODF(
-        _buildlodf(a, ptdf_t, linera_solver),
-        axes,
-        look_up,
-        Ref(tol),
-    )
+    return
 end
 
 """
