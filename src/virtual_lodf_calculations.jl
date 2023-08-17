@@ -219,28 +219,27 @@ function _getindex(
 
         # ! should be sparse if done here ! consider function "sparsify"
         if get_tol(vlodf) > eps()
-            make_entries_zero!(lodf_row, get_tol(vlodf))
+            vlodf.cache[row] = deepcopy(sparsify(lodf_row, get_tol(vlodf)))
+        else
+            vlodf.cache[row] = deepcopy(lodf_row)
         end
-
-        vlodf.cache[row] = deepcopy(lodf_row)
         return vlodf.cache[row][column]
     end
 end
 
 """
 Gets the value of the element of the LODF matrix given the row and column indices
-corresponding to the branch and buses one respectively. If `column` is a Colon then
+corresponding to the selected and outage branch respectively. If `column` is a Colon then
 the entire row is returned.
 
 # Arguments
 - `vlodf::VirtualLODF`:
-VirtualLODF struct where to evaluate and store the values.
+        VirtualLODF struct where to evaluate and store the row values.
 - `row`:
-        Branch index.
+        selected line name
 - `column`:
-        Bus index. If Colon then get the values of the whole row.
+        outage line name. If `Colon` then get the values of the whole row.
 """
-# ! check if indexing is correct
 function Base.getindex(vlodf::VirtualLODF, row, column)
     row_, column_ = to_index(vlodf, row, column)
     return _getindex(vlodf, row_, column_)

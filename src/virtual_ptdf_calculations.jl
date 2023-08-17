@@ -223,7 +223,7 @@ the entire row is returned.
 
 # Arguments
 - `vptdf::VirtualPTDF`:
-        VirtualPTDF struct where to evaluate and store the values.
+        VirtualPTDF struct where to evaluate and store the row values.
 - `row`:
         Branch index.
 - `column`:

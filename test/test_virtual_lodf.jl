@@ -15,6 +15,17 @@
         # compare
         @test isapprox(data_dict.temp_cache[i], LODF_ref[i, :], atol = 1e-6)
     end
+
+    # check the getindex function works properly
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    vlodf5 = VirtualLODF(sys5)
+    for i in axes(Lodf_5, 1)
+        for j in axes(Lodf_5, 2)
+            # get the data
+            @test isapprox(vlodf5[i, j], Lodf_5[i, j], atol=1e-3)
+        end
+    end
+
 end
 
 @testset "Virtual LODF functions" begin
@@ -29,11 +40,21 @@ end
 end
 
 @testset "Virtual LODF matrices with tolerance" begin
-    sys = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys")
-    lodf_virtual = VirtualLODF(sys)
+    
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    lodf_reference = deepcopy(Lodf_14)
+    lodf_reference[abs.(lodf_reference) .<= 1e-2] .= 0
     lodf_virtual_with_tol = VirtualLODF(sys; tol = 1e-2)
-    @test sum(abs.(lodf_virtual["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", :])) >
-          sum(abs.(lodf_virtual_with_tol["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", :]))
+    for (n, i) in enumerate(axes(lodf_virtual_with_tol, 1))
+        @show i
+        @test isapprox(
+            lodf_virtual_with_tol[i, :], lodf_reference[n, :], atol = 1e-3)
+    end
+
+    @test isapprox(
+        sum(abs.(lodf_reference[lodf_virtual_with_tol.lookup[1]["Line12"], :])),
+        sum(abs.(lodf_virtual_with_tol["Line12", :])),
+        atol=1e-5)
 end
 
 @testset "Virtual LODF matrices for 10 bus system with 2 reference buses" begin
