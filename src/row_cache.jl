@@ -44,8 +44,8 @@ function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
     return RowCache(
         sizehint!(
             Dict{Int, Union{Vector{Float64}, SparseArrays.SparseVector{Float64}}}(),
-            max_num_keys
-            ),
+            max_num_keys,
+        ),
         persistent_rows,
         max_cache_size,
         max_num_keys,
@@ -95,7 +95,11 @@ Allocates vector as row of the matrix saved in cache.
 - `key::Int`:
         row number (corresponding to the enumerated branch index) related to the input row vector
 """
-function Base.setindex!(cache::RowCache, val::Union{Vector{Float64}, SparseArrays.SparseVector{Float64}}, key::Int)
+function Base.setindex!(
+    cache::RowCache,
+    val::Union{Vector{Float64}, SparseArrays.SparseVector{Float64}},
+    key::Int,
+)
     check_cache_size!(cache)
     cache.temp_cache[key] = val
     return
@@ -110,7 +114,10 @@ Gets the row of the stored matrix in cache.
 - `key::Int`:
         row number (corresponding to the enumerated branch index) related to the row vector.
 """
-function Base.getindex(cache::RowCache, key::Int)::Union{Vector{Float64}, SparseArrays.SparseVector{Float64}}
+function Base.getindex(
+    cache::RowCache,
+    key::Int,
+)::Union{Vector{Float64}, SparseArrays.SparseVector{Float64}}
     return cache.temp_cache[key]
 end
 

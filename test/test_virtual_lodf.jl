@@ -22,10 +22,9 @@
     for i in axes(Lodf_5, 1)
         for j in axes(Lodf_5, 2)
             # get the data
-            @test isapprox(vlodf5[i, j], Lodf_5[i, j], atol=1e-3)
+            @test isapprox(vlodf5[i, j], Lodf_5[i, j], atol = 1e-3)
         end
     end
-
 end
 
 @testset "Virtual LODF functions" begin
@@ -40,15 +39,14 @@ end
 end
 
 @testset "Virtual LODF matrices with tolerance" begin
-    
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     lodf_reference = deepcopy(Lodf_14)
     lodf_reference[abs.(lodf_reference) .<= 1e-2] .= 0
     lodf_virtual_with_tol = VirtualLODF(sys; tol = 1e-2)
-    lodf_virtual_with_tol1  = VirtualLODF(sys)
+    lodf_virtual_with_tol1 = VirtualLODF(sys)
     for (n, i) in enumerate(axes(lodf_virtual_with_tol, 1))
         # get the row
-        lodf_virtual_with_tol1[i, :];
+        lodf_virtual_with_tol1[i, :]
         @test isapprox(
             lodf_virtual_with_tol[i, :], lodf_reference[n, :], atol = 1e-3)
     end
@@ -62,7 +60,7 @@ end
     @test isapprox(
         sum(abs.(lodf_reference[lodf_virtual_with_tol.lookup[1]["Line12"], :])),
         sum(abs.(lodf_virtual_with_tol["Line12", :])),
-        atol=1e-5)
+        atol = 1e-5)
 end
 
 @testset "Virtual LODF matrices for 10 bus system with 2 reference buses" begin
