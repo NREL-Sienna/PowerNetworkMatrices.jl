@@ -23,11 +23,10 @@ The VirtualLODF struct is indexed using branch names.
         Vector containing the indexes of the rows of the transposed BA matrix 
         corresponding to the refence buses.
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors (the first one showing the branches names,
-        the second showing the buses numbers).
+        Tuple containing two vectors showing the branch names.
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries, the first mapping the branches
-        and buses with their enumerated indexes.
+        Tuple containing two dictionaries, mapping the branches names 
+        the enumerated row indexes indexes.
 - `valid_ix::Vector{Int}`:
         Vector containing the row/columns indices of matrices related the buses
         which are not slack ones.
@@ -53,6 +52,27 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
+end
+
+"""
+Sets to zero those elements of each LODF matrix row whose absolute values are 
+below the threshold specified by the field "tol".
+
+# Arguments
+- `mat::VirtualLODF`:
+        VirtualLODF structure
+- `tol::Float64`:
+        tolerance
+"""
+function drop_small_entries!(mat::VirtualLODF, tol::Float64)
+    if tol < mat.tol[]
+        @info "Specified tolerance is smaller than the current tolerance."
+    end
+    for i in keys(mat.cache.temp_cache)
+        make_entries_zero!(mat.cache[i], tol)
+    end
+    mat.tol[] = tol
+    return
 end
 
 function _get_PTDF_A_diag(
