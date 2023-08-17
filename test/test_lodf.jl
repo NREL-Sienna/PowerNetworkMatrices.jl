@@ -86,7 +86,7 @@ end
     @test isapprox(Matrix(L5NS_1.data), L5NS_4.data, atol = 1e-3)
 end
 
-@test "LODF getindex and get_lodf_data" begin
+@testset "LODF getindex and get_lodf_data" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
 
     # get the LODF matrix
