@@ -16,16 +16,15 @@
 end
 
 @testset "Virtual PTDF matrices with tolerance" begin
-
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     ptdf_reference = deepcopy(S14_slackB1)
     ptdf_reference[abs.(ptdf_reference) .<= 1e-2] .= 0
     ptdf_virtual_with_tol = VirtualPTDF(sys; tol = 1e-2)
-    ptdf_virtual_with_tol1  = VirtualPTDF(sys)
+    ptdf_virtual_with_tol1 = VirtualPTDF(sys)
     for (n, i) in enumerate(axes(ptdf_virtual_with_tol, 1))
         # get the row
-        @show i 
-        ptdf_virtual_with_tol1[i, :];
+        @show i
+        ptdf_virtual_with_tol1[i, :]
         @test isapprox(
             ptdf_virtual_with_tol[i, :], ptdf_reference[n, :], atol = 1e-3)
     end
@@ -39,7 +38,7 @@ end
     @test isapprox(
         sum(abs.(ptdf_reference[ptdf_virtual_with_tol.lookup[1]["Line12"], :])),
         sum(abs.(ptdf_virtual_with_tol["Line12", :])),
-        atol=1e-4)
+        atol = 1e-4)
 end
 
 @testset "Virtual PTDF matrices for 10 bus system with 2 reference buses" begin

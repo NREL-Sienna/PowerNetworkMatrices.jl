@@ -42,10 +42,10 @@
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
 
     for i in axes(Lodf_5, 1)
-        @test isapprox(L5[i, :], Lodf_5[i, :], atol=1e-3)
-        @test isapprox(L5NS[i, :], Lodf_5[i, :], atol=1e-3)
-        @test isapprox(L5NS_from_ptdf[i, :], Lodf_5[i, :], atol=1e-3)
-        @test isapprox(L5NS_from_ba_aba[i, :], Lodf_5[i, :], atol=1e-3) 
+        @test isapprox(L5[i, :], Lodf_5[i, :], atol = 1e-3)
+        @test isapprox(L5NS[i, :], Lodf_5[i, :], atol = 1e-3)
+        @test isapprox(L5NS_from_ptdf[i, :], Lodf_5[i, :], atol = 1e-3)
+        @test isapprox(L5NS_from_ba_aba[i, :], Lodf_5[i, :], atol = 1e-3)
     end
 
     # get 14 bus system
@@ -53,7 +53,6 @@
     branches_14 = branches14(buses_14)
     L14 = LODF(branches_14, buses_14)
     @test isapprox(maximum(L14.data), maximum(Lodf_14), atol = 1e-3)
-
 end
 
 @testset "Sparse LODF matrix" begin

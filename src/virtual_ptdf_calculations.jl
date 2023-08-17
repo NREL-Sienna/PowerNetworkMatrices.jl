@@ -235,7 +235,7 @@ function _getindex(
         if get_tol(vptdf) > eps()
             vptdf.cache[row] = deepcopy(sparsify(vptdf.cache[row], get_tol(vptdf)))
         end
-        
+
         return vptdf.cache[row][column]
     end
 end

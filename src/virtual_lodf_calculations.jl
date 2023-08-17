@@ -215,7 +215,7 @@ end
 
 function _getindex(
     vlodf::VirtualLODF,
-    row::Int, 
+    row::Int,
     column::Union{Int, Colon},
 )
     # check if value is in the cache
@@ -224,7 +224,7 @@ function _getindex(
     else
 
         # evaluate the value for the LODF column
-        
+
         # TODO: needs improvement to speed up computation (not much found...)
 
         lin_solve = KLU.solve!(vlodf.K, Vector(vlodf.BA[vlodf.valid_ix, row]))
