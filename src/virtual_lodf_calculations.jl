@@ -261,9 +261,7 @@ Base.setindex!(::VirtualLODF, _, idx...) = error("Operation not supported by Vir
 Base.setindex!(::VirtualLODF, _, ::CartesianIndex) =
     error("Operation not supported by VirtualLODF")
 
-# ! change it so to get only the non-empty values
-
-get_lodf_data(mat::VirtualLODF) = mat.cache
+get_lodf_data(mat::VirtualLODF) = mat.cache.temp_cache
 
 function get_branch_ax(mat::VirtualLODF)
     return mat.axes[1]

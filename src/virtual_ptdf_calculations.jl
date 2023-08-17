@@ -7,7 +7,8 @@ computational requirements).
 
 The VirtualPTDF is initialized with no row stored. 
 
-The VirtualPTDF struct is indexed using the Bus numbers and branch names.
+The VirtualPTDF is indexed using branch names and bus numbers as for the PTDF
+matrix.
 
 # Arguments
 - `K::KLU.KLUFactorization{Float64, Int}`:
@@ -21,11 +22,15 @@ The VirtualPTDF struct is indexed using the Bus numbers and branch names.
         Vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses.
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors (the first one showing the branches names,
-        the second showing the buses numbers).
+        Tuple containing two vectors: the first one showing the branches names,
+        the second showing the buses numbers. There is no link between the
+        order of the vector of the branche names and the way the PTDF rows are 
+        stored in the cache.
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries, the first mapping the branches
-        and buses with their enumerated indexes.
+        Tuple containing two dictionaries, mapping the branches
+        and buses with their enumerated indexes. The branch indexes refer to
+        the key of the cache dictionary. The bus indexes refer to the position 
+        of the elements in the PTDF row stored.
 - `temp_data::Vector{Float64}`:
         Temporary vector for internal use.
 - `valid_ix::Vector{Int}`:
@@ -250,15 +255,7 @@ Base.setindex!(::VirtualPTDF, _, idx...) = error("Operation not supported by Vir
 Base.setindex!(::VirtualPTDF, _, ::CartesianIndex) =
     error("Operation not supported by VirtualPTDF")
 
-"""
-PTDF data is stored in the the cache
-it is a nested vector containing an array for the names of each row,
-the PTDF's matrices rows and how many times they were evaluated
-"""
-
-# ! change it so to get only the non-empty values
-
-get_ptdf_data(mat::VirtualPTDF) = mat.cache
+get_ptdf_data(mat::VirtualPTDF) = mat.cache.temp_cache
 
 function get_branch_ax(ptdf::VirtualPTDF)
     return ptdf.axes[1]
