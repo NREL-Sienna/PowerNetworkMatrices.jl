@@ -24,7 +24,7 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
 end
 
 """
-Sets to zero those elements of the LODF matrix whose absolute values is below
+Sets to zero those elements of the LODF matrix whose absolute values are below
 the threshold specified by the field "tol".
 
 # Arguments
