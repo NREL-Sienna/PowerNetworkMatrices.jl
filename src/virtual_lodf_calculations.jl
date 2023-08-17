@@ -237,7 +237,6 @@ function _getindex(
         lodf_row = (vlodf.A * vlodf.temp_data) .* vlodf.inv_PTDF_A_diag
         lodf_row[row] = -1.0
 
-        # ! should be sparse if done here ! consider function "sparsify"
         if get_tol(vlodf) > eps()
             vlodf.cache[row] = deepcopy(sparsify(lodf_row, get_tol(vlodf)))
         else

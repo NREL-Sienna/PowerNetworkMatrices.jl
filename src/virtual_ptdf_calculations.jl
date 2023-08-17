@@ -143,6 +143,27 @@ function VirtualPTDF(
     return VirtualPTDF(branches, buses; kwargs...)
 end
 
+"""
+Sets to zero those elements of each PTDF matrix row whose absolute values are 
+below the threshold specified by the field "tol".
+
+# Arguments
+- `mat::VirtualPTDF`:
+        VirtualPTDF structure
+- `tol::Float64`:
+        tolerance
+"""
+function drop_small_entries!(mat::VirtualPTDF, tol::Float64)
+    if tol < mat.tol[]
+        @info "Specified tolerance is smaller than the current tolerance."
+    end
+    for i in keys(mat.cache.temp_cache)
+        make_entries_zero!(mat.cache[i], tol)
+    end
+    mat.tol[] = tol
+    return
+end
+
 # Overload Base functions
 
 """
@@ -211,12 +232,10 @@ function _getindex(
             error("Distributed bus specification doesn't match the number of buses.")
         end
 
-        # add slack bus value (zero) and make copy of temp into the cache
         if get_tol(vptdf) > eps()
-            # vptdf.cache[row] = make_entries_zero!(deepcopy(vptdf.temp_data), get_tol(vptdf))
-            make_entries_zero!(vptdf.cache[row], get_tol(vptdf))
+            vptdf.cache[row] = deepcopy(sparsify(vptdf.cache[row], get_tol(vptdf)))
         end
-
+        
         return vptdf.cache[row][column]
     end
 end
