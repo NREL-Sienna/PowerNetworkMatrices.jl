@@ -13,7 +13,7 @@
     data_dict = get_lodf_data(vlodf)
     for i in 1:length(vlodf.axes[1])
         # compare
-        @test isapprox(data_dict.temp_cache[i], LODF_ref[i, :], atol = 1e-6)
+        @test isapprox(data_dict[i], LODF_ref[i, :], atol = 1e-6)
     end
 
     # check the getindex function works properly

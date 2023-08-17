@@ -23,7 +23,6 @@ end
     ptdf_virtual_with_tol1 = VirtualPTDF(sys)
     for (n, i) in enumerate(axes(ptdf_virtual_with_tol, 1))
         # get the row
-        @show i
         ptdf_virtual_with_tol1[i, :]
         @test isapprox(
             ptdf_virtual_with_tol[i, :], ptdf_reference[n, :], atol = 1e-3)
