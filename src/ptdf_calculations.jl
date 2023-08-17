@@ -51,7 +51,7 @@ the threshold specified by the field "tol".
         tolerance
 """
 function drop_small_entries!(mat::PTDF, tol::Float64)
-    if tol > mat.tol[]
+    if tol < mat.tol[]
         @info "Specified tolerance is smaller than the current tolerance."
     end
     make_entries_zero!(mat.data, tol)
