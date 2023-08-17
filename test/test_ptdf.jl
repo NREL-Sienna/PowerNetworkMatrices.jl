@@ -1,4 +1,4 @@
-@testset "PTDF matrices" begin
+@testset "PTDF matrices, w/ and w/o tolerance" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     for solver in ["KLU", "Dense", "MKLPardiso"]
         for approach in ["standard", "separate_matrices"]
