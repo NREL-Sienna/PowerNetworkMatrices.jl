@@ -97,6 +97,6 @@ end
     for row in 1:size(ptdf.data, 2)
         # evaluate the column (just needs one element)
         vptdf[row, 1]
-        @assert isapprox(vptdf.cache[row], ptdf[row, :], atol = 1e-5)
+        @test isapprox(vptdf.cache[row], ptdf[row, :], atol = 1e-5)
     end
 end
