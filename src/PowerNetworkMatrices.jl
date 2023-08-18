@@ -3,7 +3,6 @@ module PowerNetworkMatrices
 export ABA_Matrix
 export AdjacencyMatrix
 export BA_Matrix
-export drop_small_entries!
 export factorize
 export find_subnetworks
 export from_hdf5

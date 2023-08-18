@@ -257,60 +257,6 @@ function sparsify(dense_array::Vector{Float64}, tol::Float64)
 end
 
 """
-Sets to zero every element of a Sparse matrix if absolute values is below a
-certain tolerance.
-
-# Arguments
-- `sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int}`: input sparse array.
-- `tol::Float64`: tolerance for removing entries in the PTDF matrix.
-"""
-function make_entries_zero!(
-    sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
-    tol::Float64,
-)
-    for i in 1:size(sparse_array, 1)
-        sparse_array[i, abs.(sparse_array[i, :]) .<= tol] .= 0.0
-    end
-    SparseArrays.dropzeros!(sparse_array)
-    return
-end
-
-"""
-Sets to zero every element of a Dense matrix if absolute values is below a
-certain tolerance.
-
-# Arguments
-- `dense_array::Matrix{Float64}`: input dense matrix.
-- `tol::Float64`: tolerance.
-"""
-function make_entries_zero!(
-    dense_array::Matrix{Float64},
-    tol::Float64,
-)
-    for i in 1:size(dense_array, 1)
-        dense_array[i, abs.(dense_array[i, :]) .<= tol] .= 0.0
-    end
-    return
-end
-
-"""
-Sets to zero every element of a Dense vector if absolute values is below a
-certain tolerance.
-
-# Arguments
-- `vector::Vector{Float64}`:input dense vector.
-- `tol::Float64`: tolerance.
-"""
-function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
-    for i in eachindex(vector)
-        if abs(vector[i]) <= tol
-            vector[i] = 0.0
-        end
-    end
-    return
-end
-
-"""
 !!! MISSING DOCUMENTATION !!!
 """
 function assing_reference_buses(

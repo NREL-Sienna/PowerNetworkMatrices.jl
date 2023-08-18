@@ -40,25 +40,6 @@ Deserialize a PTDF from an HDF5 file.
 """
 PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
 
-"""
-Sets to zero those elements of the PTDF matrix whose absolute values are below
-the threshold specified by the field "tol".
-
-# Arguments
-- `mat::PTDF`:
-        PTDF structure
-- `tol::Float64`:
-        tolerance
-"""
-function drop_small_entries!(mat::PTDF, tol::Float64)
-    if tol < mat.tol[]
-        @info "Specified tolerance is smaller than the current tolerance."
-    end
-    make_entries_zero!(mat.data, tol)
-    mat.tol[] = tol
-    return
-end
-
 function _buildptdf(
     branches,
     buses::Vector{PSY.Bus},

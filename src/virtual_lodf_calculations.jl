@@ -54,27 +54,6 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     tol::Base.RefValue{Float64}
 end
 
-"""
-Sets to zero those elements of each LODF matrix row whose absolute values are 
-below the threshold specified by the field "tol".
-
-# Arguments
-- `mat::VirtualLODF`:
-        VirtualLODF structure
-- `tol::Float64`:
-        tolerance
-"""
-function drop_small_entries!(mat::VirtualLODF, tol::Float64)
-    if tol < mat.tol[]
-        @info "Specified tolerance is smaller than the current tolerance."
-    end
-    for i in keys(mat.cache.temp_cache)
-        make_entries_zero!(mat.cache[i], tol)
-    end
-    mat.tol[] = tol
-    return
-end
-
 function _get_PTDF_A_diag(
     K::KLU.KLUFactorization{Float64, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},

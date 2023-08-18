@@ -61,10 +61,6 @@ end
     # basic case: system
     L5NS_1 = LODF(sys5; tol = 0.4)
 
-    # basic case: system but sparsification is done afterwards
-    L5NS_2 = LODF(sys5)
-    drop_small_entries!(L5NS_2, 0.4)
-
     # A and PTDF case
     a_matrix = IncidenceMatrix(sys5)
     ptdf_matrix = PTDF(sys5)
@@ -81,7 +77,6 @@ end
 
     # tests
     @test isapprox(Matrix(L5NS_1.data), ref_sparse_Lodf_5, atol = 1e-3)
-    @test isapprox(Matrix(L5NS_1.data), L5NS_2.data, atol = 1e-3)
     @test isapprox(Matrix(L5NS_1.data), L5NS_3.data, atol = 1e-3)
     @test isapprox(Matrix(L5NS_1.data), L5NS_4.data, atol = 1e-3)
 end
