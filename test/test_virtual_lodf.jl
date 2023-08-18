@@ -1,4 +1,4 @@
-@testset "Virtual LODF matrices" begin
+@testset "Test Virtual LODF matrices" begin
     sys = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys")
     vlodf = VirtualLODF(sys)
     LODF_ref = LODF(sys)
@@ -27,7 +27,7 @@
     end
 end
 
-@testset "Virtual LODF functions" begin
+@testset "Test Virtual LODF functions" begin
     # get system
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     buses_5 = nodes5()
@@ -38,7 +38,7 @@ end
     @test length(PNM.get_branch_ax(vlodf)) == length(branches_5)
 end
 
-@testset "Virtual LODF matrices with tolerance" begin
+@testset "Test Virtual LODF matrices with tolerance" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     lodf_reference = deepcopy(Lodf_14)
     lodf_reference[abs.(lodf_reference) .<= 1e-2] .= 0
@@ -63,7 +63,7 @@ end
         atol = 1e-5)
 end
 
-@testset "Virtual LODF matrices for 10 bus system with 2 reference buses" begin
+@testset "Test Virtual LODF matrices for 10 bus system with 2 reference buses" begin
     # get system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")   # get the system composed by 2 5-bus ones connected by a DC line
     # get PTDF matrix with KLU as reference
