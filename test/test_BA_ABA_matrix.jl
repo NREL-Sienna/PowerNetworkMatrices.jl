@@ -44,11 +44,40 @@ end
     ba = BA_Matrix(sys)
     aba = ABA_Matrix(sys)
 
-    # check if indexing is correct (row and column indices)
-    for i in size(ba, 1)
-        for j in size(ba, 2)
-
+    # check if indexing for the BA is correct (row and column indices)
+    # ba matrix is stored as transposed
+    for i in size(ba, 2)
+        for j in size(ba, 1)
+            @show i, j
+            @test isapprox(ba[i, j], ba.data[j, i])
         end
     end
+
+    # check if indexing for the BA is correct (line names and bus numbers)
+    lookup1 = PNM.get_lookup(ba)
+    for i in axes(ba, 2)
+        for j in axes(ba, 1)
+            @test isapprox(ba[i, j], ba.data[lookup1[1][j], lookup1[2][i]])
+        end
+    end
+
+    # check indexing for the ABA matrix
+    lookup2 = aba.lookup[1]
+    for i in axes(aba, 1)
+        @test aba[i, :] == aba.data[lookup2[i], :]
+    end
+
+    # test if error is correctly thrown when ref bus is called
+    rb = collect(ba.ref_bus_positions)[1]
+    try 
+        aba[rb, :]
+    catch err
+        if err isa ErrorException
+            test_val = true
+        else
+            error("Expected an ErrorException but was not thrown.")
+        end
+    end
+    @test test_val
 
 end
