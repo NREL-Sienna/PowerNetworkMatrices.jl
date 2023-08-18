@@ -69,7 +69,7 @@ end
 
     # test if error is correctly thrown when ref bus is called
     rb = collect(ba.ref_bus_positions)[1]
-    try 
+    try
         aba[rb, :]
     catch err
         if err isa ErrorException
@@ -79,5 +79,4 @@ end
         end
     end
     @test test_val
-
 end
