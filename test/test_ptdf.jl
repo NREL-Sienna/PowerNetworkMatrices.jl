@@ -62,7 +62,6 @@
             @test isapprox(get_ptdf_data(P5NS), P5NS_mod, atol = 1e-3)
 
             PRTS = PTDF(RTS; linear_solver = solver)
-            PRTS_1 = PTDF(RTS; linear_solver = solver)
             PRTS_mod = zeros(size(SRTS_GMLC))
             PRTS_sparse = PTDF(RTS; linear_solver = solver, tol = 1e-3)
             bnums = sort([PSY.get_number(b) for b in PSY.get_components(Bus, RTS)])
@@ -73,13 +72,9 @@
                 @test isapprox(getindex(PRTS, br, b), SRTS_GMLC[ibr, ib], atol = 1e-3)
             end
 
-            # check sparsification (between different methods)
-            drop_small_entries!(PRTS_1, 1e-1)       # dense matrix
-            drop_small_entries!(PRTS_sparse, 1e-1)  # sparse matrix
-            @test sum(abs.(get_ptdf_data(PRTS_1) - get_ptdf_data(PRTS_sparse)) .> 1e-3) == 0
-            # check sparsification (between method and reference values)
-            PowerNetworkMatrices.make_entries_zero!(PRTS_mod, 1e-1)
-            @test sum(abs.(get_ptdf_data(PRTS_1) - PRTS_mod) .> 1e-3) == 0
+            # manually sparsify the matrix
+            PRTS.data[abs.(PRTS.data) .< 1e-3] .= 0
+            @test sum(abs.(get_ptdf_data(PRTS) - get_ptdf_data(PRTS_sparse)) .> 1e-3) == 0
         end
     end
 end

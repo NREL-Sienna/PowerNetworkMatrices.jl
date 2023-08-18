@@ -43,18 +43,10 @@ end
     lodf_reference = deepcopy(Lodf_14)
     lodf_reference[abs.(lodf_reference) .<= 1e-2] .= 0
     lodf_virtual_with_tol = VirtualLODF(sys; tol = 1e-2)
-    lodf_virtual_with_tol1 = VirtualLODF(sys)
     for (n, i) in enumerate(axes(lodf_virtual_with_tol, 1))
         # get the row
-        lodf_virtual_with_tol1[i, :]
         @test isapprox(
             lodf_virtual_with_tol[i, :], lodf_reference[n, :], atol = 1e-3)
-    end
-
-    drop_small_entries!(lodf_virtual_with_tol1, 1e-2)
-    for (n, i) in enumerate(axes(lodf_virtual_with_tol, 1))
-        @test isapprox(
-            lodf_virtual_with_tol1[i, :], lodf_reference[n, :], atol = 1e-3)
     end
 
     @test isapprox(

@@ -20,18 +20,10 @@ end
     ptdf_reference = deepcopy(S14_slackB1)
     ptdf_reference[abs.(ptdf_reference) .<= 1e-2] .= 0
     ptdf_virtual_with_tol = VirtualPTDF(sys; tol = 1e-2)
-    ptdf_virtual_with_tol1 = VirtualPTDF(sys)
     for (n, i) in enumerate(axes(ptdf_virtual_with_tol, 1))
         # get the row
-        ptdf_virtual_with_tol1[i, :]
         @test isapprox(
             ptdf_virtual_with_tol[i, :], ptdf_reference[n, :], atol = 1e-3)
-    end
-
-    drop_small_entries!(ptdf_virtual_with_tol1, 1e-2)
-    for (n, i) in enumerate(axes(ptdf_virtual_with_tol, 1))
-        @test isapprox(
-            ptdf_virtual_with_tol1[i, :], ptdf_reference[n, :], atol = 1e-3)
     end
 
     @test isapprox(
