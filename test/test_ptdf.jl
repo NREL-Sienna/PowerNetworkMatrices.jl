@@ -1,4 +1,4 @@
-@testset "PTDF matrices, w/ and w/o tolerance" begin
+@testset "Test PTDF matrices, w/ and w/o tolerance" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     for solver in ["KLU", "Dense", "MKLPardiso"]
         for approach in ["standard", "separate_matrices"]
@@ -84,7 +84,7 @@
     end
 end
 
-@testset "PTDF matrices for 10 bus system with 2 reference buses" begin
+@testset "Test PTDF matrices for 10 bus system with 2 reference buses" begin
     # get system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")   # get the system composed by 2 5-bus ones connected by a DC line
     ptdf_complete_klu = PTDF(sys; linear_solver = "KLU")
@@ -124,7 +124,7 @@ end
     end
 end
 
-@testset "System with isolated buses" begin
+@testset "Test System with isolated buses" begin
     sys_1 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     PSY.add_component!(
         sys_1,
@@ -193,7 +193,7 @@ end
     @test_throws IS.ConflictingInputsError ptdf_2 = PTDF(sys_2)
 end
 
-@testset "PTDF matrices with distributed slack" begin
+@testset "Test PTDF matrices with distributed slack" begin
     """
     CAUTION: this test just test that all the matrices are the same, but there 
     are no reference values.

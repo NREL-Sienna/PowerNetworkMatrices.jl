@@ -1,11 +1,8 @@
-@testset "RowCache functions" begin
+@testset "Test RowCache functions" begin
 
     # dummy rows
-    key1 = 1
-    row1 = ones((24,))
-
-    key5 = 5
-    row5 = ones((24,))
+    key = 1
+    row = ones((24,))
 
     # define cache struct
     cache = PNM.RowCache(
@@ -18,8 +15,8 @@
     @test isempty(cache) == true
 
     # test: Base.haskey and Base.getindex
-    cache[key1] = row1
-    @test cache[key1] == row1
+    cache[key] = row
+    @test cache[key] == row
     @test haskey(cache, 1) == true
 
     # test: Base.length (number of rows stored)
@@ -32,9 +29,9 @@
 
     # test: Base.setindex, check_cache_size!
     for i in 1:5
-        cache[i] = row1
+        cache[i] = row
     end
-    cache[6] = row1
+    cache[6] = row
     @test length(cache) == 5
 
     # test: Base.empty!

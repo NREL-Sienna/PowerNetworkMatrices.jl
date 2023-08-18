@@ -1,4 +1,4 @@
-@testset "LODF matrices" begin
+@testset "Test LODF matrices" begin
     """
     NOTE: LODF is transposed
     """
@@ -55,7 +55,7 @@
     @test isapprox(maximum(L14.data), maximum(Lodf_14), atol = 1e-3)
 end
 
-@testset "Sparse LODF matrix" begin
+@testset "Test sparse LODF matrix" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
     # basic case: system
@@ -86,7 +86,7 @@ end
     @test isapprox(Matrix(L5NS_1.data), L5NS_4.data, atol = 1e-3)
 end
 
-@testset "LODF getindex and get_lodf_data" begin
+@testset "Test LODF getindex and get_lodf_data" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
 
     # get the LODF matrix

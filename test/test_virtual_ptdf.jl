@@ -1,4 +1,4 @@
-@testset "Virtual PTDF matrices" begin
+@testset "Test Virtual PTDF matrices" begin
     sys = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys")
     ptdf_complete = PTDF(sys; linear_solver = "KLU")
     ptdf_virtual = VirtualPTDF(sys)
@@ -15,7 +15,7 @@
     @test length(ptdf_virtual.cache) == length(ptdf_virtual.axes[1])
 end
 
-@testset "Virtual PTDF matrices with tolerance" begin
+@testset "Test Virtual PTDF matrices with tolerance" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     ptdf_reference = deepcopy(S14_slackB1)
     ptdf_reference[abs.(ptdf_reference) .<= 1e-2] .= 0
@@ -40,7 +40,7 @@ end
         atol = 1e-4)
 end
 
-@testset "Virtual PTDF matrices for 10 bus system with 2 reference buses" begin
+@testset "Test Virtual PTDF matrices for 10 bus system with 2 reference buses" begin
     # get system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")   # get the system composed by 2 5-bus ones connected by a DC line
     # get PTDF matrix with KLU as reference

@@ -1,4 +1,4 @@
-@testset "Test ABA matrix" begin
+@testset "Test A, BA, and ABA matrix creation" begin
     # test on 5 and 14 bus system
     for name in ["c_sys5", "c_sys14"]
         sys = PSB.build_system(PSB.PSITestSystems, name)
@@ -35,4 +35,20 @@
             atol = 1e-8,
         )
     end
+end
+
+@testset "Test BA and ABA matrix indexing" begin
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+
+    # get the matrices
+    ba = BA_Matrix(sys)
+    aba = ABA_Matrix(sys)
+
+    # check if indexing is correct (row and column indices)
+    for i in size(ba, 1)
+        for j in size(ba, 2)
+
+        end
+    end
+
 end
