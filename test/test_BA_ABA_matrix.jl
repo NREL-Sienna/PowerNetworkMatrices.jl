@@ -46,9 +46,8 @@ end
 
     # check if indexing for the BA is correct (row and column indices)
     # ba matrix is stored as transposed
-    for i in size(ba, 2)
-        for j in size(ba, 1)
-            @show i, j
+    for i in 1:size(ba, 2)
+        for j in 1:size(ba, 1)
             @test isapprox(ba[i, j], ba.data[j, i])
         end
     end
