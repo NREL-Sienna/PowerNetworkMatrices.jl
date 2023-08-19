@@ -48,6 +48,29 @@
         @test isapprox(L5NS_from_ba_aba[i, :], Lodf_5[i, :], atol = 1e-3)
     end
 
+    # test if error is thrown in case `tol` is defined in PTDF
+    P5 = PTDF(sys5; tol = 1e-3)
+    test_value = false
+    try
+        L5NS_from_ptdf = LODF(A, P5)
+    catch err
+        if err isa ErrorException
+            test_value = true
+        end
+    end
+    @test test_value
+
+    # test if error is thrown in case `MKLPardiso` is chosen as a linera solver
+    test_value = false
+    try
+        lodf = LODF(sys5; linear_solver = "MKLPardiso")
+    catch err
+        if err isa ErrorException
+            test_value = true
+        end
+    end
+    @test test_value
+
     # get 14 bus system
     buses_14 = nodes14()
     branches_14 = branches14(buses_14)
@@ -73,7 +96,7 @@ end
 
     # reference value
     ref_sparse_Lodf_5 = deepcopy(Lodf_5')
-    ref_sparse_Lodf_5[abs.(ref_sparse_Lodf_5) .< 0.4] .= 0
+    ref_sparse_Lodf_5[abs.(ref_sparse_Lodf_5) .< PNM.get_tol(L5NS_1)] .= 0
 
     # tests
     @test isapprox(Matrix(L5NS_1.data), ref_sparse_Lodf_5, atol = 1e-3)
@@ -104,4 +127,7 @@ end
             @test isapprox(element_2, element_3, atol = 1e-5)
         end
     end
+end
+
+@testset "Test LODF auxiliary functions" begin
 end
