@@ -77,6 +77,16 @@
             @test sum(abs.(get_ptdf_data(PRTS) - get_ptdf_data(PRTS_sparse)) .> 1e-3) == 0
         end
     end
+
+    # check axes values
+    P5 = PTDF(sys5)
+    @test setdiff(PNM.get_branch_ax(P5), PSY.get_name.(PNM.get_ac_branches(sys5))) ==
+          String[]
+    @test setdiff(PNM.get_bus_ax(P5), PSY.get_number.(PNM.get_buses(sys5))) == String[]
+
+    # auxiliary functio1n
+    PRTS_sparse = PTDF(RTS; tol = 1e-3)
+    @test PNM.get_tol(PRTS_sparse).x == Base.RefValue(1e-3).x
 end
 
 @testset "Test PTDF matrices for 10 bus system with 2 reference buses" begin
@@ -208,4 +218,49 @@ end
     @assert isapprox(P5_1.data, P5_2.data, atol = 1e-5)
     @assert isapprox(P5_1.data, P5_3.data, atol = 1e-5)
     @assert isapprox(P5_2.data, P5_3.data, atol = 1e-5)
+end
+
+@testset "Test PTDF matrix with distributed bus and with 2 reference buses" begin
+
+    # check if an error is correctly thrown
+
+    # 2 bus system
+    sys = PSB.build_system(PSISystems, "2Area 5 Bus System")
+    buscount = length(PNM.get_buses(sys))
+    dist_slack = 1 / buscount * ones(buscount)
+    slack_array = dist_slack / sum(dist_slack)
+
+    test_val1 = false
+    try
+        ptdf_1 = PTDF(sys; dist_slack = slack_array)
+    catch err
+        if err isa ErrorException
+            test_val1 = true
+        else
+            error(
+                "Error was not thrown for PTDF with distributed slack bus and more than one reference bus.",
+            )
+        end
+    end
+
+    # incorrect dist_slack arrya length
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    buscount = length(PNM.get_buses(sys5)) + 1
+    dist_slack = 1 / buscount * ones(buscount)
+    slack_array = dist_slack / sum(dist_slack)
+    test_val2 = false
+    try
+        ptdf_2 = PTDF(sys5; dist_slack = slack_array)
+    catch err
+        if err isa ErrorException
+            test_val2 = true
+        else
+            error(
+                "Error was not thrown for PTDF with distributed slack array of incorrect length.",
+            )
+        end
+    end
+
+    @test test_val1
+    @test test_val2
 end
