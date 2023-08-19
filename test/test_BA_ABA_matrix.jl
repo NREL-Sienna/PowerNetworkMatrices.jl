@@ -51,7 +51,6 @@ end
             @test isapprox(ba[i, j], ba.data[j, i])
         end
     end
-
     # check if indexing for the BA is correct (line names and bus numbers)
     lookup1 = PNM.get_lookup(ba)
     for i in axes(ba, 2)
