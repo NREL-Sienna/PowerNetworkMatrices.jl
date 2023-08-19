@@ -84,7 +84,7 @@
           String[]
     @test setdiff(PNM.get_bus_ax(P5), PSY.get_number.(PNM.get_buses(sys5))) == String[]
 
-    # auxiliary functio1n
+    # auxiliary function
     PRTS_sparse = PTDF(RTS; tol = 1e-3)
     @test PNM.get_tol(PRTS_sparse).x == Base.RefValue(1e-3).x
 end
