@@ -164,18 +164,22 @@ end
 Checks if the any of the fields of VirtualLODF is empty.
 """
 function Base.isempty(vlodf::VirtualLODF)
-    !isempty(vlodf.K.L) && return false
-    !isempty(vlodf.K.U) && return false
-    !isempty(vlodf.BA) && return false
-    !isempty(vlodf.A) && return false
-    !isempty(vlodf.inv_PTDF_A_diag) && return false
-    !isempty(vlodf.ref_bus_positions) && return false
-    !isempty(vlodf.axes) && return false
-    !isempty(vlodf.lookup) && return false
-    !isempty(vlodf.cache) && return false
-    !isempty(subnetworks) && return false
-    !isempty(tol) && return false
-    return true
+    for name in fieldnames(typeof(vlodf))
+        @show name
+        if name == :K
+            if isempty(vlodf.K.L) || isempty(vlodf.K.U)
+                return true
+                break
+            end
+        elseif name == :tol
+            @info "Field tol has default value: " * string(getfield(vlodf, name)) * "."
+        elseif isempty(getfield(vlodf, name))
+            @info "Field " * string(name) * " not defined. Other fields might be empty."
+            return true
+            break
+        end
+    end
+    return false
 end
 
 """
