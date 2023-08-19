@@ -117,7 +117,7 @@ Gets the row of the stored matrix in cache.
 function Base.getindex(
     cache::RowCache,
     key::Int,
-)::Union{Vector{Float64}, SparseArrays.SparseVector{Float64}}
+)
     return cache.temp_cache[key]
 end
 

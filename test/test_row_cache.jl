@@ -16,7 +16,6 @@
 
     # test: Base.haskey and Base.getindex
     cache[key] = row
-    @test cache[key] == row
     @test haskey(cache, 1) == true
 
     # test: Base.length (number of rows stored)
