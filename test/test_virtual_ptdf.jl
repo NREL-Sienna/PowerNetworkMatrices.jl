@@ -4,7 +4,6 @@
     ptdf_virtual = VirtualPTDF(sys)
 
     for i in axes(ptdf_complete, 2)
-        comp = ptdf_complete[i, :]
         virtual = ptdf_virtual[i, :]
         for j in axes(ptdf_complete, 1)
             # check values using PTDFs axes
@@ -61,7 +60,7 @@ end
     @test isapprox(ptdf_first_area, ptdf_second_area, atol = 1e-6)
 end
 
-@testset "Test virtual PTDF cache" begin
+@testset "Test Virtual PTDF cache" begin
     RTS = build_system(PSITestSystems, "test_RTS_GMLC_sys")
     line_names = get_name.(get_components(Line, RTS))
     persist_lines = line_names[1:10]
@@ -77,7 +76,7 @@ end
     end
 end
 
-@testset "Test virtual PTDF with distributed slack" begin
+@testset "Test Virtual PTDF with distributed slack" begin
     # get 5 bus system
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     bus_number = length(PNM.get_buses(sys))
@@ -91,4 +90,40 @@ end
         vptdf[row, 1]
         @test isapprox(vptdf.cache[row], ptdf[row, :], atol = 1e-5)
     end
+end
+
+@testset "Test Virtual PTDF auxiliary functions" begin
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+
+    vptdf = VirtualPTDF(sys)
+    @test isempty(vptdf) == true
+
+    # check if error is correctly thrown
+    test_value = false
+    try
+        vptdf[1, 1] = 1
+    catch err
+        if err isa ErrorException
+            test_value = true
+        end
+    end
+    @test test_value
+
+    # get the rows and full PTDF matrix, test get_ptdf_data
+    ptdf = PTDF(sys)
+    for i in PNM.get_branch_ax(vptdf)
+        for j in PNM.get_bus_ax(vptdf)
+            vptdf[i, j]
+        end
+    end
+    dict_ = Dict()
+    for (n, i) in enumerate(PNM.get_branch_ax(vptdf))
+        dict_[n] = vptdf.cache[n]
+    end
+    @test get_ptdf_data(vptdf) == dict_
+
+    # test get axes values
+    @test setdiff(PNM.get_branch_ax(vptdf), PSY.get_name.(PNM.get_ac_branches(sys))) ==
+          String[]
+    @test setdiff(PNM.get_bus_ax(vptdf), PSY.get_number.(PNM.get_buses(sys))) == String[]
 end

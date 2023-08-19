@@ -149,17 +149,23 @@ end
 Checks if the any of the fields of VirtualPTDF is empty.
 """
 function Base.isempty(vptdf::VirtualPTDF)
-    !isempty(vptdf.K.L) && return false
-    !isempty(vptdf.K.U) && return false
-    !isempty(vptdf.BA) && return false
-    !isempty(vptdf.ref_bus_positions) && return false
-    !isempty(vptdf.axes) && return false
-    !isempty(vptdf.lookup) && return false
-    !isempty(vptdf.temp_data) && return false
-    !isempty(vptdf.valid_ix) && return false
-    !isempty(vptdf.cache) && return false
-    !isempty(vptdf.subnetworks) && return false
-    return true
+    for name in fieldnames(typeof(vptdf))
+        @show name
+        if name == :K
+            if isempty(vptdf.K.L) || isempty(vptdf.K.U)
+                return true
+                break
+            end
+        elseif name in [:tol, :dist_slack]
+            @info "Field " * string(name) * " has default value: " *
+                  string(getfield(vptdf, name)) * "."
+        elseif isempty(getfield(vptdf, name))
+            @info "Field " * string(name) * " not defined. Other fields might be empty."
+            return true
+            break
+        end
+    end
+    return false
 end
 
 """
