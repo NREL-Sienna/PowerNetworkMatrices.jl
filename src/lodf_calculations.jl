@@ -193,7 +193,6 @@ function LODF(
             Ref(tol),
         )
     end
-    return
 end
 
 """

@@ -29,9 +29,13 @@
     A = IncidenceMatrix(sys5)
     P5 = PTDF(sys5)
     L5NS_from_ptdf = LODF(A, P5)
+    L5NS_from_ptdf2 = LODF(A, P5; linear_solver = "Dense")
     @test getindex(L5NS_from_ptdf, "5", "6") - -0.3071 <= 1e-4
+    @test getindex(L5NS_from_ptdf2, "5", "6") - -0.3071 <= 1e-4
     total_error = abs.(L5NS_from_ptdf.data' .- Lodf_5)
+    total_error2 = abs.(L5NS_from_ptdf2.data' .- Lodf_5)
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
+    @test isapprox(sum(total_error2), 0.0, atol = 1e-3)
 
     # A, ABA, and BA case
     ABA = ABA_Matrix(sys5; factorize = true)
@@ -47,6 +51,17 @@
         @test isapprox(L5NS_from_ptdf[i, :], Lodf_5[i, :], atol = 1e-3)
         @test isapprox(L5NS_from_ba_aba[i, :], Lodf_5[i, :], atol = 1e-3)
     end
+
+    # test if error is thrown in case other linear solvers are called
+    test_value = false
+    try
+        L5NS_from_ba_aba = LODF(A, ABA, BA; linear_solver = "Dense")
+    catch err
+        if err isa ErrorException
+            test_value = true
+        end
+    end
+    @test test_value
 
     # test if error is thrown in case `tol` is defined in PTDF
     P5 = PTDF(sys5; tol = 1e-3)
