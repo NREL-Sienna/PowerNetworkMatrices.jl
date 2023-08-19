@@ -128,6 +128,3 @@ end
         end
     end
 end
-
-@testset "Test LODF auxiliary functions" begin
-end
