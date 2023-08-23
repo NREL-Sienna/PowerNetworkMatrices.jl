@@ -228,7 +228,7 @@ function Base.summary(io::IO, A::PowerNetworkMatrix)
     return
 end
 
-_summary(io::IO, ::T) where T <: PowerNetworkMatrix = println(io, "$T")
+_summary(io::IO, ::T) where {T <: PowerNetworkMatrix} = println(io, "$T")
 
 function Base.summary(
     io::IOContext{Base.GenericIOBuffer{Array{UInt8, 1}}},
