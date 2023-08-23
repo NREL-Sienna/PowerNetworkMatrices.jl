@@ -104,6 +104,7 @@ function VirtualPTDF(
         subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
     end
     temp_data = zeros(length(bus_ax))
+    # if isempty(persistent_lines)
     if isempty(persistent_lines)
         empty_cache =
             RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
@@ -150,19 +151,15 @@ Checks if the any of the fields of VirtualPTDF is empty.
 """
 function Base.isempty(vptdf::VirtualPTDF)
     for name in fieldnames(typeof(vptdf))
-        @show name
-        if name == :K
-            if isempty(vptdf.K.L) || isempty(vptdf.K.U)
-                return true
-                break
-            end
-        elseif name in [:tol, :dist_slack]
-            @info "Field " * string(name) * " has default value: " *
-                  string(getfield(vptdf, name)) * "."
-        elseif isempty(getfield(vptdf, name))
-            @info "Field " * string(name) * " not defined. Other fields might be empty."
+        if name == :K && (isempty(vptdf.K.L) || isempty(vptdf.K.U))
+            @info "Either L o U factorization matrix is empty."
             return true
-            break
+        elseif name == :dist_slack && isempty(getfield(vptdf, name))
+            @info "Field dist_slack has default value: " *
+                string(getfield(vptdf, name)) * "."
+        elseif !(name in [:K, :dist_slack]) && isempty(getfield(vptdf, name))
+            @info "Field " * string(name) * " not defined."
+            return true
         end
     end
     return false
@@ -172,6 +169,7 @@ end
 Gives the size of the whole PTDF matrix, not the number of rows stored.
 """
 Base.size(vptdf::VirtualPTDF) = size(vptdf.BA)
+
 """
 Gives the cartesian indexes of the PTDF matrix (same as the BA one).
 """

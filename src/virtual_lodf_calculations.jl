@@ -165,18 +165,12 @@ Checks if the any of the fields of VirtualLODF is empty.
 """
 function Base.isempty(vlodf::VirtualLODF)
     for name in fieldnames(typeof(vlodf))
-        @show name
-        if name == :K
-            if isempty(vlodf.K.L) || isempty(vlodf.K.U)
-                return true
-                break
-            end
-        elseif name == :tol
-            @info "Field tol has default value: " * string(getfield(vlodf, name)) * "."
-        elseif isempty(getfield(vlodf, name))
-            @info "Field " * string(name) * " not defined. Other fields might be empty."
+        if name == :K && (isempty(vlodf.K.L) || isempty(vlodf.K.U))
+            @info "Either L o U factorization matrix is empty."
             return true
-            break
+        elseif name != :K && isempty(getfield(vlodf, name))
+            @info "Field " * string(name) * " is empty."
+            return true
         end
     end
     return false
@@ -185,8 +179,8 @@ end
 """
 Shows the size of the whole LODF matrix, not the number of rows stored.
 """
-# ! test
 Base.size(vlodf::VirtualLODF) = (size(vlodf.BA, 2), size(vlodf.BA, 2))
+
 """
 Gives the cartesian indexes of the LODF matrix.
 """
