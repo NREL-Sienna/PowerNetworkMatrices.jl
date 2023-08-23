@@ -165,10 +165,8 @@ Checks if the any of the fields of VirtualLODF is empty.
 """
 function Base.isempty(vlodf::VirtualLODF)
     for name in fieldnames(typeof(vlodf))
-        if name == :K && (isempty(vlodf.K.L) || isempty(vlodf.K.U))
-            @info "Either L o U factorization matrix is empty."
-            return true
-        elseif name != :K && isempty(getfield(vlodf, name))
+        # note: impossible to define empty KLU field
+        if name != :K && isempty(getfield(vlodf, name))
             @info "Field " * string(name) * " is empty."
             return true
         end
