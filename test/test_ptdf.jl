@@ -224,7 +224,7 @@ end
 
     # check if an error is correctly thrown
 
-    # 2 bus system
+    # 2 reference bus system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")
     buscount = length(PNM.get_buses(sys))
     dist_slack = 1 / buscount * ones(buscount)
