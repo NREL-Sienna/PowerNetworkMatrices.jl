@@ -57,6 +57,14 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     tol::Base.RefValue{Float64}
 end
 
+function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
+    summary(io, array)
+    isempty(array) && return
+    println(io, ":")
+    Base.print_array(io, array)
+    return
+end
+
 """
 Builds the PTDF matrix from a group of branches and buses. The return is a
 PTDF array indexed with the branch numbers.
