@@ -226,7 +226,7 @@ value is above a certain tolerance.
 function sparsify(dense_array::Matrix{Float64}, tol::Float64)
     m, n = size(dense_array)
     sparse_array = SparseArrays.spzeros(m, n)
-    for i in 1:m, j in 1:n
+    for j in 1:n, i in 1:m
         if abs(dense_array[i, j]) > tol
             sparse_array[i, j] = dense_array[i, j]
         end
@@ -235,57 +235,25 @@ function sparsify(dense_array::Matrix{Float64}, tol::Float64)
 end
 
 """
-Sets to zero every element of a Sparse matrix if absolute values is below a
-certain tolerance.
+Return a sparse vector given a dense one by dropping element whose absolute
+value is above a certain tolerance.
+
 
 # Arguments
-- `sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int}`: input sparse array.
-- `tol::Float64`: tolerance for removing entries in the PTDF matrix.
+- dense_array::Vector{Float64}`:
+        input vector (e.g., PTDF row from VirtualPTDF).
+- `tol::Float64`:
+        tolerance.
 """
-function make_entries_zero!(
-    sparse_array::SparseArrays.SparseMatrixCSC{Float64, Int},
-    tol::Float64,
-)
-    for i in 1:size(sparse_array, 1)
-        sparse_array[i, abs.(sparse_array[i, :]) .<= tol] .= 0.0
-    end
-    SparseArrays.dropzeros!(sparse_array)
-    return
-end
-
-"""
-Sets to zero every element of a Dense matrix if absolute values is below a
-certain tolerance.
-
-# Arguments
-- `dense_array::Matrix{Float64}`: input dense matrix.
-- `tol::Float64`: tolerance.
-"""
-function make_entries_zero!(
-    dense_array::Matrix{Float64},
-    tol::Float64,
-)
-    for i in 1:size(dense_array, 1)
-        dense_array[i, abs.(dense_array[i, :]) .<= tol] .= 0.0
-    end
-    return
-end
-
-"""
-Sets to zero every element of a Dense vector if absolute values is below a
-certain tolerance.
-
-# Arguments
-- `vector::Vector{Float64}`:input dense vector.
-- `tol::Float64`: tolerance.
-"""
-function make_entries_zero!(vector::Vector{Float64}, tol::Float64)
-    for i in eachindex(vector)
-        if abs(vector[i]) <= tol
-            vector[i] = 0.0
+function sparsify(dense_array::Vector{Float64}, tol::Float64)
+    m = length(dense_array)
+    sparse_array = SparseArrays.spzeros(m)
+    for i in 1:m
+        if abs(dense_array[i]) > tol
+            sparse_array[i] = dense_array[i]
         end
     end
-    return
+    return sparse_array
 end
 
 """

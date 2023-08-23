@@ -1,22 +1,25 @@
 """
-Power Transfer Distribution Factors (PTDF) indicate the incremental change in real power that occurs on transmission lines due to real power injections changes at the buses.
+Power Transfer Distribution Factors (PTDF) indicate the incremental change in 
+real power that occurs on transmission lines due to real power injections 
+changes at the buses.
 
 The PTDF struct is indexed using the Bus numbers and Branch names.
 
 # Arguments
 - `data<:AbstractArray{Float64, 2}`:
-        the actual Incidence matrix.
+        the transposed PTDF matrix.
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors (the first one showing the branches names,
-        the second showing the buses numbers).
+        Tuple containing two vectors: the first one showing the bus numbers,
+        the second showing the branch names. The information contained in this
+        field matches the axes of the fiels `data`.
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries, the first mapping the branches
-        and buses with their enumerated indexes.
+        Tuple containing two dictionaries mapping the bus numbers and branch 
+        names with the indices of the matrix contained in `data`.
 - `subnetworks::Dict{Int, Set{Int}}`:
         dictionary containing the set of bus indexes defining the subnetworks
         of the system.
 - `tol::Base.RefValue{Float64}`:
-        tolerance used for sportifying the matrix (dropping element whose
+        tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
 """
 struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
@@ -36,26 +39,6 @@ Deserialize a PTDF from an HDF5 file.
 - `filename::AbstractString`: File containing a serialized PTDF.
 """
 PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
-
-"""
-Elements whose values are below "tol" are set to zero (dropped in case of Sparse matrix).
-"""
-function drop_small_entries!(mat::PTDF, tol::Float64)
-    if tol > mat.tol[]
-        @info "Specified tolerance is smaller than the current tolerance."
-    end
-    make_entries_zero!(mat.data, tol)
-    mat.tol[] = tol
-    return
-end
-
-"""
-Takes and existing PTDF and makes it sparse given a certain tolerance "tol".
-"""
-function make_sparse_PTDF(mat::PTDF{Ax, L, Matrix{Float64}}, tol::Float64) where {Ax, L}
-    new_mat = sparsify(mat.data, tol)
-    return PTDF(new_mat, mat.axes, mat.lookup, ref_bus_positions, mat.subnetworks, Ref(tol))
-end
 
 function _buildptdf(
     branches,
@@ -157,7 +140,7 @@ function _calculate_PTDF_matrix_KLU(
         PTDFm_t[collect(ref_bus_positions), :] .= 0.0
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
-        return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
+        return PTDFm_t .- (slack_array * PTDFm_t)
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
@@ -189,9 +172,6 @@ function calculate_PTDF_matrix_KLU(
     return PTDFm, A
 end
 
-"""
-!!! MISSING DOCUMENTATION !!!
-"""
 function _binfo_check(binfo::Int)
     if binfo != 0
         if binfo < 0
@@ -510,4 +490,8 @@ end
 
 function get_bus_ax(ptdf::PTDF)
     return ptdf.axes[1]
+end
+
+function get_tol(ptdf::PTDF)
+    return ptdf.tol
 end

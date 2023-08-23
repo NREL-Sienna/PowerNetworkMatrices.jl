@@ -1,4 +1,4 @@
-@testset "test connected components" begin
+@testset "Test connected components" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     M = AdjacencyMatrix(sys5)
     subnetworks = find_subnetworks(M)
