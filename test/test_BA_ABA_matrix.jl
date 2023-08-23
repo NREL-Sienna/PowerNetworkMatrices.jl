@@ -1,4 +1,4 @@
-@testset "Test ABA matrix" begin
+@testset "Test A, BA, and ABA matrix creation" begin
     # test on 5 and 14 bus system
     for name in ["c_sys5", "c_sys14"]
         sys = PSB.build_system(PSB.PSITestSystems, name)
@@ -35,4 +35,47 @@
             atol = 1e-8,
         )
     end
+end
+
+@testset "Test BA and ABA matrix indexing" begin
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+
+    # get the matrices
+    ba = BA_Matrix(sys)
+    aba = ABA_Matrix(sys)
+
+    # check if indexing for the BA is correct (row and column indices)
+    # ba matrix is stored as transposed
+    for i in 1:size(ba, 2)
+        for j in 1:size(ba, 1)
+            @test isapprox(ba[i, j], ba.data[j, i])
+        end
+    end
+    # check if indexing for the BA is correct (line names and bus numbers)
+    lookup1 = PNM.get_lookup(ba)
+    for i in axes(ba, 2)
+        for j in axes(ba, 1)
+            @test isapprox(ba[i, j], ba.data[lookup1[1][j], lookup1[2][i]])
+        end
+    end
+
+    # check indexing for the ABA matrix
+    lookup2 = aba.lookup[1]
+    for i in axes(aba, 1)
+        @test aba[i, :] == aba.data[lookup2[i], :]
+    end
+
+    # test if error is correctly thrown when ref bus is called
+    rb = collect(ba.ref_bus_positions)[1]
+    test_val = false
+    try
+        aba[rb, :]
+    catch err
+        if err isa ErrorException
+            test_val = true
+        else
+            error("Expected an ErrorException but was not thrown.")
+        end
+    end
+    @test test_val
 end
