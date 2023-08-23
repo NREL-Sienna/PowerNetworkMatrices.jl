@@ -151,10 +151,7 @@ Checks if the any of the fields of VirtualPTDF is empty.
 """
 function Base.isempty(vptdf::VirtualPTDF)
     for name in fieldnames(typeof(vptdf))
-        if name == :K && (isempty(vptdf.K.L) || isempty(vptdf.K.U))
-            @info "Either L o U factorization matrix is empty."
-            return true
-        elseif name == :dist_slack && isempty(getfield(vptdf, name))
+        if name == :dist_slack && isempty(getfield(vptdf, name))
             @info "Field dist_slack has default value: " *
                   string(getfield(vptdf, name)) * "."
         elseif !(name in [:K, :dist_slack]) && isempty(getfield(vptdf, name))

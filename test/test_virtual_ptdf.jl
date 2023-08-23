@@ -122,7 +122,8 @@ end
     slack_array = dist_slack / sum(dist_slack)
     test_val2 = false
     try
-        ptdf_2 = PTDF(sys5; dist_slack = slack_array)
+        ptdf_2 = VirtualPTDF(sys5; dist_slack = slack_array)
+        ptdf_2[1, 1]
     catch err
         if err isa ErrorException
             test_val2 = true
