@@ -224,11 +224,11 @@ function Base.summary(io::IO, A::PowerNetworkMatrix)
         show(IOContext(io, :limit => true), ax)
         println(io)
     end
-    print(io, "And data, a ", size(A))
+    print(io, "And data with size ", size(A))
     return
 end
 
-_summary(io::IO, A::PowerNetworkMatrix) = println(io, "PowerNetworkMatrix")
+_summary(io::IO, ::T) where T <: PowerNetworkMatrix = println(io, "$T")
 
 function Base.summary(
     io::IOContext{Base.GenericIOBuffer{Array{UInt8, 1}}},
@@ -303,7 +303,7 @@ function Base.show_nd(
     end
 end
 
-function Base.show(io::IO, array::PowerNetworkMatrix)
+function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::PowerNetworkMatrix)
     summary(io, array)
     isempty(array) && return
     println(io, ":")

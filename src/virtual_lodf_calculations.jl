@@ -167,7 +167,7 @@ function Base.isempty(vlodf::VirtualLODF)
     for name in fieldnames(typeof(vlodf))
         # note: impossible to define empty KLU field
         if name != :K && isempty(getfield(vlodf, name))
-            @info "Field " * string(name) * " is empty."
+            @debug "Field " * string(name) * " is empty."
             return true
         end
     end
