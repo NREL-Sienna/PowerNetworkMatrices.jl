@@ -156,7 +156,7 @@ function Base.isempty(vptdf::VirtualPTDF)
             return true
         elseif name == :dist_slack && isempty(getfield(vptdf, name))
             @info "Field dist_slack has default value: " *
-                string(getfield(vptdf, name)) * "."
+                  string(getfield(vptdf, name)) * "."
         elseif !(name in [:K, :dist_slack]) && isempty(getfield(vptdf, name))
             @info "Field " * string(name) * " not defined."
             return true
