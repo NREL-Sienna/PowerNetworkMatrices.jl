@@ -98,13 +98,4 @@ ptdf_sparse = PTDF(sys, tol=0.2);
 get_ptdf_data(ptdf_sparse)
 ```
 
-Please consider that 0.2 was used for the purpose of this tutorial. In practice much smaller values are used (e.g., 1e-5).
-
-In case the `PTDF` matrix was evaluated without defining the `tol` argument, elements characterized by small absolute values can be droppped using the `drop_small_entries!` function:
-
-``` @repl tutorial_PTDF_matrix
-drop_small_entries!(ptdf_klu, 0.2);
-get_ptdf_data(ptdf_klu)
-```
-
-As it can be seen, the resulting matrix has all the elements whose absolute values are below the desired threshold dropped, however the matrix is still kept of type `Matrix{Float64}` rather than `SparseArrays.SparseMatrixCSC{Float64, Int64}`.
+**NOTE:** 0.2 was used for the purpose of this tutorial. In practice much smaller values are used (e.g., 1e-5).

@@ -27,89 +27,74 @@ lodf_1 = LODF(sys);
 lodf_2 = LODF(sys, linear_solver="Dense");
 
 # show matrix
-
+get_lodf_data(lodf_1)
 ```
 
-Advanced users might be interested in computing the `PTDF` matrix starting from either the data contained in the `IncidenceMatrix` and `BA_matrix` structures, or by the information related to the `branches` and `buses` of the system.
+Advanced users might be interested in computing the `LODF` matrix starting from either the `branches` and `buses` data (`CASE 1`), the `IncidenceMatrix` and `PTDF` structures (`CASE 2`), or by the information related to `IncidenceMatrix`, `BA_Matrix` and `ABA_Matrix` (`CASE 3`).
 
 ``` @repl tutorial_PTDF_matrix
-# evaluate the BA_matrix and Incidence_Matrix
-ba_matrix = BA_Matrix(sys);
-a_matrix = IncidenceMatrix(sys);
+# CASE 1
 
-# get the PTDF matrix starting from the values of the 
-# previosly cumputed matrices
-ptdf_2 = PTDF(a_matrix, ba_matrix);
-get_ptdf_data(ptdf_2)
-
-# get the buses and branches of the system
+# get the branches and buses data
 branches = PNM.get_ac_branches(sys);
 buses = PNM.get_buses(sys);
-ptdf_3 = PTDF(branches, buses);
-get_ptdf_data(ptdf_3)
+
+# compute the LODF matrix from branches and buses data
+lodf_3 = LODF(branches, buses);
+
+# CASE 2
+
+# get the Incidence and PTDF matrix
+a = IncidenceMatrix(sys);
+ptdf = PTDF(sys);
+
+# compute LODF matrix with the two netwrok matrices
+lodf_4 = LODF(a, ptdf);
+
+# CASE 3
+
+# get the BA and ABA matrices (ABA matrix must include LU factorization 
+# matrices)
+ba = BA_Matrix(sys);
+aba = ABA_Matrix(sys, factorize = true);
+
+# compute LODF matrix with the three netwrok matrices
+lodf_5 = LODF(a, aba, ba);
 ```
 
-NOTE: both the `get_ac_branches` and `get_ac_branches` functions are not exported by the `PowerNetworkMatrices` package, and therefore require the package name to be called as a prefix. However, they are shown here just for the sake of making an example.
+**NOTE:** whenever the method `LODF(sys::System)` is used, the methods previously defined for `CASE 1` and `CASE 2` are executed in sequence. Therefore the method `LODF(a::IncidenceMatrix, ptdf::PTDF)` is the default one when evaluating the `LODF` matrix from the `System` data directly.
 
-## Available methods for the computation of the `PTDF` matrix
 
-As previously mentioned, the `PTDF` matrix can be evaluated considering different approaches. The method can be selected by specifying the field `linear_solver` in the `PTDF` function.
+## Available methods for the computation of the `LODF` matrix
+
+For those methods that either require the evaluation of the `PTDF` matrix, or that execute this evaluation internally, two different approaches casen be used.
+
+As for the `PTDF` matrix, here too the optional argument `linear_solver` can be specified with either `KLU` (for spars matrix calculation) or `Dense` (for sparse matrix calculation).
 
 ``` @repl tutorial_PTDF_matrix
-ptdf_dense = PTDF(sys, linear_solver="Dense");
-get_ptdf_data(ptdf_dense)
-
-ptdf_klu = PTDF(sys, linear_solver="KLU");
-get_ptdf_data(ptdf_klu)
+lodf_dense = LODF(sys, linear_solver="Dense");
 ```
 
-By default the "KLU" method is selected, which appeared to require significant less time and memory with respect to "Dense".
-Please note that either the `KLU` or `Dense` method isi used, the resultig `PTDF` matrix is stored as a dense one.
+**NOTE (1):** by default the "KLU" method is selected, which appeared to require significant less time and memory with respect to "Dense".
+Please note that wether the `KLU` or `Dense` method is used, the resultig `LODF` matrix is stored as a dense one.
 
-## Evaluating the `PTDF` matrix considering distributed slack bus
+**NOTE (2):** for the moment, the method `LODF(a::IncidenceMatrix, aba::ABA_Matrix, ba::BA_Matrix)` will take `KLU` as `linear_solver` option.
 
-Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus. To do so, a vecotr of type `Vector{Float64}` needs to be defined, specifying the weights for each bus of the system. These weights identify how the load on the slakc bus is redistributed accross the system.
+## "Sparse" `LODF` matrix
+
+The `LODF` matrix can be computed in a "sparse" fashion by defining the input argument `tol`. If this argument is defined, then elements of the `LODF` matrix whose absolute values are below the set threshold are dropped. In addition, the matrix will be stored as a sparse one of type `SparseArrays.SparseMatrixCSC{Float64, Int64}` type instead of `Matrix{Float64}` one.
+
+By considering an "extreme" value of 0.4 as `tol`, the `LODF` matrix can be computed as follows:
 
 ``` @repl tutorial_PTDF_matrix
-# consider equal distribution accross each bus for this example
-buscount = length(PNM.get_buses(sys));
-dist_slack = 1 / buscount * ones(buscount);
-dist_slack_array = dist_slack / sum(dist_slack);
+lodf_sparse = LODF(sys, tol=0.4);
+get_lodf_data(lodf_sparse)
 ```
 
-Once the vector of the weights is defined, the `PTDF` matrix can be computed by defining the input argument `dist_slack` (empty array `Float64[]` by default):
+Please consider that 0.4 was used for the purpose of this tutorial. In practice much smaller values are used (e.g., 1e-5).
 
-``` @repl tutorial_PTDF_matrix
-ptdf_distr = PTDF(sys, dist_slack=dist_slack_array);
-```
+**NOTE (1):** elements whose absolute values exceed the `tol` argument are removed from the `LODF` matrix *after* this has been computed.
 
-The diffrence between a the matrix computed with and without the `dist_slack` field defined can be seen as follows:
+**NOTE (2):** the `tol` argument does not refer to the "sparsification" tolerance of the `PTDF` matrix that is computed in the `LODF` method.
 
-``` @repl tutorial_PTDF_matrix
-# with no distributed slack bus
-get_ptdf_data(ptdf_klu)
-# with distributed slack bus
-get_ptdf_data(ptdf_distr)
-```
-
-## "Sparse" `PTDF` matrix
-
-The `PTFD` matrix can be computed in a "sparse" fashion by defining the input argument `tol`. If this argument is defined, then elements of the `PTDF` matrix whose absolute values are below the set threshold are dropped. In addition, the matrix will be stored as a sparse one of type `SparseArrays.SparseMatrixCSC{Float64, Int64}` instead of `Matrix{Float64}`.
-
-By considering an "extreme" value of 0.2 as `tol`, the `PTDF` matrix can be computed as follows:
-
-``` @repl tutorial_PTDF_matrix
-ptdf_sparse = PTDF(sys, tol=0.2);
-get_ptdf_data(ptdf_sparse)
-```
-
-Please consider that 0.2 was used for the purpose of this tutorial. In practice much smaller values are used (e.g., 1e-5).
-
-In case the `PTDF` matrix was evaluated without defining the `tol` argument, elements characterized by small absolute values can be droppped using the `drop_small_entries!` function:
-
-``` @repl tutorial_PTDF_matrix
-drop_small_entries!(ptdf_klu, 0.2);
-get_ptdf_data(ptdf_klu)
-```
-
-As it can be seen, the resulting matrix has all the elements whose absolute values are below the desired threshold dropped, however the matrix is still kept of type `Matrix{Float64}` rather than `SparseArrays.SparseMatrixCSC{Float64, Int64}`.
+**NOTE (3):** in case the method `LODF(a::IncidenceMatrix, ptdf::PTDF)` is considerd, an error will be thrown whenever the `tol` argument in the `PTDF` structure used as input is different then 1e-15.
