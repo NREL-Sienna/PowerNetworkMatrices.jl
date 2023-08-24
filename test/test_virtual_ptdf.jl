@@ -181,7 +181,7 @@ end
     # test show
     test_value = false
     try
-        show(vptdf);
+        show(vptdf)
         test_value = true
     catch err
         if err isa Exception
@@ -189,5 +189,4 @@ end
         end
     end
     @test test_value
-
 end

@@ -125,7 +125,7 @@ end
     # test show
     test_value = false
     try
-        show(vlodf);
+        show(vlodf)
         test_value = true
     catch err
         if err isa Exception
@@ -133,5 +133,4 @@ end
         end
     end
     @test test_value
-
 end
