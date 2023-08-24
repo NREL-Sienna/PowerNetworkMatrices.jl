@@ -195,7 +195,7 @@ function _getindex(
 )
     # check if value is in the cache
     if haskey(vlodf.cache, row)
-        return vlodf.cache[row][column]
+        return vlodf.cache.temp_cache[row][column]
     else
 
         # evaluate the value for the LODF column

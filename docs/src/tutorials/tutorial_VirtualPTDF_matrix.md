@@ -23,7 +23,7 @@ The flowchart below shows how the `VirtualPTDF` is structured and how it works. 
 
 ## Initialize `VirtualPTDF` and compute/access row/element
 
-As for the `PTDF` matrix, at first the `System` data must be loaded. The same 5-bus systems is considered as example:
+As for the `PTDF` matrix, at first the `System` data must be loaded. The "RTS GMLC" systems is considered as example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
 using PowerNetworkMatrices
@@ -55,15 +55,21 @@ col_number = v_ptdf.lookup[2][105]
 el_C31_2_105_bis = v_ptdf[row_number, col_number]
 ```
 
-**NOTE**: this example was made for the sake of completeness and considering the actual branche name and bus number is reccomended.
+**NOTE**: this example was made for the sake of completeness and considering the actual branch name and bus number is reccomended.
 
 As previosly mentioned, in order to evalute a single element of the `VirtualPTDF`, the entire row related to the selected branch must be considered. For this reason it is cached in the `VirtualPTDF` structure for later calls.
 This is evident by looking at the following example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
-@time v_ptdf["A32-2", 215]  # evaluate PTDF row related to branche "A32-2"
+sys_2k = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys");
 
-@time v_ptdf["A32-2", 215]  # call same element after the row has been stored
+v_ptdf_2k = VirtualPTDF(sys_2k);
+
+# evaluate PTDF row related to branch "ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1"
+@time v_ptdf_2k["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", 8155]
+
+# call same element after the row has been stored
+@time v_ptdf_2k["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", 8155]
 ```
 
 ## `VirtualPTDF` with distributed slack bus
@@ -108,6 +114,6 @@ v_ptdf_sparse = VirtualPTDF(sys_2, tol=0.2);
 
 Let's now evaluate the same row as before and compare the results:
 ``` @repl tutorial_VirtualPTDF_matrix
-sparse_row = [v_ptdf_sparse["1", j] for j in v_ptdf_sparse.axes[2]]
 original_row = [v_ptdf_dense["1", j] for j in v_ptdf_dense.axes[2]]
+sparse_row = [v_ptdf_sparse["1", j] for j in v_ptdf_sparse.axes[2]]
 ```
