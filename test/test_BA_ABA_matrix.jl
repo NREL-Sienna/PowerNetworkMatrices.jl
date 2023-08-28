@@ -90,12 +90,11 @@ end
     for mat in [a, ba, aba]
         test_value = false
         try
-            show(@eval a)
+            show(@eval $mat)
             test_value = true
         catch err
-            if err isa Exception
-                test_value = false
-            end
+            @error err
+            test_value = false
         end
         @test test_value
     end
