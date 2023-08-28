@@ -191,7 +191,7 @@ function _getindex(
 )
     # check if value is in the cache
     if haskey(vptdf.cache, row)
-        return vptdf.cache[row][column]
+        return vptdf.cache.temp_cache[row][column]
     else
         # evaluate the value for the PTDF column
         # Needs improvement
