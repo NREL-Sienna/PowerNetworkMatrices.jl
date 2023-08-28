@@ -11,7 +11,7 @@
 
 ## Version Advisory
 
-- PowerNetworkMatrices.jl will work with Julia v1.6+.
+- PowerNetworkMatrices.jl will work with Julia v1.6+. In Mac the requirement is to have Julia 1.9.2+ due to issues with MKL and dynamic library loading.
 - PowerNetworkMatrices.jl exports Matrix methods that were available in PowerSystems.jl version 1.0 and have been implemented as a separate package.
 
 ## License
