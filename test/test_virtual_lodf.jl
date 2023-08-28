@@ -103,9 +103,11 @@ end
 @testset "Test Virtual LODF auxiliary functions" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
+    # test isempty when VirtualLODF is created (cache must be empty)
     vlodf = VirtualLODF(sys)
     @test isempty(vlodf) == true
 
+    # test eachindex and axes
     @test length(eachindex(vlodf)) ==
           length(axes(vlodf)[1]) * length(axes(vlodf)[2])
 
@@ -116,6 +118,18 @@ end
     catch err
         if err isa ErrorException
             test_value = true
+        end
+    end
+    @test test_value
+
+    # test show
+    test_value = false
+    try
+        show(vlodf)
+        test_value = true
+    catch err
+        if err isa Exception
+            test_value = false
         end
     end
     @test test_value

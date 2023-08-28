@@ -79,3 +79,24 @@ end
     end
     @test test_val
 end
+
+@testset "Test show for A, BA and ABA matrix" begin
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+
+    a = IncidenceMatrix(sys)
+    ba = BA_Matrix(sys)
+    aba = ABA_Matrix(sys)
+
+    for mat in [a, ba, aba]
+        test_value = false
+        try
+            show(@eval a)
+            test_value = true
+        catch err
+            if err isa Exception
+                test_value = false
+            end
+        end
+        @test test_value
+    end
+end
