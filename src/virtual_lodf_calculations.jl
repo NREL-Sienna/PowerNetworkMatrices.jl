@@ -54,6 +54,14 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     tol::Base.RefValue{Float64}
 end
 
+function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
+    summary(io, array)
+    isempty(array) && return
+    println(io, ":")
+    Base.print_array(io, array)
+    return
+end
+
 function _get_PTDF_A_diag(
     K::KLU.KLUFactorization{Float64, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},

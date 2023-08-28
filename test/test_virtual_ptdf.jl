@@ -177,4 +177,16 @@ end
     @test setdiff(PNM.get_branch_ax(vptdf), PSY.get_name.(PNM.get_ac_branches(sys))) ==
           String[]
     @test setdiff(PNM.get_bus_ax(vptdf), PSY.get_number.(PNM.get_buses(sys))) == String[]
+
+    # test show
+    test_value = false
+    try
+        show(vptdf)
+        test_value = true
+    catch err
+        if err isa Exception
+            test_value = false
+        end
+    end
+    @test test_value
 end

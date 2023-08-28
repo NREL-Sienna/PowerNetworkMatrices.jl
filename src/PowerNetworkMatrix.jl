@@ -303,7 +303,7 @@ function Base.show_nd(
     end
 end
 
-function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::PowerNetworkMatrix)
+function Base.show(io::IO, array::PowerNetworkMatrix)
     summary(io, array)
     isempty(array) && return
     println(io, ":")
