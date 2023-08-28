@@ -1,6 +1,8 @@
 # Quick Start Guide
 
-The data for these tutorials is provided in [PowerSystemCaseBuilder](https://github.com/nrel-sienna/PowerSystemCaseBuilder.jl). If you want to build your own case, take a look at the tutorial [Creating and Handling Data for Dynamic Simulations](https://nrel-sienna.github.io/PowerSimulationsDynamics.jl/stable/tutorials/tutorial_dynamic_data/#Creating-and-Handling-Data-for-Dynamic-Simulations).
+!!! note
+    `PowerSystemCaseBuilder.jl` is a helper library that makes it easier to reproduce examples in the documentation and tutorials. Normally you would pass your local files to create the system data instead of calling the function `build_system`.
+    For more details visit [PowerSystemCaseBuilder Documentation](https://nrel-sienna.github.io/PowerSystems.jl/stable/tutorials/powersystembuilder/)
 
 For more details about loading data and adding more dynamic components check the
 [Creating a System with Dynamic devices](https://nrel-sienna.github.io/PowerSystems.jl/stable/modeler_guide/system_dynamic_data/)
@@ -22,10 +24,10 @@ sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
 ## Computation of the PTDF matrix
 
-Once system data is loaded, netwrok matrices can be evaluated. The following 
+Once system data is loaded, netwrok matrices can be evaluated. The following
 example shows how the PTDF matrix is computed.
 
-The function `PTDF` is called for the evaluation of the matrix and other data. These 
+The function `PTDF` is called for the evaluation of the matrix and other data. These
 are stored in a structure of type `PTDF`.
 
 ``` @repl quick_start_guide
@@ -36,5 +38,5 @@ ptdf_matrix = PNM.PTDF(sys);
 PNM.get_data(ptdf_matrix)
 ```
 
-As it can be seen, PTDF matrix is stored such that the number of rows is equal 
+As it can be seen, PTDF matrix is stored such that the number of rows is equal
 to the number of buses, number of columns equal to the number of branches.
