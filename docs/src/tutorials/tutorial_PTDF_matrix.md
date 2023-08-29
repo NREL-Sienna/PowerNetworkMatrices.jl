@@ -1,7 +1,7 @@
 # PTDF matrix
 
 In this tutorial the methods for computing the Power Transfer Distribution Factors (`PTDF`) are presented.
-Before diving into this tutorial we encourage the user to load `PowerNetworkMatrices`, hit the `?` key in the REPL terminal and look for the documentiont of the different `PTDF` methods avialable.
+Before diving into this tutorial we encourage the user to load `PowerNetworkMatrices`, hit the `?` key in the REPL terminal and look for the documention of the different `PTDF` methods available.
 
 ## Evaluation of the `PTDF` matrix
 
@@ -59,11 +59,11 @@ get_ptdf_data(ptdf_klu)
 ```
 
 By default the "KLU" method is selected, which appeared to require significant less time and memory with respect to "Dense".
-Please note that either the `KLU` or `Dense` method isi used, the resultig `PTDF` matrix is stored as a dense one.
+Please note that either the `KLU` or `Dense` method is used, the resulting `PTDF` matrix is stored as a dense one.
 
 ## Evaluating the `PTDF` matrix considering distributed slack bus
 
-Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus. To do so, a vecotr of type `Vector{Float64}` needs to be defined, specifying the weights for each bus of the system. These weights identify how the load on the slakc bus is redistributed accross the system.
+Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus. To do so, a vector of type `Vector{Float64}` needs to be defined, specifying the weights for each bus of the system. These weights identify how the load on the slakc bus is redistributed accross the system.
 
 ``` @repl tutorial_PTDF_matrix
 # consider equal distribution accross each bus for this example
@@ -78,7 +78,7 @@ Once the vector of the weights is defined, the `PTDF` matrix can be computed by 
 ptdf_distr = PTDF(sys, dist_slack=dist_slack_array);
 ```
 
-The diffrence between a the matrix computed with and without the `dist_slack` field defined can be seen as follows:
+The difference between a the matrix computed with and without the `dist_slack` field defined can be seen as follows:
 
 ``` @repl tutorial_PTDF_matrix
 # with no distributed slack bus

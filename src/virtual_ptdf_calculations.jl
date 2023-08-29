@@ -24,7 +24,7 @@ matrix.
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors: the first one showing the branches names,
         the second showing the buses numbers. There is no link between the
-        order of the vector of the branche names and the way the PTDF rows are 
+        order of the vector of the branches names and the way the PTDF rows are 
         stored in the cache.
 - `lookup<:NTuple{2, Dict}`:
         Tuple containing two dictionaries, mapping the branches

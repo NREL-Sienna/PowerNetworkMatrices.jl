@@ -8,7 +8,7 @@ CurrentModule = PowerNetworkMatrices
 
 `PowerNetworkMatrices.jl` is a [`Julia`](http://www.julialang.org) package for
 the evaluation of network matrices given the system's data. The package allows to compute
-the matrices according to different methods, providing a flexibe and powerful tool.
+the matrices according to different methods, providing a flexible and powerful tool.
 
 The documentation and code are organized according to the needs of different
 users depending on their skillset and requirements. In broad terms there are three categories:
