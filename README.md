@@ -7,7 +7,7 @@
 [![PowerNetworkMatrices.jl Downloads](https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/PowerNetworkMatrices)](https://pkgs.genieframework.com?packages=PowerNetworkMatrices)
 
 `PowerNetworkMatrices.jl` is able to build classic power systems modeling network matrices such as
-[Ybus](https://en.wikipedia.org/wiki/Nodal_admittance_matrix), [PTDF](https://www.powerworld.com/WebHelp/Content/MainDocumentation_HTML/Power_Transfer_Distribution_Factors.htm) and LODF.
+[Ybus](https://en.wikipedia.org/wiki/Nodal_admittance_matrix), [PTDF](https://www.powerworld.com/WebHelp/Content/MainDocumentation_HTML/Power_Transfer_Distribution_Factors.htm) and [LODF](https://www.powerworld.com/WebHelp/Content/MainDocumentation_HTML/Line_Outage_Distribution_Factors_LODFs.htm#:~:text=Line%20Outage%20Distribution%20Factors%20(LODFs)%20are%20a%20sensitivity%20measure%20of,other%20lines%20in%20the%20system.).
 
 ## Version Advisory
 

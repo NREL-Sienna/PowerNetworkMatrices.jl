@@ -7,8 +7,8 @@ CurrentModule = PowerNetworkMatrices
 ## Overview
 
 `PowerNetworkMatrices.jl` is a [`Julia`](http://www.julialang.org) package for
-the evaluation of network matrices given the system's data. The package allows to compute 
-the matrices according to different methods, providing a flexibe and powerful tool.
+the evaluation of network matrices given the system's data. The package allows to compute
+the matrices according to different methods, providing a flexible and powerful tool.
 
 The documentation and code are organized according to the needs of different
 users depending on their skillset and requirements. In broad terms there are three categories:
@@ -37,6 +37,4 @@ For the current development version, "checkout" this package with
 ```
 
 ------------
-PowerNetworkMatrices has been developed as part of the Scalable Integrated Infrastructure Planning
-(SIIP) initiative at the U.S. Department of Energy's National Renewable Energy
-Laboratory ([NREL](https://www.nrel.gov/)).
+PowerNetworkMatrices has been developed as part of the Scalable Integrated Infrastructure Planning (SIIP) initiative at the U.S. Department of Energy's National Renewable Energy Laboratory ([NREL](https://www.nrel.gov/)).

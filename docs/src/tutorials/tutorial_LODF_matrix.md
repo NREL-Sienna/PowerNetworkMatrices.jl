@@ -7,7 +7,7 @@ Before diving into this tutorial we encourage the user to load `PowerNetworkMatr
 
 As for the `PTDF` matrix, the `LODF` one can be evaluated according to two different approaches:
 - `Dense`: considers functions for dense matrix multiplication and inversion
-- `KLU`: considers functions for sparse matrix multiplication  and inversion(**default**)
+- `KLU`: considers functions for sparse matrix multiplication  and inversion (**default**)
 
 The evaluation of the `LODF` matrix can be easily performed starting from importing the system's data and then by simply calling the `LODF` method.
 
@@ -69,7 +69,7 @@ lodf_5 = LODF(a, aba, ba);
 
 For those methods that either require the evaluation of the `PTDF` matrix, or that execute this evaluation internally, two different approaches casen be used.
 
-As for the `PTDF` matrix, here too the optional argument `linear_solver` can be specified with either `KLU` (for spars matrix calculation) or `Dense` (for sparse matrix calculation).
+As for the `PTDF` matrix, here too the optional argument `linear_solver` can be specified with either `KLU` (for sparse matrix calculation) or `Dense` (for sparse matrix calculation).
 
 ``` @repl tutorial_PTDF_matrix
 lodf_dense = LODF(sys, linear_solver="Dense");
@@ -97,4 +97,4 @@ Please consider that 0.4 was used for the purpose of this tutorial. In practice 
 
 **NOTE (2):** the `tol` argument does not refer to the "sparsification" tolerance of the `PTDF` matrix that is computed in the `LODF` method.
 
-**NOTE (3):** in case the method `LODF(a::IncidenceMatrix, ptdf::PTDF)` is considerd, an error will be thrown whenever the `tol` argument in the `PTDF` structure used as input is different then 1e-15.
+**NOTE (3):** in case the method `LODF(a::IncidenceMatrix, ptdf::PTDF)` is considered, an error will be thrown whenever the `tol` argument in the `PTDF` structure used as input is different than `1e-15`.
