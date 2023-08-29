@@ -41,13 +41,13 @@ incidence_matrix.axes
 # data: Incidence Matrix
 incidence_matrix.data
 
-# lookup: dictionary linking the branche names and bus numbers with the row
+# lookup: dictionary linking the branches names and bus numbers with the row
 # and column numbers, respectively.
 incidence_matrix.axes
 
 # ref_bus_positions: set containing the positions of the reference buses.
 # this represents the positions where to add the column of zeros. Please refer to the
-# exaple in the BA matrix for more details.
+# example in the BA matrix for more details.
 incidence_matrix.ref_bus_positions
 ```
 
@@ -63,7 +63,7 @@ the column related to the reference bus is discarded.
 ## BA_Matrix
 
 The `BA_Matrix` is a structure containing the matrix coming from the product of the
-`IncidenceMatrix` and the diagonal matrix contianing the impedence of the system's branches ("B" matrix).
+`IncidenceMatrix` and the diagonal matrix containing the impedence of the system's branches ("B" matrix).
 
 The `BA_Matrix` is computed as follows:
 

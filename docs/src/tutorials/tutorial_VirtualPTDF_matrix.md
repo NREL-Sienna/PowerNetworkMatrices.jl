@@ -18,12 +18,12 @@ Regarding point 2, if the row has been stored previosly then the desired element
 The flowchart below shows how the `VirtualPTDF` is structured and how it works. Examples will be presented in the following sections.
 
 ```@raw html
-<img src="../assets/VirtualPTDF_scheme.png"/>
+<img src="../../assets/VirtualPTDF_scheme.png"/>
 ```
 
 ## Initialize `VirtualPTDF` and compute/access row/element
 
-As for the `PTDF` matrix, at first the `System` data must be loaded. The "RTS GMLC" systems is considered as example:
+As for the `PTDF` matrix, at first the `System` data must be loaded. The "RTS-GMLC" systems is considered as example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
 using PowerNetworkMatrices
@@ -57,7 +57,7 @@ el_C31_2_105_bis = v_ptdf[row_number, col_number]
 
 **NOTE**: this example was made for the sake of completeness and considering the actual branch name and bus number is reccomended.
 
-As previosly mentioned, in order to evalute a single element of the `VirtualPTDF`, the entire row related to the selected branch must be considered. For this reason it is cached in the `VirtualPTDF` structure for later calls.
+As previosly mentioned, in order to evaluate a single element of the `VirtualPTDF`, the entire row related to the selected branch must be considered. For this reason it is cached in the `VirtualPTDF` structure for later calls.
 This is evident by looking at the following example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
@@ -75,7 +75,7 @@ v_ptdf_2k = VirtualPTDF(sys_2k);
 ## `VirtualPTDF` with distributed slack bus
 
 As for the `PTDF` matrix, here too each row can be evaluated considering distibuted slack buses.
-A vecotr of type `Vector{Float64}` is defined, specifying the weights for each bus of the system. 
+A vector of type `Vector{Float64}` is defined, specifying the weights for each bus of the system. 
 
 ``` @repl tutorial_VirtualPTDF_matrix
 # smaller system for the next examples
@@ -94,7 +94,7 @@ v_ptdf_distr = VirtualPTDF(sys_2, dist_slack=dist_slack_array);
 v_ptdf_orig = VirtualPTDF(sys_2);
 ```
 
-Now check the difference with the same row related to the branch `"1"` evaluated withou considering distributed slack bus.
+Now check the difference with the same row related to the branch `"1"` evaluated without considering distributed slack bus.
 
 ``` @repl tutorial_VirtualPTDF_matrix
 row_distr = [v_ptdf_distr["1", j] for j in v_ptdf_distr.axes[2]]

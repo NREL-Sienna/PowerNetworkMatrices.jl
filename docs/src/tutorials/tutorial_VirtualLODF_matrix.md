@@ -8,7 +8,7 @@ Refer to the different arguments of the `VirtualLODF` methods by looking at the 
 
 The `VirtualLODF` structure retains many of the similarities of the `VirtualPTDF`. However, its computation is more complex and requires some additional data.
 
-Starting from the system data, the `IncidenceMatrix`, `BA_Matrix` and `ABA_Matrix` (with relative LU factorization matrices) are evaluated. The `ABA_Matrix` and `BA_Matrix` are used for the computation of the diagonal elements of the `PTDF` matrix, and this vector is stored in the `VirtualLODF` structure together with the other structures abovementioned.
+Starting from the system data, the `IncidenceMatrix`, `BA_Matrix` and `ABA_Matrix` (with relative LU factorization matrices) are evaluated. The `ABA_Matrix` and `BA_Matrix` are used for the computation of the diagonal elements of the `PTDF` matrix, and this vector is stored in the `VirtualLODF` structure together with the other structures mentioned above.
 
 Once the `VirtualLODF` is initialized, each row of the matrix can be evaluated separately and on user request. The algorithmic procedure is the following:
 1. Define the `VirtualPTDF` structure
@@ -19,12 +19,12 @@ Regarding point 2, if the row has been stored previosly then the desired element
 The flowchart below shows how the `VirtualLODF` is structured and how it works. Examples will be presented in the following sections.
 
 ```@raw html
-<img src="../assets/VirtualLODF_scheme.png"/>
+<img src="../../assets/VirtualLODF_scheme.png"/>
 ```
 
 ## Initialize `VirtualLODF` and compute/access row/element
 
-As for the `LODF` matrix, at first the `System` data must be loaded. The "RTS GMLC" systems is considered as example:
+As for the `LODF` matrix, at first the `System` data must be loaded. The "RTS-GMLC" systems is considered as example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
 using PowerNetworkMatrices
@@ -58,9 +58,9 @@ col_number = v_lodf.lookup[2]["A3"]
 el_C31_2_105_bis = v_lodf[row_number, col_number]
 ```
 
-**NOTE**: this example was made for the sake of completeness and considering the actual branch names is reccomended.
+**NOTE**: this example was made for the sake of completeness and considering the actual branch names is recommended.
 
-As previosly mentioned, in order to evalute a single element of the `VirtualLODF`, the entire row related to the selected branch must be considered. For this reason it is cached for later calls.
+As previosly mentioned, in order to evaluate a single element of the `VirtualLODF`, the entire row related to the selected branch must be considered. For this reason it is cached for later calls.
 This is evident by looking at the following example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
