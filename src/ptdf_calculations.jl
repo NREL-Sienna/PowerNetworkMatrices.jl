@@ -215,39 +215,9 @@ function _calculate_PTDF_matrix_DENSE(
     _binfo_check(binfo)
     PTDFm_t = zeros(buscount, linecount)
 
-    #build incidence matrix
-    for (ix, b) in enumerate(branches)
-        if isa(b, PSY.DCBranch)
-            @warn("PTDF construction ignores DC-Lines")
-            continue
-        end
-
-        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
-        A[fr_b, ix] = 1
-        A[to_b, ix] = -1
-
-        inv_X[ix, ix] = PSY.get_series_susceptance(b)
-    end
-
-    slacks =
-        [bus_lookup[PSY.get_number(n)] for n in nodes if PSY.get_bustype(n) == ACBusTypes.REF]
-    isempty(slacks) && error("System must have a reference bus!")
-
-    slack_position = slacks[1]
-    B = gemm(
-        'N',
-        'T',
-        gemm('N', 'N', A[setdiff(1:end, slack_position), 1:end], inv_X),
-        A[setdiff(1:end, slack_position), 1:end],
-    )
-    if dist_slack[1] == 0.1 && length(dist_slack) == 1
-        (B, bipiv, binfo) = getrf!(B)
-        binfo_check(binfo)
-        S = gemm(
-            'N',
-            'N',
-            gemm('N', 'T', inv_X, A[setdiff(1:end, slack_position), :]),
-            getri!(B, bipiv),
+    if !isempty(dist_slack) && length(ref_bus_positions) != 1
+        error(
+            "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         PTDFm_t[valid_ixs, :] = gemm(
