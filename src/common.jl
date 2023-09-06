@@ -1,3 +1,12 @@
+function _add_to_collection!(collection::Vector{PSY.ACBranch}, branch::PSY.ACBranch)
+    push!(collection, branch)
+    return
+end
+
+function _add_to_collection!(::Vector{PSY.ACBranch}, ::Union{PSY.TwoTerminalHVDCLine, PSY.TwoTerminalVSCDCLine})
+    return
+end
+
 """
 Gets the AC branches from a given Systems.
 """
@@ -19,7 +28,7 @@ function get_ac_branches(sys::PSY.System)
                 ),
             )
         end
-        push!(collection, br)
+        _add_to_collection!(collection, br)
     end
     return sort!(collection;
         by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
