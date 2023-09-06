@@ -292,34 +292,6 @@ function _goderya(ybus::SparseArrays.SparseMatrixCSC)
     return I
 end
 
-"""
-Checks the network connectivity of the system.
-
-# Keyword arguments
-- `connectivity_method::Function = goderya_connectivity`: Specifies the method used as Goderya's algorithm (`goderya_connectivity`) or depth first search/network traversal (`dfs_connectivity`)
-* Note that the default Goderya method is more efficient, but is resource intensive and may not scale well on large networks.
-"""
-function validate_connectivity(
-    sys::PSY.System;
-    connectivity_method::Function = goderya_connectivity,
-)
-    nodes = sort!(
-        collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.ACBus, sys),
-        );
-        by = x -> PSY.get_number(x),
-    )
-    branches = PSY.get_components(PSY.get_available, PSY.Branch, sys)
-    a = Adjacency(branches, nodes; check_connectivity = false)
-
-    return validate_connectivity(
-        a.data,
-        nodes,
-        a.lookup[1];
-        connectivity_method = connectivity_method,
-    )
-end
-
 function validate_connectivity(
     M,
     nodes::Vector{PSY.ACBus},
