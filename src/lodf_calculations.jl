@@ -169,9 +169,9 @@ Builds the LODF matrix given the data of branches and buses of the system.
 """
 function LODF(
     branches,
-    buses::Vector{PSY.ACBus},
-    linera_solver::String = "KLU",
-    dist_slack::Vector{Float64} = Float64[],
+    buses::Vector{PSY.ACBus};
+    linear_solver::String = "KLU",
+    tol::Float64 = eps(),
 )
 
     # get axis names
