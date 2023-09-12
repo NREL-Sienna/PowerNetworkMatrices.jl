@@ -1,7 +1,7 @@
 name = "PowerNetworkMatrices"
 uuid = "bed98974-b02a-5e2f-9fe0-a103f5c450dd"
 authors = ["Jose Daniel Lara", "Alessandro Castelli", "Sourabh Dalvi"]
-version = "0.9.0"
+version = "0.9.1
 
 [deps]
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
@@ -15,7 +15,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
 DocStringExtensions = "~0.8, ~0.9"
-HDF5 = "0.16"
+HDF5 = "0.17"
 InfrastructureSystems = "^1.20"
 KLU = "~0.4"
 Pardiso = "~0.5"
