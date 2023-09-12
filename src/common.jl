@@ -1,3 +1,12 @@
+function _add_to_collection!(collection::Vector{PSY.ACBranch}, branch::PSY.ACBranch)
+    push!(collection, branch)
+    return
+end
+
+function _add_to_collection!(::Vector{PSY.ACBranch}, ::Union{PSY.TwoTerminalHVDCLine, PSY.TwoTerminalVSCDCLine})
+    return
+end
+
 """
 Gets the AC branches from a given Systems.
 """
@@ -5,21 +14,21 @@ function get_ac_branches(sys::PSY.System)
     collection = Vector{PSY.ACBranch}()
     for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
         arc = PSY.get_arc(br)
-        if PSY.get_bustype(arc.from) == BusTypes.ISOLATED
+        if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
                     "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.from))",
                 ),
             )
         end
-        if PSY.get_bustype(arc.to) == BusTypes.ISOLATED
+        if PSY.get_bustype(arc.to) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
                     "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.to))",
                 ),
             )
         end
-        push!(collection, br)
+        _add_to_collection!(collection, br)
     end
     return sort!(collection;
         by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
@@ -29,10 +38,10 @@ end
 """
 Gets the non-isolated buses from a given System
 """
-function get_buses(sys::PSY.System)::Vector{PSY.Bus}
+function get_buses(sys::PSY.System)::Vector{PSY.ACBus}
     return sort!(
         collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != BusTypes.ISOLATED, PSY.Bus, sys),
+            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.ACBus, sys),
         );
         by = x -> PSY.get_number(x),
     )
@@ -50,7 +59,7 @@ end
 function find_slack_positions(buses, bus_lookup::Dict{Int, Int})::Set{Int}
     slack_position = sort([
         bus_lookup[PSY.get_number(n)]
-        for n in buses if PSY.get_bustype(n) == BusTypes.REF
+        for n in buses if PSY.get_bustype(n) == ACBusTypes.REF
     ])
     if length(slack_position) == 0
         error("Slack bus not identified in the Bus/buses list, can't build NetworkMatrix")
@@ -76,7 +85,7 @@ Evaluates the Incidence matrix A given the branches and node of a System.
 # Arguments
 - `branches`:
         vector containing the branches of the considered system (should be AC branches).
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector containing the buses of the considered system.
 
 NOTE:
@@ -85,7 +94,7 @@ NOTE:
 """
 function calculate_A_matrix(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
 )
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
@@ -117,10 +126,10 @@ Evaluates the Adjacency matrix given the banches and buses of a given System.
 # Arguments
 - `branches`:
         vector containing the branches of the considered system (should be AC branches).
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector containing the buses of the considered system.
 """
-function calculate_adjacency(branches, buses::Vector{PSY.Bus})
+function calculate_adjacency(branches, buses::Vector{PSY.ACBus})
     bus_ax = PSY.get_number.(buses)
     return calculate_adjacency(branches, buses, make_ax_ref(bus_ax))
 end
@@ -134,7 +143,7 @@ NOTE:
 """
 function calculate_adjacency(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
 )
     buscount = length(buses)

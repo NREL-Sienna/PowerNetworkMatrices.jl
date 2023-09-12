@@ -56,7 +56,7 @@
     @test isa(Ybus(t2_sys5_re), Ybus)
 
     sys_3bus = PSB.build_system(PSB.PSYTestSystems, "psse_3bus_gen_cls_sys")
-    bus_103 = PSY.get_component(PSY.Bus, sys_3bus, "BUS 3")
+    bus_103 = PSY.get_component(PSY.ACBus, sys_3bus, "BUS 3")
     fix_shunt = FixedAdmittance("FixAdm_Bus3", true, bus_103, 0.0 + 0.2im)
     add_component!(sys_3bus, fix_shunt)
     Ybus3 = Ybus(sys_3bus)

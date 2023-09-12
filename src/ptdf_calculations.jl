@@ -1,6 +1,6 @@
 """
-Power Transfer Distribution Factors (PTDF) indicate the incremental change in 
-real power that occurs on transmission lines due to real power injections 
+Power Transfer Distribution Factors (PTDF) indicate the incremental change in
+real power that occurs on transmission lines due to real power injections
 changes at the buses.
 
 The PTDF struct is indexed using the Bus numbers and Branch names.
@@ -13,7 +13,7 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
         the second showing the branch names. The information contained in this
         field matches the axes of the fiels `data`.
 - `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries mapping the bus numbers and branch 
+        Tuple containing two dictionaries mapping the bus numbers and branch
         names with the indices of the matrix contained in `data`.
 - `subnetworks::Dict{Int, Set{Int}}`:
         dictionary containing the set of bus indexes defining the subnetworks
@@ -42,7 +42,7 @@ PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
 
 function _buildptdf(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
     linear_solver::String)
@@ -154,7 +154,7 @@ Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrice
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
@@ -163,7 +163,7 @@ Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrice
 """
 function calculate_PTDF_matrix_KLU(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
@@ -252,7 +252,7 @@ Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense mat
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
@@ -261,7 +261,7 @@ Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense mat
 """
 function calculate_PTDF_matrix_DENSE(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
@@ -336,7 +336,7 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
@@ -345,7 +345,7 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 """
 function calculate_PTDF_matrix_MKLPardiso(
     branches,
-    buses::Vector{PSY.Bus},
+    buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
@@ -360,7 +360,7 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `dist_slack::Vector{Float64}`:
         vector of weights to be used as distributed slack bus.
@@ -372,7 +372,7 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
 """
 function PTDF(
     branches,
-    buses::Vector{PSY.Bus};
+    buses::Vector{PSY.ACBus};
     dist_slack::Vector{Float64} = Float64[],
     linear_solver::String = "KLU",
     tol::Float64 = eps())

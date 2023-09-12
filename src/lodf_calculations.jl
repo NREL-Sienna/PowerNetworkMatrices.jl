@@ -6,7 +6,7 @@ of how a change in a line's flow affects the flows on other lines in the system.
 - `data<:AbstractArray{Float64, 2}`:
         the transposed LODF matrix.
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two identical vectors containing the names of the 
+        Tuple containing two identical vectors containing the names of the
         branches related to each row/column.
 - `lookup<:NTuple{2, Dict}`:
         Tuple containing two identical dictionaries mapping the branches
@@ -162,14 +162,14 @@ Builds the LODF matrix given the data of branches and buses of the system.
 # Arguments
 - `branches`:
         vector of the System AC branches
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         vector of the System buses
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps())
 """
 function LODF(
     branches,
-    buses::Vector{PSY.Bus};
+    buses::Vector{PSY.ACBus};
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
 )
@@ -214,8 +214,8 @@ end
 """
 Builds the LODF matrix given the Incidence Matrix and the PTDF matrix of the system.
 
-NOTE: tol is referred to the LODF sparsification, not the PTDF one. PTDF matrix 
-must be considered as NON sparsified ("tol" argument not specified when calling 
+NOTE: tol is referred to the LODF sparsification, not the PTDF one. PTDF matrix
+must be considered as NON sparsified ("tol" argument not specified when calling
 the PTDF method).
 
 # Arguments
