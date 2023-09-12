@@ -3,7 +3,10 @@ function _add_to_collection!(collection::Vector{PSY.ACBranch}, branch::PSY.ACBra
     return
 end
 
-function _add_to_collection!(::Vector{PSY.ACBranch}, ::Union{PSY.TwoTerminalHVDCLine, PSY.TwoTerminalVSCDCLine})
+function _add_to_collection!(
+    ::Vector{PSY.ACBranch},
+    ::Union{PSY.TwoTerminalHVDCLine, PSY.TwoTerminalVSCDCLine},
+)
     return
 end
 
@@ -41,7 +44,11 @@ Gets the non-isolated buses from a given System
 function get_buses(sys::PSY.System)::Vector{PSY.ACBus}
     return sort!(
         collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.ACBus, sys),
+            PSY.get_components(
+                x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED,
+                PSY.ACBus,
+                sys,
+            ),
         );
         by = x -> PSY.get_number(x),
     )

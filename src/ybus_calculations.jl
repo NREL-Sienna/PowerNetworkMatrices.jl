@@ -258,7 +258,11 @@ Builds a Adjacency from the system. The return is an N x N Adjacency Array index
 function Adjacency(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     nodes = sort!(
         collect(
-            PSY.get_components(x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED, PSY.ACBus, sys),
+            PSY.get_components(
+                x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED,
+                PSY.ACBus,
+                sys,
+            ),
         );
         by = x -> PSY.get_number(x),
     )
