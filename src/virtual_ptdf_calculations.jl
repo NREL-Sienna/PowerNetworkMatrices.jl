@@ -72,7 +72,7 @@ PTDF array indexed with the branch numbers.
 # Arguments
 - `branches`:
         Vector of the system's AC branches.
-- `buses::Vector{PSY.Bus}`:
+- `buses::Vector{PSY.ACBus}`:
         Vector of the system's buses.
 - `dist_slack::Vector{Float64} = Float64[]`:
         Vector of weights to be used as distributed slack bus.
@@ -86,7 +86,7 @@ PTDF array indexed with the branch numbers.
 """
 function VirtualPTDF(
     branches,
-    buses::Vector{PSY.Bus};
+    buses::Vector{PSY.ACBus};
     dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
