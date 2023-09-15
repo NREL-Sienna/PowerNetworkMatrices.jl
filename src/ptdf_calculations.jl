@@ -297,7 +297,11 @@ function _calculate_PTDF_matrix_MKLPardiso(
     # Here add the subnetwork detection
     ps = Pardiso.MKLPardisoSolver()
     #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
+    defaults = Pardiso.get_iparms(ps)
     Pardiso.set_iparm!(ps, 1, 1)
+    for (ix, v) in enumerate(defaults[2:end])
+        Pardiso.set_iparm!(ps, ix, v)
+    end
     Pardiso.set_iparm!(ps, 2, 2)
     Pardiso.set_iparm!(ps, 59, 2)
     Pardiso.set_iparm!(ps, 6, 1)
