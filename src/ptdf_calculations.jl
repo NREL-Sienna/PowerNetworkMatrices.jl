@@ -305,6 +305,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     Pardiso.set_iparm!(ps, 2, 2)
     Pardiso.set_iparm!(ps, 59, 2)
     Pardiso.set_iparm!(ps, 6, 1)
+    @show Pardiso.get_iparms(ps)[6]
     # inizialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
@@ -316,19 +317,20 @@ function _calculate_PTDF_matrix_MKLPardiso(
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
         Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
-        PTDFm_t[valid_ix, :] .= full_BA
+        PTDFm_t[valid_ix, :] = full_BA
+        Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
         Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
-        PTDFm_t[valid_ix, :] .= full_BA
+        PTDFm_t[valid_ix, :] = full_BA
+        Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
         return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
-    # Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
     return
 end
 
