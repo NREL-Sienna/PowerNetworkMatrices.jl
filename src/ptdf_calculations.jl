@@ -296,7 +296,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     # Here add the subnetwork detection
     ps = Pardiso.MKLPardisoSolver()
-    Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
+    #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     Pardiso.set_iparm!(ps, 1, 1)
     Pardiso.set_iparm!(ps, 2, 2)
     Pardiso.set_iparm!(ps, 59, 2)
