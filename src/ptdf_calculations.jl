@@ -295,31 +295,29 @@ function _calculate_PTDF_matrix_MKLPardiso(
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     # Here add the subnetwork detection
-    Ix = Matrix(
-        1.0I,
-        buscount - length(ref_bus_positions),
-        buscount - length(ref_bus_positions),
-    )
-    ABA_inv = zeros(Float64, size(Ix))
-
     ps = Pardiso.MKLPardisoSolver()
-    Pardiso.set_iparm!(ps, 59, 2)
     Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-    Pardiso.solve!(ps, ABA_inv, ABA, Ix)
+    Pardiso.set_iparm!(ps, 1, 1)
+    Pardiso.set_iparm!(ps, 2, 2)
+    Pardiso.set_iparm!(ps, 59, 2)
+    Pardiso.set_iparm!(ps, 6, 1)
     # inizialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
 
+    full_BA = Matrix(BA[valid_ix, :])
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
-        PTDFm_t[valid_ix, :] = ABA_inv * @view BA[valid_ix, :]
+        Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
+        PTDFm_t[valid_ix, :] .= full_BA
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        PTDFm_t[valid_ix, :] = ABA_inv * @view BA[valid_ix, :]
+        Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
+        @show PTDFm_t[valid_ix, :] .= full_BA
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
         return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
