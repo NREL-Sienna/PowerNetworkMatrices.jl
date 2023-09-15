@@ -200,7 +200,7 @@ end
 
 @testset "Test PTDF matrices with distributed slack" begin
     """
-    CAUTION: this test just test that all the matrices are the same, but there 
+    CAUTION: this test just test that all the matrices are the same, but there
     are no reference values.
     """
 
@@ -215,9 +215,9 @@ end
     P5_2 = PTDF(sys5; dist_slack = slack_array, linear_solver = "Dense")
     P5_3 = PTDF(sys5; dist_slack = slack_array, linear_solver = "MKLPardiso")
 
-    @assert isapprox(P5_1.data, P5_2.data, atol = 1e-5)
-    @assert isapprox(P5_1.data, P5_3.data, atol = 1e-5)
-    @assert isapprox(P5_2.data, P5_3.data, atol = 1e-5)
+    @test isapprox(P5_1.data, P5_2.data, atol = 1e-5)
+    @test isapprox(P5_1.data, P5_3.data, atol = 1e-5)
+    @test isapprox(P5_2.data, P5_3.data, atol = 1e-5)
 end
 
 @testset "Test PTDF matrix with distributed bus and with 2 reference buses" begin
