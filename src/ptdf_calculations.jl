@@ -296,7 +296,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     # Here add the subnetwork detection
     ps = Pardiso.MKLPardisoSolver()
-    #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
+    Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     defaults = Pardiso.get_iparms(ps)
     Pardiso.set_iparm!(ps, 1, 1)
     for (ix, v) in enumerate(defaults[2:end])
@@ -315,13 +315,14 @@ function _calculate_PTDF_matrix_MKLPardiso(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
-        Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
-        PTDFm_t[valid_ix, :] .= full_BA
+        v1 = @elapsed Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
+        v2 = @elapsed PTDFm_t[valid_ix, :] .= full_BA
+        @error v1 v2
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
         Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
-        @show PTDFm_t[valid_ix, :] .= full_BA
+        PTDFm_t[valid_ix, :] .= full_BA
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
         return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
@@ -351,8 +352,10 @@ function calculate_PTDF_matrix_MKLPardiso(
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_lookup)
-    PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
+    BA, vals1 = @timed calculate_BA_matrix(branches, bus_lookup)
+    PTDFm, vals2 = @timed _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
+    @error "BA time $vals1"
+    @error "MKL time $vals2"
     return PTDFm, A
 end
 
