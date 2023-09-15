@@ -329,7 +329,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     else
         error("Distributed bus specification doesn't match the number of buses.")
     end
-
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
     return
 end
 
