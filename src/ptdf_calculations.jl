@@ -172,19 +172,6 @@ function calculate_PTDF_matrix_KLU(
     return PTDFm, A
 end
 
-function _binfo_check(binfo::Int)
-    if binfo != 0
-        if binfo < 0
-            error("Illegal Argument in Inputs")
-        elseif binfo > 0
-            error("Singular value in factorization. Possibly there is an islanded bus")
-        else
-            @assert false
-        end
-    end
-    return
-end
-
 """
 Funciton for internal use only.
 
