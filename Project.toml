@@ -1,6 +1,6 @@
 name = "PowerNetworkMatrices"
 uuid = "bed98974-b02a-5e2f-9fe0-a103f5c450dd"
-authors = ["Jose Daniel Lara", "Alessandro Castelli", "Sourabh Dalvi"]
+authors = ["Jose Daniel Lara", "Alessandro Francesco Castelli", "Sourabh Dalvi"]
 version = "0.9.3"
 
 [deps]
