@@ -201,18 +201,15 @@ Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense mat
         vector containing the weights for the distributed slacks.
 """
 function _calculate_PTDF_matrix_DENSE(
-    A::Matrix{Int8},
-    BA::Matrix{T},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
+    BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int},
-    dist_slack::Vector{Float64}) where {T <: Union{Float32, Float64}}
+    dist_slack::Vector{Float64})
     linecount = size(BA, 2)
     buscount = size(BA, 1)
     # Use dense calculation of ABA
     valid_ixs = setdiff(1:buscount, ref_bus_positions)
-    ABA = transpose(A[:, valid_ixs]) * transpose(BA[valid_ixs, :])
-    # get LU factorization matrices
-    (ABA, bipiv, binfo) = getrf!(ABA)
-    _binfo_check(binfo)
+    ABA = Matrix(calculate_ABA_matrix(A, BA, ref_bus_positions))
     PTDFm_t = zeros(buscount, linecount)
 
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
@@ -220,21 +217,11 @@ function _calculate_PTDF_matrix_DENSE(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        PTDFm_t[valid_ixs, :] = gemm(
-            'N',
-            'N',
-            getri!(ABA, bipiv),
-            BA[valid_ixs, :],
-        )
+        PTDFm_t[valid_ixs, :] = ABA \ BA[valid_ixs, :]
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        PTDFm_t[valid_ixs, :] = gemm(
-            'N',
-            'N',
-            getri!(ABA, bipiv),
-            BA[valid_ixs, :],
-        )
+        PTDFm_t[valid_ixs, :] = ABA \ BA[valid_ixs, :]
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
         return PTDFm_t -
@@ -265,8 +252,8 @@ function calculate_PTDF_matrix_DENSE(
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64})
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = Matrix(calculate_BA_matrix(branches, bus_lookup))
-    PTDFm = _calculate_PTDF_matrix_DENSE(Matrix(A), BA, ref_bus_positions, dist_slack)
+    BA = calculate_BA_matrix(branches, bus_lookup)
+    PTDFm = _calculate_PTDF_matrix_DENSE(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
 end
 
