@@ -68,7 +68,6 @@ end
     # test if error is correctly thrown when ref bus is called
     rb = collect(ba.ref_bus_positions)[1]
     @test_throws ErrorException aba[rb, :]
-
 end
 
 @testset "Test show for A, BA and ABA matrix" begin
