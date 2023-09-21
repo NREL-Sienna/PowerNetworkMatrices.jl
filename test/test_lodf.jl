@@ -13,12 +13,6 @@
     @test isapprox(maximum(L5.data), maximum(Lodf_5), atol = 1e-3)
     @test isapprox(L5[branches_5[1], branches_5[2]], 0.3447946513849093)
 
-    # get LODF with second method
-    a = IncidenceMatrix(sys5)
-    ptdf = PTDF(sys5)
-    lodf_t_3 = PNM._calculate_LODF_matrix_KLU2(a.data, ptdf.data)
-    @test isapprox(lodf_t_3, L5.data, atol = 1e-5)
-
     # get LODF with system
     L5NS = LODF(sys5)
     @test getindex(L5NS, "5", "6") - -0.3071 <= 1e-4
@@ -57,37 +51,14 @@
     end
 
     # test if error is thrown in case other linear solvers are called
-    test_value = false
-    try
-        L5NS_from_ba_aba = LODF(A, ABA, BA; linear_solver = "Dense")
-    catch err
-        if err isa ErrorException
-            test_value = true
-        end
-    end
-    @test test_value
+    @test_throws ErrorException LODF(A, ABA, BA; linear_solver = "Dense")
 
-    test_value = false
-    try
-        L5NS_from_ba_aba = LODF(A, P5; linear_solver = "XXX")
-    catch err
-        if err isa ErrorException
-            test_value = true
-        end
-    end
-    @test test_value
+    @test_throws ErrorException LODF(A, P5; linear_solver = "XXX")
 
     # test if error is thrown in case `tol` is defined in PTDF
     P5 = PTDF(sys5; tol = 1e-3)
     test_value = false
-    try
-        L5NS_from_ptdf = LODF(A, P5)
-    catch err
-        if err isa ErrorException
-            test_value = true
-        end
-    end
-    @test test_value
+    @test_throws ErrorException L5NS_from_ptdf = LODF(A, P5)
 
     # get 14 bus system
     buses_14 = nodes14()

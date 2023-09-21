@@ -109,30 +109,6 @@ function _calculate_LODF_matrix_KLU(
     return lodf_t
 end
 
-# ! used only in testing, can be removed in the future
-function _calculate_LODF_matrix_KLU2(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int},
-    ptdf::Matrix{Float64},
-)
-    ptdf_denominator_t = a * ptdf
-    linecount = size(ptdf, 2)
-    lodf_t = zeros(linecount, linecount)
-    for i in 1:linecount
-        for j in 1:linecount
-            if i == j
-                lodf_t[i, i] = -1.0
-            else
-                if (1.0 - ptdf_denominator_t[i, i]) < 1.0E-06
-                    lodf_t[i, j] = ptdf_denominator_t[i, j]
-                else
-                    lodf_t[i, j] = ptdf_denominator_t[i, j] / (1 - ptdf_denominator_t[i, i])
-                end
-            end
-        end
-    end
-    return lodf_t
-end
-
 function _calculate_LODF_matrix_DENSE(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
