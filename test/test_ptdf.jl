@@ -239,5 +239,4 @@ end
     slack_array = dist_slack / sum(dist_slack)
 
     @test_throws ErrorException ptdf_2 = PTDF(sys5; dist_slack = slack_array)
-
 end

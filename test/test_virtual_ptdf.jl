@@ -112,7 +112,6 @@ end
     test_val2 = false
     ptdf_2 = VirtualPTDF(sys5; dist_slack = slack_array)
     @test_throws ErrorException ptdf_2[1, 1]
-
 end
 
 @testset "Test Virtual PTDF auxiliary functions" begin
