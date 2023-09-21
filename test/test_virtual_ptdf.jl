@@ -101,19 +101,8 @@ end
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = dist_slack / sum(dist_slack)
 
-    test_val1 = false
-    try
-        ptdf_1 = VirtualPTDF(sys; dist_slack = slack_array)
-        ptdf_1[1, 1]
-    catch err
-        if err isa ErrorException
-            test_val1 = true
-        else
-            error(
-                "Error was not thrown for PTDF with distributed slack bus and more than one reference bus.",
-            )
-        end
-    end
+    ptdf_1 = VirtualPTDF(sys; dist_slack = slack_array)
+    @test_throws ErrorException ptdf_1[1, 1]
 
     # incorrect dist_slack array length
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
@@ -121,21 +110,8 @@ end
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = dist_slack / sum(dist_slack)
     test_val2 = false
-    try
-        ptdf_2 = VirtualPTDF(sys5; dist_slack = slack_array)
-        ptdf_2[1, 1]
-    catch err
-        if err isa ErrorException
-            test_val2 = true
-        else
-            error(
-                "Error was not thrown for PTDF with distributed slack array of incorrect length.",
-            )
-        end
-    end
-
-    @test test_val1
-    @test test_val2
+    ptdf_2 = VirtualPTDF(sys5; dist_slack = slack_array)
+    @test_throws ErrorException ptdf_2[1, 1]
 end
 
 @testset "Test Virtual PTDF auxiliary functions" begin
@@ -150,15 +126,7 @@ end
     @test isempty(vptdf) == false
 
     # check if error is correctly thrown
-    test_value = false
-    try
-        vptdf[1, 1] = 1
-    catch err
-        if err isa ErrorException
-            test_value = true
-        end
-    end
-    @test test_value
+    @test_throws ErrorException vptdf[1, 1] = 1
 
     # get the rows and full PTDF matrix, test get_ptdf_data
     ptdf = PTDF(sys)

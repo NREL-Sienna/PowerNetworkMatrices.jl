@@ -67,17 +67,7 @@ end
 
     # test if error is correctly thrown when ref bus is called
     rb = collect(ba.ref_bus_positions)[1]
-    test_val = false
-    try
-        aba[rb, :]
-    catch err
-        if err isa ErrorException
-            test_val = true
-        else
-            error("Expected an ErrorException but was not thrown.")
-        end
-    end
-    @test test_val
+    @test_throws ErrorException aba[rb, :]
 end
 
 @testset "Test show for A, BA and ABA matrix" begin
