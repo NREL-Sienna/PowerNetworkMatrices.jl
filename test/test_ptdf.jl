@@ -230,37 +230,13 @@ end
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = dist_slack / sum(dist_slack)
 
-    test_val1 = false
-    try
-        ptdf_1 = PTDF(sys; dist_slack = slack_array)
-    catch err
-        if err isa ErrorException
-            test_val1 = true
-        else
-            error(
-                "Error was not thrown for PTDF with distributed slack bus and more than one reference bus.",
-            )
-        end
-    end
+    @test_throws ErrorException ptdf_1 = PTDF(sys; dist_slack = slack_array)
 
     # incorrect dist_slack arrya length
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     buscount = length(PNM.get_buses(sys5)) + 1
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = dist_slack / sum(dist_slack)
-    test_val2 = false
-    try
-        ptdf_2 = PTDF(sys5; dist_slack = slack_array)
-    catch err
-        if err isa ErrorException
-            test_val2 = true
-        else
-            error(
-                "Error was not thrown for PTDF with distributed slack array of incorrect length.",
-            )
-        end
-    end
 
-    @test test_val1
-    @test test_val2
+    @test_throws ErrorException ptdf_2 = PTDF(sys5; dist_slack = slack_array)
 end

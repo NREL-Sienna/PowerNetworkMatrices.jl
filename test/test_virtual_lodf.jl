@@ -112,15 +112,7 @@ end
           length(axes(vlodf)[1]) * length(axes(vlodf)[2])
 
     # check if error is correctly thrown
-    test_value = false
-    try
-        vlodf[1, 1] = 1
-    catch err
-        if err isa ErrorException
-            test_value = true
-        end
-    end
-    @test test_value
+    @test_throws ErrorException vlodf[1, 1] = 1
 
     # test show
     test_value = false

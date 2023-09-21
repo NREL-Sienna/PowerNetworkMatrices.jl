@@ -32,8 +32,8 @@ function _buildlodf(
         lodf_t = _calculate_LODF_matrix_KLU(a, ptdf)
     elseif linear_solver == "Dense"
         lodf_t = _calculate_LODF_matrix_DENSE(a, ptdf)
-    else
-        error("MKLPardiso still to be implemented")
+    elseif linear_solver == "MKLPardiso"
+        lodf_t = _calculate_LODF_matrix_MKLPardiso(a, ptdf)
     end
     return lodf_t
 end
@@ -109,50 +109,65 @@ function _calculate_LODF_matrix_KLU(
     return lodf_t
 end
 
-# ! temp for evaluation
-function _calculate_LODF_matrix_KLU2(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int},
-    ptdf::Matrix{Float64},
-)
-    ptdf_denominator_t = a * ptdf
-    linecount = size(ptdf, 2)
-    lodf_t = zeros(linecount, linecount)
-    for i in 1:linecount
-        for j in 1:linecount
-            if i == j
-                lodf_t[i, i] = -1.0
-            else
-                if (1.0 - ptdf_denominator_t[i, i]) < 1.0E-06
-                    lodf_t[i, j] = ptdf_denominator_t[i, j]
-                else
-                    lodf_t[i, j] = ptdf_denominator_t[i, j] / (1 - ptdf_denominator_t[i, i])
-                end
-            end
-        end
-    end
-    return lodf_t
-end
-
 function _calculate_LODF_matrix_DENSE(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
 )
     linecount = size(ptdf, 2)
     ptdf_denominator_t = a * ptdf
+    m_V = Float64[]
     for iline in 1:linecount
         if (1.0 - ptdf_denominator_t[iline, iline]) < 1.0E-06
-            ptdf_denominator_t[iline, iline] = 0.0
+            push!(m_V, 1.0)
+        else
+            push!(m_V, 1.0 - ptdf_denominator_t[iline, iline])
         end
     end
-    (Dem, dipiv, dinfo) = getrf!(
-        Matrix{Float64}(1.0I, linecount, linecount) -
-        Array(LinearAlgebra.Diagonal(ptdf_denominator_t)),
-    )
-    lodf_t = gemm('N', 'N', getri!(Dem, dipiv), ptdf_denominator_t)
-    lodf_t =
-        lodf_t - Array(LinearAlgebra.Diagonal(lodf_t)) -
-        Matrix{Float64}(1.0I, linecount, linecount)
+    lodf_t = LinearAlgebra.diagm(m_V) \ ptdf_denominator_t
+    lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
+    return lodf_t
+end
 
+function _calculate_LODF_matrix_MKLPardiso(
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    ptdf::Matrix{Float64},
+)
+    linecount = size(ptdf, 2)
+    ptdf_denominator_t = a * ptdf
+    m_I = Int[]
+    m_V = Float64[]
+    for iline in 1:linecount
+        if (1.0 - ptdf_denominator_t[iline, iline]) < 1.0E-06
+            push!(m_I, iline)
+            push!(m_V, 1.0)
+        else
+            push!(m_I, iline)
+            push!(m_V, 1 - ptdf_denominator_t[iline, iline])
+        end
+    end
+
+    # intialize MKLPardiso
+    ps = Pardiso.MKLPardisoSolver()
+    defaults = Pardiso.get_iparms(ps)
+    Pardiso.set_iparm!(ps, 1, 1)
+    for (ix, v) in enumerate(defaults[2:end])
+        Pardiso.set_iparm!(ps, ix + 1, v)
+    end
+    Pardiso.set_iparm!(ps, 2, 2)
+    Pardiso.set_iparm!(ps, 59, 2)
+    Pardiso.set_iparm!(ps, 6, 1)
+    # inizialize matrix for evaluation
+    lodf_t = zeros(linecount, linecount)
+    # solve system
+    Pardiso.pardiso(
+        ps,
+        lodf_t,
+        SparseArrays.sparse(m_I, m_I, m_V),
+        ptdf_denominator_t,
+    )
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    # set diagonal to -1
+    lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
     return lodf_t
 end
 
@@ -164,6 +179,10 @@ Builds the LODF matrix given the data of branches and buses of the system.
         vector of the System AC branches
 - `buses::Vector{PSY.ACBus}`:
         vector of the System buses
+- `linear_solver`::String
+        linear solver to use for matrix evaluation.
+        Available options: "KLU", "Dense" (OpenBLAS) or "MKLPardiso".
+        Default solver: "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps())
 """
