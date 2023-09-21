@@ -109,7 +109,7 @@ function _calculate_LODF_matrix_KLU(
     return lodf_t
 end
 
-# ! temp for evaluation
+# ! used only in testing, can be removed in the future
 function _calculate_LODF_matrix_KLU2(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
@@ -139,20 +139,16 @@ function _calculate_LODF_matrix_DENSE(
 )
     linecount = size(ptdf, 2)
     ptdf_denominator_t = a * ptdf
+    m_V = Float64[]
     for iline in 1:linecount
         if (1.0 - ptdf_denominator_t[iline, iline]) < 1.0E-06
-            ptdf_denominator_t[iline, iline] = 0.0
+            push!(m_V, 1.0)
+        else
+            push!(m_V, 1.0 - ptdf_denominator_t[iline, iline])
         end
     end
-    (Dem, dipiv, dinfo) = getrf!(
-        Matrix{Float64}(1.0I, linecount, linecount) -
-        Array(LinearAlgebra.Diagonal(ptdf_denominator_t)),
-    )
-    lodf_t = gemm('N', 'N', getri!(Dem, dipiv), ptdf_denominator_t)
-    lodf_t =
-        lodf_t - Array(LinearAlgebra.Diagonal(lodf_t)) -
-        Matrix{Float64}(1.0I, linecount, linecount)
-
+    lodf_t = LinearAlgebra.diagm(m_V) \ (a * ptdf)
+    lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
     return lodf_t
 end
 
