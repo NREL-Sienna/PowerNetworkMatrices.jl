@@ -132,6 +132,7 @@ function _calculate_LODF_matrix_MKLPardiso(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
 )
+    @error "LODF Start"
     linecount = size(ptdf, 2)
     ptdf_denominator_t = a * ptdf
     m_I = Int[]
@@ -159,6 +160,8 @@ function _calculate_LODF_matrix_MKLPardiso(
     # inizialize matrix for evaluation
     lodf_t = zeros(linecount, linecount)
     # solve system
+    Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
+    @error "Call to Pardiso Start"
     Pardiso.pardiso(
         ps,
         lodf_t,
