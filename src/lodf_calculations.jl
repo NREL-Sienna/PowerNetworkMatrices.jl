@@ -157,6 +157,7 @@ function _calculate_LODF_matrix_MKLPardiso(
     Pardiso.set_iparm!(ps, 2, 2)
     Pardiso.set_iparm!(ps, 59, 2)
     Pardiso.set_iparm!(ps, 6, 1)
+    Pardiso.set_iparm!(ps, 27, 1)
     # inizialize matrix for evaluation
     lodf_t = zeros(linecount, linecount)
     # solve system
