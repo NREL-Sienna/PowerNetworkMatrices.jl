@@ -149,11 +149,14 @@ function _calculate_LODF_matrix_MKLPardiso(
 
     # intialize MKLPardiso
     ps = Pardiso.MKLPardisoSolver()
+    Pardiso.pardisoinit(ps)
+    Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     defaults = Pardiso.get_iparms(ps)
     Pardiso.set_iparm!(ps, 1, 1)
     #for (ix, v) in enumerate(defaults[2:end])
     #    Pardiso.set_iparm!(ps, ix + 1, v)
     #end
+    Pardiso.set_iparm!(ps, 12, 1)
     Pardiso.set_iparm!(ps, 2, 2)
     Pardiso.set_iparm!(ps, 59, 2)
     # Pardiso.set_iparm!(ps, 6, 1)
@@ -164,8 +167,23 @@ function _calculate_LODF_matrix_MKLPardiso(
     # inizialize matrix for evaluation
     lodf_t = zeros(linecount, linecount)
     # solve system
-    Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-    @error "Call to Pardiso Start"
+    @error "Call to Pardiso Analysis"
+    Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
+    Pardiso.pardiso(
+        ps,
+        lodf_t,
+        SparseArrays.sparse(m_I, m_I, m_V),
+        ptdf_denominator_t,
+    )
+    Pardiso.set_phase!(ps, Pardiso.NUM_FACT)
+    @error "Call to Pardiso Fact"
+    Pardiso.pardiso(
+        ps,
+        ptdf_denominator_t,
+        Float64[]
+    )
+    Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
+    @error "Call to Pardiso Solve"
     Pardiso.pardiso(
         ps,
         lodf_t,
