@@ -182,7 +182,7 @@ function _calculate_LODF_matrix_MKLPardiso(
         SparseArrays.sparse(m_I, m_I, m_V),
         Float64[]
     )
-    Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
+    Pardiso.set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
     @error "Call to Pardiso Solve"
     Pardiso.pardiso(
         ps,
