@@ -179,7 +179,7 @@ function _calculate_LODF_matrix_MKLPardiso(
     @error "Call to Pardiso Fact"
     Pardiso.pardiso(
         ps,
-        ptdf_denominator_t,
+        SparseArrays.sparse(m_I, m_I, m_V),
         Float64[]
     )
     Pardiso.set_phase!(cache.cacheval, Pardiso.SOLVE_ITERATIVE_REFINE)
