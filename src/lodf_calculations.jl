@@ -151,13 +151,16 @@ function _calculate_LODF_matrix_MKLPardiso(
     ps = Pardiso.MKLPardisoSolver()
     defaults = Pardiso.get_iparms(ps)
     Pardiso.set_iparm!(ps, 1, 1)
-    for (ix, v) in enumerate(defaults[2:end])
-        Pardiso.set_iparm!(ps, ix + 1, v)
-    end
+    #for (ix, v) in enumerate(defaults[2:end])
+    #    Pardiso.set_iparm!(ps, ix + 1, v)
+    #end
     Pardiso.set_iparm!(ps, 2, 2)
     Pardiso.set_iparm!(ps, 59, 2)
     Pardiso.set_iparm!(ps, 6, 1)
     Pardiso.set_iparm!(ps, 27, 1)
+    Pardiso.set_iparm!(ps, 10, 0)
+    Pardiso.set_iparm!(ps, 12, 0)
+    Pardiso.set_iparm!(ps, 23, 0)
     # inizialize matrix for evaluation
     lodf_t = zeros(linecount, linecount)
     # solve system
