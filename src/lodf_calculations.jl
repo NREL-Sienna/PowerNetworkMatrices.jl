@@ -157,47 +157,44 @@ function _calculate_LODF_matrix_MKLPardiso(
     #    Pardiso.set_iparm!(ps, ix + 1, v)
     #end
     Pardiso.set_iparm!(ps, 12, 1)
-    Pardiso.set_iparm!(ps, 2, 2)
+    Pardiso.set_iparm!(ps, 2, 3)
     Pardiso.set_iparm!(ps, 59, 2)
     # Pardiso.set_iparm!(ps, 6, 1)
     Pardiso.set_iparm!(ps, 27, 1)
-    Pardiso.set_iparm!(ps, 10, 0)
-    Pardiso.set_iparm!(ps, 12, 0)
+    Pardiso.set_iparm!(ps, 11, 1)
+    Pardiso.set_iparm!(ps, 13, 1)
     Pardiso.set_iparm!(ps, 23, 0)
     # inizialize matrix for evaluation
     lodf_t = zeros(linecount, linecount)
     # solve system
     @error "Call to Pardiso Analysis"
     Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
+    A = SparseArrays.sparse(m_I, m_I, m_V)
     Pardiso.pardiso(
         ps,
         lodf_t,
-        SparseArrays.sparse(m_I, m_I, m_V),
+        A,
         ptdf_denominator_t,
     )
     Pardiso.set_phase!(ps, Pardiso.NUM_FACT)
     @error "Call to Pardiso Fact"
     Pardiso.pardiso(
         ps,
-        SparseArrays.sparse(m_I, m_I, m_V),
+        A,
         Float64[]
     )
     Pardiso.set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
     @error "Call to Pardiso Solve"
-    for i in 1:linecount
-        temp = zeros(Float64, linecount)
-        Pardiso.pardiso(
-            ps,
-            temp,
-            SparseArrays.sparse(m_I, m_I, m_V),
-            ptdf_denominator_t[:, i],
-        )
-        lodf_t[:,i] .= temp
-        lodf_t[i,i] = -1.0
-    end
-    # Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    Pardiso.pardiso(
+        ps,
+        lodf_t,
+        A,
+        lodf_t,
+    )
+    @error "Call to Pardiso release"
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
     # set diagonal to -1
-    #lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
+    lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
     return lodf_t
 end
 
