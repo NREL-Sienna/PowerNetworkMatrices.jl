@@ -189,6 +189,9 @@ function _calculate_LODF_matrix_MKLPardiso(
     tmp = zeros(Float64, linecount, 10000)
     while i_count <= linecount
         edge = min(i_count + 9999, linecount)
+        if edge - i_count < 10000
+            tmp = tmp[:, i_count:edge]
+        end
         Pardiso.pardiso(
             ps,
             tmp,
