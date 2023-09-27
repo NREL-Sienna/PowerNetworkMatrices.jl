@@ -186,7 +186,7 @@ function _calculate_LODF_matrix_MKLPardiso(
     @error "Call to Pardiso Solve"
     Pardiso.pardiso(
         ps,
-        lodf_t,
+        lodf_t[:,1],
         SparseArrays.sparse(m_I, m_I, m_V),
         ptdf_denominator_t[:,1],
     )
