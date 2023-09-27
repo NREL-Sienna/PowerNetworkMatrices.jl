@@ -156,9 +156,8 @@ function _pardiso_sequential_LODF!(
     Pardiso.set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
     i_count = 1
     tmp = zeros(Float64, linecount, chunk_size)
-
     while i_count <= linecount
-        edge = min(i_count + chunk_size, linecount)
+        edge = min(i_count + chunk_size - 1, linecount)
         if linecount - edge <= 0
             tmp = tmp[:, 1:(edge - i_count + 1)]
         end
