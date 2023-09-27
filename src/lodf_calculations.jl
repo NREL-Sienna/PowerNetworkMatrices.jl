@@ -185,12 +185,18 @@ function _calculate_LODF_matrix_MKLPardiso(
     )
     Pardiso.set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
     @error "Call to Pardiso Solve"
-    Pardiso.pardiso(
-        ps,
-        lodf_t,
-        A,
-        ptdf_denominator_t,
-    )
+    i_count = 1
+    while i_count <= linecount
+        edge = min(i_count + 2999, linecount)
+        tmp = zeros(Float64, 3000)
+        Pardiso.pardiso(
+            ps,
+            tmp,
+            A,
+            ptdf_denominator_t[:, i_count:edge],
+        )
+        i_count = edge
+    end
     @error "Call to Pardiso release"
     Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
     # set diagonal to -1
