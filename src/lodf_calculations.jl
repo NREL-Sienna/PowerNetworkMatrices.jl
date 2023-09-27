@@ -132,8 +132,8 @@ function _pardiso_sequential_LODF!(
     lodf_t::Matrix{Float64},
     A::SparseArrays.SparseMatrixCSC{Float64, Int},
     ptdf_denominator_t::Matrix{Float64},
-    chunk_size::Int = DEFAULT_LODF_CHUNK_SIZE
-    )
+    chunk_size::Int = DEFAULT_LODF_CHUNK_SIZE,
+)
     linecount = size(lodf_t, 1)
     ps = Pardiso.MKLPardisoSolver()
     Pardiso.pardisoinit(ps)
@@ -151,7 +151,7 @@ function _pardiso_sequential_LODF!(
     Pardiso.pardiso(
         ps,
         A,
-        Float64[]
+        Float64[],
     )
     Pardiso.set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
     i_count = 1
