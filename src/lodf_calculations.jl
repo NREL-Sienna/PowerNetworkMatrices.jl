@@ -186,15 +186,16 @@ function _calculate_LODF_matrix_MKLPardiso(
     Pardiso.set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
     @error "Call to Pardiso Solve"
     i_count = 1
+    tmp = zeros(Float64, 3000)
     while i_count <= linecount
         edge = min(i_count + 2999, linecount)
-        tmp = zeros(Float64, 3000)
         Pardiso.pardiso(
             ps,
             tmp,
             A,
             ptdf_denominator_t[:, i_count:edge],
         )
+        lodf_t[:, i_count:edge] .= tmp
         i_count = edge
     end
     @error "Call to Pardiso release"
