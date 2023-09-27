@@ -189,7 +189,7 @@ function _calculate_LODF_matrix_MKLPardiso(
         ps,
         lodf_t,
         A,
-        lodf_t,
+        ptdf_denominator_t,
     )
     @error "Call to Pardiso release"
     Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
