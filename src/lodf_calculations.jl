@@ -196,7 +196,7 @@ function _calculate_LODF_matrix_MKLPardiso(
             ptdf_denominator_t[:, i_count:edge],
         )
         lodf_t[:, i_count:edge] .= tmp
-        i_count = edge
+        i_count = edge + 1
     end
     @error "Call to Pardiso release"
     Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
