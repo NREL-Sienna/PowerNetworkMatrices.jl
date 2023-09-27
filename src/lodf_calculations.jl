@@ -186,7 +186,7 @@ function _calculate_LODF_matrix_MKLPardiso(
     Pardiso.set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
     @error "Call to Pardiso Solve"
     i_count = 1
-    tmp = zeros(Float64, 10000)
+    tmp = zeros(Float64, linecount, 10000)
     while i_count <= linecount
         edge = min(i_count + 9999, linecount)
         Pardiso.pardiso(
