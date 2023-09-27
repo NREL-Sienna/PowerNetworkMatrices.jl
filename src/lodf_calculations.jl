@@ -186,11 +186,10 @@ function _calculate_LODF_matrix_MKLPardiso(
     @error "Call to Pardiso Solve"
     Pardiso.pardiso(
         ps,
-        lodf_t[:,1],
+        lodf_t,
         SparseArrays.sparse(m_I, m_I, m_V),
-        ptdf_denominator_t[:,1],
+        ptdf_denominator_t,
     )
-    error()
     # Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
     # set diagonal to -1
     lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
