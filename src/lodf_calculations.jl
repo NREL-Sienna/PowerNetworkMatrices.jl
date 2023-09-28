@@ -189,12 +189,12 @@ function _pardiso_single_LODF!(
     ps = Pardiso.MKLPardisoSolver()
     Pardiso.pardisoinit(ps)
     Pardiso.set_iparm!(ps, 1, 1)
+    defaults = Pardiso.get_iparms(ps)
     for (ix, v) in enumerate(defaults[2:end])
         Pardiso.set_iparm!(ps, ix + 1, v)
     end
     Pardiso.set_iparm!(ps, 2, 2)
     Pardiso.set_iparm!(ps, 59, 2)
-    Pardiso.set_iparm!(ps, 6, 1)
     Pardiso.set_iparm!(ps, 12, 1)
     #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     Pardiso.pardiso(
@@ -204,11 +204,7 @@ function _pardiso_single_LODF!(
         ptdf_denominator_t,
     )
     Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-    Pardiso.pardiso(
-        ps,
-        A,
-        Float64[],
-    )
+    Pardiso.pardiso(ps)
     return
 end
 
