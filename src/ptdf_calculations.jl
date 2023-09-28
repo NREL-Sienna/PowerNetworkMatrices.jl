@@ -291,13 +291,13 @@ function _calculate_PTDF_matrix_MKLPardiso(
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
         Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
-        copyto!(PTDFm_t[valid_ix, :], full_BA)
+        PTDFm_t[valid_ix, :] .= full_BA
         Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
         Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
-        copyto!(PTDFm_t[valid_ix, :], full_BA)
+        PTDFm_t[valid_ix, :] .= full_BA
         Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
