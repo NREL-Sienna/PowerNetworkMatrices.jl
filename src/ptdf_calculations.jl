@@ -272,7 +272,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     ps = Pardiso.MKLPardisoSolver()
     Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM)
     Pardiso.pardisoinit(ps)
-    Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
+    # Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     defaults = Pardiso.get_iparms(ps)
     Pardiso.set_iparm!(ps, 1, 1)
     for (ix, v) in enumerate(defaults[2:end])
