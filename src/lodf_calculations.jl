@@ -184,6 +184,8 @@ function _pardiso_sequential_LODF!(
         lodf_t[:, i_count:edge] .= tmp
         i_count = edge + 1
     end
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    Pardiso.pardiso(ps)
     return
 end
 
