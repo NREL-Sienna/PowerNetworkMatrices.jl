@@ -137,7 +137,7 @@ function _pardiso_sequential_LODF!(
     linecount = size(lodf_t, 1)
     ps = Pardiso.MKLPardisoSolver()
     Pardiso.pardisoinit(ps)
-    Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
+    #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
 
     Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
     Pardiso.pardiso(
@@ -178,7 +178,6 @@ function _calculate_LODF_matrix_MKLPardiso(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
 )
-    @error "LODF Start"
     linecount = size(ptdf, 2)
     ptdf_denominator_t = a * ptdf
     m_I = Int[]
