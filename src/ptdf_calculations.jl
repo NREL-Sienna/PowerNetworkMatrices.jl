@@ -293,9 +293,13 @@ function _calculate_PTDF_matrix_MKLPardiso(
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
         tmp = similar(full_BA)
+        @error "solve call"
         Pardiso.pardiso(ps, tmp, ABA, full_BA)
+        @error "solve done"
         Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+        @error "release call"
         Pardiso.pardiso(ps)
+        @error "release done"
         PTDFm_t[valid_ix, :] = tmp
         return PTDFm_t
     elseif length(dist_slack) == buscount
