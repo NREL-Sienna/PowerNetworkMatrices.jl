@@ -135,10 +135,10 @@ function _pardiso_sequential_LODF!(
     chunk_size::Int = DEFAULT_LODF_CHUNK_SIZE,
 )
     linecount = size(lodf_t, 1)
+    @assert LinearAlgebra.ishermitian(A)
     ps = Pardiso.MKLPardisoSolver()
-    Pardiso.pardisoinit(ps)
+    Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM_POSDEF)
     #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-
     Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
     Pardiso.pardiso(
         ps,
@@ -157,7 +157,7 @@ function _pardiso_sequential_LODF!(
     i_count = 1
     tmp = zeros(Float64, linecount, chunk_size)
     while i_count <= linecount
-        edge = min(i_count + chunk_size -  1, linecount)
+        edge = min(i_count + chunk_size - 1, linecount)
         if linecount - edge <= 0
             tmp = tmp[:, 1:(edge - i_count + 1)]
         end
@@ -171,11 +171,7 @@ function _pardiso_sequential_LODF!(
         i_count = edge + 1
     end
     Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-    Pardiso.pardiso(
-        ps,
-        A,
-        Float64[],
-    )
+    Pardiso.pardiso(ps)
     return
 end
 
@@ -183,10 +179,10 @@ function _pardiso_single_LODF!(
     lodf_t::Matrix{Float64},
     A::SparseArrays.SparseMatrixCSC{Float64, Int},
     ptdf_denominator_t::Matrix{Float64},
-    chunk_size::Int = DEFAULT_LODF_CHUNK_SIZE,
 )
-    linecount = size(lodf_t, 1)
+    @assert LinearAlgebra.ishermitian(A)
     ps = Pardiso.MKLPardisoSolver()
+    Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM_POSDEF)
     Pardiso.pardisoinit(ps)
     Pardiso.set_iparm!(ps, 1, 1)
     defaults = Pardiso.get_iparms(ps)
@@ -207,7 +203,6 @@ function _pardiso_single_LODF!(
     Pardiso.pardiso(ps)
     return
 end
-
 
 function _calculate_LODF_matrix_MKLPardiso(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},

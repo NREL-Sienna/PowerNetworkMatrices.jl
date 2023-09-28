@@ -268,10 +268,11 @@ function _calculate_PTDF_matrix_MKLPardiso(
     buscount = size(BA, 1)
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-    # Here add the subnetwork detection
+    @assert LinearAlgebra.issymmetric(ABA)
     ps = Pardiso.MKLPardisoSolver()
+    Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM)
     Pardiso.pardisoinit(ps)
-    # Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
+    Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     defaults = Pardiso.get_iparms(ps)
     Pardiso.set_iparm!(ps, 1, 1)
     for (ix, v) in enumerate(defaults[2:end])
@@ -281,6 +282,9 @@ function _calculate_PTDF_matrix_MKLPardiso(
     Pardiso.set_iparm!(ps, 59, 2)
     Pardiso.set_iparm!(ps, 6, 1)
     Pardiso.set_iparm!(ps, 12, 1)
+    Pardiso.set_iparm!(ps, 11, 0)
+    Pardiso.set_iparm!(ps, 13, 0)
+    Pardiso.set_iparm!(ps, 32, 1)
 
     # inizialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
