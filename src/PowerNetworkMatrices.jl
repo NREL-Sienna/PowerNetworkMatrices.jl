@@ -19,6 +19,7 @@ export VirtualPTDF
 export Ybus
 
 using DocStringExtensions
+import MKL
 import InfrastructureSystems
 import PowerSystems
 import PowerSystems: ACBusTypes
@@ -31,9 +32,9 @@ import SparseArrays: rowvals, nzrange
 import HDF5
 import KLU: klu
 import KLU
-import LinearAlgebra: LAPACK.getri!, LAPACK.getrf!, BLAS.gemm
-import LinearAlgebra: ldiv!, mul!, I, dot
 import LinearAlgebra
+import LinearAlgebra: BLAS.gemm
+import LinearAlgebra: ldiv!, mul!, I, dot
 import Pardiso
 
 @template DEFAULT = """
