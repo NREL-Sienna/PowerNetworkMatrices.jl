@@ -174,6 +174,27 @@ function _pardiso_sequential_LODF!(
     return
 end
 
+function _pardiso_single_LODF!(
+    lodf_t::Matrix{Float64},
+    A::SparseArrays.SparseMatrixCSC{Float64, Int},
+    ptdf_denominator_t::Matrix{Float64},
+    chunk_size::Int = DEFAULT_LODF_CHUNK_SIZE,
+)
+    linecount = size(lodf_t, 1)
+    ps = Pardiso.MKLPardisoSolver()
+    Pardiso.pardisoinit(ps)
+    #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
+    Pardiso.pardiso(
+        ps,
+        lodf_t,
+        A,
+        ptdf_denominator_t,
+    )
+    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    return
+end
+
+
 function _calculate_LODF_matrix_MKLPardiso(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
@@ -193,7 +214,11 @@ function _calculate_LODF_matrix_MKLPardiso(
     end
     lodf_t = zeros(linecount, linecount)
     A = SparseArrays.sparse(m_I, m_I, m_V)
-    _pardiso_sequential_LODF!(lodf_t, A, ptdf_denominator_t)
+    if linecount > DEFAULT_LODF_CHUNK_SIZE
+        _pardiso_sequential_LODF!(lodf_t, A, ptdf_denominator_t)
+    else
+        _pardiso_single_LODF!(lodf_t, A, ptdf_denominator_t)
+    end
     lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
     return lodf_t
 end
