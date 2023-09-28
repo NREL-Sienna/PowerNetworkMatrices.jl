@@ -134,10 +134,11 @@ function _pardiso_sequential_LODF!(
     ptdf_denominator_t::Matrix{Float64},
     chunk_size::Int = DEFAULT_LODF_CHUNK_SIZE,
 )
+    @info "Line Count too large for single compute using Pardiso. Employing Sequential Calulations using a chunk_size=$(chunk_size)"
     linecount = size(lodf_t, 1)
     @assert LinearAlgebra.ishermitian(A)
     ps = Pardiso.MKLPardisoSolver()
-    Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM_POSDEF)
+    Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM)
     #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
     Pardiso.pardiso(
@@ -170,8 +171,6 @@ function _pardiso_sequential_LODF!(
         lodf_t[:, i_count:edge] .= tmp
         i_count = edge + 1
     end
-    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-    Pardiso.pardiso(ps)
     return
 end
 
