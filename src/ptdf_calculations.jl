@@ -293,6 +293,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
         Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
+        full_BA*1.0
         PTDFm_t[valid_ix, :] .= deepcopy(full_BA)
         Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
         Pardiso.pardiso(ps, Float64[], ABA, full_BA)
