@@ -279,7 +279,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     end
     Pardiso.set_iparm!(ps, 2, 2)
     Pardiso.set_iparm!(ps, 59, 2)
-    Pardiso.set_iparm!(ps, 6, 1)
+    #Pardiso.set_iparm!(ps, 6, 1)
     Pardiso.set_iparm!(ps, 12, 1)
 
     # inizialize matrices for evaluation
@@ -292,11 +292,11 @@ function _calculate_PTDF_matrix_MKLPardiso(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
-        Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
+        tmp = similar(full_BA)
+        Pardiso.pardiso(ps, tmp, ABA, full_BA)
         Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
         Pardiso.pardiso(ps)
-        full_BA*1.0
-        PTDFm_t[valid_ix, :] .= deepcopy(full_BA)
+        PTDFm_t[valid_ix, :] = tmp
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
