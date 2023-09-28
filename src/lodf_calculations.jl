@@ -171,6 +171,11 @@ function _pardiso_sequential_LODF!(
         i_count = edge + 1
     end
     Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    Pardiso.pardiso(
+        ps,
+        A,
+        Float64[],
+    )
     return
 end
 
@@ -199,6 +204,11 @@ function _pardiso_single_LODF!(
         ptdf_denominator_t,
     )
     Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
+    Pardiso.pardiso(
+        ps,
+        A,
+        Float64[],
+    )
     return
 end
 
