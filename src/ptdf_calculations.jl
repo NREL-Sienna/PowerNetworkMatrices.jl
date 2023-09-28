@@ -279,7 +279,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     end
     Pardiso.set_iparm!(ps, 2, 2)
     Pardiso.set_iparm!(ps, 59, 2)
-    #Pardiso.set_iparm!(ps, 6, 1)
+    Pardiso.set_iparm!(ps, 6, 1)
     Pardiso.set_iparm!(ps, 12, 1)
 
     # inizialize matrices for evaluation
@@ -292,22 +292,17 @@ function _calculate_PTDF_matrix_MKLPardiso(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
-        tmp = similar(full_BA)
-        @error "solve call"
-        Pardiso.pardiso(ps, tmp, ABA, full_BA)
-        @error "solve done"
+        Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
+        PTDFm_t[valid_ix, :] = full_BA
         Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-        @error "release call"
         Pardiso.pardiso(ps)
-        @error "release done"
-        PTDFm_t[valid_ix, :] = tmp
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
         Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
-        PTDFm_t[valid_ix, :] .= deepcopy(full_BA)
+        PTDFm_t[valid_ix, :] = full_BA
         Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-        Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
+        Pardiso.pardiso(ps)
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
         return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
