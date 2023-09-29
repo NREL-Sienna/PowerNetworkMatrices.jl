@@ -123,9 +123,11 @@ function _calculate_LODF_matrix_DENSE(
             push!(m_V, 1.0 - ptdf_denominator_t[iline, iline])
         end
     end
-    lodf_t = LinearAlgebra.diagm(m_V) \ ptdf_denominator_t
-    lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
-    return lodf_t
+    (mV, bipiv, binfo) = getrf!(Matrix(LinearAlgebra.diagm(m_V)))
+    _binfo_check(binfo)
+    getrs!('N', mV, bipiv, ptdf_denominator_t)
+    ptdf_denominator_t[LinearAlgebra.diagind(ptdf_denominator_t)] .= -1.0
+    return ptdf_denominator_t
 end
 
 function _pardiso_sequential_LODF!(
