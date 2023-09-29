@@ -19,7 +19,7 @@ export VirtualPTDF
 export Ybus
 
 using DocStringExtensions
-import MKL
+#import MKL
 import InfrastructureSystems
 import PowerSystems
 import PowerSystems: ACBusTypes
