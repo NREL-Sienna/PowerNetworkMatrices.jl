@@ -80,9 +80,9 @@ function _calculate_LODF_matrix_KLU(
         end
     end
     Dem_LU = klu(SparseArrays.sparse(m_I, m_I, m_V))
-    lodf_t = Dem_LU \ ptdf_denominator
-    lodf_t[SparseArrays.diagind(lodf_t)] .= -1.0
-    return lodf_t
+    KLU.solve!(Dem_LU, ptdf_denominator)
+    ptdf_denominator[SparseArrays.diagind(ptdf_denominator)] .= -1.0
+    return ptdf_denominator
 end
 
 function _calculate_LODF_matrix_KLU(
