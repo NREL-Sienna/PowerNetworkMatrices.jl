@@ -19,7 +19,7 @@ export VirtualPTDF
 export Ybus
 
 using DocStringExtensions
-#import MKL
+import MKL
 import InfrastructureSystems
 import PowerSystems
 import PowerSystems: ACBusTypes
@@ -35,6 +35,7 @@ import KLU
 import LinearAlgebra
 import LinearAlgebra: BLAS.gemm
 import LinearAlgebra: ldiv!, mul!, I, dot
+import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 import Pardiso
 
 @template DEFAULT = """

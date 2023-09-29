@@ -123,19 +123,17 @@ function _calculate_PTDF_matrix_KLU(
     # inizialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
-
+    copyto!(PTDFm_t, BA)
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        copyto!(PTDFm_t, BA)
         PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
         PTDFm_t[collect(ref_bus_positions), :] .= 0.0
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        copyto!(PTDFm_t, BA)
         PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
         PTDFm_t[collect(ref_bus_positions), :] .= 0.0
         slack_array = dist_slack / sum(dist_slack)
@@ -172,6 +170,19 @@ function calculate_PTDF_matrix_KLU(
     return PTDFm, A
 end
 
+function _binfo_check(binfo::Int)
+    if binfo != 0
+        if binfo < 0
+            error("Illegal Argument in Inputs")
+        elseif binfo > 0
+            error("Singular value in factorization. Possibly there is an islanded bus")
+        else
+            @assert false
+        end
+    end
+    return
+end
+
 """
 Funciton for internal use only.
 
@@ -198,17 +209,21 @@ function _calculate_PTDF_matrix_DENSE(
     valid_ixs = setdiff(1:buscount, ref_bus_positions)
     ABA = Matrix(calculate_ABA_matrix(A, BA, ref_bus_positions))
     PTDFm_t = zeros(buscount, linecount)
-
+    (ABA, bipiv, binfo) = getrf!(ABA)
+    _binfo_check(binfo)
+    BA = Matrix(BA[valid_ixs, :])
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
             "Distibuted slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        PTDFm_t[valid_ixs, :] = ABA \ BA[valid_ixs, :]
+        getrs!('N', ABA, bipiv, BA)
+        PTDFm_t[valid_ixs, :] = BA
         return PTDFm_t
     elseif length(dist_slack) == buscount
         @info "Distributed bus"
-        PTDFm_t[valid_ixs, :] = ABA \ BA[valid_ixs, :]
+        getrs!('N', ABA, bipiv, BA)
+        PTDFm_t[valid_ixs, :] = BA
         slack_array = dist_slack / sum(dist_slack)
         slack_array = reshape(slack_array, 1, buscount)
         return PTDFm_t -
