@@ -39,7 +39,7 @@ function Ward_data(
     Y_es = ybus.data[unselect_x, select_y];
     Y_ee = ybus.data[unselect_x, unselect_y];
     # get the matrices
-    A = Y_se*KLU.solve!(KLU.klu(Y_ee), Matrix(Y_es));
+    A = -Y_se*KLU.solve!(KLU.klu(Y_ee), Matrix(Y_es));
     B = KLU.solve!(KLU.klu(Y_ee), Matrix(transpose(Y_se)));
     return Ward_data(
         A,

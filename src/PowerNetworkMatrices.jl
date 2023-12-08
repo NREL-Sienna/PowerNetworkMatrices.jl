@@ -16,6 +16,7 @@ export to_hdf5
 export validate_connectivity
 export VirtualLODF
 export VirtualPTDF
+export Ward_data
 export Ybus
 
 using DocStringExtensions
@@ -58,5 +59,6 @@ include("lodf_calculations.jl")
 include("virtual_lodf_calculations.jl")
 include("system_utils.jl")
 include("serialization.jl")
+include("ward_calculations.jl")
 
 end
