@@ -12,6 +12,7 @@ export IncidenceMatrix
 export is_factorized
 export LODF
 export PTDF
+export RadialBranches
 export to_hdf5
 export validate_connectivity
 export VirtualLODF
@@ -49,6 +50,7 @@ include("BA_ABA_matrices.jl")
 include("incedence_matrix.jl")
 include("adjacency_matrix.jl")
 include("common.jl")
+include("radial_braches.jl")
 include("definitions.jl")
 include("ptdf_calculations.jl")
 include("ybus_calculations.jl")
