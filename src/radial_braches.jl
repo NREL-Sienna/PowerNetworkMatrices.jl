@@ -6,6 +6,12 @@ end
 get_bus_reduction_map(rb::RadialBranches) = rb.bus_reduction_map
 get_radial_branches(rb::RadialBranches) = rb.radial_branches
 
+function RadialBranches(;
+    bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
+    radial_branches::Set{String} = Set{String}())
+    return RadialBranches(bus_reduction_map, radial_branches)
+end
+
 function _find_upstream_bus(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
     j::Int,
@@ -89,17 +95,29 @@ function _reverse_search(
 end
 
 function RadialBranches(A::IncidenceMatrix)
+    return RadialBranches(A.data, A.lookup[1], A.lookup[2], A.ref_bus_positions)
+end
+
+function RadialBranches(
+    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    line_map::Dict{String, Int},
+    bus_map::Dict{Int, Int},
+    ref_bus_positions::Set{Int})
     lk = ReentrantLock()
-    buscount = size(A, 2)
+    buscount = length(bus_map)
     bus_reduction_map_index = Dict{Int, Set{Int}}()
     radial_branches = Set{String}()
-    reverse_line_map = Dict(reverse(kv) for kv in A.lookup[1])
-    reverse_bus_map = Dict(reverse(kv) for kv in A.lookup[2])
-    Threads.@threads for j in 1:buscount
-        if length(SparseArrays.nzrange(A.data, j)) == 1
+    reverse_line_map = Dict(reverse(kv) for kv in line_map)
+    reverse_bus_map = Dict(reverse(kv) for kv in bus_map)
+    #Threads.@threads
+    for j in 1:buscount
+        if length(SparseArrays.nzrange(A, j)) == 1
+            if reverse_line_map[j] ∈ ref_bus_positions
+                continue
+            end
             lock(lk) do
                 _reverse_search(
-                    A.data,
+                    A,
                     j,
                     bus_reduction_map_index,
                     reverse_line_map,
