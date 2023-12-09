@@ -8,6 +8,8 @@ export find_subnetworks
 export from_hdf5
 export get_ptdf_data
 export get_lodf_data
+export get_bus_reduction_map
+export get_radial_branches
 export IncidenceMatrix
 export is_factorized
 export LODF
