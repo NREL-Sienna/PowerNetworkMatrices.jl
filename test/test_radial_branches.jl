@@ -14,3 +14,11 @@
     @test get_bus_reduction_map(rb)[7] == Set([61, 8])
     @test get_radial_branches(rb) == Set(["tl", "Trans4"])
 end
+
+@testset "Radial Branches Large" begin
+    sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys"; add_forecasts = false)
+    rb = RadialBranches(IncidenceMatrix(sys))
+    for (k, v) in get_bus_reduction_map(rb)
+        @test k ∉ v
+    end
+end
