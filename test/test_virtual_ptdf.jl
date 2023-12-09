@@ -119,11 +119,11 @@ end
 
     # test empty cache
     vptdf = VirtualPTDF(sys)
-    @test isempty(vptdf) == true
+    @test isempty(vptdf)
 
     # test full cache
     vptdf[2, 1]
-    @test isempty(vptdf) == false
+    @test !isempty(vptdf)
 
     # check if error is correctly thrown
     @test_throws ErrorException vptdf[1, 1] = 1
