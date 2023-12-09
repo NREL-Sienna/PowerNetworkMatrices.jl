@@ -114,7 +114,7 @@ function VirtualPTDF(
         subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
     end
     temp_data = zeros(length(bus_ax))
-    # if isempty(persistent_lines)
+
     if isempty(persistent_lines)
         empty_cache =
             RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
@@ -170,15 +170,16 @@ Checks if the any of the fields of VirtualPTDF is empty.
 """
 function Base.isempty(vptdf::VirtualPTDF)
     for name in fieldnames(typeof(vptdf))
-        if name == :dist_slack && isempty(getfield(vptdf, name))
-            @debug "Field dist_slack has default value: " *
+        if name == :dist_slack && !isempty(getfield(vptdf, name))
+            @info "Field dist_slack has default value: " *
                    string(getfield(vptdf, name)) * "."
-        elseif !(name in [:K, :dist_slack]) && isempty(getfield(vptdf, name))
-            @debug "Field " * string(name) * " not defined."
-            return true
+            return false
+        elseif (name in [:cache, :radial_branches]) && !isempty(getfield(vptdf, name))
+            @info "Field " * string(name) * " not defined."
+            return false
         end
     end
-    return false
+    return true
 end
 
 """
