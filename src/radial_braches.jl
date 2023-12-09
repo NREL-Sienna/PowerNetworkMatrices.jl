@@ -1,7 +1,10 @@
 struct RadialBranches
-    bus_reduction_map_index::Dict{Int, Set{Int}}
-    radial_branches::Vector{String}
+    bus_reduction_map::Dict{Int, Set{Int}}
+    radial_branches::Set{String}
 end
+
+get_bus_reduction_map(rb::RadialBranches) = rb.bus_reduction_map
+get_radial_branches(rb::RadialBranches) = rb.radial_branches
 
 function _find_upstream_bus(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
@@ -107,5 +110,5 @@ function RadialBranches(A::IncidenceMatrix)
         end
     end
 
-    return bus_reduction_map_index, radial_branches
+    return RadialBranches(bus_reduction_map_index, radial_branches)
 end
