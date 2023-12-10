@@ -5,7 +5,8 @@ end
 
 get_bus_reduction_map(rb::RadialBranches) = rb.bus_reduction_map
 get_radial_branches(rb::RadialBranches) = rb.radial_branches
-Base.isempty(rb::RadialBranches) = isempty(rb.bus_reduction_map) && isempty(rb.bus_reduction_map)
+Base.isempty(rb::RadialBranches) =
+    isempty(rb.bus_reduction_map) && isempty(rb.bus_reduction_map)
 
 function RadialBranches(;
     bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
