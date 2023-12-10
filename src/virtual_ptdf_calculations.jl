@@ -172,7 +172,7 @@ function Base.isempty(vptdf::VirtualPTDF)
     for name in fieldnames(typeof(vptdf))
         if name == :dist_slack && !isempty(getfield(vptdf, name))
             @info "Field dist_slack has default value: " *
-                   string(getfield(vptdf, name)) * "."
+                  string(getfield(vptdf, name)) * "."
             return false
         elseif (name in [:cache, :radial_branches]) && !isempty(getfield(vptdf, name))
             @info "Field " * string(name) * " not defined."
