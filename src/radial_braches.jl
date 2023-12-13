@@ -104,8 +104,8 @@ function RadialBranches(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
     line_map::Dict{String, Int},
     bus_map::Dict{Int, Int},
-    ref_bus_positions::Set{Int}
-    )
+    ref_bus_positions::Set{Int},
+)
     lk = ReentrantLock()
     buscount = length(bus_map)
     bus_reduction_map_index = Dict{Int, Set{Int}}()
