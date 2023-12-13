@@ -263,6 +263,9 @@ Builds the LODF matrix given the data of branches and buses of the system.
         Default solver: "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps())
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function LODF(
     branches,
@@ -334,6 +337,9 @@ the PTDF method).
         Linear solver to be used. Options are "Dense" and "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps()).
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function LODF(
     A::IncidenceMatrix,
@@ -392,6 +398,9 @@ NOTE: this method does not support distributed slack bus.
         Linear solver to be used. Options are "Dense" and "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps()).
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function LODF(
     A::IncidenceMatrix,
