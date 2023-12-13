@@ -84,6 +84,9 @@ PTDF array indexed with the branch numbers.
         max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function VirtualPTDF(
     branches,
@@ -172,7 +175,7 @@ function Base.isempty(vptdf::VirtualPTDF)
     for name in fieldnames(typeof(vptdf))
         if name == :dist_slack && !isempty(getfield(vptdf, name))
             @debug "Field dist_slack has default value: " *
-                  string(getfield(vptdf, name)) * "."
+                   string(getfield(vptdf, name)) * "."
             return false
         elseif (name in [:cache, :radial_branches]) && !isempty(getfield(vptdf, name))
             @debug "Field " * string(name) * " not defined."
