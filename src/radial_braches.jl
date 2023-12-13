@@ -104,17 +104,17 @@ function RadialBranches(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
     line_map::Dict{String, Int},
     bus_map::Dict{Int, Int},
-    ref_bus_positions::Set{Int})
+    ref_bus_positions::Set{Int}
+    )
     lk = ReentrantLock()
     buscount = length(bus_map)
     bus_reduction_map_index = Dict{Int, Set{Int}}()
     radial_branches = Set{String}()
     reverse_line_map = Dict(reverse(kv) for kv in line_map)
     reverse_bus_map = Dict(reverse(kv) for kv in bus_map)
-    #Threads.@threads
-    for j in 1:buscount
+    Threads.@threads for j in 1:buscount
         if length(SparseArrays.nzrange(A, j)) == 1
-            if reverse_line_map[j] ∈ ref_bus_positions
+            if j ∈ ref_bus_positions
                 continue
             end
             lock(lk) do
