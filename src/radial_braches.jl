@@ -1,3 +1,5 @@
+# TODO reference bus must not be removed
+
 struct RadialBranches
     bus_reduction_map::Dict{Int, Set{Int}}
     radial_branches::Set{String}
@@ -131,4 +133,26 @@ function RadialBranches(
     end
 
     return RadialBranches(bus_reduction_map_index, radial_branches)
+end
+
+# TODO consider removing this function later
+function _rebase_branches(
+    branches::Vector{PSY.ACBranch},
+    radial_branches::Set{String}
+)
+    branches = [i for i in branches if PSY.get_name(i) ∉ radial_branches]
+    return branches
+end
+
+# TODO consider removing this function later
+function _rebase_buses(
+    buses::Vector{PSY.ACBus},
+    bus_reduction_map::Dict{Int64, Set{Int64}}
+)
+    leaf_buses = Int64[]
+    for i in keys(bus_reduction_map)
+        append!(leaf_buses, collect(bus_reduction_map[i]))
+    end
+    buses = [i for i in buses if PSY.get_number(i) ∉ leaf_buses]
+    return buses
 end

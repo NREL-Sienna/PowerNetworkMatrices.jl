@@ -1,3 +1,10 @@
+# TODO:
+# - error for removed branches and buses
+# - evaluate BA, A again (no need of special functions)
+# - evaluation of other matrices
+# - tests: see if flows are the same
+#   check radial branches if ref bus is there or not
+
 module PowerNetworkMatrices
 
 export ABA_Matrix
@@ -48,11 +55,11 @@ import Pardiso
 
 # network calculations
 include("PowerNetworkMatrix.jl")
-include("BA_ABA_matrices.jl")
 include("incedence_matrix.jl")
 include("adjacency_matrix.jl")
 include("common.jl")
 include("radial_braches.jl")
+include("BA_ABA_matrices.jl")
 include("definitions.jl")
 include("ptdf_calculations.jl")
 include("ybus_calculations.jl")
