@@ -1,3 +1,5 @@
+# TODO: maybe a version with BA_Matrix(sys:System, rb:RadialBranches)? so to use custom radial branches...
+
 """
 Structure containing the BA matrix and other relevant data.
 
@@ -22,22 +24,40 @@ struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
+    reduce_radial_branches::RadialBranches
 end
 
 """
 Build the BA matrix from a given System
+
+# Arguments
+- `sys::PSY.System`:
+        PSY system for which the matrix is constructed
+- `reduce_radial_branches::Bool`:
+        if True the matrix is build considering radial branches removed from 
+        the system
 """
-function BA_Matrix(sys::PSY.System)
+function BA_Matrix(sys::PSY.System; reduce_radial_branches::Bool=false)
+    # TODO branches and buses can be evaluated directly in the if statement
+    # TODO maybe consider changing the get_ac_branches and get_buses function
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
     ref_bus_positions = find_slack_positions(buses)
+    if reduce_radial_branches
+        # remove radial buses and branches
+        rb = RadialBranches(IncidenceMatrix(sys))
+        branches = _rebase_branches(branches, rb.radial_branches);
+        buses = _rebase_buses(buses, rb.bus_reduction_map);
+    else
+        rb = RadialBranches()
+    end
     bus_lookup = make_ax_ref(buses)
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in setdiff(buses, ref_bus_positions)]
     axes = (bus_ax, line_ax)
     lookup = (make_ax_ref(bus_ax), make_ax_ref(line_ax))
     data = calculate_BA_matrix(branches, bus_lookup)
-    return BA_Matrix(data, axes, lookup, ref_bus_positions)
+    return BA_Matrix(data, axes, lookup, ref_bus_positions, rb)
 end
 
 """
