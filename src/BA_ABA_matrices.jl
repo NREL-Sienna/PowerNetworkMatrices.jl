@@ -1,5 +1,4 @@
-# TODO: maybe a version with BA_Matrix(sys:System, rb:RadialBranches)? so to use custom radial branches...
-
+# TODO: BA_Matrix(sys::PSY.Sytems, radial_branches::Vector{String}), for custom radial branches
 """
 Structure containing the BA matrix and other relevant data.
 
@@ -18,6 +17,9 @@ Structure containing the BA matrix and other relevant data.
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
+- `reduce_radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
@@ -74,6 +76,9 @@ Structure containing the ABA matrix and other relevant data.
         to the refence buses
 - `K<:Union{Nothing, KLU.KLUFactorization{Float64, Int}}`:
         either nothing or a container for KLU factorization matrices (LU factorization)
+- `reduce_radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 struct ABA_Matrix{
     Ax,
@@ -85,6 +90,7 @@ struct ABA_Matrix{
     lookup::L
     ref_bus_positions::Set{Int}
     K::F
+    reduce_radial_branches::RadialBranches
 end
 
 """
@@ -97,7 +103,17 @@ Builds the ABA matrix from a System
 # Keyword arguments
 - `factorize`: if true populates ABA_Matrix.K with KLU factorization matrices
 """
-function ABA_Matrix(sys::PSY.System; factorize = false)
+function ABA_Matrix(
+    sys::PSY.System;
+    factorize = false,
+    reduce_radial_branches::Bool=false
+)
+    if reduce_radial_branches
+        rb = RadialBranches(IncidenceMatrix(sys))
+    else
+        rb = RadialBranches()
+    end
+
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
     bus_lookup = make_ax_ref(buses)
