@@ -38,19 +38,14 @@ Build the BA matrix from a given System
         the system
 """
 function BA_Matrix(sys::PSY.System; reduce_radial_branches::Bool=false)
-    # TODO branches and buses can be evaluated directly in the if statement
-    # TODO maybe consider changing the get_ac_branches and get_buses function
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
-    ref_bus_positions = find_slack_positions(buses)
     if reduce_radial_branches
-        # remove radial buses and branches
         rb = RadialBranches(IncidenceMatrix(sys))
-        branches = _rebase_branches(branches, rb.radial_branches);
-        buses = _rebase_buses(buses, rb.bus_reduction_map);
     else
         rb = RadialBranches()
     end
+    branches = get_ac_branches(branches, rb.radial_branches);
+    buses = get_buses(buses, rb.bus_reduction_map);
+    ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in setdiff(buses, ref_bus_positions)]

@@ -13,7 +13,7 @@ end
 """
 Gets the AC branches from a given Systems.
 """
-function get_ac_branches(sys::PSY.System)
+function get_ac_branches(sys::PSY.System, radial_branches::Set{String}=Set{String}())::Vector{PSY.ACBranch}
     collection = Vector{PSY.ACBranch}()
     for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
         arc = PSY.get_arc(br)
@@ -31,7 +31,9 @@ function get_ac_branches(sys::PSY.System)
                 ),
             )
         end
-        _add_to_collection!(collection, br)
+        if PSY.get_name(br) ∉ radial_branches
+            _add_to_collection!(collection, br)
+        end
     end
     return sort!(collection;
         by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
@@ -41,11 +43,21 @@ end
 """
 Gets the non-isolated buses from a given System
 """
-function get_buses(sys::PSY.System)::Vector{PSY.ACBus}
+function get_buses(
+    sys::PSY.System,
+    bus_reduction_map::Dict{Int64, Set{Int64}}=Dict{Int64, Set{Int64}}()
+)::Vector{PSY.ACBus}
+    # TODO: what is taking long here is the filter in get_components
+    leaf_buses = Int64[]
+    if !isempty(bus_reduction_map)
+        for i in keys(bus_reduction_map)
+            append!(leaf_buses, collect(bus_reduction_map[i]))
+        end
+    end
     return sort!(
         collect(
             PSY.get_components(
-                x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED,
+                x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED && PSY.get_number(x) ∉ leaf_buses,
                 PSY.ACBus,
                 sys,
             ),
@@ -53,6 +65,7 @@ function get_buses(sys::PSY.System)::Vector{PSY.ACBus}
         by = x -> PSY.get_number(x),
     )
 end
+
 """
 Gets the indices  of the reference (slack) buses.
 NOTE:
