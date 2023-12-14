@@ -55,10 +55,10 @@ import Pardiso
 
 # network calculations
 include("PowerNetworkMatrix.jl")
+include("radial_braches.jl")
 include("incedence_matrix.jl")
 include("adjacency_matrix.jl")
 include("common.jl")
-include("radial_braches.jl")
 include("BA_ABA_matrices.jl")
 include("definitions.jl")
 include("ptdf_calculations.jl")
