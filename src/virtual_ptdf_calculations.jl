@@ -1,11 +1,11 @@
 """
 The Virtual Power Transfer Distribution Factor (VirtualPTDF) structure gathers
-the rows of the PTDF matrix as they are evaluated on-the-go. These rows are 
-evalauted independently, cached in the structure and do not require the 
-computation of the whole matrix (therefore significantly reducing the 
+the rows of the PTDF matrix as they are evaluated on-the-go. These rows are
+evalauted independently, cached in the structure and do not require the
+computation of the whole matrix (therefore significantly reducing the
 computational requirements).
 
-The VirtualPTDF is initialized with no row stored. 
+The VirtualPTDF is initialized with no row stored.
 
 The VirtualPTDF is indexed using branch names and bus numbers as for the PTDF
 matrix.
@@ -24,12 +24,12 @@ matrix.
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors: the first one showing the branches names,
         the second showing the buses numbers. There is no link between the
-        order of the vector of the branches names and the way the PTDF rows are 
+        order of the vector of the branches names and the way the PTDF rows are
         stored in the cache.
 - `lookup<:NTuple{2, Dict}`:
         Tuple containing two dictionaries, mapping the branches
         and buses with their enumerated indexes. The branch indexes refer to
-        the key of the cache dictionary. The bus indexes refer to the position 
+        the key of the cache dictionary. The bus indexes refer to the position
         of the elements in the PTDF row stored.
 - `temp_data::Vector{Float64}`:
         Temporary vector for internal use.
@@ -55,6 +55,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
+    radial_banches::RadialBranches
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
@@ -83,6 +84,9 @@ PTDF array indexed with the branch numbers.
         max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function VirtualPTDF(
     branches,
@@ -90,7 +94,8 @@ function VirtualPTDF(
     dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
-    persistent_lines::Vector{String} = String[])
+    persistent_lines::Vector{String} = String[],
+    reduce_radial_branches::Bool = false)
     if length(dist_slack) != 0
         @info "Distributed bus"
     end
@@ -112,7 +117,7 @@ function VirtualPTDF(
         subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
     end
     temp_data = zeros(length(bus_ax))
-    # if isempty(persistent_lines)
+
     if isempty(persistent_lines)
         empty_cache =
             RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
@@ -125,6 +130,14 @@ function VirtualPTDF(
                 length(bus_ax) * sizeof(Float64),
             )
     end
+
+    if reduce_radial_branches
+        data, ref_bus_positions = calculate_A_matrix(branches, buses)
+        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
+    else
+        radial_branches = RadialBranches()
+    end
+
     return VirtualPTDF(
         klu(ABA),
         BA,
@@ -137,6 +150,7 @@ function VirtualPTDF(
         empty_cache,
         subnetworks,
         Ref(tol),
+        radial_branches,
     )
 end
 
@@ -159,15 +173,16 @@ Checks if the any of the fields of VirtualPTDF is empty.
 """
 function Base.isempty(vptdf::VirtualPTDF)
     for name in fieldnames(typeof(vptdf))
-        if name == :dist_slack && isempty(getfield(vptdf, name))
+        if name == :dist_slack && !isempty(getfield(vptdf, name))
             @debug "Field dist_slack has default value: " *
                    string(getfield(vptdf, name)) * "."
-        elseif !(name in [:K, :dist_slack]) && isempty(getfield(vptdf, name))
+            return false
+        elseif (name in [:cache, :radial_branches]) && !isempty(getfield(vptdf, name))
             @debug "Field " * string(name) * " not defined."
-            return true
+            return false
         end
     end
-    return false
+    return true
 end
 
 """

@@ -21,6 +21,9 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
 - `tol::Base.RefValue{Float64}`:
         tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
        PowerNetworkMatrix{Float64}
@@ -30,6 +33,16 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     subnetworks::Dict{Int, Set{Int}}
     ref_bus_positions::Set{Int}
     tol::Base.RefValue{Float64}
+    radial_banches::RadialBranches
+end
+
+function PTDF(data::AbstractArray{Float64, 2},
+    axes,
+    lookup::NTuple{2, Dict},
+    subnetworks::Dict{Int, Set{Int}},
+    ref_bus_positions::Set{Int},
+    tol::Base.RefValue{Float64})
+    return PTDF(data, axes, lookup, subnetworks, ref_bus_positions, tol, RadialBranches)
 end
 
 """
@@ -370,13 +383,17 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
         Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
 - `tol::Float64`:
         Tolerance to eliminate entries in the PTDF matrix (default eps())
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function PTDF(
     branches,
     buses::Vector{PSY.ACBus};
     dist_slack::Vector{Float64} = Float64[],
     linear_solver::String = "KLU",
-    tol::Float64 = eps())
+    tol::Float64 = eps(),
+    reduce_radial_branches::Bool = false)
     validate_linear_solver(linear_solver)
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
@@ -397,6 +414,12 @@ function PTDF(
         dist_slack,
         linear_solver,
     )
+    if reduce_radial_branches
+        data, _ = calculate_A_matrix(branches, buses)
+        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
+    else
+        radial_branches = RadialBranches()
+    end
     if tol > eps()
         return PTDF(
             sparsify(S, tol),
@@ -405,9 +428,10 @@ function PTDF(
             subnetworks,
             ref_bus_positions,
             Ref(tol),
+            radial_branches,
         )
     end
-    return PTDF(S, axes, look_up, subnetworks, ref_bus_positions, Ref(tol))
+    return PTDF(S, axes, look_up, subnetworks, ref_bus_positions, Ref(tol), radial_branches)
 end
 
 """
@@ -441,18 +465,28 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
         Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso.
 - `tol::Float64`:
         Tolerance to eliminate entries in the PTDF matrix (default eps()).
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
     dist_slack::Vector{Float64} = Float64[],
     linear_solver = "KLU",
-    tol::Float64 = eps())
+    tol::Float64 = eps(),
+    reduce_radial_branches::Bool = false)
     validate_linear_solver(linear_solver)
     S = _buildptdf_from_matrices(A, BA.data, dist_slack, linear_solver)
     axes = (A.axes[2], A.axes[1])
     lookup = (A.lookup[2], A.lookup[1])
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
+    if reduce_radial_branches
+        data, ref_bus_positions = calculate_A_matrix(branches, buses)
+        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
+    else
+        radial_branches = RadialBranches()
+    end
     if tol > eps()
         return PTDF(
             sparsify(S, tol),
@@ -461,9 +495,18 @@ function PTDF(
             Dict{Int, Set{Int}}(),
             BA.ref_bus_positions,
             Ref(tol),
+            radial_branches,
         )
     else
-        return PTDF(S, axes, lookup, Dict{Int, Set{Int}}(), BA.ref_bus_positions, Ref(tol))
+        return PTDF(
+            S,
+            axes,
+            lookup,
+            Dict{Int, Set{Int}}(),
+            BA.ref_bus_positions,
+            Ref(tol),
+            radial_branches,
+        )
     end
 end
 

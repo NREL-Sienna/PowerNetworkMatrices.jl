@@ -21,6 +21,7 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     axes::Ax
     lookup::L
     tol::Base.RefValue{Float64}
+    radial_banches::RadialBranches
 end
 
 function _buildlodf(
@@ -262,31 +263,44 @@ Builds the LODF matrix given the data of branches and buses of the system.
         Default solver: "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps())
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function LODF(
     branches,
     buses::Vector{PSY.ACBus};
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
+    reduce_radial_branches::Bool = false,
 )
 
     # get axis names
     line_ax = [branch.name for branch in branches]
     axes = (line_ax, line_ax)
-    look_up = (make_ax_ref(line_ax), make_ax_ref(line_ax))
+    line_map = make_ax_ref(line_ax)
+    look_up = (line_map, line_map)
     bus_ax = [PSY.get_number(bus) for bus in buses]
     bus_lookup = make_ax_ref(bus_ax)
     # get network matrices
     ptdf_t, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, Float64[])
+    if reduce_radial_branches
+        data, ref_bus_positions = calculate_A_matrix(branches, buses)
+        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
+    else
+        radial_branches = RadialBranches()
+    end
+
     if tol > eps()
         lodf_t = _buildlodf(a, ptdf_t, linear_solver)
-        return LODF(sparsify(lodf_t, tol), axes, look_up, Ref(tol))
+        return LODF(sparsify(lodf_t, tol), axes, look_up, Ref(tol), radial_branches)
     else
         return LODF(
             _buildlodf(a, ptdf_t, linear_solver),
             axes,
             look_up,
             Ref(tol),
+            radial_branches,
         )
     end
 end
@@ -323,12 +337,16 @@ the PTDF method).
         Linear solver to be used. Options are "Dense" and "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps()).
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function LODF(
     A::IncidenceMatrix,
     PTDFm::PTDF;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
+    reduce_radial_branches::Bool = true,
 )
     validate_linear_solver(linear_solver)
 
@@ -339,7 +357,11 @@ function LODF(
         )
         error(err_msg)
     end
-
+    if reduce_radial_branches
+        radial_branches = RadialBranches(A)
+    else
+        radial_branches = RadialBranches()
+    end
     ax_ref = make_ax_ref(A.axes[1])
     if tol > eps()
         lodf_t = _buildlodf(A.data, PTDFm.data, linear_solver)
@@ -348,6 +370,7 @@ function LODF(
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
             Ref(tol),
+            radial_branches,
         )
     end
     return LODF(
@@ -355,6 +378,7 @@ function LODF(
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
+        radial_branches,
     )
 end
 
@@ -374,6 +398,9 @@ NOTE: this method does not support distributed slack bus.
         Linear solver to be used. Options are "Dense" and "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps()).
+- `reduce_radial_branches::Bool`:
+        True to reduce the network by simplifying the radial branches and mapping the
+        eliminate buses
 """
 function LODF(
     A::IncidenceMatrix,
@@ -381,9 +408,15 @@ function LODF(
     BA::BA_Matrix;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
+    reduce_radial_branches::Bool = false,
 )
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
+    if reduce_radial_branches
+        radial_branches = RadialBranches(A)
+    else
+        radial_branches = RadialBranches()
+    end
     if tol > eps()
         lodf_t = _buildlodf(A.data, ABA.K, BA.data,
             A.ref_bus_positions, linear_solver)
@@ -392,6 +425,7 @@ function LODF(
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
             Ref(tol),
+            radial_branches,
         )
     end
     return LODF(
@@ -399,6 +433,7 @@ function LODF(
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
+        radial_branches,
     )
 end
 

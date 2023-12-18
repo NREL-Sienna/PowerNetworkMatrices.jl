@@ -52,6 +52,7 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
+    radial_banches::RadialBranches
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
@@ -105,6 +106,7 @@ function VirtualLODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
+    reduce_radial_branches::Bool = false,
 )
 
     #Get axis names and lookups
@@ -149,6 +151,12 @@ function VirtualLODF(
                 length(bus_ax) * sizeof(Float64),
             )
     end
+    if reduce_radial_branches
+        data, ref_bus_positions = calculate_A_matrix(branches, buses)
+        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
+    else
+        radial_branches = RadialBranches()
+    end
 
     return VirtualLODF(
         K,
@@ -163,6 +171,7 @@ function VirtualLODF(
         empty_cache,
         subnetworks,
         Ref(tol),
+        radial_branches,
     )
 end
 
