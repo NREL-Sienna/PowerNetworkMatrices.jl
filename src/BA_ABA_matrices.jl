@@ -45,8 +45,8 @@ function BA_Matrix(sys::PSY.System; reduce_radial_branches::Bool=false)
     else
         rb = RadialBranches()
     end
-    branches = get_ac_branches(branches, rb.radial_branches);
-    buses = get_buses(buses, rb.bus_reduction_map);
+    branches = get_ac_branches(sys, rb.radial_branches);
+    buses = get_buses(sys, rb.bus_reduction_map);
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
     line_ax = [PSY.get_name(branch) for branch in branches]
