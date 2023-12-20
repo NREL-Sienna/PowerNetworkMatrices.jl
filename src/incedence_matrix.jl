@@ -35,19 +35,18 @@ values.
 - `reduce_radial_branches::RadialBranches`: user defined structure containing the radial
         branches and leaf buses of the system (optional, deafault is empty structure)
 """
-function IncidenceMatrix(
+function evaluate_A_matrix_values(
     sys::PSY.System,
-    radial_branches::Set{String}=Set{String}(),
-    bus_reduction_map::Dict{Int, Set{Int}}=Dict{Int, Set{Int}}(),
+    rb::RadialBranches=RadialBranches()
 )
-    branches = get_ac_branches(sys, radial_branches)
-    buses = get_buses(sys, bus_reduction_map)
+    branches = get_ac_branches(sys, rb.radial_branches)
+    buses = get_buses(sys, rb.bus_reduction_map)
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
     data, ref_bus_positions = calculate_A_matrix(branches, buses)
     axes = (line_ax, bus_ax)
     lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
-    return IncidenceMatrix(data, axes, lookup, ref_bus_positions, RadialBranches(bus_reduction_map, radial_branches))
+    return data, axes, lookup, ref_bus_positions
 end
 
 """
@@ -63,12 +62,14 @@ function IncidenceMatrix(
     sys::PSY.System;
     reduce_radial_branches::Bool=false
 )
+    data, axes, lookup, ref_bus_positions = evaluate_A_matrix_values(sys)
     if reduce_radial_branches
-        rb = RadialBranches(IncidenceMatrix(sys))
+        rb = RadialBranches(data, lookup[1], lookup[2], ref_bus_positions)
+        data, axes, lookup, ref_bus_positions = evaluate_A_matrix_values(sys, rb)
     else
         rb = RadialBranches()
     end
-    return IncidenceMatrix(sys, rb.radial_branches, rb.bus_reduction_map)
+    return IncidenceMatrix(data, axes, lookup, ref_bus_positions, rb)
 end
 
 # this function needs to stay here due to dependency of IncidenceMatrix
