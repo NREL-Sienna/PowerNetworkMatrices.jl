@@ -156,6 +156,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.lookup),
         deepcopy(ABA.ref_bus_positions),
         klu(ABA.data),
+        deepcopy(ABA.reduce_radial_branches)
     )
     return ABA_lu
 end
