@@ -406,7 +406,8 @@ function PTDF(
         @info "Network is not connected, using subnetworks"
         subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
     end
-    look_up = (bus_ax_ref, make_ax_ref(line_ax))
+    line_map = make_ax_ref(line_ax)
+    look_up = (bus_ax_ref, line_map)
     S, _ = _buildptdf(
         branches,
         buses,
@@ -416,7 +417,7 @@ function PTDF(
     )
     if reduce_radial_branches
         data, _ = calculate_A_matrix(branches, buses)
-        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
+        radial_branches = RadialBranches(data, line_map, bus_ax_ref, ref_bus_positions)
     else
         radial_branches = RadialBranches()
     end
