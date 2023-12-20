@@ -123,8 +123,15 @@ end
         # evalaute according to the matrices with no radial branches
         reduced_bus_angles = zeros((length(bus_idx) + length(A.ref_bus_positions),))
         reduce_flow_values = zeros((length(br_idx),))
+        # change power injection for affrefated leaf buses
+        power_injection2 = deepcopy(power_injection)
+        for i in keys(rb.bus_reduction_map)
+            for j in rb.bus_reduction_map[i]
+                power_injection2[BA.lookup[1][i]] += power_injection[BA.lookup[1][j]]
+            end
+        end
         valid_ix2 = setdiff(1:size(BA_rad.data, 1), BA_rad.ref_bus_positions)
-        reduced_bus_angles[valid_ix2] = ABA_rad.K \ power_injection[bus_idx]
+        reduced_bus_angles[valid_ix2] = ABA_rad.K \ power_injection2[bus_idx]
         reduced_flow_values = transpose(BA_rad.data) * reduced_bus_angles
 
         # now check if flows and angles are the same
