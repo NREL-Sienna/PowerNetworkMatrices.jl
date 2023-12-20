@@ -33,14 +33,14 @@ end
         # ... and with radial lines
         BA_rad = BA_Matrix(sys; reduce_radial_branches=true);
         # get inidices for the leaf nodes
-        rb = BA_rad.reduce_radial_branchesa;
+        rb = BA_rad.reduce_radial_branches;
         bus_numbers = [];
         for i in keys(rb.bus_reduction_map)
             append!(bus_numbers, collect(rb.bus_reduction_map[i]))
         end
-        bus_idx = setdiff(1:size(A.data, 2), [A.lookup[2][i] for i in bus_numbers])
+        bus_idx = setdiff(1:size(BA.data, 1), [BA.lookup[1][i] for i in bus_numbers])
         # ... and radial branches
-        br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in rb.radial_branches])
+        br_idx = setdiff(1:size(BA.data, 2), [BA.lookup[2][i] for i in rb.radial_branches])
         # now extract A matrix anc compare
         @test all(isapprox.(BA.data[bus_idx, br_idx], BA_rad.data))
     end
