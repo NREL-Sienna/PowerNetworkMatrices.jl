@@ -31,7 +31,7 @@ end
         # get the incidence matrix
         BA = BA_Matrix(sys);
         # ... and with radial lines
-        BA_rad = IncidenceMatrix(sys; reduce_radial_branches=true);
+        BA_rad = BA_Matrix(sys; reduce_radial_branches=true);
         # get inidices for the leaf nodes
         rb = BA_rad.reduce_radial_branchesa;
         bus_numbers = [];
