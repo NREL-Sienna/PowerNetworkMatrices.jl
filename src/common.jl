@@ -190,7 +190,9 @@ function calculate_BA_matrix(
     for (ix, b) in enumerate(branches)
         (fr_b, to_b) = get_bus_indices(b, bus_lookup)
         b_val = PSY.get_series_susceptance(b)
-
+        if !isfinite(b_val)
+            error("Invalid value for branch $(PSY.summary(b)), $b_val")
+        end
         push!(BA_I, fr_b)
         push!(BA_J, ix)
         push!(BA_V, b_val)
