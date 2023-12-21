@@ -11,7 +11,7 @@
         # ... and with radial lines
         A_rad = IncidenceMatrix(sys; reduce_radial_branches=true)
         # get inidices for the leaf nodes
-        rb = A_rad.reduce_radial_branches
+        rb = A_rad.radial_branches
         bus_numbers = []
         for i in keys(rb.bus_reduction_map)
             append!(bus_numbers, collect(rb.bus_reduction_map[i]))
@@ -33,7 +33,7 @@ end
         # ... and with radial lines
         BA_rad = BA_Matrix(sys; reduce_radial_branches=true);
         # get inidices for the leaf nodes
-        rb = BA_rad.reduce_radial_branches;
+        rb = BA_rad.radial_branches;
         bus_numbers = [];
         for i in keys(rb.bus_reduction_map)
             append!(bus_numbers, collect(rb.bus_reduction_map[i]))

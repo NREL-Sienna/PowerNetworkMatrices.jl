@@ -16,6 +16,7 @@ Gets the AC branches from a given Systems.
 function get_ac_branches(sys::PSY.System, radial_branches::Set{String}=Set{String}())::Vector{PSY.ACBranch}
     collection = Vector{PSY.ACBranch}()
     for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
+        # TODO: if it is a TwoTerminalHVDC line, then skip
         arc = PSY.get_arc(br)
         if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
             throw(
@@ -54,6 +55,7 @@ function get_buses(
             append!(leaf_buses, collect(bus_reduction_map[i]))
         end
     end
+    # TODO: use for loop with if statement for filtering. Pre-allocate empty vector and then remove tail.
     return sort!(
         collect(
             PSY.get_components(
@@ -203,6 +205,10 @@ function calculate_BA_matrix(
     for (ix, b) in enumerate(branches)
         (fr_b, to_b) = get_bus_indices(b, bus_lookup)
         b_val = PSY.get_series_susceptance(b)
+
+        if !isfinite(b_val)
+            error("Invalid value for branch $(PSY.summary(b)), $b_val")
+        end
 
         push!(BA_I, fr_b)
         push!(BA_J, ix)

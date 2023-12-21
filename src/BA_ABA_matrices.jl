@@ -17,7 +17,7 @@ Structure containing the BA matrix and other relevant data.
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
-- `reduce_radial_branches::RadialBranches`:
+- `radial_branches::RadialBranches`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -26,7 +26,7 @@ struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
-    reduce_radial_branches::RadialBranches
+    radial_branches::RadialBranches
 end
 
 """
@@ -76,7 +76,7 @@ Structure containing the ABA matrix and other relevant data.
         to the refence buses
 - `K<:Union{Nothing, KLU.KLUFactorization{Float64, Int}}`:
         either nothing or a container for KLU factorization matrices (LU factorization)
-- `reduce_radial_branches::RadialBranches`:
+- `radial_branches::RadialBranches`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -90,7 +90,7 @@ struct ABA_Matrix{
     lookup::L
     ref_bus_positions::Set{Int}
     K::F
-    reduce_radial_branches::RadialBranches
+    radial_branches::RadialBranches
 end
 
 """
@@ -156,7 +156,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.lookup),
         deepcopy(ABA.ref_bus_positions),
         klu(ABA.data),
-        deepcopy(ABA.reduce_radial_branches)
+        deepcopy(ABA.radial_branches)
     )
     return ABA_lu
 end

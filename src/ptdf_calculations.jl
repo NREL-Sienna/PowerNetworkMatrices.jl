@@ -21,9 +21,9 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
 - `tol::Base.RefValue{Float64}`:
         tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
-- `reduce_radial_branches::Bool`:
-        True to reduce the network by simplifying the radial branches and mapping the
-        eliminate buses
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
        PowerNetworkMatrix{Float64}
@@ -41,8 +41,9 @@ function PTDF(data::AbstractArray{Float64, 2},
     lookup::NTuple{2, Dict},
     subnetworks::Dict{Int, Set{Int}},
     ref_bus_positions::Set{Int},
-    tol::Base.RefValue{Float64})
-    return PTDF(data, axes, lookup, subnetworks, ref_bus_positions, tol, RadialBranches)
+    tol::Base.RefValue{Float64},
+    radial_banches::RadialBranches)
+    return PTDF(data, axes, lookup, subnetworks, ref_bus_positions, tol, radial_banches)
 end
 
 """
@@ -384,8 +385,8 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
 - `tol::Float64`:
         Tolerance to eliminate entries in the PTDF matrix (default eps())
 - `reduce_radial_branches::Bool`:
-        True to reduce the network by simplifying the radial branches and mapping the
-        eliminate buses
+        if True the matrix will be evaluated discarding
+        all the radial branches and leaf buses (optional, default value is false)
 """
 function PTDF(
     branches,
@@ -394,7 +395,9 @@ function PTDF(
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
     reduce_radial_branches::Bool = false)
+
     validate_linear_solver(linear_solver)
+
     #Get axis names
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
@@ -443,8 +446,13 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 """
 function PTDF(
     sys::PSY.System;
+    reduce_radial_branches::Bool=false,
     kwargs...,
 )
+    if reduce_radial_branches
+        rb = RadialBranche(sys)
+    else
+    end
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
     return PTDF(branches, buses; kwargs...)
@@ -469,6 +477,7 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
         True to reduce the network by simplifying the radial branches and mapping the
         eliminate buses
 """
+# TODO: if either A or BA have RadialBranches, then throw an @info say that those are used 
 function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
@@ -483,7 +492,7 @@ function PTDF(
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
     if reduce_radial_branches
         data, ref_bus_positions = calculate_A_matrix(branches, buses)
-        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
+        radial_branches = BA.radial_branches # ! RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
     else
         radial_branches = RadialBranches()
     end
@@ -509,6 +518,10 @@ function PTDF(
         )
     end
 end
+
+##############################################################################
+########################### Auxiliary functions ##############################
+##############################################################################
 
 # PTDF stores the transposed matrix. Overload indexing and how data is exported.
 function Base.getindex(A::PTDF, line, bus)

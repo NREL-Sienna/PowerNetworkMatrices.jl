@@ -11,14 +11,17 @@ Incidence matrix: shows connection between buses, defining lines
         Tuple containing two dictionaries, the first mapping the branches
         and buses with their enumerated indexes.
 - `ref_bus_positions::Set{Int}`:
-        vector containing the indices of the reference slack buses.
+        Vector containing the indices of the reference slack buses.
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
-    reduce_radial_branches::RadialBranches
+    radial_branches::RadialBranches
 end
 
 # functions to get stored data
@@ -32,15 +35,16 @@ values.
 
 # Arguments
 - `sys::PSY.System`: the PowerSystem system to consider
-- `reduce_radial_branches::RadialBranches`: user defined structure containing the radial
-        branches and leaf buses of the system (optional, deafault is empty structure)
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 function evaluate_A_matrix_values(
     sys::PSY.System,
-    rb::RadialBranches=RadialBranches()
+    radial_branches::RadialBranches=RadialBranches()
 )
-    branches = get_ac_branches(sys, rb.radial_branches)
-    buses = get_buses(sys, rb.bus_reduction_map)
+    branches = get_ac_branches(sys, radial_branches.radial_branches)
+    buses = get_buses(sys, radial_branches.bus_reduction_map)
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
     data, ref_bus_positions = calculate_A_matrix(branches, buses)
@@ -54,8 +58,10 @@ Builds the Incidence matrix of the system by evaluating the actual matrix and ot
 values.
 
 # Arguments
-- `sys::PSY.System`: the PowerSystem system to consider
-- `reduce_radial_branches::Bool`: if True the matrix will be evaluated discarding
+- `sys::PSY.System`:
+        the PowerSystem system to consider
+- `reduce_radial_branches::Bool`:
+        if True the matrix will be evaluated discarding
         all the radial branches and leaf buses (optional, default value is false)
 """
 function IncidenceMatrix(
