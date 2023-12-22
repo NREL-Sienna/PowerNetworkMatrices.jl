@@ -33,7 +33,7 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     subnetworks::Dict{Int, Set{Int}}
     ref_bus_positions::Set{Int}
     tol::Base.RefValue{Float64}
-    radial_banches::RadialBranches
+    radial_branches::RadialBranches
 end
 
 """
@@ -453,7 +453,6 @@ function PTDF(
     else
         rb = RadialBranches()
     end
-    @show dist_slack
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
     return PTDF(branches, buses; dist_slack=dist_slack, radial_branches=rb, kwargs...)
@@ -496,7 +495,12 @@ function PTDF(
     lookup = (A.lookup[2], A.lookup[1])
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
     if reduce_radial_branches
-        radial_branches = BA.radial_branches
+        if !isempty(A.radial_branches) && !isempty(BA.radial_branches)
+            radial_branches = BA.radial_branches
+            @info "Non-empty `radial_branches` field found in A, BA and matrix. PTDF is evaluated considering radial branches and leaf nodes removed."
+        else
+            error("Mismatch in `radial_branches` field between A and BA matrices.")
+        end
     else
         radial_branches = RadialBranches()
     end

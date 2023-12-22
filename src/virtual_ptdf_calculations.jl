@@ -184,7 +184,6 @@ function VirtualPTDF(
     else
         rb = RadialBranches()
     end
-    @show dist_slack
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
     return VirtualPTDF(branches, buses; dist_slack=dist_slack, radial_branches=rb, kwargs...)
