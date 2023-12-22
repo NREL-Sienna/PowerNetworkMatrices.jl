@@ -367,6 +367,8 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
         vector of the System AC branches
 - `buses::Vector{PSY.ACBus}`:
         vector of the System buses
+
+# Keyword Arguments
 - `dist_slack::Vector{Float64}`:
         vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses
@@ -374,9 +376,9 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
         Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
 - `tol::Float64`:
         Tolerance to eliminate entries in the PTDF matrix (default eps())
-- `reduce_radial_branches::Bool`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the ma
 """
 function PTDF(
     branches,
@@ -384,7 +386,8 @@ function PTDF(
     dist_slack::Vector{Float64} = Float64[],
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    radial_branches::RadialBranches = RadialBranches())
+    radial_branches::RadialBranches = RadialBranches()
+)
 
     validate_linear_solver(linear_solver)
 
@@ -426,7 +429,17 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 
 # Arguments
 - `sys::PSY.System`:
-        Power Systems system
+        PSY system for which the matrix is constructed
+
+# Keyword Arguments
+- `dist_slack::Vector{Float64}=Float64[]`:
+        vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buse
+- `reduce_radial_branches::Bool=false`:
+        if True the matrix will be evaluated discarding
+        all the radial branches and leaf buses (optional, default value is false)
+- `kwargs...`:
+        other keyword arguments used by PTDF
 """
 function PTDF(
     sys::PSY.System;
@@ -436,27 +449,11 @@ function PTDF(
 )
     if reduce_radial_branches
         A = IncidenceMatrix(sys)
-        rb = RadialBranches(A)
-        # if original length of dist_slack is correct
-        if length(dist_slack) == size(A.data, 2)
-            # get the number of leaf nodes
-            bus_numbers = reduce(vcat, [rb.bus_reduction_map[i] for i in keys(rb.bus_reduction_map)])
-            for i in keys(rb.bus_reduction_map)
-                for j in rb.bus_reduction_map[i]
-                    dist_slack[A.lookup[2][i]] += dist_slack[A.lookup[2][j]]
-                    dist_slack[A.lookup[2][j]] = -9999
-                end
-            end
-            # redefine dist_slack
-            dist_slack = dist_slack[dist_slack .!= -9999]
-            @assert length(dist_slack) == size(A.data, 2) - length(bus_numbers)
-        # otherwise throw an error
-        elseif !isempty(dist_slack) && length(dist_slack) != size(A.data, 2)
-            error("Distributed bus specification doesn't match the number of the buses.")
-        end
+        dist_slack, rb = redistribute_dist_slack(dist_slack, A)
     else
         rb = RadialBranches()
     end
+    @show dist_slack
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
     return PTDF(branches, buses; dist_slack=dist_slack, radial_branches=rb, kwargs...)
@@ -470,6 +467,8 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
         Incidence Matrix (full structure)
 - `BA::BA_Matrix`:
         BA matrix (full structure)
+
+# Keyword Arguments
 - `dist_slack::Vector{Float64}`:
         Vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses.
@@ -488,7 +487,9 @@ function PTDF(
     dist_slack::Vector{Float64} = Float64[],
     linear_solver = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = false)
+    reduce_radial_branches::Bool = false
+)
+
     validate_linear_solver(linear_solver)
     S = _buildptdf_from_matrices(A, BA.data, dist_slack, linear_solver)
     axes = (A.axes[2], A.axes[1])
@@ -554,4 +555,29 @@ end
 
 function get_tol(ptdf::PTDF)
     return ptdf.tol
+end
+
+function redistribute_dist_slack(
+    dist_slack::Vector{Float64},
+    A::IncidenceMatrix
+)
+    dist_slack1 = deepcopy(dist_slack)
+    rb = RadialBranches(A)
+    # if original length of dist_slack is correct
+    if length(dist_slack) == size(A.data, 2)
+        # get the number of leaf nodes
+        bus_numbers = reduce(vcat, [rb.bus_reduction_map[i] for i in keys(rb.bus_reduction_map)])
+        for i in keys(rb.bus_reduction_map)
+            for j in rb.bus_reduction_map[i]
+                dist_slack1[A.lookup[2][i]] += dist_slack1[A.lookup[2][j]]
+                dist_slack1[A.lookup[2][j]] = -9999
+            end
+        end
+        # redefine dist_slack
+        return dist_slack1[dist_slack1 .!= -9999], rb
+    # otherwise throw an error
+    elseif !isempty(dist_slack) && length(dist_slack) != size(A.data, 2)
+        error("Distributed bus specification doesn't match the number of the buses.")
+    end
+    return dist_slack, rb
 end
