@@ -71,7 +71,7 @@ end
 
 """
 Builds the PTDF matrix from a group of branches and buses. The return is a
-PTDF array indexed with the branch numbers.
+VirtualPTDF struct with an empty cache.
 
 # Arguments
 - `branches`:

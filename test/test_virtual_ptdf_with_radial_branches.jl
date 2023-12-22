@@ -14,6 +14,7 @@
     end
     # Check the cache is populated
     @test length(vptdf_rad.cache) == length(vptdf_rad.axes[1])
+    @test length(vptdf_rad.cache[1]) == length(vptdf_rad.axes[2])
 end
 
 @testset "Test VirtualPTDF with radial lines and distributed slack" begin
