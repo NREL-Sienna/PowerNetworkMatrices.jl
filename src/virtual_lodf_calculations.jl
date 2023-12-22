@@ -151,7 +151,7 @@ function VirtualLODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
-    radial_branches::RadialBranches = RadialBranches()
+    radial_branches::RadialBranches = RadialBranches(),
 )
 
     #Get axis names and lookups
