@@ -2,8 +2,8 @@
     # get the system
     sys = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys")
     # get the PTDF matrix for reference
-    ptdf_rad = PTDF(sys; reduce_radial_branches=true)
-    vptdf_rad = VirtualPTDF(sys; reduce_radial_branches=true)
+    ptdf_rad = PTDF(sys; reduce_radial_branches = true)
+    vptdf_rad = VirtualPTDF(sys; reduce_radial_branches = true)
 
     for i in axes(ptdf_rad, 2)
         virtual = vptdf_rad[i, :]
@@ -23,8 +23,8 @@ end
     buscount = length(PNM.get_buses(sys))
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = dist_slack / sum(dist_slack)
-    ptdf_rad = PTDF(sys; reduce_radial_branches=true, dist_slack=slack_array);
-    vptdf_rad = VirtualPTDF(sys; reduce_radial_branches=true, dist_slack=slack_array);
+    ptdf_rad = PTDF(sys; reduce_radial_branches = true, dist_slack = slack_array)
+    vptdf_rad = VirtualPTDF(sys; reduce_radial_branches = true, dist_slack = slack_array)
     for i in axes(ptdf_rad, 2)
         virtual = vptdf_rad[i, :]
         for j in axes(ptdf_rad, 1)

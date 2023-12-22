@@ -41,7 +41,7 @@ values.
 """
 function evaluate_A_matrix_values(
     sys::PSY.System,
-    radial_branches::RadialBranches=RadialBranches()
+    radial_branches::RadialBranches = RadialBranches(),
 )
     branches = get_ac_branches(sys, radial_branches.radial_branches)
     buses = get_buses(sys, radial_branches.bus_reduction_map)
@@ -66,7 +66,7 @@ values.
 """
 function IncidenceMatrix(
     sys::PSY.System;
-    reduce_radial_branches::Bool=false
+    reduce_radial_branches::Bool = false,
 )
     data, axes, lookup, ref_bus_positions = evaluate_A_matrix_values(sys)
     if reduce_radial_branches
@@ -82,4 +82,3 @@ end
 function RadialBranches(A::IncidenceMatrix)
     return RadialBranches(A.data, A.lookup[1], A.lookup[2], A.ref_bus_positions)
 end
-

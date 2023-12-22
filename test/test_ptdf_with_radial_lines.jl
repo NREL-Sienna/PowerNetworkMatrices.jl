@@ -7,33 +7,34 @@
         rb = RadialBranches(IncidenceMatrix(sys))
 
         # get the A and BA matrices without radial lines
-        A_rad = IncidenceMatrix(sys, reduce_radial_branches=true)
-        BA_rad = BA_Matrix(sys, reduce_radial_branches=true)
-
+        A_rad = IncidenceMatrix(sys; reduce_radial_branches = true)
+        BA_rad = BA_Matrix(sys; reduce_radial_branches = true)
 
         # get the original and reduced PTDF matrices (consider different methods)
-        ptdf = PTDF(sys);
-        ptdf_rad = PTDF(sys; reduce_radial_branches=true);
-        ptdf_rad_A_BA = PTDF(A_rad, BA_rad; reduce_radial_branches=true);
+        ptdf = PTDF(sys)
+        ptdf_rad = PTDF(sys; reduce_radial_branches = true)
+        ptdf_rad_A_BA = PTDF(A_rad, BA_rad; reduce_radial_branches = true)
 
         # check if the same angles and flows are coputed with the matrices of the reduced systems
         # get the indices for the reduced system
-        bus_numbers = [];
+        bus_numbers = []
         for i in keys(rb.bus_reduction_map)
             append!(bus_numbers, collect(rb.bus_reduction_map[i]))
         end
         bus_idx = setdiff(
             1:size(ptdf.data, 1),
-            append!([ptdf.lookup[1][i] for i in bus_numbers])
-            )
-        br_idx = setdiff(1:size(ptdf.data, 2), [ptdf.lookup[2][i] for i in rb.radial_branches])
+            append!([ptdf.lookup[1][i] for i in bus_numbers]),
+        )
+        br_idx =
+            setdiff(1:size(ptdf.data, 2), [ptdf.lookup[2][i] for i in rb.radial_branches])
 
         # now get the injections from the system
         n_buses = length(axes(ptdf, 1))
         bus_lookup = ptdf.lookup[1]
-        branch_flow_values =zeros(Float64, length(axes(ptdf, 2)))
+        branch_flow_values = zeros(Float64, length(axes(ptdf, 2)))
         bus_activepower_injection = zeros(Float64, n_buses)
-        sources = PSY.get_components(d -> !isa(d, PSY.ElectricLoad), PSY.StaticInjection, sys)
+        sources =
+            PSY.get_components(d -> !isa(d, PSY.ElectricLoad), PSY.StaticInjection, sys)
         for source in sources
             !PSY.get_available(source) && continue
             bus = PSY.get_bus(source)
@@ -68,14 +69,14 @@
         # now check if flows are the same
         @test isapprox(ref_flow_values[br_idx], reduced_flow_values)
         # for the PTDF from A and BA matrices just need to check the elements
-        @test isapprox(ptdf_rad.data, ptdf_rad_A_BA.data, atol=1e-5)
+        @test isapprox(ptdf_rad.data, ptdf_rad_A_BA.data, atol = 1e-5)
     end
 end
 
 @testset "Test PTDF with radial lines and distributed slack" begin
     for name in ["c_sys14", "test_RTS_GMLC_sys"]
         # load the system
-        sys = PSB.build_system(PSB.PSITestSystems, name) 
+        sys = PSB.build_system(PSB.PSITestSystems, name)
         # get the radial branches
         A = IncidenceMatrix(sys)
         rb = RadialBranches(A)
@@ -85,11 +86,14 @@ end
         dist_slack = 1 / buscount * ones(buscount)
         slack_array = dist_slack / sum(dist_slack)
         # adjust to have the same vector with and without leaf node reduction
-        bus_numbers = reduce(vcat, [collect(rb.bus_reduction_map[i]) for i in keys(rb.bus_reduction_map)])
+        bus_numbers = reduce(
+            vcat,
+            [collect(rb.bus_reduction_map[i]) for i in keys(rb.bus_reduction_map)],
+        )
         bus_idx = setdiff(
             1:size(A.data, 2),
-            append!([A.lookup[2][i] for i in bus_numbers])
-            )
+            append!([A.lookup[2][i] for i in bus_numbers]),
+        )
         br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in rb.radial_branches])
         for i in keys(rb.bus_reduction_map)
             for j in rb.bus_reduction_map[i]
@@ -101,15 +105,16 @@ end
         slack_array[slack_array .== -9999] .= 0
         slack_array1 = slack_array[slack_array .!= -9999]
         # now get the PTDF matrices
-        ptdf = PTDF(sys; dist_slack=slack_array)
-        ptdf_rad = PTDF(sys; reduce_radial_branches=true, dist_slack=slack_array1)
+        ptdf = PTDF(sys; dist_slack = slack_array)
+        ptdf_rad = PTDF(sys; reduce_radial_branches = true, dist_slack = slack_array1)
 
         # now get the injections from the system
         n_buses = length(axes(ptdf, 1))
         bus_lookup = ptdf.lookup[1]
-        branch_flow_values =zeros(Float64, length(axes(ptdf, 2)))
+        branch_flow_values = zeros(Float64, length(axes(ptdf, 2)))
         bus_activepower_injection = zeros(Float64, n_buses)
-        sources = PSY.get_components(d -> !isa(d, PSY.ElectricLoad), PSY.StaticInjection, sys)
+        sources =
+            PSY.get_components(d -> !isa(d, PSY.ElectricLoad), PSY.StaticInjection, sys)
         for source in sources
             !PSY.get_available(source) && continue
             bus = PSY.get_bus(source)

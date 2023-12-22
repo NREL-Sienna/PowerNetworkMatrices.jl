@@ -100,9 +100,8 @@ function VirtualPTDF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
-    radial_branches::RadialBranches = RadialBranches()
+    radial_branches::RadialBranches = RadialBranches(),
 )
-
     if length(dist_slack) != 0
         @info "Distributed bus"
     end
@@ -174,8 +173,8 @@ struct with an empty cache.
 """
 function VirtualPTDF(
     sys::PSY.System;
-    dist_slack::Vector{Float64}=Float64[],
-    reduce_radial_branches::Bool=false,
+    dist_slack::Vector{Float64} = Float64[],
+    reduce_radial_branches::Bool = false,
     kwargs...,
 )
     if reduce_radial_branches
@@ -186,7 +185,13 @@ function VirtualPTDF(
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
-    return VirtualPTDF(branches, buses; dist_slack=dist_slack, radial_branches=rb, kwargs...)
+    return VirtualPTDF(
+        branches,
+        buses;
+        dist_slack = dist_slack,
+        radial_branches = rb,
+        kwargs...,
+    )
 end
 
 # Overload Base functions

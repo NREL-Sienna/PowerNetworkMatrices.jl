@@ -40,9 +40,9 @@ end
 
 @testset "Check reference bus in Radial Branches" begin
     for name in ["matpower_ACTIVSg2000_sys", "matpower_ACTIVSg10k_sys"]
-        sys = build_system(MatpowerTestSystems, name; add_forecasts = false);
-        a_mat = IncidenceMatrix(sys);
-        rb = RadialBranches(IncidenceMatrix(sys));
+        sys = build_system(MatpowerTestSystems, name; add_forecasts = false)
+        a_mat = IncidenceMatrix(sys)
+        rb = RadialBranches(IncidenceMatrix(sys))
         leaf_buses = Int64[]
         for i in keys(rb.bus_reduction_map)
             append!(leaf_buses, collect(rb.bus_reduction_map[i]))

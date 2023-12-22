@@ -277,7 +277,7 @@ function LODF(
     buses::Vector{PSY.ACBus};
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    radial_branches::RadialBranches = RadialBranches()
+    radial_branches::RadialBranches = RadialBranches(),
 )
 
     # get axis names
@@ -320,7 +320,7 @@ Builds the LODF matrix from a system.
 """
 function LODF(
     sys::PSY.System;
-    reduce_radial_branches::Bool=false,
+    reduce_radial_branches::Bool = false,
     kwargs...,
 )
     if reduce_radial_branches
@@ -330,7 +330,7 @@ function LODF(
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
-    return LODF(branches, buses; radial_branches=rb, kwargs...)
+    return LODF(branches, buses; radial_branches = rb, kwargs...)
 end
 
 """
@@ -425,13 +425,13 @@ function LODF(
     BA::BA_Matrix;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = false
+    reduce_radial_branches::Bool = false,
 )
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
     if reduce_radial_branches
-        if !isempty(A.radial_branches) && !isempty(BA.radial_branches) && 
-            !isempty(ABA.radial_branches)
+        if !isempty(A.radial_branches) && !isempty(BA.radial_branches) &&
+           !isempty(ABA.radial_branches)
             radial_branches = BA.radial_branches
             @info "Non-empty `radial_branches` field found in A, BA and ABA matrix. LODF is evaluated considering radial branches and leaf nodes removed."
         else
