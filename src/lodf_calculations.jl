@@ -358,7 +358,7 @@ function LODF(
     PTDFm::PTDF;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = true,
+    reduce_radial_branches::Bool = false,
 )
     validate_linear_solver(linear_solver)
 
@@ -374,6 +374,7 @@ function LODF(
             radial_branches = A.radial_branches
             @info "Non-empty `radial_branches` field found in A and PTDFm matrix. LODF is evaluated considering radial branches and leaf nodes removed."
         else
+
             error("Mismatch in `radial_branches` field between A and PTDFm matrices.")
         end
     else
