@@ -39,7 +39,7 @@ Build the BA matrix from a given System
         if True the matrix is build considering radial branches removed from 
         the system
 """
-function BA_Matrix(sys::PSY.System; reduce_radial_branches::Bool=false)
+function BA_Matrix(sys::PSY.System; reduce_radial_branches::Bool = false)
     if reduce_radial_branches
         rb = RadialBranches(IncidenceMatrix(sys))
     else
@@ -106,7 +106,7 @@ Builds the ABA matrix from a System
 function ABA_Matrix(
     sys::PSY.System;
     factorize = false,
-    reduce_radial_branches::Bool=false
+    reduce_radial_branches::Bool = false,
 )
     if reduce_radial_branches
         rb = RadialBranches(IncidenceMatrix(sys))
@@ -138,7 +138,7 @@ function ABA_Matrix(
         lookup,
         ref_bus_positions,
         K,
-        rb
+        rb,
     )
 end
 
@@ -156,7 +156,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.lookup),
         deepcopy(ABA.ref_bus_positions),
         klu(ABA.data),
-        deepcopy(ABA.radial_branches)
+        deepcopy(ABA.radial_branches),
     )
     return ABA_lu
 end

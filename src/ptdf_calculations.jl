@@ -386,9 +386,8 @@ function PTDF(
     dist_slack::Vector{Float64} = Float64[],
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    radial_branches::RadialBranches = RadialBranches()
+    radial_branches::RadialBranches = RadialBranches(),
 )
-
     validate_linear_solver(linear_solver)
 
     #Get axis names
@@ -443,8 +442,8 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 """
 function PTDF(
     sys::PSY.System;
-    dist_slack::Vector{Float64}=Float64[],
-    reduce_radial_branches::Bool=false,
+    dist_slack::Vector{Float64} = Float64[],
+    reduce_radial_branches::Bool = false,
     kwargs...,
 )
     if reduce_radial_branches
@@ -455,7 +454,7 @@ function PTDF(
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
-    return PTDF(branches, buses; dist_slack=dist_slack, radial_branches=rb, kwargs...)
+    return PTDF(branches, buses; dist_slack = dist_slack, radial_branches = rb, kwargs...)
 end
 
 """
@@ -486,9 +485,8 @@ function PTDF(
     dist_slack::Vector{Float64} = Float64[],
     linear_solver = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = false
+    reduce_radial_branches::Bool = false,
 )
-
     validate_linear_solver(linear_solver)
     S = _buildptdf_from_matrices(A, BA.data, dist_slack, linear_solver)
     axes = (A.axes[2], A.axes[1])
@@ -563,14 +561,15 @@ end
 
 function redistribute_dist_slack(
     dist_slack::Vector{Float64},
-    A::IncidenceMatrix
+    A::IncidenceMatrix,
 )
     dist_slack1 = deepcopy(dist_slack)
     rb = RadialBranches(A)
     # if original length of dist_slack is correct
     if length(dist_slack) == size(A.data, 2)
         # get the number of leaf nodes
-        bus_numbers = reduce(vcat, [rb.bus_reduction_map[i] for i in keys(rb.bus_reduction_map)])
+        bus_numbers =
+            reduce(vcat, [rb.bus_reduction_map[i] for i in keys(rb.bus_reduction_map)])
         for i in keys(rb.bus_reduction_map)
             for j in rb.bus_reduction_map[i]
                 dist_slack1[A.lookup[2][i]] += dist_slack1[A.lookup[2][j]]
@@ -579,7 +578,7 @@ function redistribute_dist_slack(
         end
         # redefine dist_slack
         return dist_slack1[dist_slack1 .!= -9999], rb
-    # otherwise throw an error
+        # otherwise throw an error
     elseif !isempty(dist_slack) && length(dist_slack) != size(A.data, 2)
         error("Distributed bus specification doesn't match the number of the buses.")
     end

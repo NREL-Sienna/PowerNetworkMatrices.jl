@@ -3,11 +3,11 @@
     # matrix without the rows and columns related to radiale branches and leaf nodes
     for name in ["c_sys14", "test_RTS_GMLC_sys"]
         # load the system
-        sys = PSB.build_system(PSB.PSITestSystems, name);
+        sys = PSB.build_system(PSB.PSITestSystems, name)
         # get the incidence matrix
-        A = IncidenceMatrix(sys);
+        A = IncidenceMatrix(sys)
         # ... and with radial lines
-        A_rad = IncidenceMatrix(sys; reduce_radial_branches=true)
+        A_rad = IncidenceMatrix(sys; reduce_radial_branches = true)
         # get inidices for the leaf nodes
         rb = A_rad.radial_branches
         bus_numbers = []
@@ -25,14 +25,14 @@ end
 @testset "Test BA matrix with radial lines" begin
     for name in ["c_sys14", "test_RTS_GMLC_sys"]
         # load the system
-        sys = PSB.build_system(PSB.PSITestSystems, name);
+        sys = PSB.build_system(PSB.PSITestSystems, name)
         # get the incidence matrix
-        BA = BA_Matrix(sys);
+        BA = BA_Matrix(sys)
         # ... and with radial lines
-        BA_rad = BA_Matrix(sys; reduce_radial_branches=true);
+        BA_rad = BA_Matrix(sys; reduce_radial_branches = true)
         # get inidices for the leaf nodes
-        rb = BA_rad.radial_branches;
-        bus_numbers = [];
+        rb = BA_rad.radial_branches
+        bus_numbers = []
         for i in keys(rb.bus_reduction_map)
             append!(bus_numbers, collect(rb.bus_reduction_map[i]))
         end
@@ -50,28 +50,28 @@ end
     for name in ["c_sys14", "test_RTS_GMLC_sys"]
         # load the system
         sys = PSB.build_system(PSB.PSITestSystems, name)
-        
+
         # get the RadialBranches struct
         rb = RadialBranches(IncidenceMatrix(sys))
 
         # get the original and reduced IncidenceMatrix, BA and ABA
         A = IncidenceMatrix(sys)
-        A_rad = IncidenceMatrix(sys, reduce_radial_branches=true)
+        A_rad = IncidenceMatrix(sys; reduce_radial_branches = true)
         BA = BA_Matrix(sys)
-        BA_rad = BA_Matrix(sys, reduce_radial_branches=true)
-        ABA = ABA_Matrix(sys, factorize=true)
-        ABA_rad = ABA_Matrix(sys, factorize=true, reduce_radial_branches=true)
+        BA_rad = BA_Matrix(sys; reduce_radial_branches = true)
+        ABA = ABA_Matrix(sys; factorize = true)
+        ABA_rad = ABA_Matrix(sys; factorize = true, reduce_radial_branches = true)
 
         # check if the same angles and flows are coputed with the matrices of the reduced systems
         # get the indices for the reduced system
-        bus_numbers = [];
+        bus_numbers = []
         for i in keys(rb.bus_reduction_map)
             append!(bus_numbers, collect(rb.bus_reduction_map[i]))
         end
         bus_idx = setdiff(
             1:size(A.data, 2),
-            append!([A.lookup[2][i] for i in bus_numbers], A.ref_bus_positions)
-            )
+            append!([A.lookup[2][i] for i in bus_numbers], A.ref_bus_positions),
+        )
         br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in rb.radial_branches])
 
         # now get the injuctions from the system
@@ -79,9 +79,10 @@ end
         bus_lookup = BA.lookup[1]
         branch_lookup = BA.lookup[2]
         bus_angles = zeros(Float64, n_buses)
-        branch_flow_values =zeros(Float64, length(axes(BA, 2)))
+        branch_flow_values = zeros(Float64, length(axes(BA, 2)))
         temp_bus_map = Dict{Int, String}(
-            PSY.get_number(b) => PSY.get_name(b) for b in PSY.get_components(PSY.ACBus, sys)
+            PSY.get_number(b) => PSY.get_name(b) for
+            b in PSY.get_components(PSY.ACBus, sys)
         )
         for (bus_no, ix) in bus_lookup
             bus_name = temp_bus_map[bus_no]
@@ -93,7 +94,8 @@ end
             end
         end
         bus_activepower_injection = zeros(Float64, n_buses)
-        sources = PSY.get_components(d -> !isa(d, PSY.ElectricLoad), PSY.StaticInjection, sys)
+        sources =
+            PSY.get_components(d -> !isa(d, PSY.ElectricLoad), PSY.StaticInjection, sys)
         for source in sources
             !PSY.get_available(source) && continue
             bus = PSY.get_bus(source)

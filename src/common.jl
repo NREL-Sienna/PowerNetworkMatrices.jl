@@ -13,7 +13,10 @@ end
 """
 Gets the AC branches from a given Systems.
 """
-function get_ac_branches(sys::PSY.System, radial_branches::Set{String}=Set{String}())::Vector{PSY.ACBranch}
+function get_ac_branches(
+    sys::PSY.System,
+    radial_branches::Set{String} = Set{String}(),
+)::Vector{PSY.ACBranch}
     collection = Vector{PSY.ACBranch}()
     for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
         # TODO: if it is a TwoTerminalHVDC line, then skip
@@ -46,7 +49,7 @@ Gets the non-isolated buses from a given System
 """
 function get_buses(
     sys::PSY.System,
-    bus_reduction_map::Dict{Int64, Set{Int64}}=Dict{Int64, Set{Int64}}()
+    bus_reduction_map::Dict{Int64, Set{Int64}} = Dict{Int64, Set{Int64}}(),
 )::Vector{PSY.ACBus}
     # TODO: what is taking long here is the filter in get_components
     leaf_buses = Int64[]
@@ -59,7 +62,9 @@ function get_buses(
     return sort!(
         collect(
             PSY.get_components(
-                x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED && PSY.get_number(x) ∉ leaf_buses,
+                x ->
+                    PSY.get_bustype(x) != ACBusTypes.ISOLATED &&
+                        PSY.get_number(x) ∉ leaf_buses,
                 PSY.ACBus,
                 sys,
             ),
