@@ -85,7 +85,7 @@ end
         dist_slack = 1 / buscount * ones(buscount)
         slack_array = dist_slack / sum(dist_slack)
         # adjust to have the same vector with and without leaf node reduction
-        bus_numbers = reduce(vcat, [rb.bus_reduction_map[i] for i in keys(rb.bus_reduction_map)])
+        bus_numbers = reduce(vcat, [collect(rb.bus_reduction_map[i]) for i in keys(rb.bus_reduction_map)])
         bus_idx = setdiff(
             1:size(A.data, 2),
             append!([A.lookup[2][i] for i in bus_numbers])
@@ -93,16 +93,16 @@ end
         br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in rb.radial_branches])
         for i in keys(rb.bus_reduction_map)
             for j in rb.bus_reduction_map[i]
-                dist_slack[A.lookup[2][i]] += dist_slack[A.lookup[2][j]]
-                dist_slack[A.lookup[2][j]] = -9999
+                slack_array[A.lookup[2][i]] += slack_array[A.lookup[2][j]]
+                slack_array[A.lookup[2][j]] = -9999
             end
         end
-        # redefine dist_slack
-        dist_slack[dist_slack .== -9999] .= 0
-        dist_slack1 = dist_slack[dist_slack .!= -9999]
+        # redefine slack_array
+        slack_array[slack_array .== -9999] .= 0
+        slack_array1 = slack_array[slack_array .!= -9999]
         # now get the PTDF matrices
-        ptdf = PTDF(sys; dist_slack=dist_slack)
-        ptdf_rad = PTDF(sys; reduce_radial_branches=true, dist_slack=dist_slack1)
+        ptdf = PTDF(sys; dist_slack=slack_array)
+        ptdf_rad = PTDF(sys; reduce_radial_branches=true, dist_slack=slack_array1)
 
         # now get the injections from the system
         n_buses = length(axes(ptdf, 1))
