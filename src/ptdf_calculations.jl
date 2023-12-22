@@ -36,16 +36,6 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     radial_banches::RadialBranches
 end
 
-function PTDF(data::AbstractArray{Float64, 2},
-    axes,
-    lookup::NTuple{2, Dict},
-    subnetworks::Dict{Int, Set{Int}},
-    ref_bus_positions::Set{Int},
-    tol::Base.RefValue{Float64},
-    radial_banches::RadialBranches)
-    return PTDF(data, axes, lookup, subnetworks, ref_bus_positions, tol, radial_banches)
-end
-
 """
 Deserialize a PTDF from an HDF5 file.
 
@@ -394,7 +384,7 @@ function PTDF(
     dist_slack::Vector{Float64} = Float64[],
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = false)
+    radial_branches::RadialBranches = RadialBranches())
 
     validate_linear_solver(linear_solver)
 
@@ -417,12 +407,6 @@ function PTDF(
         dist_slack,
         linear_solver,
     )
-    if reduce_radial_branches
-        data, _ = calculate_A_matrix(branches, buses)
-        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
-    else
-        radial_branches = RadialBranches()
-    end
     if tol > eps()
         return PTDF(
             sparsify(S, tol),
@@ -446,16 +430,36 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 """
 function PTDF(
     sys::PSY.System;
+    dist_slack::Vector{Float64}=Float64[],
     reduce_radial_branches::Bool=false,
     kwargs...,
 )
     if reduce_radial_branches
-        rb = RadialBranche(sys)
+        A = IncidenceMatrix(sys)
+        rb = RadialBranches(A)
+        # if original length of dist_slack is correct
+        if length(dist_slack) == size(A.data, 2)
+            # get the number of leaf nodes
+            bus_numbers = reduce(vcat, [rb.bus_reduction_map[i] for i in keys(rb.bus_reduction_map)])
+            for i in keys(rb.bus_reduction_map)
+                for j in rb.bus_reduction_map[i]
+                    dist_slack[A.lookup[2][i]] += dist_slack[A.lookup[2][j]]
+                    dist_slack[A.lookup[2][j]] = -9999
+                end
+            end
+            # redefine dist_slack
+            dist_slack = dist_slack[dist_slack .!= -9999]
+            @assert length(dist_slack) == size(A.data, 2) - length(bus_numbers)
+        # otherwise throw an error
+        elseif !isempty(dist_slack) && length(dist_slack) != size(A.data, 2)
+            error("Distributed bus specification doesn't match the number of the buses.")
+        end
     else
+        rb = RadialBranches()
     end
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
-    return PTDF(branches, buses; kwargs...)
+    branches = get_ac_branches(sys, rb.radial_branches)
+    buses = get_buses(sys, rb.bus_reduction_map)
+    return PTDF(branches, buses; dist_slack=dist_slack, radial_branches=rb, kwargs...)
 end
 
 """
@@ -491,8 +495,7 @@ function PTDF(
     lookup = (A.lookup[2], A.lookup[1])
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
     if reduce_radial_branches
-        data, ref_bus_positions = calculate_A_matrix(branches, buses)
-        radial_branches = BA.radial_branches # ! RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
+        radial_branches = BA.radial_branches
     else
         radial_branches = RadialBranches()
     end

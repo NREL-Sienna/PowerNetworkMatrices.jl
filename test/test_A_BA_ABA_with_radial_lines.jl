@@ -1,5 +1,3 @@
-# TODO: missing tests for BA matrix with radial lines
-# TODO: missing tests for ABA matrix with radial lines (creating ABA from A and BA with radial lines)
 @testset "Test A matrix with radial lines" begin
     # A matrix evaluated with radial lines must be the same as the ogirinal A
     # matrix without the rows and columns related to radiale branches and leaf nodes
