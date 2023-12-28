@@ -396,7 +396,7 @@ function PTDF(
     axes = (bus_ax, line_ax)
     M, bus_ax_ref = calculate_adjacency(branches, buses)
     ref_bus_positions = find_slack_positions(buses)
-    subnetworks = find_subnetworks(M, bus_ax)
+
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
         subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
@@ -478,7 +478,7 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
         True to reduce the network by simplifying the radial branches and mapping the
         eliminate buses
 """
-# TODO: if either A or BA have RadialBranches, then throw an @info say that those are used 
+# TODO: if either A or BA have RadialBranches, then throw an @info say that those are used
 function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;

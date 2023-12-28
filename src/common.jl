@@ -72,7 +72,7 @@ function get_buses(
         count_i += 1
     end
 
-    return sort!(deleteat!(buses, count_i:length(buses)), by = x -> PSY.get_number(x))
+    return sort!(deleteat!(buses, count_i:length(buses)); by = x -> PSY.get_number(x))
 end
 
 """
@@ -189,7 +189,7 @@ function calculate_adjacency(
         if PSY.get_bustype(buses[i]) == ACBusTypes.ISOLATED
             continue
         end
-        a[i,i] = 1
+        a[i, i] = 1
     end
 
     # Return both for type stability
