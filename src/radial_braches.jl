@@ -112,6 +112,7 @@ function RadialBranches(
     reverse_bus_map = Dict(reverse(kv) for kv in bus_map)
     Threads.@threads for j in 1:buscount
         if length(SparseArrays.nzrange(A, j)) == 1
+            @show reverse_bus_map[j]
             if j ∈ ref_bus_positions
                 continue
             end
