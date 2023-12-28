@@ -54,7 +54,7 @@ function _new_parent(
         )
         new_parent_bus_number = reverse_bus_map[new_parent_val]
         new_set = push!(pop!(bus_reduction_map_index, parent_bus_number), parent_bus_number)
-        bus_reduction_map_index[new_parent_bus_number] = new_set
+        union!(get!(bus_reduction_map_index, new_parent_bus_number, Set{Int}()), new_set)
         _new_parent(
             A,
             new_parent_val,
@@ -86,7 +86,7 @@ function _reverse_search(
         reverse_bus_map,
     )
     parent_bus_number = reverse_bus_map[parent]
-    bus_reduction_map_index[parent_bus_number] = reducion_set
+    union!(get!(bus_reduction_map_index, parent_bus_number, Set{Int}()), reducion_set)
     _new_parent(
         A,
         parent,
@@ -112,7 +112,6 @@ function RadialBranches(
     reverse_bus_map = Dict(reverse(kv) for kv in bus_map)
     Threads.@threads for j in 1:buscount
         if length(SparseArrays.nzrange(A, j)) == 1
-            @show reverse_bus_map[j]
             if j ∈ ref_bus_positions
                 continue
             end
