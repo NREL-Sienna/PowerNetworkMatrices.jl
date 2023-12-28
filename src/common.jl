@@ -19,7 +19,6 @@ function get_ac_branches(
 )::Vector{PSY.ACBranch}
     collection = Vector{PSY.ACBranch}()
     for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
-        # TODO: if it is a TwoTerminalHVDC line, then skip
         arc = PSY.get_arc(br)
         if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
             throw(
@@ -51,26 +50,29 @@ function get_buses(
     sys::PSY.System,
     bus_reduction_map::Dict{Int64, Set{Int64}} = Dict{Int64, Set{Int64}}(),
 )::Vector{PSY.ACBus}
-    # TODO: what is taking long here is the filter in get_components
-    leaf_buses = Int64[]
+    leaf_buses = Set{PSY.Int64}()
     if !isempty(bus_reduction_map)
-        for i in keys(bus_reduction_map)
-            append!(leaf_buses, collect(bus_reduction_map[i]))
+        for vals in values(bus_reduction_map)
+            union!(leaf_buses, vals)
         end
     end
-    # TODO: use for loop with if statement for filtering. Pre-allocate empty vector and then remove tail.
-    return sort!(
-        collect(
-            PSY.get_components(
-                x ->
-                    PSY.get_bustype(x) != ACBusTypes.ISOLATED &&
-                        PSY.get_number(x) ∉ leaf_buses,
-                PSY.ACBus,
-                sys,
-            ),
-        );
-        by = x -> PSY.get_number(x),
-    )
+
+    count_i = 1
+    all_buses = PSY.get_components(PSY.ACBus, sys)
+    buses = Vector{PSY.ACBus}(undef, length(all_buses))
+    for b in all_buses
+        if PSY.get_bustype(b) == ACBusTypes.ISOLATED
+            continue
+        end
+
+        if PSY.get_number(b) ∈ leaf_buses
+            continue
+        end
+        buses[count_i] = b
+        count_i += 1
+    end
+
+    return sort!(deleteat!(buses, count_i:length(buses)), by = x -> PSY.get_number(x))
 end
 
 """
@@ -177,11 +179,17 @@ function calculate_adjacency(
     a = SparseArrays.spzeros(Int8, buscount, buscount)
 
     for b in branches
-        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+        fr_b, to_b = get_bus_indices(b, bus_lookup)
         a[fr_b, to_b] = 1
         a[to_b, fr_b] = -1
-        a[fr_b, fr_b] = 1
-        a[to_b, to_b] = 1
+    end
+
+    # If a line is disconnected needs to check for the buses correctly
+    for i in 1:buscount
+        if PSY.get_bustype(buses[i]) == ACBusTypes.ISOLATED
+            continue
+        end
+        a[i,i] = 1
     end
 
     # Return both for type stability
