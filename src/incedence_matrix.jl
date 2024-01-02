@@ -21,7 +21,6 @@ struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
-    radial_branches::RadialBranches
 end
 
 # functions to get stored data
@@ -41,10 +40,9 @@ values.
 """
 function evaluate_A_matrix_values(
     sys::PSY.System,
-    radial_branches::RadialBranches = RadialBranches(),
 )
-    branches = get_ac_branches(sys, radial_branches.radial_branches)
-    buses = get_buses(sys, radial_branches.bus_reduction_map)
+    branches = get_ac_branches(sys)
+    buses = get_buses(sys)
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
     data, ref_bus_positions = calculate_A_matrix(branches, buses)
@@ -65,20 +63,8 @@ values.
         all the radial branches and leaf buses (optional, default value is false)
 """
 function IncidenceMatrix(
-    sys::PSY.System;
-    reduce_radial_branches::Bool = false,
+    sys::PSY.System,
 )
     data, axes, lookup, ref_bus_positions = evaluate_A_matrix_values(sys)
-    if reduce_radial_branches
-        rb = RadialBranches(data, lookup[1], lookup[2], ref_bus_positions)
-        data, axes, lookup, ref_bus_positions = evaluate_A_matrix_values(sys, rb)
-    else
-        rb = RadialBranches()
-    end
-    return IncidenceMatrix(data, axes, lookup, ref_bus_positions, rb)
-end
-
-# this function needs to stay here due to dependency of IncidenceMatrix
-function RadialBranches(A::IncidenceMatrix)
-    return RadialBranches(A.data, A.lookup[1], A.lookup[2], A.ref_bus_positions)
+    return IncidenceMatrix(data, axes, lookup, ref_bus_positions)
 end
