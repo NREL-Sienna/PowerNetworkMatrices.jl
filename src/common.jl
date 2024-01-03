@@ -352,7 +352,7 @@ function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{I
     subnetworks = Dict{Int, Set{Int}}()
     for (ix, bus_number) in enumerate(bus_numbers)
         neighbors = SparseArrays.nzrange(M, ix)
-        if length(neighbors) < 1
+        if length(neighbors) <= 1
             @warn "Bus $bus_number is islanded"
             subnetworks[bus_number] = Set{Int}(bus_number)
             continue
