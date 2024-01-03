@@ -4,7 +4,7 @@ Structure containing the BA matrix and other relevant data.
 
 # Arguments
 - `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        the transposed BA matrix coming from the product between the Incidence 
+        the transposed BA matrix coming from the product between the Incidence
         Matrix A and the Matrix of Susceptance B
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors, the first one contains the names of each
@@ -15,7 +15,7 @@ Structure containing the BA matrix and other relevant data.
         Tuple containing 2 Dictionaries mapping the number of rows and columns
         with the names of buses and branches
 - `ref_bus_positions::Set{Int}`:
-        Vector containing the indexes of the columns of the BA matrix corresponding
+        Set containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
 - `radial_branches::RadialBranches`:
         Structure containing the radial branches and leaf buses that were removed
@@ -36,7 +36,7 @@ Build the BA matrix from a given System
 - `sys::PSY.System`:
         PSY system for which the matrix is constructed
 - `reduce_radial_branches::Bool`:
-        if True the matrix is build considering radial branches removed from 
+        if True the matrix is build considering radial branches removed from
         the system
 """
 function BA_Matrix(sys::PSY.System; reduce_radial_branches::Bool = false)
@@ -65,7 +65,7 @@ Structure containing the ABA matrix and other relevant data.
         the ABA matrix coming from the product between the Incidence Matrix A and
         the Matrix BA.
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two identical vectors, both containing the number of 
+        Tuple containing two identical vectors, both containing the number of
         each bus of the network (each one related to a row/column of the Matrix
         in "data"), excluding the slack buses.
 - `lookup<:NTuple{2, Dict}`:
@@ -182,7 +182,7 @@ function Base.getindex(
     return A.data[bus_number, line_number]
 end
 
-# get_index functions: ABA_Matrix stores a square matrix whose number of rows 
+# get_index functions: ABA_Matrix stores a square matrix whose number of rows
 # and column is equal to the number of the system's buses minus the slack ones,
 # NOTE: bus_1, bus_2 are bus numbers not row and column indices!
 function Base.getindex(A::ABA_Matrix, bus_1, bus_2)
