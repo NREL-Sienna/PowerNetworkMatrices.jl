@@ -32,7 +32,7 @@ end
 
         # get the original and reduced IncidenceMatrix, BA and ABA
         A = IncidenceMatrix(sys)
-        A_rad = IncidenceMatrix(sys; reduce_radial_branches = true)
+        A_rad = IncidenceMatrix(sys)
         BA = BA_Matrix(sys)
         BA_rad = BA_Matrix(sys; reduce_radial_branches = true)
         ABA = ABA_Matrix(sys; factorize = true)

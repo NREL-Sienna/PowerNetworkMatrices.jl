@@ -5,7 +5,7 @@
         sys = PSB.build_system(PSB.PSITestSystems, name)
 
         # get A, BA and ABA matrix with radial branches
-        A_rad = IncidenceMatrix(sys; reduce_radial_branches = true)
+        A_rad = IncidenceMatrix(sys)
         BA_rad = BA_Matrix(sys, ; reduce_radial_branches = true)
         ABA_rad = ABA_Matrix(sys; reduce_radial_branches = true, factorize = true)
         ptdf = PTDF(sys)
