@@ -1,5 +1,3 @@
-# TODO reference bus must not be removed
-
 struct RadialBranches
     bus_reduction_map::Dict{Int, Set{Int}}
     reverse_bus_search_map::Dict{Int, Int}
@@ -11,6 +9,7 @@ get_bus_reduction_map(rb::RadialBranches) = rb.bus_reduction_map
 get_reverse_bus_search_map(rb::RadialBranches) = rb.reverse_bus_search_map
 get_radial_branches(rb::RadialBranches) = rb.radial_branches
 get_meshed_branches(rb::RadialBranches) = rb.meshed_branches
+
 function Base.isempty(rb::RadialBranches)
     if !isempty(rb.bus_reduction_map)
         return false
@@ -39,9 +38,25 @@ function RadialBranches(;
     )
 end
 
+"""
+Structure to collect information the branches in the system that are radial and can be
+ignored in the models.
+
+# Arguments
+- `A::IncidenceMatrix`: IncidenceMatrix
+
+"""
 function RadialBranches(A::IncidenceMatrix)
-    return RadialBranches(A.data, A.lookup[1], A.lookup[2], A.ref_bus_positions)
+    return calculate_radial_branches(A.data, A.lookup[1], A.lookup[2], A.ref_bus_positions)
 end
+
+"""
+Structure to collect information the branches in the system that are radial and can be
+ignored in the models.
+
+# Arguments
+- `sys::PSY.System`: System Data
+"""
 
 function RadialBranches(sys::PSY.System)
     return RadialBranches(IncidenceMatrix(sys))
@@ -107,6 +122,7 @@ function _reverse_search(
     reverse_bus_map::Dict{Int, Int},
 )
     j_bus_number = reverse_bus_map[j]
+    pop!(bus_reduction_map_index, j_bus_number)
     reducion_set = Set{Int}(j_bus_number)
     parent = _find_upstream_bus(
         A,
@@ -140,7 +156,19 @@ function _make_reverse_bus_search_map(bus_reduction_map::Dict{Int, Set{Int}}, n_
     return map
 end
 
-function RadialBranches(
+"""
+used to calculate the branches in the system that are radial and can be
+ignored in the models by exploring the structure of the incidence matrix
+
+# Arguments
+- `A::SparseArrays.SparseMatrixCSC{Int8, Int64}`: Data from the IncidenceMatrix
+- `line_map::Dict{String, Int}`: Map of Line Name to Matrix Index
+- `bus_map::Dict{Int, Int}`: Map of Bus Name to Matrix Index
+- `ref_bus_positions::Set{Int}`:
+        Set containing the indexes of the columns of the BA matrix corresponding
+        to the refence buses
+"""
+function calculate_radial_branches(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
     line_map::Dict{String, Int},
     bus_map::Dict{Int, Int},
@@ -185,6 +213,13 @@ function RadialBranches(
     )
 end
 
+"""
+Interface to obtain the parent bus number of a reduced bus when radial branches are eliminated
+
+# Arguments
+- `rb::RadialBranches`: RadialBranches object
+- `bus_number::Int`: Bus number of the reduced bus
+"""
 function get_mapped_bus_number(rb::RadialBranches, bus_number::Int)
     if isempty(rb)
         return bus_number
