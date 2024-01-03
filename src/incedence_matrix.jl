@@ -33,6 +33,24 @@ Builds the Incidence matrix of the system by evaluating the actual matrix and ot
 values.
 
 # Arguments
+- `sys::PSY.System`:
+        the PowerSystem system to consider
+- `reduce_radial_branches::Bool`:
+        if True the matrix will be evaluated discarding
+        all the radial branches and leaf buses (optional, default value is false)
+"""
+function IncidenceMatrix(
+    sys::PSY.System,
+)
+    data, axes, lookup, ref_bus_positions = evaluate_A_matrix_values(sys)
+    return IncidenceMatrix(data, axes, lookup, ref_bus_positions)
+end
+
+"""
+Builds the Incidence matrix of the system by evaluating the actual matrix and other relevant
+values.
+
+# Arguments
 - `sys::PSY.System`: the PowerSystem system to consider
 - `radial_branches::RadialBranches`:
         Structure containing the radial branches and leaf buses that were removed
@@ -51,20 +69,14 @@ function evaluate_A_matrix_values(
     return data, axes, lookup, ref_bus_positions
 end
 
-"""
-Builds the Incidence matrix of the system by evaluating the actual matrix and other relevant
-values.
-
-# Arguments
-- `sys::PSY.System`:
-        the PowerSystem system to consider
-- `reduce_radial_branches::Bool`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
-"""
-function IncidenceMatrix(
-    sys::PSY.System,
+function reduce_A_matrix(
+    A::IncidenceMatrix,
+    bus_reduction_map::Dict{Int, Set{Int}},
+    meshed_branches::Set{String},
 )
-    data, axes, lookup, ref_bus_positions = evaluate_A_matrix_values(sys)
-    return IncidenceMatrix(data, axes, lookup, ref_bus_positions)
+    branch_ixs = sort!([A.lookup[1][k] for k in meshed_branches])
+    bus_ixs = sort!([A.lookup[2][k] for k in keys(bus_reduction_map)])
+    ref_buses = [k for (k, v) in A.lookup[2] if v in A.ref_bus_positions]
+    ref_bus_positions = Set{Int}(i for i in bus_ixs if i in ref_buses)
+    return A.data[branch_ixs, bus_ixs], ref_bus_positions
 end
