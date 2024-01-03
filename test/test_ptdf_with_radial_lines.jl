@@ -7,7 +7,7 @@
         rb = RadialBranches(IncidenceMatrix(sys))
 
         # get the A and BA matrices without radial lines
-        A_rad = IncidenceMatrix(sys; reduce_radial_branches = true)
+        A_rad = IncidenceMatrix(sys)
         BA_rad = BA_Matrix(sys; reduce_radial_branches = true)
 
         # get the original and reduced PTDF matrices (consider different methods)
