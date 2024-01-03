@@ -363,25 +363,37 @@ function LODF(
     validate_linear_solver(linear_solver)
 
     if PTDFm.tol.x > 1e-15
-        err_msg = string(
-            "The argument `tol` in the PTDF matrix was set to a value dirrent than the default one.\n",
-            "The PTDF matrix used as input of the LODF matrix must have the default `tol` value.\n",
+        warn_msg = string(
+            "The argument `tol` in the PTDF matrix was set to a value different than the default one.\n",
+            "The resulting LODF can include unexpected rounding errors.\n",
         )
-        error(err_msg)
+        @warn(warn_msg)
+        PTDFm_data = Matrix(PTDFm.data)
+    else
+        PTDFm_data = PTDFm.data
     end
+
     if reduce_radial_branches
-        if !isempty(A.radial_branches) && !isempty(PTDFm.radial_branches)
-            radial_branches = A.radial_branches
-            @info "Non-empty `radial_branches` field found in A and PTDFm matrix. LODF is evaluated considering radial branches and leaf nodes removed."
+        if !isempty(PTDFm.radial_branches)
+            radial_branches = PTDFm.radial_branches
+            @info "`radial_branches` field found in PTDFm matrix. LODF is evaluated considering radial branches and leaf nodes removed."
         else
-            error("Mismatch in `radial_branches` field between A and PTDFm matrices.")
+            radial_branches = RadialBranches(A)
         end
+        A_matrix, _ = reduce_A_matrix(
+            A,
+            radial_branches.bus_reduction_map,
+            radial_branches.meshed_branches,
+        )
+        ax_ref = make_ax_ref(sort!(collect(radial_branches.meshed_branches)))
     else
         radial_branches = RadialBranches()
+        A_matrix = A.data
+        ax_ref = make_ax_ref(A.axes[1])
     end
-    ax_ref = make_ax_ref(A.axes[1])
+
     if tol > eps()
-        lodf_t = _buildlodf(A.data, PTDFm.data, linear_solver)
+        lodf_t = _buildlodf(A_matrix, PTDFm_data, linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
             (A.axes[1], A.axes[1]),
@@ -391,7 +403,7 @@ function LODF(
         )
     end
     return LODF(
-        _buildlodf(A.data, PTDFm.data, linear_solver),
+        _buildlodf(A_matrix, PTDFm_data, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
@@ -430,19 +442,25 @@ function LODF(
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
     if reduce_radial_branches
-        if !isempty(A.radial_branches) && !isempty(BA.radial_branches) &&
-           !isempty(ABA.radial_branches)
+        if !isempty(BA.radial_branches) && !isempty(ABA.radial_branches)
             radial_branches = BA.radial_branches
-            @info "Non-empty `radial_branches` field found in A, BA and ABA matrix. LODF is evaluated considering radial branches and leaf nodes removed."
+            @info "Non-empty `radial_branches` field found in BA and ABA matrix. LODF is evaluated considering radial branches and leaf nodes removed."
         else
             error("Mismatch in `radial_branches` field between A, BA and ABA matrices.")
         end
+
+        A_matrix, _ = reduce_A_matrix(
+            A,
+            radial_branches.bus_reduction_map,
+            radial_branches.meshed_branches,
+        )
     else
         radial_branches = RadialBranches()
+        A_matrix = A.data
     end
+
     if tol > eps()
-        lodf_t = _buildlodf(A.data, ABA.K, BA.data,
-            A.ref_bus_positions, linear_solver)
+        lodf_t = _buildlodf(A_matrix, ABA.K, BA.data, A.ref_bus_positions, linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
             (A.axes[1], A.axes[1]),
@@ -452,7 +470,7 @@ function LODF(
         )
     end
     return LODF(
-        _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
+        _buildlodf(A_matrix, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),

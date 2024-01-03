@@ -77,23 +77,24 @@ function _buildptdf(
 end
 
 function _buildptdf_from_matrices(
-    A::IncidenceMatrix,
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}},
+    ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64},
     linear_solver::String)
     if linear_solver == "KLU"
-        PTDFm = _calculate_PTDF_matrix_KLU(A.data, BA, A.ref_bus_positions, dist_slack)
+        PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
     elseif linear_solver == "Dense"
         # Convert SparseMatrices to Dense
         PTDFm = _calculate_PTDF_matrix_DENSE(
-            Matrix(A.data),
+            Matrix(A),
             Matrix(BA),
             A.ref_bus_positions,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
         PTDFm =
-            _calculate_PTDF_matrix_MKLPardiso(A.data, BA, A.ref_bus_positions, dist_slack)
+            _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     end
 
     return PTDFm
@@ -488,20 +489,37 @@ function PTDF(
     reduce_radial_branches::Bool = false,
 )
     validate_linear_solver(linear_solver)
-    S = _buildptdf_from_matrices(A, BA.data, dist_slack, linear_solver)
-    axes = (A.axes[2], A.axes[1])
-    lookup = (A.lookup[2], A.lookup[1])
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
     if reduce_radial_branches
-        if !isempty(A.radial_branches) && !isempty(BA.radial_branches)
+        if !isempty(BA.radial_branches)
             radial_branches = BA.radial_branches
-            @info "Non-empty `radial_branches` field found in A, BA and matrix. PTDF is evaluated considering radial branches and leaf nodes removed."
+            @info "Non-empty `radial_branches` field found in BA matrix. PTDF is evaluated considering radial branches and leaf nodes removed."
         else
-            error("Mismatch in `radial_branches` field between A and BA matrices.")
+            radial_branches = RadialBranches(A)
         end
+        A_matrix, ref_bus_positions = reduce_A_matrix(
+            A,
+            radial_branches.bus_reduction_map,
+            radial_branches.meshed_branches,
+        )
+        bus_ax = sort!(collect(keys(radial_branches.bus_reduction_map)))
+        line_ax = sort!(collect(radial_branches.meshed_branches))
+        axes = (bus_ax, line_ax)
+        lookup = (make_ax_ref(bus_ax), make_ax_ref(line_ax))
     else
         radial_branches = RadialBranches()
+        A_matrix = A.data
+        axes = (A.axes[2], A.axes[1])
+        lookup = (A.lookup[2], A.lookup[1])
+        ref_bus_positions = A.ref_bus_positions
     end
+    S = _buildptdf_from_matrices(
+        A_matrix,
+        BA.data,
+        ref_bus_positions,
+        dist_slack,
+        linear_solver,
+    )
     if tol > eps()
         return PTDF(
             sparsify(S, tol),
