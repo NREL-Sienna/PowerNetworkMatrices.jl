@@ -400,7 +400,7 @@ function PTDF(
     subnetworks = find_subnetworks(M, bus_ax)
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
-        subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
+        subnetworks = assign_reference_buses(subnetworks, ref_bus_positions)
     end
     look_up = (bus_ax_ref, make_ax_ref(line_ax))
     S, _ = _buildptdf(
@@ -426,6 +426,7 @@ end
 
 """
 Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
+Note that `dist_slack` and `reduce_radial_branches` kwargs are explicitly mentioned because needed inside of the function.
 
 # Arguments
 - `sys::PSY.System`:
@@ -438,8 +439,6 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 - `reduce_radial_branches::Bool=false`:
         if True the matrix will be evaluated discarding
         all the radial branches and leaf buses (optional, default value is false)
-- `kwargs...`:
-        other keyword arguments used by PTDF
 """
 function PTDF(
     sys::PSY.System;

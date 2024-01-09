@@ -306,6 +306,7 @@ end
 
 """
 Builds the LODF matrix from a system.
+Note that `reduce_radial_branches` kwargs is explicitly mentioned because needed inside of the function.
 
 # Arguments
 - `sys::PSY.System`:
@@ -315,8 +316,6 @@ Builds the LODF matrix from a system.
 - `reduce_radial_branches::Bool=false`:
         if True the matrix will be evaluated discarding
         all the radial branches and leaf buses (optional, default value is false)
-- `kwargs...`:
-        other keyword arguments used by PTDF
 """
 function LODF(
     sys::PSY.System;
@@ -376,9 +375,9 @@ function LODF(
     if reduce_radial_branches
         if !isempty(PTDFm.radial_branches)
             radial_branches = PTDFm.radial_branches
-            @info "`radial_branches` field found in PTDFm matrix. LODF is evaluated considering radial branches and leaf nodes removed."
+            @info "Non-empty `radial_branches` field found in PTDF matrix. LODF is evaluated considering radial branches and leaf nodes removed."
         else
-            radial_branches = RadialBranches(A)
+            error("PTDF has empty `radial_branches` field.")
         end
         A_matrix, _ = reduce_A_matrix(
             A,
@@ -387,9 +386,13 @@ function LODF(
         )
         ax_ref = make_ax_ref(sort!(collect(radial_branches.meshed_branches)))
     else
-        radial_branches = RadialBranches()
-        A_matrix = A.data
-        ax_ref = make_ax_ref(A.axes[1])
+        if isempty(PTDFm.radial_branches)
+            radial_branches = RadialBranches()
+            A_matrix = A.data
+            ax_ref = make_ax_ref(A.axes[1])
+        else
+            error("Field `radial_branches` in PTDF must be empty if `reduce_radial_branches` is not true.")
+        end
     end
 
     if tol > eps()
@@ -442,21 +445,26 @@ function LODF(
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
     if reduce_radial_branches
-        if !isempty(BA.radial_branches) && !isempty(ABA.radial_branches)
+        # BA and ABA must contain the same, non-empty RadialBranches stucture
+        if !isempty(BA.radial_branches) && !isempty(ABA.radial_branches) && isequal(BA.radial_branches, ABA.radial_branches)
             radial_branches = BA.radial_branches
             @info "Non-empty `radial_branches` field found in BA and ABA matrix. LODF is evaluated considering radial branches and leaf nodes removed."
         else
-            error("Mismatch in `radial_branches` field between A, BA and ABA matrices.")
+            error("Mismatch in `radial_branches` field between BA and ABA matrices.")
         end
-
         A_matrix, _ = reduce_A_matrix(
             A,
             radial_branches.bus_reduction_map,
             radial_branches.meshed_branches,
         )
     else
-        radial_branches = RadialBranches()
-        A_matrix = A.data
+        # BA and ABA must contain the same, empty RadialBranches stucture
+        if isempty(BA.radial_branches) && isempty(ABA.radial_branches)
+            radial_branches = RadialBranches()
+            A_matrix = A.data
+        else
+            error("Field `radial_branches` in BA and ABA must be empty if `reduce_radial_branches` is not true.")
+        end
     end
 
     if tol > eps()
