@@ -226,3 +226,19 @@ function get_mapped_bus_number(rb::RadialBranches, bus_number::Int)
     end
     return get(rb.reverse_bus_search_map, bus_number, bus_number)
 end
+
+##############################################################################
+########################### Auxiliary functions ##############################
+##############################################################################
+
+function isequal(
+    rb1::RadialBranches,
+    rb2::RadialBranches
+)
+    for field in fieldnames(typeof(rb1))
+        if getfield(rb1, field) != getfield(rb2, field)
+            return false
+        end
+    end
+    return true
+end

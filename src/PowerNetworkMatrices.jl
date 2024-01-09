@@ -1,10 +1,3 @@
-# TODO:
-# - error for removed branches and buses
-# - evaluate BA, A again (no need of special functions)
-# - evaluation of other matrices
-# - tests: see if flows are the same
-#   check radial branches if ref bus is there or not
-
 module PowerNetworkMatrices
 
 export ABA_Matrix

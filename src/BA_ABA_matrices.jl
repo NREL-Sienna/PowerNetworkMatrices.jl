@@ -1,4 +1,3 @@
-# TODO: BA_Matrix(sys::PSY.Sytems, radial_branches::Vector{String}), for custom radial branches
 """
 Structure containing the BA matrix and other relevant data.
 

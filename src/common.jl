@@ -307,7 +307,7 @@ end
 """
 !!! MISSING DOCUMENTATION !!!
 """
-function assing_reference_buses(
+function assign_reference_buses(
     subnetworks::Dict{Int, Set{Int}},
     ref_bus_positions::Set{Int},
 )
