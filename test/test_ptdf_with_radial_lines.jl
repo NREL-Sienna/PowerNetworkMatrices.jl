@@ -150,3 +150,35 @@ end
         @test isapprox(ref_flow_values[br_idx], reduced_flow_values)
     end
 end
+
+@testset "Test LODF errors" begin
+
+    # load the system
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+
+    # get the A and BA matrices without radial lines
+    A = IncidenceMatrix(sys)
+    BA = BA_Matrix(sys)
+    BA_rad = BA_Matrix(sys; reduce_radial_branches = true)
+
+    test_value = false
+    try
+        ptdf = PTDF(A, BA; reduce_radial_branches = true)
+    catch err
+        if err isa Exception
+            test_value = true
+        end
+    end
+    @test test_value
+
+    test_value = false
+    try
+        ptdf = PTDF(A, BA_rad)
+    catch err
+        if err isa Exception
+            test_value = true
+        end
+    end
+    @test test_value
+
+end
