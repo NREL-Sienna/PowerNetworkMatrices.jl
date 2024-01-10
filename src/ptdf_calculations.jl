@@ -495,15 +495,13 @@ function PTDF(
         else
             error("BA has empty `radial_branches` field.")
         end
-        A_matrix, ref_bus_positions = reduce_A_matrix(
+        A_matrix, _ = reduce_A_matrix(
             A,
             radial_branches.bus_reduction_map,
             radial_branches.meshed_branches,
         )
-        bus_ax = sort!(collect(keys(radial_branches.bus_reduction_map)))
-        line_ax = sort!(collect(radial_branches.meshed_branches))
-        axes = (bus_ax, line_ax)
-        lookup = (make_ax_ref(bus_ax), make_ax_ref(line_ax))
+        axes = BA.axes
+        lookup = BA.lookup
     else
         if isempty(BA.radial_branches)
             radial_branches = RadialBranches()
@@ -518,7 +516,7 @@ function PTDF(
     S = _buildptdf_from_matrices(
         A_matrix,
         BA.data,
-        ref_bus_positions,
+        BA.ref_bus_positions,
         dist_slack,
         linear_solver,
     )
@@ -587,9 +585,6 @@ function redistribute_dist_slack(
     rb = RadialBranches(A)
     # if original length of dist_slack is correct
     if length(dist_slack) == size(A.data, 2)
-        # get the number of leaf nodes
-        bus_numbers =
-            reduce(vcat, [rb.bus_reduction_map[i] for i in keys(rb.bus_reduction_map)])
         for i in keys(rb.bus_reduction_map)
             for j in rb.bus_reduction_map[i]
                 dist_slack1[A.lookup[2][i]] += dist_slack1[A.lookup[2][j]]
