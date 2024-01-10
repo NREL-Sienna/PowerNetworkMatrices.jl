@@ -512,7 +512,9 @@ function PTDF(
             lookup = (A.lookup[2], A.lookup[1])
             ref_bus_positions = A.ref_bus_positions
         else
-            error("Field `radial_branches` in BA must be empty if `reduce_radial_branches` is not true.")
+            error(
+                "Field `radial_branches` in BA must be empty if `reduce_radial_branches` is not true.",
+            )
         end
     end
     S = _buildptdf_from_matrices(

@@ -391,7 +391,9 @@ function LODF(
             A_matrix = A.data
             ax_ref = make_ax_ref(A.axes[1])
         else
-            error("Field `radial_branches` in PTDF must be empty if `reduce_radial_branches` is not true.")
+            error(
+                "Field `radial_branches` in PTDF must be empty if `reduce_radial_branches` is not true.",
+            )
         end
     end
 
@@ -446,7 +448,8 @@ function LODF(
     ax_ref = make_ax_ref(A.axes[1])
     if reduce_radial_branches
         # BA and ABA must contain the same, non-empty RadialBranches stucture
-        if !isempty(BA.radial_branches) && !isempty(ABA.radial_branches) && isequal(BA.radial_branches, ABA.radial_branches)
+        if !isempty(BA.radial_branches) && !isempty(ABA.radial_branches) &&
+           isequal(BA.radial_branches, ABA.radial_branches)
             radial_branches = BA.radial_branches
             @info "Non-empty `radial_branches` field found in BA and ABA matrix. LODF is evaluated considering radial branches and leaf nodes removed."
         else
@@ -463,7 +466,9 @@ function LODF(
             radial_branches = RadialBranches()
             A_matrix = A.data
         else
-            error("Field `radial_branches` in BA and ABA must be empty if `reduce_radial_branches` is not true.")
+            error(
+                "Field `radial_branches` in BA and ABA must be empty if `reduce_radial_branches` is not true.",
+            )
         end
     end
 
