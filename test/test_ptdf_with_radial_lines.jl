@@ -151,7 +151,7 @@ end
     end
 end
 
-@testset "Test LODF errors" begin
+@testset "Test PTDF errors" begin
 
     # load the system
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
