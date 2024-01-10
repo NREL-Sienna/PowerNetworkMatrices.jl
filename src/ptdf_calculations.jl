@@ -478,7 +478,6 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
         True to reduce the network by simplifying the radial branches and mapping the
         eliminate buses
 """
-# TODO: if either A or BA have RadialBranches, then throw an @info say that those are used
 function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
@@ -494,7 +493,7 @@ function PTDF(
             radial_branches = BA.radial_branches
             @info "Non-empty `radial_branches` field found in BA matrix. PTDF is evaluated considering radial branches and leaf nodes removed."
         else
-            radial_branches = RadialBranches(A)
+            error("BA has empty `radial_branches` field.")
         end
         A_matrix, ref_bus_positions = reduce_A_matrix(
             A,
@@ -506,11 +505,15 @@ function PTDF(
         axes = (bus_ax, line_ax)
         lookup = (make_ax_ref(bus_ax), make_ax_ref(line_ax))
     else
-        radial_branches = RadialBranches()
-        A_matrix = A.data
-        axes = (A.axes[2], A.axes[1])
-        lookup = (A.lookup[2], A.lookup[1])
-        ref_bus_positions = A.ref_bus_positions
+        if isempty(BA.radial_branches)
+            radial_branches = RadialBranches()
+            A_matrix = A.data
+            axes = (A.axes[2], A.axes[1])
+            lookup = (A.lookup[2], A.lookup[1])
+            ref_bus_positions = A.ref_bus_positions
+        else
+            error("Field `radial_branches` in BA must be empty if `reduce_radial_branches` is not true.")
+        end
     end
     S = _buildptdf_from_matrices(
         A_matrix,
