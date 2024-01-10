@@ -84,56 +84,55 @@ end
 
 @testset "Test LODF errors" begin
 
-        # load the system
-        sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    # load the system
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
 
-        # get A, BA and ABA matrix with radial branches
-        A = IncidenceMatrix(sys)
-        BA_rad = BA_Matrix(sys, ; reduce_radial_branches = true)
-        ABA = ABA_Matrix(sys; factorize = true)
-        ptdf = PTDF(sys)
-        ptdf_rad = PTDF(sys; reduce_radial_branches = true)
+    # get A, BA and ABA matrix with radial branches
+    A = IncidenceMatrix(sys)
+    BA_rad = BA_Matrix(sys, ; reduce_radial_branches = true)
+    ABA = ABA_Matrix(sys; factorize = true)
+    ptdf = PTDF(sys)
+    ptdf_rad = PTDF(sys; reduce_radial_branches = true)
 
-        # test LODF from A, ABA and BA
-        test_value = false
-        try
-            lodf_rad_A_BA_ABA = LODF(A, ABA, BA_rad; reduce_radial_branches = true)
-        catch err
-            if err isa Exception
-                test_value = true
-            end
+    # test LODF from A, ABA and BA
+    test_value = false
+    try
+        lodf_rad_A_BA_ABA = LODF(A, ABA, BA_rad; reduce_radial_branches = true)
+    catch err
+        if err isa Exception
+            test_value = true
         end
-        @test test_value
+    end
+    @test test_value
 
-        test_value = false
-        try
-            lodf_rad_A_BA_ABA = LODF(A, ABA, BA_rad)
-        catch err
-            if err isa Exception
-                test_value = true
-            end
+    test_value = false
+    try
+        lodf_rad_A_BA_ABA = LODF(A, ABA, BA_rad)
+    catch err
+        if err isa Exception
+            test_value = true
         end
-        @test test_value
+    end
+    @test test_value
 
-        # test LODF from A, PTDF
-        test_value = false
-        try
-            lodf_rad_A_PTDF = LODF(A_rad, ptdf; reduce_radial_branches = true)
-        catch err
-            if err isa Exception
-                test_value = true
-            end
+    # test LODF from A, PTDF
+    test_value = false
+    try
+        lodf_rad_A_PTDF = LODF(A_rad, ptdf; reduce_radial_branches = true)
+    catch err
+        if err isa Exception
+            test_value = true
         end
-        @test test_value
-        
-        test_value = false
-        try
-            lodf_rad_A_PTDF = LODF(A_rad, ptdf_rad)
-        catch err
-            if err isa Exception
-                test_value = true
-            end
-        end
-        @test test_value
+    end
+    @test test_value
 
+    test_value = false
+    try
+        lodf_rad_A_PTDF = LODF(A_rad, ptdf_rad)
+    catch err
+        if err isa Exception
+            test_value = true
+        end
+    end
+    @test test_value
 end

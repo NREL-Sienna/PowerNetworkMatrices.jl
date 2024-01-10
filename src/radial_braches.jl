@@ -233,7 +233,7 @@ end
 
 function isequal(
     rb1::RadialBranches,
-    rb2::RadialBranches
+    rb2::RadialBranches,
 )
     for field in fieldnames(typeof(rb1))
         if getfield(rb1, field) != getfield(rb2, field)
