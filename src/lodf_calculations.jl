@@ -379,7 +379,7 @@ function LODF(
         else
             error("PTDF has empty `radial_branches` field.")
         end
-        A_matrix, _ = reduce_A_matrix(
+        A_matrix = reduce_A_matrix(
             A,
             radial_branches.bus_reduction_map,
             radial_branches.meshed_branches,
@@ -455,7 +455,7 @@ function LODF(
         else
             error("Mismatch in `radial_branches` field between BA and ABA matrices.")
         end
-        A_matrix, _ = reduce_A_matrix(
+        A_matrix = reduce_A_matrix(
             A,
             radial_branches.bus_reduction_map,
             radial_branches.meshed_branches,
