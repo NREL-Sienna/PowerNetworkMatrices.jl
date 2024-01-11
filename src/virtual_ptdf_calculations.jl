@@ -42,6 +42,9 @@ matrix.
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
@@ -55,7 +58,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
-    radial_banches::RadialBranches
+    radial_branches::RadialBranches
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
@@ -68,13 +71,15 @@ end
 
 """
 Builds the PTDF matrix from a group of branches and buses. The return is a
-PTDF array indexed with the branch numbers.
+VirtualPTDF struct with an empty cache.
 
 # Arguments
 - `branches`:
         Vector of the system's AC branches.
 - `buses::Vector{PSY.ACBus}`:
         Vector of the system's buses.
+
+# Keyword Arguments
 - `dist_slack::Vector{Float64} = Float64[]`:
         Vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses.
@@ -84,9 +89,9 @@ PTDF array indexed with the branch numbers.
         max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
-- `reduce_radial_branches::Bool`:
-        True to reduce the network by simplifying the radial branches and mapping the
-        eliminate buses
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 function VirtualPTDF(
     branches,
@@ -95,7 +100,8 @@ function VirtualPTDF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
-    reduce_radial_branches::Bool = false)
+    radial_branches::RadialBranches = RadialBranches(),
+)
     if length(dist_slack) != 0
         @info "Distributed bus"
     end
@@ -114,7 +120,7 @@ function VirtualPTDF(
     subnetworks = find_subnetworks(M, bus_ax)
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
-        subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
+        subnetworks = assign_reference_buses(subnetworks, ref_bus_positions)
     end
     temp_data = zeros(length(bus_ax))
 
@@ -129,13 +135,6 @@ function VirtualPTDF(
                 init_persistent_dict,
                 length(bus_ax) * sizeof(Float64),
             )
-    end
-
-    if reduce_radial_branches
-        data, ref_bus_positions = calculate_A_matrix(branches, buses)
-        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
-    else
-        radial_branches = RadialBranches()
     end
 
     return VirtualPTDF(
@@ -157,13 +156,42 @@ end
 """
 Builds the Virtual PTDF matrix from a system. The return is a VirtualPTDF
 struct with an empty cache.
+
+# Arguments
+- `sys::PSY.System`:
+        PSY system for which the matrix is constructed
+
+# Keyword Arguments
+- `dist_slack::Vector{Float64}=Float64[]`:
+        vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buse
+- `reduce_radial_branches::Bool=false`:
+        if True the matrix will be evaluated discarding
+        all the radial branches and leaf buses (optional, default value is false)
+- `kwargs...`:
+        other keyword arguments used by VirtualPTDF
 """
 function VirtualPTDF(
-    sys::PSY.System; kwargs...)
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
-
-    return VirtualPTDF(branches, buses; kwargs...)
+    sys::PSY.System;
+    dist_slack::Vector{Float64} = Float64[],
+    reduce_radial_branches::Bool = false,
+    kwargs...,
+)
+    if reduce_radial_branches
+        A = IncidenceMatrix(sys)
+        dist_slack, rb = redistribute_dist_slack(dist_slack, A)
+    else
+        rb = RadialBranches()
+    end
+    branches = get_ac_branches(sys, rb.radial_branches)
+    buses = get_buses(sys, rb.bus_reduction_map)
+    return VirtualPTDF(
+        branches,
+        buses;
+        dist_slack = dist_slack,
+        radial_branches = rb,
+        kwargs...,
+    )
 end
 
 # Overload Base functions

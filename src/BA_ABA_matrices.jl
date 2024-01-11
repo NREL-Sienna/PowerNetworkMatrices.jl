@@ -3,7 +3,7 @@ Structure containing the BA matrix and other relevant data.
 
 # Arguments
 - `data::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        the transposed BA matrix coming from the product between the Incidence 
+        the transposed BA matrix coming from the product between the Incidence
         Matrix A and the Matrix of Susceptance B
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors, the first one contains the names of each
@@ -14,22 +14,38 @@ Structure containing the BA matrix and other relevant data.
         Tuple containing 2 Dictionaries mapping the number of rows and columns
         with the names of buses and branches
 - `ref_bus_positions::Set{Int}`:
-        Vector containing the indexes of the columns of the BA matrix corresponding
+        Set containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
+    radial_branches::RadialBranches
 end
 
 """
 Build the BA matrix from a given System
+
+# Arguments
+- `sys::PSY.System`:
+        PSY system for which the matrix is constructed
+- `reduce_radial_branches::Bool`:
+        if True the matrix is build considering radial branches removed from
+        the system
 """
-function BA_Matrix(sys::PSY.System)
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
+function BA_Matrix(sys::PSY.System; reduce_radial_branches::Bool = false)
+    if reduce_radial_branches
+        rb = RadialBranches(IncidenceMatrix(sys))
+    else
+        rb = RadialBranches()
+    end
+    branches = get_ac_branches(sys, rb.radial_branches)
+    buses = get_buses(sys, rb.bus_reduction_map)
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
     line_ax = [PSY.get_name(branch) for branch in branches]
@@ -37,7 +53,7 @@ function BA_Matrix(sys::PSY.System)
     axes = (bus_ax, line_ax)
     lookup = (make_ax_ref(bus_ax), make_ax_ref(line_ax))
     data = calculate_BA_matrix(branches, bus_lookup)
-    return BA_Matrix(data, axes, lookup, ref_bus_positions)
+    return BA_Matrix(data, axes, lookup, ref_bus_positions, rb)
 end
 
 """
@@ -48,7 +64,7 @@ Structure containing the ABA matrix and other relevant data.
         the ABA matrix coming from the product between the Incidence Matrix A and
         the Matrix BA.
 - `axes<:NTuple{2, Dict}`:
-        Tuple containing two identical vectors, both containing the number of 
+        Tuple containing two identical vectors, both containing the number of
         each bus of the network (each one related to a row/column of the Matrix
         in "data"), excluding the slack buses.
 - `lookup<:NTuple{2, Dict}`:
@@ -59,6 +75,9 @@ Structure containing the ABA matrix and other relevant data.
         to the refence buses
 - `K<:Union{Nothing, KLU.KLUFactorization{Float64, Int}}`:
         either nothing or a container for KLU factorization matrices (LU factorization)
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 struct ABA_Matrix{
     Ax,
@@ -70,6 +89,7 @@ struct ABA_Matrix{
     lookup::L
     ref_bus_positions::Set{Int}
     K::F
+    radial_branches::RadialBranches
 end
 
 """
@@ -82,9 +102,19 @@ Builds the ABA matrix from a System
 # Keyword arguments
 - `factorize`: if true populates ABA_Matrix.K with KLU factorization matrices
 """
-function ABA_Matrix(sys::PSY.System; factorize = false)
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
+function ABA_Matrix(
+    sys::PSY.System;
+    factorize = false,
+    reduce_radial_branches::Bool = false,
+)
+    if reduce_radial_branches
+        rb = RadialBranches(IncidenceMatrix(sys))
+    else
+        rb = RadialBranches()
+    end
+
+    branches = get_ac_branches(sys, rb.radial_branches)
+    buses = get_buses(sys, rb.bus_reduction_map)
     bus_lookup = make_ax_ref(buses)
 
     A, ref_bus_positions = calculate_A_matrix(branches, buses)
@@ -107,6 +137,7 @@ function ABA_Matrix(sys::PSY.System; factorize = false)
         lookup,
         ref_bus_positions,
         K,
+        rb,
     )
 end
 
@@ -124,6 +155,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.lookup),
         deepcopy(ABA.ref_bus_positions),
         klu(ABA.data),
+        deepcopy(ABA.radial_branches),
     )
     return ABA_lu
 end
@@ -149,7 +181,7 @@ function Base.getindex(
     return A.data[bus_number, line_number]
 end
 
-# get_index functions: ABA_Matrix stores a square matrix whose number of rows 
+# get_index functions: ABA_Matrix stores a square matrix whose number of rows
 # and column is equal to the number of the system's buses minus the slack ones,
 # NOTE: bus_1, bus_2 are bus numbers not row and column indices!
 function Base.getindex(A::ABA_Matrix, bus_1, bus_2)
