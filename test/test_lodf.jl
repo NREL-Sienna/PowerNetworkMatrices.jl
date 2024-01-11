@@ -57,8 +57,10 @@
 
     # test if error is thrown in case `tol` is defined in PTDF
     P5 = PTDF(sys5; tol = 1e-3)
-    test_value = false
-    @test_throws ErrorException L5NS_from_ptdf = LODF(A, P5)
+    @test_logs (
+        :warn,
+        "The argument `tol` in the PTDF matrix was set to a value different than the default one.\nThe resulting LODF can include unexpected rounding errors.\n",
+    ) match_mode = :any LODF(A, P5)
 
     # get 14 bus system
     buses_14 = nodes14()

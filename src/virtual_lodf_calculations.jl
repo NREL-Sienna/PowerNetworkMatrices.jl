@@ -38,6 +38,9 @@ The VirtualLODF struct is indexed using branch names.
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
@@ -52,7 +55,7 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
-    radial_banches::RadialBranches
+    radial_branches::RadialBranches
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
@@ -91,22 +94,64 @@ function _get_PTDF_A_diag(
     return diag_
 end
 
-function VirtualLODF(
-    sys::PSY.System; kwargs...,
-)
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
+"""
+Builds the Virtual LODF matrix from a system. The return is a VirtualLODF
+struct with an empty cache.
 
-    return VirtualLODF(branches, buses; kwargs...)
+# Arguments
+- `sys::PSY.System`:
+        PSY system for which the matrix is constructed
+
+# Keyword Arguments
+- `reduce_radial_branches::Bool=false`:
+        if True the matrix will be evaluated discarding
+        all the radial branches and leaf buses (optional, default value is false)
+- `kwargs...`:
+        other keyword arguments used by VirtualPTDF
+"""
+function VirtualLODF(
+    sys::PSY.System;
+    reduce_radial_branches::Bool = false,
+    kwargs...,
+)
+    if reduce_radial_branches
+        rb = RadialBranches(IncidenceMatrix(sys))
+    else
+        rb = RadialBranches()
+    end
+    branches = get_ac_branches(sys, rb.radial_branches)
+    buses = get_buses(sys, rb.bus_reduction_map)
+    return VirtualLODF(branches, buses; radial_branches = rb, kwargs...)
 end
 
+"""
+Builds the LODF matrix from a group of branches and buses. The return is a
+VirtualLODF struct with an empty cache.
+
+# Arguments
+- `branches`:
+        Vector of the system's AC branches.
+- `buses::Vector{PSY.ACBus}`:
+        Vector of the system's buses.
+
+# Keyword Arguments
+- `tol::Float64 = eps()`:
+        Tolerance related to sparsification and values to drop.
+- `max_cache_size::Int`:
+        max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
+- `persistent_lines::Vector{String}`:
+        line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
+"""
 function VirtualLODF(
     branches,
     buses::Vector{PSY.ACBus};
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
-    reduce_radial_branches::Bool = false,
+    radial_branches::RadialBranches = RadialBranches(),
 )
 
     #Get axis names and lookups
@@ -126,7 +171,7 @@ function VirtualLODF(
     # check subnetworks
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
-        subnetworks = assing_reference_buses(subnetworks, ref_bus_positions)
+        subnetworks = assign_reference_buses(subnetworks, ref_bus_positions)
     end
     # get diagonal of PTDF
     temp_data = zeros(length(bus_ax))
@@ -151,13 +196,6 @@ function VirtualLODF(
                 length(bus_ax) * sizeof(Float64),
             )
     end
-    if reduce_radial_branches
-        data, ref_bus_positions = calculate_A_matrix(branches, buses)
-        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
-    else
-        radial_branches = RadialBranches()
-    end
-
     return VirtualLODF(
         K,
         BA,

@@ -21,5 +21,5 @@ by the reference bus of the subnetworks if they exist
 """
 function find_subnetworks(sys::PSY.System)
     sbn, ref_bus_positions = _find_subnetworks(sys)
-    return assing_reference_buses(sbn, ref_bus_positions)
+    return assign_reference_buses(sbn, ref_bus_positions)
 end

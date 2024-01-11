@@ -14,6 +14,9 @@ of how a change in a line's flow affects the flows on other lines in the system.
 - `tol::Base.RefValue{Float64}`:
         tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the matrix
 """
 struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
        PowerNetworkMatrix{Float64}
@@ -21,7 +24,7 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     axes::Ax
     lookup::L
     tol::Base.RefValue{Float64}
-    radial_banches::RadialBranches
+    radial_branches::RadialBranches
 end
 
 function _buildlodf(
@@ -257,22 +260,24 @@ Builds the LODF matrix given the data of branches and buses of the system.
         vector of the System AC branches
 - `buses::Vector{PSY.ACBus}`:
         vector of the System buses
+
+# Keyword Arguments
 - `linear_solver`::String
         linear solver to use for matrix evaluation.
         Available options: "KLU", "Dense" (OpenBLAS) or "MKLPardiso".
         Default solver: "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps())
-- `reduce_radial_branches::Bool`:
-        True to reduce the network by simplifying the radial branches and mapping the
-        eliminate buses
+- `radial_branches::RadialBranches`:
+        Structure containing the radial branches and leaf buses that were removed
+        while evaluating the ma
 """
 function LODF(
     branches,
     buses::Vector{PSY.ACBus};
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = false,
+    radial_branches::RadialBranches = RadialBranches(),
 )
 
     # get axis names
@@ -284,12 +289,6 @@ function LODF(
     bus_lookup = make_ax_ref(bus_ax)
     # get network matrices
     ptdf_t, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, Float64[])
-    if reduce_radial_branches
-        data, ref_bus_positions = calculate_A_matrix(branches, buses)
-        radial_branches = RadialBranches(data, bus_lookup, line_map, ref_bus_positions)
-    else
-        radial_branches = RadialBranches()
-    end
 
     if tol > eps()
         lodf_t = _buildlodf(a, ptdf_t, linear_solver)
@@ -307,18 +306,30 @@ end
 
 """
 Builds the LODF matrix from a system.
+Note that `reduce_radial_branches` kwargs is explicitly mentioned because needed inside of the function.
 
 # Arguments
 - `sys::PSY.System`:
         Power Systems system
+
+# Keyword Arguments
+- `reduce_radial_branches::Bool=false`:
+        if True the matrix will be evaluated discarding
+        all the radial branches and leaf buses (optional, default value is false)
 """
 function LODF(
     sys::PSY.System;
+    reduce_radial_branches::Bool = false,
     kwargs...,
 )
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
-    return LODF(branches, buses; kwargs...)
+    if reduce_radial_branches
+        rb = RadialBranches(IncidenceMatrix(sys))
+    else
+        rb = RadialBranches()
+    end
+    branches = get_ac_branches(sys, rb.radial_branches)
+    buses = get_buses(sys, rb.bus_reduction_map)
+    return LODF(branches, buses; radial_branches = rb, kwargs...)
 end
 
 """
@@ -346,25 +357,48 @@ function LODF(
     PTDFm::PTDF;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = true,
+    reduce_radial_branches::Bool = false,
 )
     validate_linear_solver(linear_solver)
 
     if PTDFm.tol.x > 1e-15
-        err_msg = string(
-            "The argument `tol` in the PTDF matrix was set to a value dirrent than the default one.\n",
-            "The PTDF matrix used as input of the LODF matrix must have the default `tol` value.\n",
+        warn_msg = string(
+            "The argument `tol` in the PTDF matrix was set to a value different than the default one.\n",
+            "The resulting LODF can include unexpected rounding errors.\n",
         )
-        error(err_msg)
-    end
-    if reduce_radial_branches
-        radial_branches = RadialBranches(A)
+        @warn(warn_msg)
+        PTDFm_data = Matrix(PTDFm.data)
     else
-        radial_branches = RadialBranches()
+        PTDFm_data = PTDFm.data
     end
-    ax_ref = make_ax_ref(A.axes[1])
+
+    if reduce_radial_branches
+        if !isempty(PTDFm.radial_branches)
+            radial_branches = PTDFm.radial_branches
+            @info "Non-empty `radial_branches` field found in PTDF matrix. LODF is evaluated considering radial branches and leaf nodes removed."
+        else
+            error("PTDF has empty `radial_branches` field.")
+        end
+        A_matrix = reduce_A_matrix(
+            A,
+            radial_branches.bus_reduction_map,
+            radial_branches.meshed_branches,
+        )
+        ax_ref = make_ax_ref(sort!(collect(radial_branches.meshed_branches)))
+    else
+        if isempty(PTDFm.radial_branches)
+            radial_branches = RadialBranches()
+            A_matrix = A.data
+            ax_ref = make_ax_ref(A.axes[1])
+        else
+            error(
+                "Field `radial_branches` in PTDF must be empty if `reduce_radial_branches` is not true.",
+            )
+        end
+    end
+
     if tol > eps()
-        lodf_t = _buildlodf(A.data, PTDFm.data, linear_solver)
+        lodf_t = _buildlodf(A_matrix, PTDFm_data, linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
             (A.axes[1], A.axes[1]),
@@ -374,7 +408,7 @@ function LODF(
         )
     end
     return LODF(
-        _buildlodf(A.data, PTDFm.data, linear_solver),
+        _buildlodf(A_matrix, PTDFm_data, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
@@ -413,13 +447,33 @@ function LODF(
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
     if reduce_radial_branches
-        radial_branches = RadialBranches(A)
+        # BA and ABA must contain the same, non-empty RadialBranches stucture
+        if !isempty(BA.radial_branches) && !isempty(ABA.radial_branches) &&
+           isequal(BA.radial_branches, ABA.radial_branches)
+            radial_branches = BA.radial_branches
+            @info "Non-empty `radial_branches` field found in BA and ABA matrix. LODF is evaluated considering radial branches and leaf nodes removed."
+        else
+            error("Mismatch in `radial_branches` field between BA and ABA matrices.")
+        end
+        A_matrix = reduce_A_matrix(
+            A,
+            radial_branches.bus_reduction_map,
+            radial_branches.meshed_branches,
+        )
     else
-        radial_branches = RadialBranches()
+        # BA and ABA must contain the same, empty RadialBranches stucture
+        if isempty(BA.radial_branches) && isempty(ABA.radial_branches)
+            radial_branches = RadialBranches()
+            A_matrix = A.data
+        else
+            error(
+                "Field `radial_branches` in BA and ABA must be empty if `reduce_radial_branches` is not true.",
+            )
+        end
     end
+
     if tol > eps()
-        lodf_t = _buildlodf(A.data, ABA.K, BA.data,
-            A.ref_bus_positions, linear_solver)
+        lodf_t = _buildlodf(A_matrix, ABA.K, BA.data, A.ref_bus_positions, linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
             (A.axes[1], A.axes[1]),
@@ -429,7 +483,7 @@ function LODF(
         )
     end
     return LODF(
-        _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
+        _buildlodf(A_matrix, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
