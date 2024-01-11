@@ -495,7 +495,7 @@ function PTDF(
         else
             error("BA has empty `radial_branches` field.")
         end
-        A_matrix, _ = reduce_A_matrix(
+        A_matrix = reduce_A_matrix(
             A,
             radial_branches.bus_reduction_map,
             radial_branches.meshed_branches,
