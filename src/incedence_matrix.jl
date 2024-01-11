@@ -76,8 +76,5 @@ function reduce_A_matrix(
 )
     branch_ixs = sort!([A.lookup[1][k] for k in meshed_branches])
     bus_ixs = sort!([A.lookup[2][k] for k in keys(bus_reduction_map)])
-    ref_buses = [k for (k, v) in A.lookup[2] if v in A.ref_bus_positions]
-    ref_bus_positions =
-        Set{Int}(A.lookup[2][i] for i in ref_buses if A.lookup[2][i] in bus_ixs)
-    return A.data[branch_ixs, bus_ixs], ref_bus_positions
+    return A.data[branch_ixs, bus_ixs]
 end
