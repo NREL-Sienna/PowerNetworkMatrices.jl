@@ -227,6 +227,17 @@ function get_mapped_bus_number(rb::RadialNetworkReduction, bus_number::Int)
     return get(rb.reverse_bus_search_map, bus_number, bus_number)
 end
 
+"""
+Interface to obtain the parent bus number of a reduced bus when radial branches are eliminated
+
+# Arguments
+- `rb::RadialNetworkReduction`: RadialNetworkReduction object
+- `bus::ACBus`: Reduced bus
+"""
+function get_mapped_bus_number(rb::RadialNetworkReduction, bus::PSY.ACBus)
+    return get_mapped_bus_number(rb, PSY.get_number(bus))
+end
+
 ##############################################################################
 ########################### Auxiliary functions ##############################
 ##############################################################################
