@@ -27,8 +27,8 @@ end
         # load the system
         sys = PSB.build_system(PSB.PSITestSystems, name)
 
-        # get the RadialBranches struct
-        rb = RadialBranches(IncidenceMatrix(sys))
+        # get the RadialNetworkReduction struct
+        rb = RadialNetworkReduction(IncidenceMatrix(sys))
 
         # get the original and reduced IncidenceMatrix, BA and ABA
         A = IncidenceMatrix(sys)

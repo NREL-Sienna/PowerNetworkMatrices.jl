@@ -14,7 +14,7 @@ of how a change in a line's flow affects the flows on other lines in the system.
 - `tol::Base.RefValue{Float64}`:
         tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
-- `radial_branches::RadialBranches`:
+- `radial_branches::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -24,7 +24,7 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     axes::Ax
     lookup::L
     tol::Base.RefValue{Float64}
-    radial_branches::RadialBranches
+    radial_branches::RadialNetworkReduction
 end
 
 function _buildlodf(
@@ -268,7 +268,7 @@ Builds the LODF matrix given the data of branches and buses of the system.
         Default solver: "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps())
-- `radial_branches::RadialBranches`:
+- `radial_branches::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the ma
 """
@@ -277,7 +277,7 @@ function LODF(
     buses::Vector{PSY.ACBus};
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    radial_branches::RadialBranches = RadialBranches(),
+    radial_branches::RadialNetworkReduction = RadialNetworkReduction(),
 )
 
     # get axis names
@@ -323,9 +323,9 @@ function LODF(
     kwargs...,
 )
     if reduce_radial_branches
-        rb = RadialBranches(IncidenceMatrix(sys))
+        rb = RadialNetworkReduction(IncidenceMatrix(sys))
     else
-        rb = RadialBranches()
+        rb = RadialNetworkReduction()
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
@@ -387,7 +387,7 @@ function LODF(
         ax_ref = make_ax_ref(sort!(collect(radial_branches.meshed_branches)))
     else
         if isempty(PTDFm.radial_branches)
-            radial_branches = RadialBranches()
+            radial_branches = RadialNetworkReduction()
             A_matrix = A.data
             ax_ref = make_ax_ref(A.axes[1])
         else
@@ -447,7 +447,7 @@ function LODF(
     validate_linear_solver(linear_solver)
     ax_ref = make_ax_ref(A.axes[1])
     if reduce_radial_branches
-        # BA and ABA must contain the same, non-empty RadialBranches stucture
+        # BA and ABA must contain the same, non-empty RadialNetworkReduction stucture
         if !isempty(BA.radial_branches) && !isempty(ABA.radial_branches) &&
            isequal(BA.radial_branches, ABA.radial_branches)
             radial_branches = BA.radial_branches
@@ -461,9 +461,9 @@ function LODF(
             radial_branches.meshed_branches,
         )
     else
-        # BA and ABA must contain the same, empty RadialBranches stucture
+        # BA and ABA must contain the same, empty RadialNetworkReduction stucture
         if isempty(BA.radial_branches) && isempty(ABA.radial_branches)
-            radial_branches = RadialBranches()
+            radial_branches = RadialNetworkReduction()
             A_matrix = A.data
         else
             error(

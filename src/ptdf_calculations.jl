@@ -21,7 +21,7 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
 - `tol::Base.RefValue{Float64}`:
         tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
-- `radial_branches::RadialBranches`:
+- `radial_branches::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -33,7 +33,7 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     subnetworks::Dict{Int, Set{Int}}
     ref_bus_positions::Set{Int}
     tol::Base.RefValue{Float64}
-    radial_branches::RadialBranches
+    radial_branches::RadialNetworkReduction
 end
 
 """
@@ -377,7 +377,7 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
         Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
 - `tol::Float64`:
         Tolerance to eliminate entries in the PTDF matrix (default eps())
-- `radial_branches::RadialBranches`:
+- `radial_branches::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the ma
 """
@@ -387,7 +387,7 @@ function PTDF(
     dist_slack::Vector{Float64} = Float64[],
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    radial_branches::RadialBranches = RadialBranches(),
+    radial_branches::RadialNetworkReduction = RadialNetworkReduction(),
 )
     validate_linear_solver(linear_solver)
 
@@ -450,7 +450,7 @@ function PTDF(
         A = IncidenceMatrix(sys)
         dist_slack, rb = redistribute_dist_slack(dist_slack, A)
     else
-        rb = RadialBranches()
+        rb = RadialNetworkReduction()
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
@@ -504,7 +504,7 @@ function PTDF(
         lookup = BA.lookup
     else
         if isempty(BA.radial_branches)
-            radial_branches = RadialBranches()
+            radial_branches = RadialNetworkReduction()
             A_matrix = A.data
             axes = (A.axes[2], A.axes[1])
             lookup = (A.lookup[2], A.lookup[1])
@@ -583,7 +583,7 @@ function redistribute_dist_slack(
     A::IncidenceMatrix,
 )
     dist_slack1 = deepcopy(dist_slack)
-    rb = RadialBranches(A)
+    rb = RadialNetworkReduction(A)
     # if original length of dist_slack is correct
     if length(dist_slack) == size(A.data, 2)
         for i in keys(rb.bus_reduction_map)

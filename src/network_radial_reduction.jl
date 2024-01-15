@@ -1,16 +1,16 @@
-struct RadialBranches
+struct RadialNetworkReduction
     bus_reduction_map::Dict{Int, Set{Int}}
     reverse_bus_search_map::Dict{Int, Int}
     radial_branches::Set{String}
     meshed_branches::Set{String}
 end
 
-get_bus_reduction_map(rb::RadialBranches) = rb.bus_reduction_map
-get_reverse_bus_search_map(rb::RadialBranches) = rb.reverse_bus_search_map
-get_radial_branches(rb::RadialBranches) = rb.radial_branches
-get_meshed_branches(rb::RadialBranches) = rb.meshed_branches
+get_bus_reduction_map(rb::RadialNetworkReduction) = rb.bus_reduction_map
+get_reverse_bus_search_map(rb::RadialNetworkReduction) = rb.reverse_bus_search_map
+get_radial_branches(rb::RadialNetworkReduction) = rb.radial_branches
+get_meshed_branches(rb::RadialNetworkReduction) = rb.meshed_branches
 
-function Base.isempty(rb::RadialBranches)
+function Base.isempty(rb::RadialNetworkReduction)
     if !isempty(rb.bus_reduction_map)
         return false
     end
@@ -25,12 +25,12 @@ function Base.isempty(rb::RadialBranches)
     return true
 end
 
-function RadialBranches(;
+function RadialNetworkReduction(;
     bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}(),
     radial_branches::Set{String} = Set{String}(),
     meshed_branches::Set{String} = Set{String}())
-    return RadialBranches(
+    return RadialNetworkReduction(
         bus_reduction_map,
         reverse_bus_search_map,
         radial_branches,
@@ -46,7 +46,7 @@ ignored in the models.
 - `A::IncidenceMatrix`: IncidenceMatrix
 
 """
-function RadialBranches(A::IncidenceMatrix)
+function RadialNetworkReduction(A::IncidenceMatrix)
     return calculate_radial_branches(A.data, A.lookup[1], A.lookup[2], A.ref_bus_positions)
 end
 
@@ -58,8 +58,8 @@ ignored in the models.
 - `sys::PSY.System`: System Data
 """
 
-function RadialBranches(sys::PSY.System)
-    return RadialBranches(IncidenceMatrix(sys))
+function RadialNetworkReduction(sys::PSY.System)
+    return RadialNetworkReduction(IncidenceMatrix(sys))
 end
 
 function _find_upstream_bus(
@@ -205,7 +205,7 @@ function calculate_radial_branches(
         end
         push!(meshed_branches, k)
     end
-    return RadialBranches(
+    return RadialNetworkReduction(
         bus_reduction_map_index,
         reverse_bus_search_map,
         radial_branches,
@@ -217,10 +217,10 @@ end
 Interface to obtain the parent bus number of a reduced bus when radial branches are eliminated
 
 # Arguments
-- `rb::RadialBranches`: RadialBranches object
+- `rb::RadialNetworkReduction`: RadialNetworkReduction object
 - `bus_number::Int`: Bus number of the reduced bus
 """
-function get_mapped_bus_number(rb::RadialBranches, bus_number::Int)
+function get_mapped_bus_number(rb::RadialNetworkReduction, bus_number::Int)
     if isempty(rb)
         return bus_number
     end
@@ -232,8 +232,8 @@ end
 ##############################################################################
 
 function isequal(
-    rb1::RadialBranches,
-    rb2::RadialBranches,
+    rb1::RadialNetworkReduction,
+    rb2::RadialNetworkReduction,
 )
     for field in fieldnames(typeof(rb1))
         if getfield(rb1, field) != getfield(rb2, field)
