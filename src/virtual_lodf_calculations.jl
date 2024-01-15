@@ -38,7 +38,7 @@ The VirtualLODF struct is indexed using branch names.
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
-- `radial_branches::RadialBranches`:
+- `radial_branches::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -55,7 +55,7 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
-    radial_branches::RadialBranches
+    radial_branches::RadialNetworkReduction
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
@@ -115,9 +115,9 @@ function VirtualLODF(
     kwargs...,
 )
     if reduce_radial_branches
-        rb = RadialBranches(IncidenceMatrix(sys))
+        rb = RadialNetworkReduction(IncidenceMatrix(sys))
     else
-        rb = RadialBranches()
+        rb = RadialNetworkReduction()
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
@@ -141,7 +141,7 @@ VirtualLODF struct with an empty cache.
         max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
-- `radial_branches::RadialBranches`:
+- `radial_branches::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -151,7 +151,7 @@ function VirtualLODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
-    radial_branches::RadialBranches = RadialBranches(),
+    radial_branches::RadialNetworkReduction = RadialNetworkReduction(),
 )
 
     #Get axis names and lookups

@@ -16,7 +16,7 @@ Structure containing the BA matrix and other relevant data.
 - `ref_bus_positions::Set{Int}`:
         Set containing the indexes of the columns of the BA matrix corresponding
         to the refence buses
-- `radial_branches::RadialBranches`:
+- `radial_branches::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -25,7 +25,7 @@ struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
-    radial_branches::RadialBranches
+    radial_branches::RadialNetworkReduction
 end
 
 """
@@ -40,9 +40,9 @@ Build the BA matrix from a given System
 """
 function BA_Matrix(sys::PSY.System; reduce_radial_branches::Bool = false)
     if reduce_radial_branches
-        rb = RadialBranches(IncidenceMatrix(sys))
+        rb = RadialNetworkReduction(IncidenceMatrix(sys))
     else
-        rb = RadialBranches()
+        rb = RadialNetworkReduction()
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
@@ -75,7 +75,7 @@ Structure containing the ABA matrix and other relevant data.
         to the refence buses
 - `K<:Union{Nothing, KLU.KLUFactorization{Float64, Int}}`:
         either nothing or a container for KLU factorization matrices (LU factorization)
-- `radial_branches::RadialBranches`:
+- `radial_branches::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -89,7 +89,7 @@ struct ABA_Matrix{
     lookup::L
     ref_bus_positions::Set{Int}
     K::F
-    radial_branches::RadialBranches
+    radial_branches::RadialNetworkReduction
 end
 
 """
@@ -108,9 +108,9 @@ function ABA_Matrix(
     reduce_radial_branches::Bool = false,
 )
     if reduce_radial_branches
-        rb = RadialBranches(IncidenceMatrix(sys))
+        rb = RadialNetworkReduction(IncidenceMatrix(sys))
     else
-        rb = RadialBranches()
+        rb = RadialNetworkReduction()
     end
 
     branches = get_ac_branches(sys, rb.radial_branches)
