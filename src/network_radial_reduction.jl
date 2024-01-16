@@ -166,7 +166,7 @@ ignored in the models by exploring the structure of the incidence matrix
 - `bus_map::Dict{Int, Int}`: Map of Bus Name to Matrix Index
 - `ref_bus_positions::Set{Int}`:
         Set containing the indexes of the columns of the BA matrix corresponding
-        to the refence buses
+        to the reference buses
 """
 function calculate_radial_branches(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
