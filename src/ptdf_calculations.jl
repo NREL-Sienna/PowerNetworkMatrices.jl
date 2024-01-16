@@ -21,7 +21,7 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
 - `tol::Base.RefValue{Float64}`:
         tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
-- `radial_branches::RadialBranches`:
+- `radial_network_reduction::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -33,7 +33,7 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     subnetworks::Dict{Int, Set{Int}}
     ref_bus_positions::Set{Int}
     tol::Base.RefValue{Float64}
-    radial_branches::RadialBranches
+    radial_network_reduction::RadialNetworkReduction
 end
 
 """
@@ -377,7 +377,7 @@ Builds the PTDF matrix from a group of branches and buses. The return is a PTDF 
         Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
 - `tol::Float64`:
         Tolerance to eliminate entries in the PTDF matrix (default eps())
-- `radial_branches::RadialBranches`:
+- `radial_network_reduction::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the ma
 """
@@ -387,7 +387,7 @@ function PTDF(
     dist_slack::Vector{Float64} = Float64[],
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    radial_branches::RadialBranches = RadialBranches(),
+    radial_network_reduction::RadialNetworkReduction = RadialNetworkReduction(),
 )
     validate_linear_solver(linear_solver)
 
@@ -418,10 +418,18 @@ function PTDF(
             subnetworks,
             ref_bus_positions,
             Ref(tol),
-            radial_branches,
+            radial_network_reduction,
         )
     end
-    return PTDF(S, axes, look_up, subnetworks, ref_bus_positions, Ref(tol), radial_branches)
+    return PTDF(
+        S,
+        axes,
+        look_up,
+        subnetworks,
+        ref_bus_positions,
+        Ref(tol),
+        radial_network_reduction,
+    )
 end
 
 """
@@ -450,11 +458,17 @@ function PTDF(
         A = IncidenceMatrix(sys)
         dist_slack, rb = redistribute_dist_slack(dist_slack, A)
     else
-        rb = RadialBranches()
+        rb = RadialNetworkReduction()
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
-    return PTDF(branches, buses; dist_slack = dist_slack, radial_branches = rb, kwargs...)
+    return PTDF(
+        branches,
+        buses;
+        dist_slack = dist_slack,
+        radial_network_reduction = rb,
+        kwargs...,
+    )
 end
 
 """
@@ -489,22 +503,22 @@ function PTDF(
     validate_linear_solver(linear_solver)
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
     if reduce_radial_branches
-        if !isempty(BA.radial_branches)
-            radial_branches = BA.radial_branches
+        if !isempty(BA.radial_network_reduction)
+            radial_network_reduction = BA.radial_network_reduction
             @info "Non-empty `radial_branches` field found in BA matrix. PTDF is evaluated considering radial branches and leaf nodes removed."
         else
             error("BA has empty `radial_branches` field.")
         end
         A_matrix = reduce_A_matrix(
             A,
-            radial_branches.bus_reduction_map,
-            radial_branches.meshed_branches,
+            radial_network_reduction.bus_reduction_map,
+            radial_network_reduction.meshed_branches,
         )
         axes = BA.axes
         lookup = BA.lookup
     else
-        if isempty(BA.radial_branches)
-            radial_branches = RadialBranches()
+        if isempty(BA.radial_network_reduction)
+            radial_network_reduction = RadialNetworkReduction()
             A_matrix = A.data
             axes = (A.axes[2], A.axes[1])
             lookup = (A.lookup[2], A.lookup[1])
@@ -529,7 +543,7 @@ function PTDF(
             Dict{Int, Set{Int}}(),
             BA.ref_bus_positions,
             Ref(tol),
-            radial_branches,
+            radial_network_reduction,
         )
     else
         return PTDF(
@@ -539,7 +553,7 @@ function PTDF(
             Dict{Int, Set{Int}}(),
             BA.ref_bus_positions,
             Ref(tol),
-            radial_branches,
+            radial_network_reduction,
         )
     end
 end
@@ -583,7 +597,7 @@ function redistribute_dist_slack(
     A::IncidenceMatrix,
 )
     dist_slack1 = deepcopy(dist_slack)
-    rb = RadialBranches(A)
+    rb = RadialNetworkReduction(A)
     # if original length of dist_slack is correct
     if length(dist_slack) == size(A.data, 2)
         for i in keys(rb.bus_reduction_map)

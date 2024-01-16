@@ -204,7 +204,7 @@ Evaluates the transposed BA matrix given the System's banches, reference bus pos
         vector containing the branches of the considered system (should be AC branches).
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
-        to the refence buses
+        to the reference buses
 - `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the bus numbers with their enumerated indexes.
 """

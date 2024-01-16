@@ -17,7 +17,7 @@
         lodf_rad_A_BA_ABA = LODF(A_rad, ABA_rad, BA_rad; reduce_radial_branches = true)
         lodf_rad_A_PTDF = LODF(A_rad, ptdf_rad; reduce_radial_branches = true)
 
-        rb = RadialBranches(IncidenceMatrix(sys))
+        rb = RadialNetworkReduction(IncidenceMatrix(sys))
 
         # at first check if all the matrices are the same
         @test isapprox(lodf_rad.data, lodf_rad_A_BA_ABA.data, atol = 1e-10)

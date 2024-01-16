@@ -83,7 +83,15 @@ function from_hdf5(::Type{PTDF}, filename::AbstractString)
             subnetworks[key] = Set(subnetworks_matrix[:, col])
         end
 
-        PTDF(data, axes, lookup, subnetworks, ref_bus_positions, tol, RadialBranches())
+        PTDF(
+            data,
+            axes,
+            lookup,
+            subnetworks,
+            ref_bus_positions,
+            tol,
+            RadialNetworkReduction(),
+        )
     end
 end
 
