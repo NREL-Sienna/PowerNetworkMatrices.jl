@@ -14,7 +14,7 @@ of how a change in a line's flow affects the flows on other lines in the system.
 - `tol::Base.RefValue{Float64}`:
         tolerance used for sparsifying the matrix (dropping element whose
         absolute value is below this threshold).
-- `radial_branches::RadialNetworkReduction`:
+- `radial_network_reduction::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -24,7 +24,7 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     axes::Ax
     lookup::L
     tol::Base.RefValue{Float64}
-    radial_branches::RadialNetworkReduction
+    radial_network_reduction::RadialNetworkReduction
 end
 
 function _buildlodf(
@@ -268,7 +268,7 @@ Builds the LODF matrix given the data of branches and buses of the system.
         Default solver: "KLU".
 - `tol::Float64`:
         Tolerance to eliminate entries in the LODF matrix (default eps())
-- `radial_branches::RadialNetworkReduction`:
+- `radial_network_reduction::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the ma
 """
@@ -277,7 +277,7 @@ function LODF(
     buses::Vector{PSY.ACBus};
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    radial_branches::RadialNetworkReduction = RadialNetworkReduction(),
+    radial_network_reduction::RadialNetworkReduction = RadialNetworkReduction(),
 )
 
     # get axis names
@@ -292,14 +292,20 @@ function LODF(
 
     if tol > eps()
         lodf_t = _buildlodf(a, ptdf_t, linear_solver)
-        return LODF(sparsify(lodf_t, tol), axes, look_up, Ref(tol), radial_branches)
+        return LODF(
+            sparsify(lodf_t, tol),
+            axes,
+            look_up,
+            Ref(tol),
+            radial_network_reduction,
+        )
     else
         return LODF(
             _buildlodf(a, ptdf_t, linear_solver),
             axes,
             look_up,
             Ref(tol),
-            radial_branches,
+            radial_network_reduction,
         )
     end
 end
@@ -329,7 +335,7 @@ function LODF(
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
-    return LODF(branches, buses; radial_branches = rb, kwargs...)
+    return LODF(branches, buses; radial_network_reduction = rb, kwargs...)
 end
 
 """
@@ -373,26 +379,26 @@ function LODF(
     end
 
     if reduce_radial_branches
-        if !isempty(PTDFm.radial_branches)
-            radial_branches = PTDFm.radial_branches
-            @info "Non-empty `radial_branches` field found in PTDF matrix. LODF is evaluated considering radial branches and leaf nodes removed."
+        if !isempty(PTDFm.radial_network_reduction)
+            radial_network_reduction = PTDFm.radial_network_reduction
+            @info "Non-empty `radial_network_reduction` field found in PTDF matrix. LODF is evaluated considering radial branches and leaf nodes removed."
         else
-            error("PTDF has empty `radial_branches` field.")
+            error("PTDF has empty `radial_network_reduction` field.")
         end
         A_matrix = reduce_A_matrix(
             A,
-            radial_branches.bus_reduction_map,
-            radial_branches.meshed_branches,
+            radial_network_reduction.bus_reduction_map,
+            radial_network_reduction.meshed_branches,
         )
-        ax_ref = make_ax_ref(sort!(collect(radial_branches.meshed_branches)))
+        ax_ref = make_ax_ref(sort!(collect(radial_network_reduction.meshed_branches)))
     else
-        if isempty(PTDFm.radial_branches)
-            radial_branches = RadialNetworkReduction()
+        if isempty(PTDFm.radial_network_reduction)
+            radial_network_reduction = RadialNetworkReduction()
             A_matrix = A.data
             ax_ref = make_ax_ref(A.axes[1])
         else
             error(
-                "Field `radial_branches` in PTDF must be empty if `reduce_radial_branches` is not true.",
+                "Field `radial_network_reduction` in PTDF must be empty if `reduce_radial_network_reduction` is not true.",
             )
         end
     end
@@ -404,7 +410,7 @@ function LODF(
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
             Ref(tol),
-            radial_branches,
+            radial_network_reduction,
         )
     end
     return LODF(
@@ -412,7 +418,7 @@ function LODF(
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
-        radial_branches,
+        radial_network_reduction,
     )
 end
 
@@ -448,22 +454,23 @@ function LODF(
     ax_ref = make_ax_ref(A.axes[1])
     if reduce_radial_branches
         # BA and ABA must contain the same, non-empty RadialNetworkReduction stucture
-        if !isempty(BA.radial_branches) && !isempty(ABA.radial_branches) &&
-           isequal(BA.radial_branches, ABA.radial_branches)
-            radial_branches = BA.radial_branches
+        if !isempty(BA.radial_network_reduction) &&
+           !isempty(ABA.radial_network_reduction) &&
+           isequal(BA.radial_network_reduction, ABA.radial_network_reduction)
+            radial_network_reduction = BA.radial_network_reduction
             @info "Non-empty `radial_branches` field found in BA and ABA matrix. LODF is evaluated considering radial branches and leaf nodes removed."
         else
             error("Mismatch in `radial_branches` field between BA and ABA matrices.")
         end
         A_matrix = reduce_A_matrix(
             A,
-            radial_branches.bus_reduction_map,
-            radial_branches.meshed_branches,
+            radial_network_reduction.bus_reduction_map,
+            radial_network_reduction.meshed_branches,
         )
     else
         # BA and ABA must contain the same, empty RadialNetworkReduction stucture
-        if isempty(BA.radial_branches) && isempty(ABA.radial_branches)
-            radial_branches = RadialNetworkReduction()
+        if isempty(BA.radial_network_reduction) && isempty(ABA.radial_network_reduction)
+            radial_network_reduction = RadialNetworkReduction()
             A_matrix = A.data
         else
             error(
@@ -479,7 +486,7 @@ function LODF(
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
             Ref(tol),
-            radial_branches,
+            radial_network_reduction,
         )
     end
     return LODF(
@@ -487,7 +494,7 @@ function LODF(
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
-        radial_branches,
+        radial_network_reduction,
     )
 end
 

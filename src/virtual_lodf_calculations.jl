@@ -21,7 +21,7 @@ The VirtualLODF struct is indexed using branch names.
         coming from multuiplying the PTDF matrix with th Incidence matrix
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the rows of the transposed BA matrix
-        corresponding to the refence buses.
+        corresponding to the reference buses.
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors showing the branch names.
 - `lookup<:NTuple{2, Dict}`:
@@ -38,7 +38,7 @@ The VirtualLODF struct is indexed using branch names.
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
-- `radial_branches::RadialNetworkReduction`:
+- `radial_network_reduction::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -55,7 +55,7 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
-    radial_branches::RadialNetworkReduction
+    radial_network_reduction::RadialNetworkReduction
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
@@ -121,7 +121,7 @@ function VirtualLODF(
     end
     branches = get_ac_branches(sys, rb.radial_branches)
     buses = get_buses(sys, rb.bus_reduction_map)
-    return VirtualLODF(branches, buses; radial_branches = rb, kwargs...)
+    return VirtualLODF(branches, buses; radial_network_reduction = rb, kwargs...)
 end
 
 """
@@ -141,7 +141,7 @@ VirtualLODF struct with an empty cache.
         max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
-- `radial_branches::RadialNetworkReduction`:
+- `radial_network_reduction::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -151,7 +151,7 @@ function VirtualLODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
-    radial_branches::RadialNetworkReduction = RadialNetworkReduction(),
+    radial_network_reduction::RadialNetworkReduction = RadialNetworkReduction(),
 )
 
     #Get axis names and lookups
@@ -209,7 +209,7 @@ function VirtualLODF(
         empty_cache,
         subnetworks,
         Ref(tol),
-        radial_branches,
+        radial_network_reduction,
     )
 end
 
