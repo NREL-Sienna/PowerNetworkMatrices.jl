@@ -12,7 +12,7 @@ Incidence matrix: shows connection between buses, defining lines
         and buses with their enumerated indexes.
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indices of the reference slack buses.
-- `radial_branches::RadialBranches`:
+- `radial_network_reduction::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """
@@ -52,7 +52,7 @@ values.
 
 # Arguments
 - `sys::PSY.System`: the PowerSystem system to consider
-- `radial_branches::RadialBranches`:
+- `radial_network_reduction::RadialNetworkReduction`:
         Structure containing the radial branches and leaf buses that were removed
         while evaluating the matrix
 """

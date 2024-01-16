@@ -3,8 +3,8 @@
         # load the system
         sys = PSB.build_system(PSB.PSITestSystems, name)
 
-        # get the RadialBranches struct
-        rb = RadialBranches(IncidenceMatrix(sys))
+        # get the RadialNetworkReduction struct
+        rb = RadialNetworkReduction(IncidenceMatrix(sys))
 
         # get the A and BA matrices without radial lines
         A_rad = IncidenceMatrix(sys)
@@ -79,7 +79,7 @@ end
         sys = PSB.build_system(PSB.PSITestSystems, name)
         # get the radial branches
         A = IncidenceMatrix(sys)
-        rb = RadialBranches(A)
+        rb = RadialNetworkReduction(A)
         # get number of buses
         buscount = length(PNM.get_buses(sys))
         # now compute distributed slack vector

@@ -24,7 +24,7 @@
             (0.0, 0.0),
         ),
     )
-    rb = RadialBranches(IncidenceMatrix(sys))
+    rb = RadialNetworkReduction(IncidenceMatrix(sys))
     @test get_bus_reduction_map(rb)[7] == Set([61, 8])
     @test get_radial_branches(rb) == Set(["tl", "Trans4"])
 end
@@ -32,7 +32,7 @@ end
 @testset "Radial Branches Large" begin
     sys =
         build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys"; add_forecasts = false)
-    rb = RadialBranches(IncidenceMatrix(sys))
+    rb = RadialNetworkReduction(IncidenceMatrix(sys))
     for (k, v) in get_bus_reduction_map(rb)
         @test k ∉ v
     end
@@ -42,7 +42,7 @@ end
     for name in ["matpower_ACTIVSg2000_sys", "matpower_ACTIVSg10k_sys"]
         sys = build_system(MatpowerTestSystems, name; add_forecasts = false)
         a_mat = IncidenceMatrix(sys)
-        rb = RadialBranches(IncidenceMatrix(sys))
+        rb = RadialNetworkReduction(IncidenceMatrix(sys))
         leaf_buses = Int64[]
         for i in keys(rb.bus_reduction_map)
             append!(leaf_buses, collect(rb.bus_reduction_map[i]))
