@@ -140,11 +140,11 @@ function _reverse_search(
         j,
         reverse_line_map,
         radial_branches,
-        reducion_set,
+        reduction_set,
         reverse_bus_map,
     )
     parent_bus_number = reverse_bus_map[parent]
-    union!(bus_reduction_map_index[parent_bus_number], reducion_set)
+    union!(bus_reduction_map_index[parent_bus_number], reduction_set)
     if parent ∈ ref_bus_positions
         return
     end
