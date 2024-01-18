@@ -338,7 +338,7 @@ function assign_reference_buses!(
     ref_bus_positions::Set{Int},
     bus_lookup::Dict{Int, Int},
 )
-    ref_buses = [k for (k, v) in bus_lookup if v in ref_positions]
+    ref_buses = [k for (k, v) in bus_lookup if v in ref_bus_positions]
     assign_reference_buses!(subnetworks, ref_buses)
 end
 
