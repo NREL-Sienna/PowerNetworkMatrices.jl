@@ -171,7 +171,7 @@ function VirtualLODF(
     # check subnetworks
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
-        subnetworks = assign_reference_buses(subnetworks, ref_bus_positions, bus_ax_ref)
+        subnetworks = assign_reference_buses!(subnetworks, ref_bus_positions, bus_ax_ref)
     end
     # get diagonal of PTDF
     temp_data = zeros(length(bus_ax))
