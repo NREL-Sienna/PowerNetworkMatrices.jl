@@ -99,6 +99,13 @@ function _new_parent(
             reverse_bus_map,
         )
         new_parent_bus_number = reverse_bus_map[new_parent_val]
+        # This check is meant to capture cases of a full radial network which can happen in
+        # system with small islands that represent larger interconnected areas.
+        if length(SparseArrays.nzrange(A, new_parent_val)) < 2
+            @warn "Bus $parent_bus_number Parent $new_parent_bus_number is a leaf node. Indicating there is an island."
+            push!(bus_reduction_map_index[parent_bus_number], new_parent_bus_number)
+            return
+        end
         new_set = push!(pop!(bus_reduction_map_index, parent_bus_number), parent_bus_number)
         union!(bus_reduction_map_index[new_parent_bus_number], new_set)
         _new_parent(
@@ -139,7 +146,7 @@ function _reverse_search(
     parent_bus_number = reverse_bus_map[parent]
     union!(bus_reduction_map_index[parent_bus_number], reducion_set)
     if parent ∈ ref_bus_positions
-        return
+        # return
     end
     _new_parent(
         A,
