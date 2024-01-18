@@ -146,7 +146,7 @@ function _reverse_search(
     parent_bus_number = reverse_bus_map[parent]
     union!(bus_reduction_map_index[parent_bus_number], reducion_set)
     if parent ∈ ref_bus_positions
-        # return
+        return
     end
     _new_parent(
         A,
