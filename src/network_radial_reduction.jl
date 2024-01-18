@@ -68,7 +68,7 @@ function _find_upstream_bus(
     reverse_line_map::Dict{Int64, String},
     radial_branches::Set{String},
     reduced_buses::Set{Int},
-    reverse_bus_map::Dict{Int, Int}
+    reverse_bus_map::Dict{Int, Int},
 )
     row_ix = A.rowval[A.colptr[j]]
     parent = setdiff!(A[row_ix, :].nzind, j)[1]
@@ -120,13 +120,12 @@ function _reverse_search(
     reverse_line_map::Dict{Int64, String},
     radial_branches::Set{String},
     reverse_bus_map::Dict{Int, Int},
-    ref_bus_positions::Set{Int}
+    ref_bus_positions::Set{Int},
 )
     if j ∈ ref_bus_positions
         return
     end
     j_bus_number = reverse_bus_map[j]
-    @error j_bus_number
     pop!(bus_reduction_map_index, j_bus_number)
     reducion_set = Set{Int}(j_bus_number)
     parent = _find_upstream_bus(
@@ -138,11 +137,9 @@ function _reverse_search(
         reverse_bus_map,
     )
     parent_bus_number = reverse_bus_map[parent]
-    @error parent
-    @error parent_bus_number
     union!(bus_reduction_map_index[parent_bus_number], reducion_set)
     if parent ∈ ref_bus_positions
-        #return
+        return
     end
     _new_parent(
         A,
@@ -190,10 +187,7 @@ function calculate_radial_branches(
     reverse_line_map = Dict(reverse(kv) for kv in line_map)
     reverse_bus_map = Dict(reverse(kv) for kv in bus_map)
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in keys(bus_map))
-    #Threads.@threads
-    for j in 1:buscount
-        @assert haskey(bus_reduction_map_index, 195205)
-        @error j
+    Threads.@threads for j in 1:buscount
         if length(SparseArrays.nzrange(A, j)) == 1
             lock(lk) do
                 _reverse_search(
@@ -203,7 +197,7 @@ function calculate_radial_branches(
                     reverse_line_map,
                     radial_branches,
                     reverse_bus_map,
-                    ref_bus_positions
+                    ref_bus_positions,
                 )
             end
         end
