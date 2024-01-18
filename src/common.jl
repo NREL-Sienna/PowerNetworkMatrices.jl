@@ -305,7 +305,8 @@ function sparsify(dense_array::Vector{Float64}, tol::Float64)
 end
 
 """
-!!! MISSING DOCUMENTATION !!!
+Takes the reference bus numbers and re-assigns the keys in the subnetwork dictionaries to use
+the reference bus withing each subnetwork.
 """
 function assign_reference_buses!(
     subnetworks::Dict{Int, Set{Int}},
@@ -339,7 +340,7 @@ function assign_reference_buses!(
     bus_lookup::Dict{Int, Int},
 )
     ref_buses = [k for (k, v) in bus_lookup if v in ref_bus_positions]
-    assign_reference_buses!(subnetworks, ref_buses)
+    return assign_reference_buses!(subnetworks, ref_buses)
 end
 
 """
