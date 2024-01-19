@@ -400,7 +400,7 @@ function PTDF(
     subnetworks = find_subnetworks(M, bus_ax)
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
-        subnetworks = assign_reference_buses(subnetworks, ref_bus_positions)
+        subnetworks = assign_reference_buses!(subnetworks, ref_bus_positions, bus_ax_ref)
     end
     look_up = (bus_ax_ref, make_ax_ref(line_ax))
     S, _ = _buildptdf(

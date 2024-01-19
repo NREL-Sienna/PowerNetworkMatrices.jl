@@ -99,6 +99,13 @@ function _new_parent(
             reverse_bus_map,
         )
         new_parent_bus_number = reverse_bus_map[new_parent_val]
+        # This check is meant to capture cases of a full radial network which can happen in
+        # system with small islands that represent larger interconnected areas.
+        if length(SparseArrays.nzrange(A, new_parent_val)) < 2
+            @warn "Bus $parent_bus_number Parent $new_parent_bus_number is a leaf node, indicating there is an island."
+            push!(bus_reduction_map_index[parent_bus_number], new_parent_bus_number)
+            return
+        end
         new_set = push!(pop!(bus_reduction_map_index, parent_bus_number), parent_bus_number)
         union!(bus_reduction_map_index[new_parent_bus_number], new_set)
         _new_parent(
@@ -120,20 +127,27 @@ function _reverse_search(
     reverse_line_map::Dict{Int64, String},
     radial_branches::Set{String},
     reverse_bus_map::Dict{Int, Int},
+    ref_bus_positions::Set{Int},
 )
+    if j ∈ ref_bus_positions
+        return
+    end
     j_bus_number = reverse_bus_map[j]
     pop!(bus_reduction_map_index, j_bus_number)
-    reducion_set = Set{Int}(j_bus_number)
+    reduction_set = Set{Int}(j_bus_number)
     parent = _find_upstream_bus(
         A,
         j,
         reverse_line_map,
         radial_branches,
-        reducion_set,
+        reduction_set,
         reverse_bus_map,
     )
     parent_bus_number = reverse_bus_map[parent]
-    union!(bus_reduction_map_index[parent_bus_number], reducion_set)
+    union!(bus_reduction_map_index[parent_bus_number], reduction_set)
+    if parent ∈ ref_bus_positions
+        return
+    end
     _new_parent(
         A,
         parent,
@@ -181,9 +195,6 @@ function calculate_radial_branches(
     reverse_bus_map = Dict(reverse(kv) for kv in bus_map)
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in keys(bus_map))
     Threads.@threads for j in 1:buscount
-        if j ∈ ref_bus_positions
-            continue
-        end
         if length(SparseArrays.nzrange(A, j)) == 1
             lock(lk) do
                 _reverse_search(
@@ -193,6 +204,7 @@ function calculate_radial_branches(
                     reverse_line_map,
                     radial_branches,
                     reverse_bus_map,
+                    ref_bus_positions,
                 )
             end
         end
