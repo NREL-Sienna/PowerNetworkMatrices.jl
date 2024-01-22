@@ -152,7 +152,8 @@ function check_cache_size!(cache::RowCache; new_add::Bool = false)
         v = 0
     end
     if length(cache.temp_cache) > cache.max_num_keys - v
-        @info "Maximum memory reached, removing one row from cache (not belonging to `persistent_cache_keys`)."
+        @info "Maximum memory reached, removing rows from cache (not belonging to `persistent_cache_keys`)." maxlog =
+            1
         purge_one!(cache)
     end
     return
