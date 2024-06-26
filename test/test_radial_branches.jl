@@ -31,7 +31,7 @@ end
 
 @testset "Radial Branches Large" begin
     sys =
-        build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys"; add_forecasts = false)
+        build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys")
     rb = RadialNetworkReduction(IncidenceMatrix(sys))
     for (k, v) in get_bus_reduction_map(rb)
         @test k ∉ v
@@ -40,7 +40,7 @@ end
 
 @testset "Check reference bus in Radial Branches" begin
     for name in ["matpower_ACTIVSg2000_sys", "matpower_ACTIVSg10k_sys"]
-        sys = build_system(MatpowerTestSystems, name; add_forecasts = false)
+        sys = build_system(MatpowerTestSystems, name)
         a_mat = IncidenceMatrix(sys)
         rb = RadialNetworkReduction(IncidenceMatrix(sys))
         leaf_buses = Int64[]
