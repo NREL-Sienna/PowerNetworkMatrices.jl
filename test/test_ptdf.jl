@@ -189,8 +189,8 @@ end
             r = branches_2[2].r,
             x = branches_2[2].x,
             b = branches_2[2].b,
-            rate = branches_2[2].rate,
-            angle_limits = branches_2[2].angle_limits,
+            rate = get_rating(branches_2[2]),
+            angle_limits = get_angle_limits(branches_2[2]),
         ),
     )
 
