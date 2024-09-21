@@ -397,7 +397,7 @@ function PTDF(
     axes = (bus_ax, line_ax)
     M, bus_ax_ref = calculate_adjacency(branches, buses)
     ref_bus_positions = find_slack_positions(buses, bus_ax_ref)
-    @show subnetworks =
+    subnetworks =
         assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
