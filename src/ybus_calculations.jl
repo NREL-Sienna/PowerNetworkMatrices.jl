@@ -227,7 +227,7 @@ function Adjacency(branches, nodes; check_connectivity::Bool = true, kwargs...)
     buscount = length(nodes)
     bus_ax = PSY.get_number.(nodes)
     axes = (bus_ax, bus_ax)
-    bus_lookup = _make_ax_ref(bus_ax)
+    bus_lookup = make_ax_ref(bus_ax)
     look_up = (bus_lookup, bus_lookup)
 
     a = SparseArrays.spzeros(Int, buscount, buscount)
