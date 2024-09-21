@@ -396,11 +396,10 @@ function PTDF(
     bus_ax = [PSY.get_number(bus) for bus in buses]
     axes = (bus_ax, line_ax)
     M, bus_ax_ref = calculate_adjacency(branches, buses)
-    ref_bus_positions = find_slack_positions(buses)
-    subnetworks = find_subnetworks(M, bus_ax)
+    ref_bus_positions = find_slack_positions(buses, bus_ax_ref)
+    @show subnetworks = assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
-        subnetworks = assign_reference_buses!(subnetworks, ref_bus_positions, bus_ax_ref)
     end
     look_up = (bus_ax_ref, make_ax_ref(line_ax))
     S, _ = _buildptdf(
