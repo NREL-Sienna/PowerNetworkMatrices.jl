@@ -8,7 +8,7 @@ function _add_to_collection!(
     ::Union{
         PSY.TwoTerminalHVDCLine,
         PSY.TwoTerminalVSCDCLine,
-        PSY.TwoTerminalHVDCDetailedLine,
+        PSY.TwoTerminalVSCLine,
     },
 )
     return
