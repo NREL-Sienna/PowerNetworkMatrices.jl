@@ -7,12 +7,17 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     data::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
     axes::Ax
     lookup::L
+    data_ft::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
+    data_tf::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
 end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
     br::PSY.ACBranch,
     num_bus::Dict{Int, Int},
+    branch_ix::Int64,
 )
     arc = PSY.get_arc(br)
     bus_from_no = num_bus[arc.from.number]
@@ -27,8 +32,10 @@ function _ybus!(
     ybus[bus_from_no, bus_from_no] += Y11
     Y12 = -Y_l
     ybus[bus_from_no, bus_to_no] += Y12
+    yft[branch_ix, bus_from_no] = Y12
     #Y21 = Y12
     ybus[bus_to_no, bus_from_no] += Y12
+    ytf[branch_ix, bus_to_no] = -Y12
     Y22 = Y_l + (1im * PSY.get_b(br).to)
     ybus[bus_to_no, bus_to_no] += Y22
     return
@@ -36,17 +43,23 @@ end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
     br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
+    branch_ix::Int64,
 )
-    _ybus!(ybus, br.branch, num_bus)
+    _ybus!(ybus, yft, ytf, br.branch, num_bus, branch_ix)
     return
 end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
     br::PSY.Transformer2W,
     num_bus::Dict{Int, Int},
+    branch_ix::Int64,
 )
     arc = PSY.get_arc(br)
     bus_from_no = num_bus[arc.from.number]
@@ -64,13 +77,19 @@ function _ybus!(
     ybus[bus_from_no, bus_to_no] += -Y_t
     ybus[bus_to_no, bus_from_no] += -Y_t
     ybus[bus_to_no, bus_to_no] += Y_t
+
+    yft[branch_ix, bus_from_no] = -Y_t
+    ytf[branch_ix, bus_to_no] = Y_t
     return
 end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
     br::PSY.TapTransformer,
     num_bus::Dict{Int, Int},
+    branch_ix::Int64,
 )
     arc = PSY.get_arc(br)
     bus_from_no = num_bus[arc.from.number]
@@ -93,13 +112,19 @@ function _ybus!(
     ybus[bus_to_no, bus_from_no] += Y12
     Y22 = Y_t
     ybus[bus_to_no, bus_to_no] += Y22
+
+    yft[branch_ix, bus_from_no] = Y12
+    ytf[branch_ix, bus_to_no] = -Y12
     return
 end
 
 function _ybus!(
     ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
     br::PSY.PhaseShiftingTransformer,
     num_bus::Dict{Int, Int},
+    branch_ix::Int64,
 )
     arc = PSY.get_arc(br)
     bus_from_no = num_bus[arc.from.number]
@@ -121,6 +146,9 @@ function _ybus!(
     ybus[bus_to_no, bus_from_no] += Y21
     Y22 = Y_t
     ybus[bus_to_no, bus_to_no] += Y22
+
+    yft[branch_ix, bus_from_no] = Y12
+    ytf[branch_ix, bus_to_no] = -Y21
     return
 end
 
@@ -148,20 +176,24 @@ function _buildybus(
     buscount = length(buses)
     num_bus = Dict{Int, Int}()
 
+    branchcount = length(branches)
+
     for (ix, b) in enumerate(buses)
         num_bus[PSY.get_number(b)] = ix
     end
     ybus = SparseArrays.spzeros(ComplexF64, buscount, buscount)
-    for b in branches
+    yft = SparseArrays.spzeros(ComplexF64, branchcount, buscount)
+    ytf = SparseArrays.spzeros(ComplexF64, branchcount, buscount)
+    for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        PSY.get_available(b) && _ybus!(ybus, b, num_bus)
+        PSY.get_available(b) && _ybus!(ybus, yft, ytf, b, num_bus, ix)
     end
     for fa in fixed_admittances
         PSY.get_available(fa) && _ybus!(ybus, fa, num_bus)
     end
-    return SparseArrays.dropzeros!(ybus)
+    return (SparseArrays.dropzeros!(ybus), SparseArrays.dropzeros!(yft), SparseArrays.dropzeros!(ytf))
 end
 
 """
@@ -180,12 +212,12 @@ function Ybus(
     axes = (bus_ax, bus_ax)
     bus_lookup = make_ax_ref(bus_ax)
     look_up = (bus_lookup, bus_lookup)
-    ybus = _buildybus(branches, buses, fixed_admittances)
+    ybus, yft, ytf = _buildybus(branches, buses, fixed_admittances)
     if check_connectivity && length(buses) > 1
         islands = find_subnetworks(ybus, bus_ax)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
-    return Ybus(ybus, axes, look_up)
+    return Ybus(ybus, axes, look_up, yft, ytf)
 end
 
 """
