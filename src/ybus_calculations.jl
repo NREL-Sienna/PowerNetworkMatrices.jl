@@ -9,6 +9,8 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     lookup::L
     data_ft::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
     data_tf::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
+    fb::Vector{Int64}
+    tb::Vector{Int64}
 end
 
 function _ybus!(
@@ -18,10 +20,14 @@ function _ybus!(
     br::PSY.ACBranch,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
 )
     arc = PSY.get_arc(br)
     bus_from_no = num_bus[arc.from.number]
     bus_to_no = num_bus[arc.to.number]
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
     Y11 = Y_l + (1im * PSY.get_b(br).from)
     if !isfinite(Y11) || !isfinite(Y_l)
@@ -32,12 +38,15 @@ function _ybus!(
     ybus[bus_from_no, bus_from_no] += Y11
     Y12 = -Y_l
     ybus[bus_from_no, bus_to_no] += Y12
-    yft[branch_ix, bus_from_no] = Y12
     #Y21 = Y12
     ybus[bus_to_no, bus_from_no] += Y12
-    ytf[branch_ix, bus_to_no] = -Y12
     Y22 = Y_l + (1im * PSY.get_b(br).to)
     ybus[bus_to_no, bus_to_no] += Y22
+
+    yft[branch_ix, bus_from_no] = Y11
+    yft[branch_ix, bus_to_no] = Y12
+    ytf[branch_ix, bus_from_no] = Y12
+    ytf[branch_ix, bus_to_no] = Y22
     return
 end
 
@@ -48,8 +57,10 @@ function _ybus!(
     br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
 )
-    _ybus!(ybus, yft, ytf, br.branch, num_bus, branch_ix)
+    _ybus!(ybus, yft, ytf, br.branch, num_bus, branch_ix, fb, tb)
     return
 end
 
@@ -60,10 +71,14 @@ function _ybus!(
     br::PSY.Transformer2W,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
 )
     arc = PSY.get_arc(br)
     bus_from_no = num_bus[arc.from.number]
     bus_to_no = num_bus[arc.to.number]
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     Y11 = Y_t
     b = PSY.get_primary_shunt(br)
@@ -78,7 +93,9 @@ function _ybus!(
     ybus[bus_to_no, bus_from_no] += -Y_t
     ybus[bus_to_no, bus_to_no] += Y_t
 
-    yft[branch_ix, bus_from_no] = -Y_t
+    yft[branch_ix, bus_from_no] = Y11 - (1im * b)
+    yft[branch_ix, bus_to_no] = -Y_t
+    ytf[branch_ix, bus_from_no] = -Y_t
     ytf[branch_ix, bus_to_no] = Y_t
     return
 end
@@ -90,10 +107,14 @@ function _ybus!(
     br::PSY.TapTransformer,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
 )
     arc = PSY.get_arc(br)
     bus_from_no = num_bus[arc.from.number]
     bus_to_no = num_bus[arc.to.number]
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
 
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     c = 1 / PSY.get_tap(br)
@@ -113,8 +134,10 @@ function _ybus!(
     Y22 = Y_t
     ybus[bus_to_no, bus_to_no] += Y22
 
-    yft[branch_ix, bus_from_no] = Y12
-    ytf[branch_ix, bus_to_no] = -Y12
+    yft[branch_ix, bus_from_no] = Y11 - (1im * b)
+    yft[branch_ix, bus_to_no] = Y12
+    ytf[branch_ix, bus_from_no] = Y12
+    ytf[branch_ix, bus_to_no] = Y22
     return
 end
 
@@ -125,10 +148,14 @@ function _ybus!(
     br::PSY.PhaseShiftingTransformer,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
 )
     arc = PSY.get_arc(br)
     bus_from_no = num_bus[arc.from.number]
     bus_to_no = num_bus[arc.to.number]
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     tap = (PSY.get_tap(br) * exp(PSY.get_α(br) * 1im))
     c_tap = (PSY.get_tap(br) * exp(-1 * PSY.get_α(br) * 1im))
@@ -147,8 +174,10 @@ function _ybus!(
     Y22 = Y_t
     ybus[bus_to_no, bus_to_no] += Y22
 
-    yft[branch_ix, bus_from_no] = Y12
-    ytf[branch_ix, bus_to_no] = -Y21
+    yft[branch_ix, bus_from_no] = Y11
+    yft[branch_ix, bus_to_no] = Y12
+    ytf[branch_ix, bus_from_no] = Y21
+    ytf[branch_ix, bus_to_no] = Y22
     return
 end
 
@@ -177,6 +206,8 @@ function _buildybus(
     num_bus = Dict{Int, Int}()
 
     branchcount = length(branches)
+    fb = zeros(Int64, branchcount)
+    tb = zeros(Int64, branchcount)
 
     for (ix, b) in enumerate(buses)
         num_bus[PSY.get_number(b)] = ix
@@ -188,7 +219,7 @@ function _buildybus(
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        PSY.get_available(b) && _ybus!(ybus, yft, ytf, b, num_bus, ix)
+        PSY.get_available(b) && _ybus!(ybus, yft, ytf, b, num_bus, ix, fb, tb)
     end
     for fa in fixed_admittances
         PSY.get_available(fa) && _ybus!(ybus, fa, num_bus)
@@ -197,6 +228,8 @@ function _buildybus(
         SparseArrays.dropzeros!(ybus),
         SparseArrays.dropzeros!(yft),
         SparseArrays.dropzeros!(ytf),
+        fb,
+        tb
     )
 end
 
@@ -216,12 +249,12 @@ function Ybus(
     axes = (bus_ax, bus_ax)
     bus_lookup = make_ax_ref(bus_ax)
     look_up = (bus_lookup, bus_lookup)
-    ybus, yft, ytf = _buildybus(branches, buses, fixed_admittances)
+    ybus, yft, ytf, fb, tb = _buildybus(branches, buses, fixed_admittances)
     if check_connectivity && length(buses) > 1
         islands = find_subnetworks(ybus, bus_ax)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
-    return Ybus(ybus, axes, look_up, yft, ytf)
+    return Ybus(ybus, axes, look_up, yft, ytf, fb, tb)
 end
 
 """
