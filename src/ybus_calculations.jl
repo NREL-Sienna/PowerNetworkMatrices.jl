@@ -193,7 +193,11 @@ function _buildybus(
     for fa in fixed_admittances
         PSY.get_available(fa) && _ybus!(ybus, fa, num_bus)
     end
-    return (SparseArrays.dropzeros!(ybus), SparseArrays.dropzeros!(yft), SparseArrays.dropzeros!(ytf))
+    return (
+        SparseArrays.dropzeros!(ybus),
+        SparseArrays.dropzeros!(yft),
+        SparseArrays.dropzeros!(ytf),
+    )
 end
 
 """
