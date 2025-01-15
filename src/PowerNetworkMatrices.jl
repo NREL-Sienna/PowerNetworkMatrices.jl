@@ -15,10 +15,12 @@ export is_factorized
 export LODF
 export PTDF
 export RadialNetworkReduction
+export ReducedYbus
 export to_hdf5
 export validate_connectivity
 export VirtualLODF
 export VirtualPTDF
+export WardReduction
 export Ybus
 
 using DocStringExtensions
@@ -56,6 +58,7 @@ include("BA_ABA_matrices.jl")
 include("definitions.jl")
 include("ptdf_calculations.jl")
 include("ybus_calculations.jl")
+include("reduced_ybus_calculations.jl")
 include("row_cache.jl")
 include("virtual_ptdf_calculations.jl")
 include("lodf_calculations.jl")
