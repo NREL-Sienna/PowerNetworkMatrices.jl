@@ -229,7 +229,7 @@ function _buildybus(
         SparseArrays.dropzeros!(yft),
         SparseArrays.dropzeros!(ytf),
         fb,
-        tb
+        tb,
     )
 end
 
