@@ -31,13 +31,14 @@ const PSY = PowerSystems
 
 @static if (Sys.ARCH === :x86_64 || Sys.ARCH === :i686) && !Sys.isapple()
     using MKL
-    const usemkl = MKL.MKL_jll.is_available()
+    const USE_MKL = MKL.MKL_jll.is_available()
 else
-    const usemkl = false
+    const USE_MKL = false
 end
 
 @static if Sys.isapple()
     using AppleAccelerate
+    const USE_AA = false
 end
 
 import SparseArrays

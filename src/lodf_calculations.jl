@@ -37,8 +37,10 @@ function _buildlodf(
     elseif linear_solver == "Dense"
         lodf_t = _calculate_LODF_matrix_DENSE(a, ptdf)
     elseif linear_solver == "MKLPardiso"
-        if !usemkl
-            error("The MKL library is not available. Check that your hardware and operating system support MKL.")
+        if !USE_MKL
+            error(
+                "The MKL library is not available. Check that your hardware and operating system support MKL.",
+            )
         end
         lodf_t = _calculate_LODF_matrix_MKLPardiso(a, ptdf)
     end
