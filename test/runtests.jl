@@ -20,7 +20,7 @@ Aqua.test_unbound_args(PowerNetworkMatrices)
 Aqua.test_undefined_exports(PowerNetworkMatrices)
 Aqua.test_ambiguities(PowerNetworkMatrices)
 Aqua.test_stale_deps(PowerNetworkMatrices)
-Aqua.test_deps_compat(PowerNetworkMatrices)
+Aqua.test_deps_compat(PowerNetworkMatrices; ignore = [:AppleAccelerate, :MKL, :Pardiso])
 
 include("testing_data.jl")
 
