@@ -36,7 +36,7 @@ const PSY = PowerSystems
         const usemkl = false
     end
 
-@static if !Sys.isapple()
+@static if Sys.isapple()
     import AppleAccelerate
 end
 
