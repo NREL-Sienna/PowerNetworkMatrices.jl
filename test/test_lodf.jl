@@ -26,10 +26,10 @@
     L5NS_from_ptdf2 = LODF(A, P5; linear_solver = "Dense")
     if !PowerNetworkMatrices.USE_AA
         L5NS_from_ptdf3 = LODF(A, P5; linear_solver = "MKLPardiso")
+        @test getindex(L5NS_from_ptdf3, "5", "6") - -0.3071 <= 1e-4
     end
     @test getindex(L5NS_from_ptdf, "5", "6") - -0.3071 <= 1e-4
     @test getindex(L5NS_from_ptdf2, "5", "6") - -0.3071 <= 1e-4
-    @test getindex(L5NS_from_ptdf3, "5", "6") - -0.3071 <= 1e-4
     total_error = abs.(L5NS_from_ptdf.data' .- Lodf_5)
     total_error2 = abs.(L5NS_from_ptdf2.data' .- Lodf_5)
     total_error3 = abs.(L5NS_from_ptdf3.data' .- Lodf_5)
