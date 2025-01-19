@@ -29,17 +29,16 @@ import PowerSystems: ACBusTypes
 const IS = InfrastructureSystems
 const PSY = PowerSystems
 
-@static if Sys.ARCH === :x86_64 || Sys.ARCH === :i686
-        import MKL
-        const usemkl = MKL.MKL_jll.is_available()
-    else
-        const usemkl = false
-    end
-
-@static if Sys.isapple()
-    import AppleAccelerate
+@static if (Sys.ARCH === :x86_64 || Sys.ARCH === :i686) && !Sys.isapple()
+    using MKL
+    const usemkl = MKL.MKL_jll.is_available()
+else
+    const usemkl = false
 end
 
+@static if Sys.isapple()
+    using AppleAccelerate
+end
 
 import SparseArrays
 import SparseArrays: rowvals, nzrange
@@ -51,7 +50,6 @@ import LinearAlgebra: BLAS.gemm
 import LinearAlgebra: ldiv!, mul!, I, dot
 import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 import Pardiso
-
 
 @template DEFAULT = """
                     $(SIGNATURES)
