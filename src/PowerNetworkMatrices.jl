@@ -39,6 +39,8 @@ end
 
 @static if Sys.isapple()
     using AppleAccelerate
+    const USE_AA = true
+else
     const USE_AA = false
 end
 
