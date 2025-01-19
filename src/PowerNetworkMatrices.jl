@@ -31,6 +31,7 @@ const PSY = PowerSystems
 
 @static if (Sys.ARCH === :x86_64 || Sys.ARCH === :i686) && !Sys.isapple()
     using MKL
+    using Pardiso
     const USE_MKL = MKL.MKL_jll.is_available()
 else
     const USE_MKL = false
@@ -50,7 +51,6 @@ import LinearAlgebra
 import LinearAlgebra: BLAS.gemm
 import LinearAlgebra: ldiv!, mul!, I, dot
 import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
-import Pardiso
 
 @template DEFAULT = """
                     $(SIGNATURES)
