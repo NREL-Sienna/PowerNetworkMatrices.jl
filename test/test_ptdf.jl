@@ -1,6 +1,10 @@
 @testset "Test PTDF matrices, w/ and w/o tolerance" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     for solver in ["KLU", "Dense", "MKLPardiso"]
+        if !PowerNetworkMatrices.USE_AA && solver == "MKLPardiso"
+            @info "Skippe MKLPardiso tests on Apple"
+            continue
+        end
         for approach in ["standard", "separate_matrices"]
             buses_5 = nodes5()
             branches_5 = branches5(buses_5)
