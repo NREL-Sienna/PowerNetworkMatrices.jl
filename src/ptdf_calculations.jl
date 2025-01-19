@@ -65,6 +65,9 @@ function _buildptdf(
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
+        if !usemkl
+            error("The MKL library is not available. Check that your hardware and operating system support MKL.")
+        end
         PTDFm, A = calculate_PTDF_matrix_MKLPardiso(
             branches,
             buses,
