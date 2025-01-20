@@ -34,22 +34,14 @@
 
     @test Ybus5[buses_5[1], buses_5[2]] == (-3.5234840209999647 + 35.234840209999646im)
 
-    c_sys5_re() = System(
-        100.0,
-        buses_5,
-        thermal_generators5(buses_5),
-        loads5(buses_5),
-        branches5(buses_5),
-    )
-
-    t_sys5_re = c_sys5_re()
+    t_sys5_re = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     # Make 2 islands. Island 1: 1 - 5. Island 2: 2, 3 ,4
     remove_component!(Line, t_sys5_re, "1")
     remove_component!(Line, t_sys5_re, "2")
     remove_component!(Line, t_sys5_re, "6")
     @test_throws IS.DataFormatError Ybus(t_sys5_re)
 
-    t2_sys5_re = c_sys5_re()
+    t2_sys5_re = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     # Remove lines. Don't cause islands
     remove_component!(Line, t2_sys5_re, "3")
     remove_component!(Line, t2_sys5_re, "5")

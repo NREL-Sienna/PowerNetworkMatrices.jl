@@ -1,6 +1,10 @@
 @testset "Test PTDF matrices, w/ and w/o tolerance" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     for solver in ["KLU", "Dense", "MKLPardiso"]
+        if PowerNetworkMatrices.USE_AA && solver == "MKLPardiso"
+            @info "Skipped MKLPardiso tests on Apple"
+            continue
+        end
         for approach in ["standard", "separate_matrices"]
             buses_5 = nodes5()
             branches_5 = branches5(buses_5)
@@ -213,11 +217,12 @@ end
 
     P5_1 = PTDF(sys5; dist_slack = slack_array, linear_solver = "KLU")
     P5_2 = PTDF(sys5; dist_slack = slack_array, linear_solver = "Dense")
-    P5_3 = PTDF(sys5; dist_slack = slack_array, linear_solver = "MKLPardiso")
-
     @test isapprox(P5_1.data, P5_2.data, atol = 1e-5)
-    @test isapprox(P5_1.data, P5_3.data, atol = 1e-5)
-    @test isapprox(P5_2.data, P5_3.data, atol = 1e-5)
+    if !PowerNetworkMatrices.USE_AA
+        P5_3 = PTDF(sys5; dist_slack = slack_array, linear_solver = "MKLPardiso")
+        @test isapprox(P5_2.data, P5_3.data, atol = 1e-5)
+        @test isapprox(P5_1.data, P5_3.data, atol = 1e-5)
+    end
 end
 
 @testset "Test PTDF matrix with distributed bus and with 2 reference buses" begin
