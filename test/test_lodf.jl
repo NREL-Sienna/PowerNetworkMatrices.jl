@@ -24,16 +24,19 @@
     P5 = PTDF(sys5)
     L5NS_from_ptdf = LODF(A, P5)
     L5NS_from_ptdf2 = LODF(A, P5; linear_solver = "Dense")
-    L5NS_from_ptdf3 = LODF(A, P5; linear_solver = "MKLPardiso")
     @test getindex(L5NS_from_ptdf, "5", "6") - -0.3071 <= 1e-4
     @test getindex(L5NS_from_ptdf2, "5", "6") - -0.3071 <= 1e-4
-    @test getindex(L5NS_from_ptdf3, "5", "6") - -0.3071 <= 1e-4
     total_error = abs.(L5NS_from_ptdf.data' .- Lodf_5)
     total_error2 = abs.(L5NS_from_ptdf2.data' .- Lodf_5)
-    total_error3 = abs.(L5NS_from_ptdf3.data' .- Lodf_5)
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
     @test isapprox(sum(total_error2), 0.0, atol = 1e-3)
-    @test isapprox(sum(total_error3), 0.0, atol = 1e-3)
+
+    if !PowerNetworkMatrices.USE_AA
+        L5NS_from_ptdf3 = LODF(A, P5; linear_solver = "MKLPardiso")
+        @test getindex(L5NS_from_ptdf3, "5", "6") - -0.3071 <= 1e-4
+        total_error3 = abs.(L5NS_from_ptdf3.data' .- Lodf_5)
+        @test isapprox(sum(total_error3), 0.0, atol = 1e-3)
+    end
 
     # A, ABA, and BA case
     ABA = ABA_Matrix(sys5; factorize = true)

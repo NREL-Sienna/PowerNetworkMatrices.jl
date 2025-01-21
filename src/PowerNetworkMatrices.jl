@@ -22,13 +22,27 @@ export VirtualPTDF
 export Ybus
 
 using DocStringExtensions
-import MKL
 import InfrastructureSystems
 import PowerSystems
 import PowerSystems: ACBusTypes
 
 const IS = InfrastructureSystems
 const PSY = PowerSystems
+
+@static if (Sys.ARCH === :x86_64 || Sys.ARCH === :i686) && !Sys.isapple()
+    using MKL
+    using Pardiso
+    const USE_MKL = MKL.MKL_jll.is_available()
+else
+    const USE_MKL = false
+end
+
+@static if Sys.isapple()
+    using AppleAccelerate
+    const USE_AA = true
+else
+    const USE_AA = false
+end
 
 import SparseArrays
 import SparseArrays: rowvals, nzrange
@@ -39,7 +53,6 @@ import LinearAlgebra
 import LinearAlgebra: BLAS.gemm
 import LinearAlgebra: ldiv!, mul!, I, dot
 import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
-import Pardiso
 
 @template DEFAULT = """
                     $(SIGNATURES)
