@@ -193,7 +193,6 @@ function _buildybus(
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
 )
-    buscount = length(buses)
     num_bus = Dict{Int, Int}()
 
     branchcount = length(branches)
