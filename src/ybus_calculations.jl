@@ -7,16 +7,13 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     data::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
     axes::Ax
     lookup::L
-    data_ft::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
-    data_tf::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
-    fb::Vector{Int64}
-    tb::Vector{Int64}
 end
 
 function _ybus!(
-    ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
     br::PSY.ACBranch,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
@@ -35,39 +32,36 @@ function _ybus!(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
-    ybus[bus_from_no, bus_from_no] += Y11
+    y11[branch_ix] = Y11
     Y12 = -Y_l
-    ybus[bus_from_no, bus_to_no] += Y12
-    #Y21 = Y12
-    ybus[bus_to_no, bus_from_no] += Y12
+    y12[branch_ix] = Y12
+    Y21 = Y12
+    y21[branch_ix] = Y21
     Y22 = Y_l + (1im * PSY.get_b(br).to)
-    ybus[bus_to_no, bus_to_no] += Y22
-
-    yft[branch_ix, bus_from_no] = Y11
-    yft[branch_ix, bus_to_no] = Y12
-    ytf[branch_ix, bus_from_no] = Y12
-    ytf[branch_ix, bus_to_no] = Y22
+    y22[branch_ix] = Y22
     return
 end
 
 function _ybus!(
-    ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
     br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
 )
-    _ybus!(ybus, yft, ytf, br.branch, num_bus, branch_ix, fb, tb)
+    _ybus!(y11, y12, y21, y22, br.branch, num_bus, branch_ix, fb, tb)
     return
 end
 
 function _ybus!(
-    ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
     br::PSY.Transformer2W,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
@@ -88,22 +82,21 @@ function _ybus!(
         )
     end
 
-    ybus[bus_from_no, bus_from_no] += Y11 - (1im * b)
-    ybus[bus_from_no, bus_to_no] += -Y_t
-    ybus[bus_to_no, bus_from_no] += -Y_t
-    ybus[bus_to_no, bus_to_no] += Y_t
-
-    yft[branch_ix, bus_from_no] = Y11 - (1im * b)
-    yft[branch_ix, bus_to_no] = -Y_t
-    ytf[branch_ix, bus_from_no] = -Y_t
-    ytf[branch_ix, bus_to_no] = Y_t
+    y11[branch_ix] = Y11 - (1im * b)
+    Y12 = -Y_t
+    y12[branch_ix] = Y12
+    Y21 = Y12
+    y21[branch_ix] = Y21
+    Y22 = Y_t
+    y22[branch_ix] = Y22
     return
 end
 
 function _ybus!(
-    ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
     br::PSY.TapTransformer,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
@@ -121,30 +114,27 @@ function _ybus!(
     b = PSY.get_primary_shunt(br)
 
     Y11 = (Y_t * c^2)
-    ybus[bus_from_no, bus_from_no] += Y11 - (1im * b)
+    y11[branch_ix] = Y11
     Y12 = (-Y_t * c)
     if !isfinite(Y11) || !isfinite(Y12) || !isfinite(b)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
-    ybus[bus_from_no, bus_to_no] += Y12
-    #Y21 = Y12
-    ybus[bus_to_no, bus_from_no] += Y12
-    Y22 = Y_t
-    ybus[bus_to_no, bus_to_no] += Y22
 
-    yft[branch_ix, bus_from_no] = Y11 - (1im * b)
-    yft[branch_ix, bus_to_no] = Y12
-    ytf[branch_ix, bus_from_no] = Y12
-    ytf[branch_ix, bus_to_no] = Y22
+    y12[branch_ix] = Y12
+    Y21 = Y12
+    y21[branch_ix] = Y21
+    Y22 = Y_t
+    y22[branch_ix] = Y22
     return
 end
 
 function _ybus!(
-    ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    yft::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
-    ytf::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
     br::PSY.PhaseShiftingTransformer,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
@@ -166,34 +156,35 @@ function _ybus!(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
-    ybus[bus_from_no, bus_from_no] += Y11 - (1im * b)
-    Y12 = (-Y_t / c_tap)
-    ybus[bus_from_no, bus_to_no] += Y12
-    Y21 = (-Y_t / tap)
-    ybus[bus_to_no, bus_from_no] += Y21
-    Y22 = Y_t
-    ybus[bus_to_no, bus_to_no] += Y22
 
-    yft[branch_ix, bus_from_no] = Y11
-    yft[branch_ix, bus_to_no] = Y12
-    ytf[branch_ix, bus_from_no] = Y21
-    ytf[branch_ix, bus_to_no] = Y22
+    y11[branch_ix] = Y11 - (1im * b)
+    Y12 = (-Y_t / c_tap)
+    y12[branch_ix] = Y12
+    Y21 = (-Y_t / tap)
+    y21[branch_ix] = Y21
+    Y22 = Y_t
+    y22[branch_ix] = Y22
     return
 end
 
 function _ybus!(
-    ybus::SparseArrays.SparseMatrixCSC{ComplexF64, Int},
+    y11::Vector{ComplexF64},
     fa::PSY.FixedAdmittance,
     num_bus::Dict{Int, Int},
+    branch_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
 )
     bus = PSY.get_bus(fa)
     bus_no = num_bus[PSY.get_number(bus)]
+    fb[branch_ix] = bus_no
+    tb[branch_ix] = bus_no
     if !isfinite(fa.Y)
         error(
             "Data in $(PSY.get_name(fa)) is incorrect. Y = $(fa.Y)",
         )
     end
-    ybus[bus_no, bus_no] += fa.Y
+    y11[branch_ix] = fa.Y
     return
 end
 
@@ -206,28 +197,33 @@ function _buildybus(
     num_bus = Dict{Int, Int}()
 
     branchcount = length(branches)
-    fb = zeros(Int64, branchcount)
-    tb = zeros(Int64, branchcount)
+    fa_count = length(fixed_admittances)
+    fb = zeros(Int64, branchcount + fa_count)
+    tb = zeros(Int64, branchcount + fa_count)
 
     for (ix, b) in enumerate(buses)
         num_bus[PSY.get_number(b)] = ix
     end
-    ybus = SparseArrays.spzeros(ComplexF64, buscount, buscount)
-    yft = SparseArrays.spzeros(ComplexF64, branchcount, buscount)
-    ytf = SparseArrays.spzeros(ComplexF64, branchcount, buscount)
+    
+    y11 = zeros(ComplexF64, branchcount + fa_count)
+    y12 = zeros(ComplexF64, branchcount + fa_count)
+    y21 = zeros(ComplexF64, branchcount + fa_count)
+    y22 = zeros(ComplexF64, branchcount + fa_count)
+
     for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        PSY.get_available(b) && _ybus!(ybus, yft, ytf, b, num_bus, ix, fb, tb)
+        PSY.get_available(b) && _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb)
     end
-    for fa in fixed_admittances
-        PSY.get_available(fa) && _ybus!(ybus, fa, num_bus)
+    for (ix, fa) in enumerate(fixed_admittances)
+        PSY.get_available(fa) && _ybus!(y11, fa, num_bus, ix + branchcount, fb, tb)
     end
     return (
-        SparseArrays.dropzeros!(ybus),
-        SparseArrays.dropzeros!(yft),
-        SparseArrays.dropzeros!(ytf),
+        y11,
+        y12,
+        y21,
+        y22,
         fb,
         tb,
     )
@@ -249,12 +245,18 @@ function Ybus(
     axes = (bus_ax, bus_ax)
     bus_lookup = make_ax_ref(bus_ax)
     look_up = (bus_lookup, bus_lookup)
-    ybus, yft, ytf, fb, tb = _buildybus(branches, buses, fixed_admittances)
+    y11, y12, y21, y22, fb, tb = _buildybus(branches, buses, fixed_admittances)
+    ybus = SparseArrays.sparse(
+        [fb; fb; tb; tb],  # row indices
+        [fb; tb; fb; tb],  # column indices
+        [y11; y12; y21; y22],  # values
+    )
+    SparseArrays.dropzeros!(ybus)
     if check_connectivity && length(buses) > 1
         islands = find_subnetworks(ybus, bus_ax)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
-    return Ybus(ybus, axes, look_up, yft, ytf, fb, tb)
+    return Ybus(ybus, axes, look_up)
 end
 
 """
