@@ -168,23 +168,21 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
+    ysh::Vector{ComplexF64},
     fa::PSY.FixedAdmittance,
     num_bus::Dict{Int, Int},
-    branch_ix::Int64,
-    fb::Vector{Int64},
-    tb::Vector{Int64},
+    fa_ix::Int64,
+    sb::Vector{Int64},
 )
     bus = PSY.get_bus(fa)
     bus_no = num_bus[PSY.get_number(bus)]
-    fb[branch_ix] = bus_no
-    tb[branch_ix] = bus_no
+    sb[fa_ix] = bus_no
     if !isfinite(fa.Y)
         error(
             "Data in $(PSY.get_name(fa)) is incorrect. Y = $(fa.Y)",
         )
     end
-    y11[branch_ix] = fa.Y
+    ysh[fa_ix] = fa.Y
     return
 end
 
@@ -197,17 +195,19 @@ function _buildybus(
 
     branchcount = length(branches)
     fa_count = length(fixed_admittances)
-    fb = zeros(Int64, branchcount + fa_count)
-    tb = zeros(Int64, branchcount + fa_count)
+    fb = zeros(Int64, branchcount)
+    tb = zeros(Int64, branchcount)
+    sb = zeros(Int64, fa_count)
 
     for (ix, b) in enumerate(buses)
         num_bus[PSY.get_number(b)] = ix
     end
-    
-    y11 = zeros(ComplexF64, branchcount + fa_count)
-    y12 = zeros(ComplexF64, branchcount + fa_count)
-    y21 = zeros(ComplexF64, branchcount + fa_count)
-    y22 = zeros(ComplexF64, branchcount + fa_count)
+
+    y11 = zeros(ComplexF64, branchcount)
+    y12 = zeros(ComplexF64, branchcount)
+    y21 = zeros(ComplexF64, branchcount)
+    y22 = zeros(ComplexF64, branchcount)
+    ysh = zeros(ComplexF64, fa_count)
 
     for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
@@ -216,15 +216,17 @@ function _buildybus(
         PSY.get_available(b) && _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb)
     end
     for (ix, fa) in enumerate(fixed_admittances)
-        PSY.get_available(fa) && _ybus!(y11, fa, num_bus, ix + branchcount, fb, tb)
+        PSY.get_available(fa) && _ybus!(ysh, fa, num_bus, ix, sb)
     end
     return (
         y11,
         y12,
         y21,
         y22,
+        ysh,
         fb,
         tb,
+        sb,
     )
 end
 
@@ -244,11 +246,11 @@ function Ybus(
     axes = (bus_ax, bus_ax)
     bus_lookup = make_ax_ref(bus_ax)
     look_up = (bus_lookup, bus_lookup)
-    y11, y12, y21, y22, fb, tb = _buildybus(branches, buses, fixed_admittances)
+    y11, y12, y21, y22, ysh, fb, tb, sb = _buildybus(branches, buses, fixed_admittances)
     ybus = SparseArrays.sparse(
-        [fb; fb; tb; tb],  # row indices
-        [fb; tb; fb; tb],  # column indices
-        [y11; y12; y21; y22],  # values
+        [fb; fb; tb; tb; sb],  # row indices
+        [fb; tb; fb; tb; sb],  # column indices
+        [y11; y12; y21; y22; ysh],  # values
     )
     SparseArrays.dropzeros!(ybus)
     if check_connectivity && length(buses) > 1
