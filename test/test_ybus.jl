@@ -28,8 +28,10 @@
     @test isapprox(Y5NS[10, 4], -3.3336667 + 33.336667im, atol = 1e-4)
 
     Y5NS = Ybus([branches_5[b] for b in Br5NS_ids], [buses_5[b] for b in Bu5NS_ids])
-    for buf in Bu5NS_ids, but in Bu5NS_ids
-        @test isapprox(Y5NS[buf, but], Ybus5_matpower[buf, but], atol = 1e-3)
+    for buf in Bu5NS_ids
+        for but in Bu5NS_ids
+            @test isapprox(Y5NS[buf, but], Ybus5_matpower[buf, but], atol = 1e-3)
+        end
     end
 
     @test Ybus5[buses_5[1], buses_5[2]] == (-3.5234840209999647 + 35.234840209999646im)
