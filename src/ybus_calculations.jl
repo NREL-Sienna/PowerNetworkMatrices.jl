@@ -267,8 +267,20 @@ function Ybus(
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
     if make_branch_admittance_matrices
-        yft = SparseArrays.sparse([1:length(fb); 1:length(fb)], [fb; tb], [y11; y12], length(fb), length(buses))
-        ytf = SparseArrays.sparse([1:length(tb); 1:length(tb)], [tb; fb], [y22; y21], length(tb), length(buses))
+        yft = SparseArrays.sparse(
+            [1:length(fb); 1:length(fb)],
+            [fb; tb],
+            [y11; y12],
+            length(fb),
+            length(buses),
+        )
+        ytf = SparseArrays.sparse(
+            [1:length(tb); 1:length(tb)],
+            [tb; fb],
+            [y22; y21],
+            length(tb),
+            length(buses),
+        )
     else
         yft = nothing
         ytf = nothing
