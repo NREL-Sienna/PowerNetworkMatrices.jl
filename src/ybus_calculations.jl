@@ -245,12 +245,15 @@ function Ybus(
     bus_ax = PSY.get_number.(buses)
     axes = (bus_ax, bus_ax)
     bus_lookup = make_ax_ref(bus_ax)
+    busnumber = length(buses)
     look_up = (bus_lookup, bus_lookup)
     y11, y12, y21, y22, ysh, fb, tb, sb = _buildybus(branches, buses, fixed_admittances)
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
         [y11; y12; y21; y22; ysh],  # values
+        busnumber,  # size (rows) - setting this explicitly is necessary for the case there are no branches 
+        busnumber,  # size (columns) - setting this explicitly is necessary for the case there are no branches
     )
     SparseArrays.dropzeros!(ybus)
     if check_connectivity && length(buses) > 1
