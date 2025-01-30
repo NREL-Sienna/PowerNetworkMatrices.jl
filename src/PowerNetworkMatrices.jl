@@ -20,7 +20,6 @@ export validate_connectivity
 export VirtualLODF
 export VirtualPTDF
 export Ybus
-export _buildybus
 
 using DocStringExtensions
 import InfrastructureSystems
