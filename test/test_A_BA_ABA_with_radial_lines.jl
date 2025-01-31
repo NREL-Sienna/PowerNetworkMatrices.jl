@@ -5,16 +5,17 @@
         # get the incidence matrix
         BA = BA_Matrix(sys)
         # ... and with radial lines
-        BA_rad = BA_Matrix(sys; reduce_radial_branches = true)
+        network_reduction = get_radial_reduction(sys)
+        BA_rad = BA_Matrix(sys; network_reduction = network_reduction)
         # get inidices for the leaf nodes
-        rb = BA_rad.radial_network_reduction
+        nr = BA_rad.network_reduction
         bus_numbers = []
-        for i in keys(rb.bus_reduction_map)
-            append!(bus_numbers, collect(rb.bus_reduction_map[i]))
+        for i in keys(nr.bus_reduction_map)
+            append!(bus_numbers, collect(nr.bus_reduction_map[i]))
         end
         bus_idx = setdiff(1:size(BA.data, 1), [BA.lookup[1][i] for i in bus_numbers])
         # ... and radial branches
-        br_idx = setdiff(1:size(BA.data, 2), [BA.lookup[2][i] for i in rb.radial_branches])
+        br_idx = setdiff(1:size(BA.data, 2), [BA.lookup[2][i] for i in nr.removed_branches])
         # now extract A matrix anc compare
         @test all(isapprox.(BA.data[bus_idx, br_idx], BA_rad.data))
     end
@@ -27,28 +28,28 @@ end
         # load the system
         sys = PSB.build_system(PSB.PSITestSystems, name)
 
-        # get the RadialNetworkReduction struct
-        rb = RadialNetworkReduction(IncidenceMatrix(sys))
+        # get the NetworkReduction struct
+        nr = get_radial_reduction(IncidenceMatrix(sys))
 
         # get the original and reduced IncidenceMatrix, BA and ABA
         A = IncidenceMatrix(sys)
-        A_rad = IncidenceMatrix(sys)
+        A_rad = IncidenceMatrix(sys; network_reduction = nr)
         BA = BA_Matrix(sys)
-        BA_rad = BA_Matrix(sys; reduce_radial_branches = true)
+        BA_rad = BA_Matrix(sys; network_reduction = nr)
         ABA = ABA_Matrix(sys; factorize = true)
-        ABA_rad = ABA_Matrix(sys; factorize = true, reduce_radial_branches = true)
+        ABA_rad = ABA_Matrix(sys; factorize = true, network_reduction = nr)
 
         # check if the same angles and flows are coputed with the matrices of the reduced systems
         # get the indices for the reduced system
         bus_numbers = []
-        for i in keys(rb.bus_reduction_map)
-            append!(bus_numbers, collect(rb.bus_reduction_map[i]))
+        for i in keys(nr.bus_reduction_map)
+            append!(bus_numbers, collect(nr.bus_reduction_map[i]))
         end
         bus_idx = setdiff(
             1:size(A.data, 2),
             append!([A.lookup[2][i] for i in bus_numbers], A.ref_bus_positions),
         )
-        br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in rb.radial_branches])
+        br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in nr.removed_branches])
 
         # now get the injuctions from the system
         n_buses = length(axes(BA, 1))
@@ -101,8 +102,8 @@ end
         reduce_flow_values = zeros((length(br_idx),))
         # change power injection for affrefated leaf buses
         power_injection2 = deepcopy(power_injection)
-        for i in keys(rb.bus_reduction_map)
-            for j in rb.bus_reduction_map[i]
+        for i in keys(nr.bus_reduction_map)
+            for j in nr.bus_reduction_map[i]
                 power_injection2[BA.lookup[1][i]] += power_injection[BA.lookup[1][j]]
             end
         end

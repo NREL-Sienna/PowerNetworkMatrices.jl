@@ -1,66 +1,19 @@
-struct RadialNetworkReduction
-    bus_reduction_map::Dict{Int, Set{Int}}
-    reverse_bus_search_map::Dict{Int, Int}
-    radial_branches::Set{String}
-    meshed_branches::Set{String}
+
+function get_radial_reduction(sys::PSY.System)
+    return get_radial_reduction(IncidenceMatrix(sys))
 end
 
-get_bus_reduction_map(rb::RadialNetworkReduction) = rb.bus_reduction_map
-get_reverse_bus_search_map(rb::RadialNetworkReduction) = rb.reverse_bus_search_map
-get_radial_branches(rb::RadialNetworkReduction) = rb.radial_branches
-get_meshed_branches(rb::RadialNetworkReduction) = rb.meshed_branches
-
-function Base.isempty(rb::RadialNetworkReduction)
-    if !isempty(rb.bus_reduction_map)
-        return false
-    end
-
-    if !isempty(rb.bus_reduction_map)
-        return false
-    end
-
-    if !isempty(rb.reverse_bus_search_map)
-        return false
-    end
-    return true
-end
-
-function RadialNetworkReduction(;
-    bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
-    reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}(),
-    radial_branches::Set{String} = Set{String}(),
-    meshed_branches::Set{String} = Set{String}())
-    return RadialNetworkReduction(
-        bus_reduction_map,
-        reverse_bus_search_map,
-        radial_branches,
-        meshed_branches,
-    )
-end
-
-"""
-Structure to collect information the branches in the system that are radial and can be
-ignored in the models.
-
-# Arguments
-- `A::IncidenceMatrix`: IncidenceMatrix
-
-"""
-function RadialNetworkReduction(A::IncidenceMatrix)
+function get_radial_reduction(A::IncidenceMatrix)
     return calculate_radial_branches(A.data, A.lookup[1], A.lookup[2], A.ref_bus_positions)
 end
 
-"""
-Structure to collect information the branches in the system that are radial and can be
-ignored in the models.
-
-# Arguments
-- `sys::PSY.System`: System Data
-"""
-
-function RadialNetworkReduction(sys::PSY.System)
-    return RadialNetworkReduction(IncidenceMatrix(sys))
-end
+#TODO: functions for composing multiple reductions
+#= function apply_radial_reduction!(network_reduction::NetworkReduction, A::IncidenceMatrix)
+    return 
+end 
+function apply_radial_reduction!(network_reduction::NetworkReduction, sys::PSY.System)
+    apply_radial_reduction!(network_reduction, IncidenceMatrix(sys))
+end  =#
 
 function _find_upstream_bus(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
@@ -217,11 +170,12 @@ function calculate_radial_branches(
         end
         push!(meshed_branches, k)
     end
-    return RadialNetworkReduction(
+    return NetworkReduction(
         bus_reduction_map_index,
         reverse_bus_search_map,
         radial_branches,
         meshed_branches,
+        Vector{Tuple{Int64, Int64, Float64}}(),
     )
 end
 
@@ -229,10 +183,10 @@ end
 Interface to obtain the parent bus number of a reduced bus when radial branches are eliminated
 
 # Arguments
-- `rb::RadialNetworkReduction`: RadialNetworkReduction object
+- `rb::NetworkReduction`: NetworkReduction object
 - `bus_number::Int`: Bus number of the reduced bus
 """
-function get_mapped_bus_number(rb::RadialNetworkReduction, bus_number::Int)
+function get_mapped_bus_number(rb::NetworkReduction, bus_number::Int)
     if isempty(rb)
         return bus_number
     end
@@ -243,25 +197,9 @@ end
 Interface to obtain the parent bus number of a reduced bus when radial branches are eliminated
 
 # Arguments
-- `rb::RadialNetworkReduction`: RadialNetworkReduction object
+- `rb::NetworkReduction`: NetworkReduction object
 - `bus::ACBus`: Reduced bus
 """
-function get_mapped_bus_number(rb::RadialNetworkReduction, bus::PSY.ACBus)
+function get_mapped_bus_number(rb::NetworkReduction, bus::PSY.ACBus)
     return get_mapped_bus_number(rb, PSY.get_number(bus))
-end
-
-##############################################################################
-########################### Auxiliary functions ##############################
-##############################################################################
-
-function isequal(
-    rb1::RadialNetworkReduction,
-    rb2::RadialNetworkReduction,
-)
-    for field in fieldnames(typeof(rb1))
-        if getfield(rb1, field) != getfield(rb2, field)
-            return false
-        end
-    end
-    return true
 end

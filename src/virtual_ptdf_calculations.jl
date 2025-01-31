@@ -42,9 +42,8 @@ matrix.
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
@@ -58,7 +57,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
-    radial_network_reduction::RadialNetworkReduction
+    network_reduction::NetworkReduction
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
@@ -89,9 +88,8 @@ VirtualPTDF struct with an empty cache.
         max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 function VirtualPTDF(
     branches,
@@ -100,7 +98,7 @@ function VirtualPTDF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
-    radial_network_reduction::RadialNetworkReduction = RadialNetworkReduction(),
+    network_reduction::NetworkReduction = NetworkReduction(),
 )
     if length(dist_slack) != 0
         @info "Distributed bus"
@@ -149,7 +147,7 @@ function VirtualPTDF(
         empty_cache,
         subnetworks,
         Ref(tol),
-        radial_network_reduction,
+        network_reduction,
     )
 end
 
@@ -165,31 +163,28 @@ struct with an empty cache.
 - `dist_slack::Vector{Float64}=Float64[]`:
         vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buse
-- `reduce_radial_branches::Bool=false`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
 function VirtualPTDF(
     sys::PSY.System;
     dist_slack::Vector{Float64} = Float64[],
-    reduce_radial_branches::Bool = false,
+    network_reduction::NetworkReduction = NetworkReduction(),
     kwargs...,
 )
-    if reduce_radial_branches
+    if !isempty(network_reduction)
         A = IncidenceMatrix(sys)
-        dist_slack, rb = redistribute_dist_slack(dist_slack, A)
-    else
-        rb = RadialNetworkReduction()
+        dist_slack = redistribute_dist_slack(dist_slack, A, network_reduction)
     end
-    branches = get_ac_branches(sys, rb.radial_branches)
-    buses = get_buses(sys, rb.bus_reduction_map)
+    branches = get_ac_branches(sys, network_reduction.removed_branches)
+    buses = get_buses(sys, network_reduction.bus_reduction_map)
     return VirtualPTDF(
         branches,
         buses;
         dist_slack = dist_slack,
-        radial_network_reduction = rb,
+        network_reduction = network_reduction,
         kwargs...,
     )
 end

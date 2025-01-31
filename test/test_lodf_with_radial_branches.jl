@@ -5,19 +5,20 @@
         sys = PSB.build_system(PSB.PSITestSystems, name)
 
         # get A, BA and ABA matrix with radial branches
-        A_rad = IncidenceMatrix(sys)
-        BA_rad = BA_Matrix(sys, ; reduce_radial_branches = true)
-        ABA_rad = ABA_Matrix(sys; reduce_radial_branches = true, factorize = true)
+        nr = get_radial_reduction(sys)
+        A_rad = IncidenceMatrix(sys; network_reduction = nr)
+        BA_rad = BA_Matrix(sys; network_reduction = nr)
+        ABA_rad = ABA_Matrix(sys; network_reduction = nr, factorize = true)
         ptdf = PTDF(sys)
-        ptdf_rad = PTDF(sys; reduce_radial_branches = true)
+        ptdf_rad = PTDF(sys; network_reduction = nr)
 
         # get the original and reduced PTDF matrices (consider different methods)
         lodf = LODF(sys)
-        lodf_rad = LODF(sys; reduce_radial_branches = true)
-        lodf_rad_A_BA_ABA = LODF(A_rad, ABA_rad, BA_rad; reduce_radial_branches = true)
-        lodf_rad_A_PTDF = LODF(A_rad, ptdf_rad; reduce_radial_branches = true)
+        lodf_rad = LODF(sys; network_reduction = nr)
+        lodf_rad_A_BA_ABA = LODF(A_rad, ABA_rad, BA_rad)
+        lodf_rad_A_PTDF = LODF(A_rad, ptdf_rad)
 
-        rb = RadialNetworkReduction(IncidenceMatrix(sys))
+        rb = get_radial_reduction(IncidenceMatrix(sys))
 
         # at first check if all the matrices are the same
         @test isapprox(lodf_rad.data, lodf_rad_A_BA_ABA.data, atol = 1e-10)
@@ -35,7 +36,7 @@
             append!([ptdf.lookup[1][i] for i in bus_numbers]),
         )
         br_idx =
-            setdiff(1:size(ptdf.data, 2), [ptdf.lookup[2][i] for i in rb.radial_branches])
+            setdiff(1:size(ptdf.data, 2), [ptdf.lookup[2][i] for i in rb.removed_branches])
         # now get the injections from the system
         n_buses = length(axes(ptdf, 1))
         bus_lookup = ptdf.lookup[1]
@@ -86,25 +87,15 @@ end
 
     # load the system
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
-
+    nr = get_radial_reduction(sys)
     # get A, BA and ABA matrix with radial branches
     A = IncidenceMatrix(sys)
-    BA_rad = BA_Matrix(sys, ; reduce_radial_branches = true)
+    BA_rad = BA_Matrix(sys; network_reduction = nr)
     ABA = ABA_Matrix(sys; factorize = true)
     ptdf = PTDF(sys)
-    ptdf_rad = PTDF(sys; reduce_radial_branches = true)
+    ptdf_rad = PTDF(sys; network_reduction = nr)
 
     # test LODF from A, ABA and BA
-    test_value = false
-    try
-        lodf_rad_A_BA_ABA = LODF(A, ABA, BA_rad; reduce_radial_branches = true)
-    catch err
-        if err isa Exception
-            test_value = true
-        end
-    end
-    @test test_value
-
     test_value = false
     try
         lodf_rad_A_BA_ABA = LODF(A, ABA, BA_rad)
@@ -118,7 +109,7 @@ end
     # test LODF from A, PTDF
     test_value = false
     try
-        lodf_rad_A_PTDF = LODF(A_rad, ptdf; reduce_radial_branches = true)
+        lodf_rad_A_PTDF = LODF(A_rad, ptdf)
     catch err
         if err isa Exception
             test_value = true
