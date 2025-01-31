@@ -252,6 +252,7 @@ function Ybus(
     check_connectivity::Bool = true,
     network_reduction = NetworkReduction(),
     make_branch_admittance_matrices::Bool = false,
+    network_reduction = NetworkReduction(),
 )
     bus_ax = PSY.get_number.(buses)
     axes = (bus_ax, bus_ax)
