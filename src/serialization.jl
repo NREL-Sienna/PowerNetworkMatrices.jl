@@ -90,7 +90,7 @@ function from_hdf5(::Type{PTDF}, filename::AbstractString)
             subnetworks,
             ref_bus_positions,
             tol,
-            RadialNetworkReduction(),
+            NetworkReduction(),
         )
     end
 end
