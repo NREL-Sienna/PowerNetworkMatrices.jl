@@ -12,15 +12,15 @@ Incidence matrix: shows connection between buses, defining lines
         and buses with their enumerated indexes.
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indices of the reference slack buses.
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
+    network_reduction::NetworkReduction
 end
 
 # functions to get stored data
@@ -35,15 +35,15 @@ values.
 # Arguments
 - `sys::PSY.System`:
         the PowerSystem system to consider
-- `reduce_radial_branches::Bool`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 function IncidenceMatrix(
-    sys::PSY.System,
+    sys::PSY.System;
+    network_reduction::NetworkReduction = NetworkReduction(),
 )
-    data, axes, lookup, ref_bus_positions = evaluate_A_matrix_values(sys)
-    return IncidenceMatrix(data, axes, lookup, ref_bus_positions)
+    data, axes, lookup, ref_bus_positions = evaluate_A_matrix_values(sys, network_reduction)
+    return IncidenceMatrix(data, axes, lookup, ref_bus_positions, network_reduction)
 end
 
 """
@@ -52,29 +52,19 @@ values.
 
 # Arguments
 - `sys::PSY.System`: the PowerSystem system to consider
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 function evaluate_A_matrix_values(
     sys::PSY.System,
+    nr::NetworkReduction,
 )
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
+    branches = get_ac_branches(sys, nr.removed_branches)
+    buses = get_buses(sys, nr.bus_reduction_map)
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
     data, ref_bus_positions = calculate_A_matrix(branches, buses)
     axes = (line_ax, bus_ax)
     lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
     return data, axes, lookup, ref_bus_positions
-end
-
-function reduce_A_matrix(
-    A::IncidenceMatrix,
-    bus_reduction_map::Dict{Int, Set{Int}},
-    meshed_branches::Set{String},
-)
-    branch_ixs = sort!([A.lookup[1][k] for k in meshed_branches])
-    bus_ixs = sort!([A.lookup[2][k] for k in keys(bus_reduction_map)])
-    return A.data[branch_ixs, bus_ixs]
 end
