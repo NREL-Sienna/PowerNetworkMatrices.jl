@@ -501,8 +501,6 @@ function PTDF(
 )
     validate_linear_solver(linear_solver)
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
-    @show A.network_reduction
-    @show BA.network_reduction
     if !isequal(A.network_reduction, BA.network_reduction)
         error("A and BA matrices have non-equivalent network reductions.")
     end
