@@ -7,6 +7,7 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     data::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
     axes::Ax
     lookup::L
+    network_reduction::NetworkReduction
 end
 
 function _ybus!(
@@ -175,6 +176,7 @@ function Ybus(
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}();
     check_connectivity::Bool = true,
+    network_reduction = NetworkReduction(),
 )
     bus_ax = PSY.get_number.(buses)
     axes = (bus_ax, bus_ax)
@@ -185,7 +187,7 @@ function Ybus(
         islands = find_subnetworks(ybus, bus_ax)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
-    return Ybus(ybus, axes, look_up)
+    return Ybus(ybus, axes, look_up, network_reduction)
 end
 
 """
@@ -194,9 +196,17 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 # Arguments
 - `check_connectivity::Bool`: Checks connectivity of the network
 """
-function Ybus(sys::PSY.System; kwargs...)
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
+function Ybus(
+    sys::PSY.System;
+    network_reduction::NetworkReduction = NetworkReduction(),
+    kwargs...,
+)
+    branches = get_ac_branches(sys, network_reduction.removed_branches)
+    buses = get_buses(sys, network_reduction.bus_reduction_map)
+
+    if !isempty(network_reduction.virtual_admittances)
+        #TODO - modify Ybus with virtual admittances computed during ward.
+    end
     fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
     return Ybus(
         branches,
@@ -206,7 +216,7 @@ function Ybus(sys::PSY.System; kwargs...)
     )
 end
 
-"""
+#= """
 Nodal incidence matrix (Adjacency) is an N x N matrix describing a power system with N buses. It represents the directed connectivity of the buses in a power system.
 
 The Adjacency Struct is indexed using the Bus Numbers, no need for them to be sequential
@@ -268,7 +278,7 @@ function Adjacency(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     )
     branches = PSY.get_components(PSY.get_available, PSY.Branch, sys)
     return Adjacency(branches, nodes; check_connectivity = check_connectivity, kwargs...)
-end
+end =#
 
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
     node_count = size(ybus)[1]
