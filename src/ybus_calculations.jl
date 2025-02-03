@@ -2,6 +2,10 @@
 Nodal admittance matrix (Ybus) is an N x N matrix describing a power system with N buses. It represents the nodal admittance of the buses in a power system.
 
 The Ybus Struct is indexed using the Bus Numbers, no need for them to be sequential
+
+The fields yft and ytf are the branch admittance matrices for the from-to and to-from branch admittances respectively. They are indexed with the branch numbers and the bus numbers.
+The branch numbers are sequential. The bus numbers are represented by fb, tb arraus of sequential bus indices (internal bus indices). 
+Using yft, ytf, and the voltage vector, the branch currents and power flows can be calculated.
 """
 struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     data::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
@@ -9,9 +13,8 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     lookup::L
     yft::Union{SparseArrays.SparseMatrixCSC{ComplexF64, Int}, Nothing}
     ytf::Union{SparseArrays.SparseMatrixCSC{ComplexF64, Int}, Nothing}
-    fb::Vector{Int64}
-    tb::Vector{Int64}
-    sb::Vector{Int64}
+    fb::Union{Vector{Int64}, Nothing}
+    tb::Union{Vector{Int64}, Nothing}
 end
 
 function _ybus!(
@@ -284,8 +287,10 @@ function Ybus(
     else
         yft = nothing
         ytf = nothing
+        fb = nothing
+        tb = nothing
     end
-    return Ybus(ybus, axes, look_up, yft, ytf, fb, tb, sb)
+    return Ybus(ybus, axes, look_up, yft, ytf, fb, tb)
 end
 
 """
