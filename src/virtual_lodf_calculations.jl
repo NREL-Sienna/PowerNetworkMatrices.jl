@@ -102,9 +102,8 @@ struct with an empty cache.
         PSY system for which the matrix is constructed
 
 # Keyword Arguments
-- `reduce_radial_branches::Bool=false`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
