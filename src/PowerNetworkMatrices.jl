@@ -10,6 +10,7 @@ export get_ptdf_data
 export get_lodf_data
 export get_bus_reduction_map
 export get_radial_reduction
+export get_ward_reduction
 export get_removed_branches
 export IncidenceMatrix
 export is_factorized
@@ -66,6 +67,7 @@ include("network_reduction.jl")
 include("incedence_matrix.jl")
 include("adjacency_matrix.jl")
 include("radial_reduction.jl")
+include("ward_reduction.jl")
 include("common.jl")
 include("BA_ABA_matrices.jl")
 include("definitions.jl")
