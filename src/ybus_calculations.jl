@@ -4,7 +4,7 @@ Nodal admittance matrix (Ybus) is an N x N matrix describing a power system with
 The Ybus Struct is indexed using the Bus Numbers, no need for them to be sequential
 
 The fields yft and ytf are the branch admittance matrices for the from-to and to-from branch admittances respectively. They are indexed with the branch numbers and the bus numbers.
-The branch numbers are sequential. The bus numbers are represented by fb, tb arraus of sequential bus indices (internal bus indices). 
+The branch numbers are sequential. The bus numbers are represented by fb, tb arrays of sequential bus indices (internal bus indices). 
 Using yft, ytf, and the voltage vector, the branch currents and power flows can be calculated.
 """
 struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
