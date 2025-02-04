@@ -3,7 +3,7 @@ struct NetworkReduction
     reverse_bus_search_map::Dict{Int, Int}
     removed_branches::Set{String}
     retained_branches::Set{String}
-    virtual_admittances::Vector{Tuple{Int64, Int64, Float64}}
+    virtual_admittances::Vector{Tuple{Int64, Int64, ComplexF64}}
 end
 
 get_bus_reduction_map(rb::NetworkReduction) = rb.bus_reduction_map
@@ -27,8 +27,8 @@ function NetworkReduction(;
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}(),
     removed_branches::Set{String} = Set{String}(),
     retained_branches::Set{String} = Set{String}(),
-    virtual_admittances::Vector{Tuple{Int64, Int64, Float64}} = Vector{
-        Tuple{Int64, Int64, Float64},
+    virtual_admittances::Vector{Tuple{Int64, Int64, ComplexF64}} = Vector{
+        Tuple{Int64, Int64, ComplexF64},
     }())
     return NetworkReduction(
         bus_reduction_map,
