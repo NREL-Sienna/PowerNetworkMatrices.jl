@@ -1,8 +1,19 @@
+"""
+Builds a NetworkReduction by removing radially connected buses. 
 
+# Arguments
+- `sys::System`
+"""
 function get_radial_reduction(sys::PSY.System)
     return get_radial_reduction(IncidenceMatrix(sys))
 end
 
+"""
+Builds a NetworkReduction by removing radially connected buses. 
+
+# Arguments
+- `A::IncidenceMatrix`
+"""
 function get_radial_reduction(A::IncidenceMatrix)
     return calculate_radial_branches(A.data, A.lookup[1], A.lookup[2], A.ref_bus_positions)
 end
