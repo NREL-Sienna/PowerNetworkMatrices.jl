@@ -4,7 +4,8 @@
     wr = get_ward_reduction(sys, study_buses)   #[4 and 7 = boundary; 3, 8, 9, 6  = external]
     external_buses =
         setdiff([get_number(x) for x in get_components(ACBus, sys)], study_buses)
-    @test !isempty(wr.virtual_admittances)
+    @test !isempty(wr.added_admittances)
+    @test !isempty(wr.added_branches)
     for external_bus in external_buses
         @test external_bus ∉ keys(wr.bus_reduction_map)
         @test external_bus ∈ keys(wr.reverse_bus_search_map)
@@ -18,7 +19,8 @@ end
     wr = get_ward_reduction(sys, study_buses)
     external_buses =
         setdiff([get_number(x) for x in get_components(ACBus, sys)], study_buses)
-    @test !isempty(wr.virtual_admittances)
+    @test !isempty(wr.added_admittances)
+    @test !isempty(wr.added_branches)
     for external_bus in external_buses
         @test external_bus ∉ keys(wr.bus_reduction_map)
         @test external_bus ∈ keys(wr.reverse_bus_search_map)
