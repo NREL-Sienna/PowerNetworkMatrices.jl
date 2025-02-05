@@ -77,10 +77,62 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
     # Eq. (2.16) from  https://core.ac.uk/download/pdf/79564835.pdf
     y_eq = y_be * KLU.solve!(klu(y_ee), Matrix(y_eb))
 
-    virtual_admittances = Vector{Tuple{Int64, Int64, ComplexF64}}()
-    for (ix, x) in enumerate(boundary_buses)
-        for (iy, y) in enumerate(boundary_buses)
-            push!(virtual_admittances, (x, y, y_eq[ix, iy]))
+    added_branches = Vector{PSY.Branch}()
+    added_admittances = Vector{PSY.FixedAdmittance}()
+    virtual_admittance_name_index = 1
+    virtual_branch_name_index = 1
+    #Loop upper diagonal of Yeq
+    for ix in 1:length(boundary_buses)
+        for jx in ix:length(boundary_buses)
+            if y_eq[ix, jx] != 0.0
+                if ix == jx
+                    bus = collect(
+                        PSY.get_components(
+                            x -> PSY.get_number(x) == boundary_buses[ix],
+                            PSY.ACBus,
+                            sys,
+                        ),
+                    )[1]
+                    virtual_admittance = PSY.FixedAdmittance(;
+                        name = "virtual_admittance_$(virtual_admittance_name_index)",
+                        available = true,
+                        bus = bus,
+                        Y = y_eq[ix, jx],
+                    )
+                    push!(added_admittances, virtual_admittance)
+                    virtual_admittance_name_index += 1
+                else
+                    to_bus = collect(
+                        PSY.get_components(
+                            x -> PSY.get_number(x) == boundary_buses[ix],
+                            PSY.ACBus,
+                            sys,
+                        ),
+                    )[1]
+                    from_bus = collect(
+                        PSY.get_components(
+                            x -> PSY.get_number(x) == boundary_buses[jx],
+                            PSY.ACBus,
+                            sys,
+                        ),
+                    )[1]
+                    virtual_branch = PSY.Line(;
+                        name = "virtual_branch_$(virtual_branch_name_index)",
+                        available = true,
+                        active_power_flow = 0.0,
+                        reactive_power_flow = 0.0,
+                        arc = PSY.Arc(; from = from_bus, to = to_bus),
+                        r = -1 * real(y_eq[ix, jx]),
+                        x = -1 * imag(y_eq[ix, jx]),
+                        b = (from = 0.0, to = 0.0),
+                        rating = 100.0,
+                        angle_limits = (min = (-pi / 3), max = (pi / 3)),
+                        g = (from = 0.0, to = 0.0),
+                    )
+                    push!(added_branches, virtual_branch)
+                    virtual_branch_name_index += 1
+                end
+            end
         end
     end
 
@@ -89,6 +141,7 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
         reverse_bus_search_map = reverse_bus_search_map,
         removed_branches = removed_branches,
         retained_branches = retained_branches,
-        virtual_admittances = virtual_admittances,
+        added_branches = added_branches,
+        added_admittances = added_admittances,
     )
 end
