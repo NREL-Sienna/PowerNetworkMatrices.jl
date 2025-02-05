@@ -3,14 +3,16 @@ struct NetworkReduction
     reverse_bus_search_map::Dict{Int, Int}
     removed_branches::Set{String}
     retained_branches::Set{String}
-    virtual_admittances::Vector{Tuple{Int64, Int64, ComplexF64}}
+    added_branches::Vector{PSY.Branch}
+    added_admittances::Vector{PSY.FixedAdmittance}
 end
 
 get_bus_reduction_map(rb::NetworkReduction) = rb.bus_reduction_map
 get_reverse_bus_search_map(rb::NetworkReduction) = rb.reverse_bus_search_map
 get_removed_branches(rb::NetworkReduction) = rb.removed_branches
 get_retained_branches(rb::NetworkReduction) = rb.retained_branches
-get_virtual_admittances(rb::NetworkReduction) = rb.virtual_admittances
+get_added_branches(rb::NetworkReduction) = rb.added_branches
+get_added_admittances(rb::NetworkReduction) = rb.added_admittances
 
 function Base.isempty(rb::NetworkReduction)
     if !isempty(rb.bus_reduction_map)
@@ -27,15 +29,16 @@ function NetworkReduction(;
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}(),
     removed_branches::Set{String} = Set{String}(),
     retained_branches::Set{String} = Set{String}(),
-    virtual_admittances::Vector{Tuple{Int64, Int64, ComplexF64}} = Vector{
-        Tuple{Int64, Int64, ComplexF64},
-    }())
+    added_branches::Vector{PSY.Branch} = Vector{PSY.Branch}(),
+    added_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
+)
     return NetworkReduction(
         bus_reduction_map,
         reverse_bus_search_map,
         removed_branches,
         retained_branches,
-        virtual_admittances,
+        added_branches,
+        added_admittances,
     )
 end
 
