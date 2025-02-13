@@ -6,6 +6,7 @@ Builds a NetworkReduction corresponding to Ward reduction
 - `study_buses::Vector{Int}`: Bus numbers corresponding to the area of study (the retained area)
 """
 function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
+    _validate_study_buses(sys, study_buses)
     boundary_buses = Vector{Int64}()
     for branch in PSY.get_components(PSY.ACBranch, sys)
         from_bus = PSY.get_number(PSY.get_from(PSY.get_arc(branch)))
@@ -37,9 +38,8 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
             push!(retained_branches, PSY.get_name(branch))
         end
     end
-    y_bus = Ybus(sys)
+    y_bus = Ybus(sys; check_connectivity = false)
     Z_full = KLU.solve!(klu(y_bus.data), Matrix(one(y_bus.data))) #TODO: change implementation for large systems (row by row)
-    @assert length(all_buses) < 1000
 
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
     bus_lookup = y_bus.lookup[1]    #y_bus and Z have same lookup
@@ -77,7 +77,7 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
     # Eq. (2.16) from  https://core.ac.uk/download/pdf/79564835.pdf
     y_eq = y_be * KLU.solve!(klu(y_ee), Matrix(y_eb))
 
-    added_branches = Vector{PSY.Branch}()
+    added_branches = Vector{PSY.ACBranch}()
     added_admittances = Vector{PSY.FixedAdmittance}()
     virtual_admittance_name_index = 1
     virtual_branch_name_index = 1
@@ -144,4 +144,46 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
         added_branches = added_branches,
         added_admittances = added_admittances,
     )
+end
+
+function _validate_study_buses(sys, study_buses)
+    buses = get_buses(sys, Dict{Int64, Set{Int64}}())
+    branches = get_ac_branches(sys, Set{String}())
+
+    bus_numbers = PSY.get_number.(buses)
+    for b in study_buses
+        b ∉ bus_numbers && throw(IS.DataFormatError("Study bus $b not found in system"))
+    end
+    M, _ = calculate_adjacency(branches, buses)
+    bus_ax = PSY.get_number.(buses)
+    sub_nets = find_subnetworks(M, bus_ax)
+    if length(sub_nets) > 1
+        @warn "System contains multiple islands"
+    end
+
+    slack_bus_numbers =
+        [PSY.get_number(n) for n in buses if PSY.get_bustype(n) == ACBusTypes.REF]
+    for (_, v) in sub_nets
+        all_in = all(x -> x in Set(v), study_buses)
+        none_in = all(x -> !(x in Set(v)), study_buses)
+        if all_in
+            @warn "The study buses comprise an entire island; ward reduction will not modify this island and other islands will be eliminated"
+        end
+        if !(all_in || none_in)
+            throw(
+                IS.DataFormatError(
+                    "All study_buses must occur in a single synchronously connected system.",
+                ),
+            )
+        end
+        for sb in slack_bus_numbers
+            if sb in v && sb ∉ study_buses && !(none_in)
+                throw(
+                    IS.DataFormatError(
+                        "Slack bus $sb must be included in the study buses for an area that is partially reduced",
+                    ),
+                )
+            end
+        end
+    end
 end
