@@ -203,11 +203,14 @@ function Ybus(
 )
     branches = get_ac_branches(sys, network_reduction.removed_branches)
     buses = get_buses(sys, network_reduction.bus_reduction_map)
-
-    if !isempty(network_reduction.added_admittances)
-        #TODO - modify Ybus with virtual admittances computed during ward.
+    fixed_admittances =
+        collect(PSY.get_components(x -> PSY.get_bus(x) in buses, PSY.FixedAdmittance, sys))
+    if !isempty(network_reduction.added_branches)
+        branches = vcat(branches, network_reduction.added_branches)
     end
-    fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
+    if !isempty(network_reduction.added_admittances)
+        fixed_admittances = vcat(fixed_admittances, network_reduction.added_admittances)
+    end
     return Ybus(
         branches,
         buses,

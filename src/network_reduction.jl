@@ -3,7 +3,7 @@ struct NetworkReduction
     reverse_bus_search_map::Dict{Int, Int}
     removed_branches::Set{String}
     retained_branches::Set{String}
-    added_branches::Vector{PSY.Branch}
+    added_branches::Vector{PSY.ACBranch}
     added_admittances::Vector{PSY.FixedAdmittance}
 end
 
@@ -29,7 +29,7 @@ function NetworkReduction(;
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}(),
     removed_branches::Set{String} = Set{String}(),
     retained_branches::Set{String} = Set{String}(),
-    added_branches::Vector{PSY.Branch} = Vector{PSY.Branch}(),
+    added_branches::Vector{PSY.ACBranch} = Vector{PSY.ACBranch}(),
     added_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
 )
     return NetworkReduction(

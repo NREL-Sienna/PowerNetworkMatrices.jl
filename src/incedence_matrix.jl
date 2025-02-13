@@ -60,6 +60,9 @@ function evaluate_A_matrix_values(
     nr::NetworkReduction,
 )
     branches = get_ac_branches(sys, nr.removed_branches)
+    if !isempty(nr.added_branches)
+        branches = vcat(branches, nr.added_branches)
+    end
     buses = get_buses(sys, nr.bus_reduction_map)
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
