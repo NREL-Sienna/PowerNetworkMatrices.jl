@@ -42,6 +42,9 @@ function BA_Matrix(
 )
     branches = get_ac_branches(sys, network_reduction.removed_branches)
     buses = get_buses(sys, network_reduction.bus_reduction_map)
+    if !isempty(network_reduction.added_branches)
+        branches = vcat(branches, network_reduction.added_branches)
+    end
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
     line_ax = [PSY.get_name(branch) for branch in branches]
@@ -103,6 +106,9 @@ function ABA_Matrix(
     network_reduction::NetworkReduction = NetworkReduction(),
 )
     branches = get_ac_branches(sys, network_reduction.removed_branches)
+    if !isempty(network_reduction.added_branches)
+        branches = vcat(branches, network_reduction.added_branches)
+    end
     buses = get_buses(sys, network_reduction.bus_reduction_map)
     bus_lookup = make_ax_ref(buses)
 

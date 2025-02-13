@@ -331,6 +331,9 @@ function LODF(
 )
     branches = get_ac_branches(sys, network_reduction.removed_branches)
     buses = get_buses(sys, network_reduction.bus_reduction_map)
+    if !isempty(network_reduction.added_branches)
+        branches = vcat(branches, network_reduction.added_branches)
+    end
     return LODF(branches, buses; network_reduction = network_reduction, kwargs...)
 end
 

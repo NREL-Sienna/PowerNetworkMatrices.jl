@@ -186,7 +186,7 @@ function calculate_radial_branches(
         reverse_bus_search_map,
         radial_branches,
         meshed_branches,
-        Vector{PSY.Branch}(),
+        Vector{PSY.ACBranch}(),
         Vector{PSY.FixedAdmittance}(),
     )
 end
