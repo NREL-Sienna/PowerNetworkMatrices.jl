@@ -29,7 +29,7 @@ end
         sys = PSB.build_system(PSB.PSITestSystems, name)
 
         # get the NetworkReduction struct
-        nr = get_radial_reduction(IncidenceMatrix(sys))
+        nr = get_radial_reduction(sys)
 
         # get the original and reduced IncidenceMatrix, BA and ABA
         A = IncidenceMatrix(sys)
