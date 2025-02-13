@@ -44,16 +44,16 @@ Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix
 function AdjacencyMatrix(
     sys::PSY.System;
     check_connectivity::Bool = true,
-    nr::NetworkReduction = NetworkReduction(),
+    network_reduction::NetworkReduction = NetworkReduction(),
     kwargs...,
 )
-    buses = get_buses(sys, nr.bus_reduction_map)
-    branches = get_ac_branches(sys, nr.removed_branches)
+    buses = get_buses(sys, network_reduction.bus_reduction_map)
+    branches = get_ac_branches(sys, network_reduction.removed_branches)
     return AdjacencyMatrix(
         branches,
         buses;
         check_connectivity = check_connectivity,
-        network_reduction = nr,
+        network_reduction = network_reduction,
         kwargs...,
     )
 end
