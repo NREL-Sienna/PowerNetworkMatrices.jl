@@ -1,6 +1,7 @@
 function _basic_test_ward_reduction(sys, study_buses)
     wr = get_ward_reduction(sys, study_buses)
     @test isa(wr, NetworkReduction)
+    @test get_reduction_type(wr) == NetworkReductionTypes.WARD
     external_buses =
         setdiff([get_number(x) for x in get_components(ACBus, sys)], study_buses)
     @test !isempty(wr.added_admittances)
@@ -196,5 +197,3 @@ end
     @test_throws IS.DataFormatError get_ward_reduction(sys, [1, 2, 3, 4, 5, 100])
     @test_throws IS.DataFormatError get_ward_reduction(sys, [2, 3, 4])
 end
-
-
