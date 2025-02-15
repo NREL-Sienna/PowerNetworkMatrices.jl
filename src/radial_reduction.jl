@@ -4,9 +4,17 @@ Builds a NetworkReduction by removing radially connected buses.
 # Arguments
 - `sys::System`
 """
-function get_radial_reduction(sys::PSY.System)
-    A = IncidenceMatrix(sys)
-    exempt_buses = _find_exempt_buses(sys)
+function get_radial_reduction(sys::PSY.System; exempt_buses::Vector{Int64} = Int64[])
+    return get_radial_reduction(IncidenceMatrix(sys); exempt_buses = exempt_buses)
+end
+
+"""
+Builds a NetworkReduction by removing radially connected buses. 
+
+# Arguments
+- `A::IncidenceMatrix`: IncidenceMatrix
+"""
+function get_radial_reduction(A::IncidenceMatrix; exempt_buses::Vector{Int64} = Int64[])
     exempt_bus_positions = [A.lookup[2][x] for x in exempt_buses]
     return calculate_radial_branches(
         A.data,
@@ -14,24 +22,6 @@ function get_radial_reduction(sys::PSY.System)
         A.lookup[2],
         union(A.ref_bus_positions, Set(exempt_bus_positions)),
     )
-end
-
-function _find_exempt_buses(sys::PSY.System)
-    exempt_buses = Set{Int64}()
-    buses = get_buses(sys, Dict{Int64, Set{Int64}}())
-    branches = get_ac_branches(sys, Set{String}())
-    M, _ = calculate_adjacency(branches, buses)
-    bus_ax = PSY.get_number.(buses)
-    sub_nets = find_subnetworks(M, bus_ax)
-    for (_, subnet_buses) in sub_nets
-        if length(subnet_buses) < 10
-            @warn "The system contains a small island with $(length(subnet_buses)) buses; by default, islands with less than 10 buses are not radially reduced as they often represent aggregated interconnections."
-            for b in subnet_buses
-                push!(exempt_buses, b)
-            end
-        end
-    end
-    return exempt_buses
 end
 
 #TODO: functions for composing multiple reductions
