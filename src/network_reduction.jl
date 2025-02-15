@@ -5,6 +5,7 @@ struct NetworkReduction
     retained_branches::Set{String}
     added_branches::Vector{PSY.ACBranch}
     added_admittances::Vector{PSY.FixedAdmittance}
+    reduction_type::Union{Nothing, NetworkReductionTypes}
 end
 
 get_bus_reduction_map(rb::NetworkReduction) = rb.bus_reduction_map
@@ -13,6 +14,7 @@ get_removed_branches(rb::NetworkReduction) = rb.removed_branches
 get_retained_branches(rb::NetworkReduction) = rb.retained_branches
 get_added_branches(rb::NetworkReduction) = rb.added_branches
 get_added_admittances(rb::NetworkReduction) = rb.added_admittances
+get_reduction_type(rb::NetworkReduction) = rb.reduction_type
 
 function Base.isempty(rb::NetworkReduction)
     if !isempty(rb.bus_reduction_map)
@@ -31,6 +33,7 @@ function NetworkReduction(;
     retained_branches::Set{String} = Set{String}(),
     added_branches::Vector{PSY.ACBranch} = Vector{PSY.ACBranch}(),
     added_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
+    reduction_type::Union{Nothing, NetworkReductionTypes} = nothing,
 )
     return NetworkReduction(
         bus_reduction_map,
@@ -39,6 +42,7 @@ function NetworkReduction(;
         retained_branches,
         added_branches,
         added_admittances,
+        reduction_type,
     )
 end
 
