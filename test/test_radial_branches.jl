@@ -158,6 +158,6 @@ end
 
 @testset "Small island exception for radial reduction" begin
     sys = build_hvdc_with_small_island()
-    rr = get_radial_reduction(sys)
+    rr = get_radial_reduction(sys; exempt_buses = [16, 17])
     @test isa(PTDF(sys; network_reduction = rr), PTDF)
 end
