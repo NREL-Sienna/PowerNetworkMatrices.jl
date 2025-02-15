@@ -15,6 +15,7 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     ytf::Union{SparseArrays.SparseMatrixCSC{ComplexF64, Int}, Nothing}
     fb::Union{Vector{Int64}, Nothing}
     tb::Union{Vector{Int64}, Nothing}
+    network_reduction::NetworkReduction
 end
 
 function _ybus!(
@@ -249,6 +250,7 @@ function Ybus(
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}();
     check_connectivity::Bool = true,
+    network_reduction = NetworkReduction(),
     make_branch_admittance_matrices::Bool = false,
 )
     bus_ax = PSY.get_number.(buses)
@@ -290,7 +292,7 @@ function Ybus(
         fb = nothing
         tb = nothing
     end
-    return Ybus(ybus, axes, look_up, yft, ytf, fb, tb)
+    return Ybus(ybus, axes, look_up, yft, ytf, fb, tb, network_reduction)
 end
 
 """
@@ -299,10 +301,21 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 # Arguments
 - `check_connectivity::Bool`: Checks connectivity of the network
 """
-function Ybus(sys::PSY.System; kwargs...)
-    branches = get_ac_branches(sys)
-    buses = get_buses(sys)
-    fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
+function Ybus(
+    sys::PSY.System;
+    network_reduction::NetworkReduction = NetworkReduction(),
+    kwargs...,
+)
+    branches = get_ac_branches(sys, network_reduction.removed_branches)
+    buses = get_buses(sys, network_reduction.bus_reduction_map)
+    fixed_admittances =
+        collect(PSY.get_components(x -> PSY.get_bus(x) in buses, PSY.FixedAdmittance, sys))
+    if !isempty(network_reduction.added_branches)
+        branches = vcat(branches, network_reduction.added_branches)
+    end
+    if !isempty(network_reduction.added_admittances)
+        fixed_admittances = vcat(fixed_admittances, network_reduction.added_admittances)
+    end
     return Ybus(
         branches,
         buses,
@@ -311,7 +324,7 @@ function Ybus(sys::PSY.System; kwargs...)
     )
 end
 
-"""
+#= """
 Nodal incidence matrix (Adjacency) is an N x N matrix describing a power system with N buses. It represents the directed connectivity of the buses in a power system.
 
 The Adjacency Struct is indexed using the Bus Numbers, no need for them to be sequential
@@ -373,7 +386,7 @@ function Adjacency(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
     )
     branches = PSY.get_components(PSY.get_available, PSY.Branch, sys)
     return Adjacency(branches, nodes; check_connectivity = check_connectivity, kwargs...)
-end
+end =#
 
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
     node_count = size(ybus)[1]
