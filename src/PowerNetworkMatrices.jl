@@ -19,7 +19,6 @@ export LODF
 export PTDF
 export NetworkReduction
 export NetworkReductionTypes
-
 export to_hdf5
 export validate_connectivity
 export VirtualLODF
