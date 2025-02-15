@@ -143,6 +143,7 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
         retained_branches = retained_branches,
         added_branches = added_branches,
         added_admittances = added_admittances,
+        reduction_type = NetworkReductionTypes.WARD,
     )
 end
 
