@@ -204,6 +204,7 @@ function calculate_radial_branches(
         meshed_branches,
         Vector{PSY.ACBranch}(),
         Vector{PSY.FixedAdmittance}(),
+        NetworkReductionTypes.RADIAL,
     )
 end
 
