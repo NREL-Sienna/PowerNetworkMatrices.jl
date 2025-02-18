@@ -5,7 +5,7 @@ end
 
 function _add_to_collection!(
     ::Vector{PSY.ACBranch},
-    ::Union{PSY.TwoTerminalHVDCLine, PSY.TwoTerminalVSCDCLine},
+    ::Union{PSY.TwoTerminalGenericHVDCLine, PSY.TwoTerminalVSCLine, PSY.TwoTerminalLCCLine},
 )
     return
 end
