@@ -201,6 +201,7 @@ end
 
 function _buildybus(
     branches,
+    transformer_3W,
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
@@ -208,7 +209,7 @@ function _buildybus(
 )
     num_bus = Dict{Int, Int}()
     reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
-    branchcount = length(branches)
+    branchcount = length(branches) + 3 * length(transformer_3W)
     fa_count = length(fixed_admittances)
     sa_count = length(switched_admittances)
     fb = zeros(Int64, branchcount)
@@ -304,10 +305,14 @@ function Ybus(
     if !isempty(network_reduction.added_admittances)
         fixed_admittances = vcat(fixed_admittances, network_reduction.added_admittances)
     end
+    xfrm_3w = get_transformers_3w(sys)
+    fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
+    switched_admittances = collect(PSY.get_components(PSY.SwitchedAdmittance, sys))
     return Ybus(
         branches,
         buses,
-        fixed_admittances;
+        fixed_admittances,
+        switched_admittances;
         network_reduction = network_reduction,
         kwargs...,
     )
