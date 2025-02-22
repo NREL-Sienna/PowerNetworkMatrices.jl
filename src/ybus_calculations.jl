@@ -196,13 +196,14 @@ end
 
 function _buildybus(
     branches,
+    transformer_3W,
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
 )
     num_bus = Dict{Int, Int}()
 
-    branchcount = length(branches)
+    branchcount = length(branches) + 3 * length(transformer_3W)
     fa_count = length(fixed_admittances)
     sa_count = length(switched_admittances)
     fb = zeros(Int64, branchcount)
@@ -305,6 +306,7 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 """
 function Ybus(sys::PSY.System; kwargs...)
     branches = get_ac_branches(sys)
+    xfrm_3w = get_transformers_3w(sys)
     buses = get_buses(sys)
     fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
     switched_admittances = collect(PSY.get_components(PSY.SwitchedAdmittance, sys))

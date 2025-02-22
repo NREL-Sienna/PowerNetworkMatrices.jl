@@ -18,7 +18,11 @@ function get_ac_branches(
     radial_branches::Set{String} = Set{String}(),
 )::Vector{PSY.ACBranch}
     collection = Vector{PSY.ACBranch}()
-    for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
+    for br in PSY.get_components(
+        x -> PSY.get_available(x) && !(typeof(x) <: PSY.Transformer3W),
+        PSY.ACBranch,
+        sys,
+    )
         arc = PSY.get_arc(br)
         if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
             throw(
@@ -40,6 +44,49 @@ function get_ac_branches(
     end
     return sort!(collection;
         by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
+    )
+end
+
+"""
+Gets the AC branches from a given Systems.
+"""
+function get_transformers_3w(
+    sys::PSY.System,
+    radial_branches::Set{String} = Set{String}(),
+)::Vector{PSY.Transformer3W}
+    collection = Vector{PSY.Transformer3W}()
+    for br in PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys)
+        ps_arc = PSY.get_primary_secondary_arc(br)
+        st_arc = PSY.get_secondary_tertiary_arc(br)
+        if PSY.get_bustype(ps_arc.from) == ACBusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.from))",
+                ),
+            )
+        end
+        if PSY.get_bustype(ps_arc.to) == ACBusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.to))",
+                ),
+            )
+        end
+        if PSY.get_bustype(st_arc.to) == ACBusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(st_arc.to))",
+                ),
+            )
+        end
+        _add_to_collection!(collection, br)
+    end
+    return sort!(collection;
+        by = x -> (
+            PSY.get_number(PSY.get_primary_secondary_arc(x).from),
+            PSY.get_number(PSY.get_primary_secondary_arc(x).to),
+            PSY.get_number(PSY.get_primary_tertiary_arc(x).to),
+        ),
     )
 end
 
