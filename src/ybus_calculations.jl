@@ -177,7 +177,7 @@ end
 
 function _ybus!(
     ysh::Vector{ComplexF64},
-    fa::PSY.FixedAdmittance,
+    fa::Union{PSY.FixedAdmittance, PSY.SwitchedAdmittance},
     num_bus::Dict{Int, Int},
     fa_ix::Int64,
     sb::Vector{Int64},
@@ -198,14 +198,16 @@ function _buildybus(
     branches,
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
+    switched_admittances::Vector{PSY.SwitchedAdmittance},
 )
     num_bus = Dict{Int, Int}()
 
     branchcount = length(branches)
     fa_count = length(fixed_admittances)
+    sa_count = length(switched_admittances)
     fb = zeros(Int64, branchcount)
     tb = zeros(Int64, branchcount)
-    sb = zeros(Int64, fa_count)
+    sb = zeros(Int64, fa_count + sa_count)
 
     for (ix, b) in enumerate(buses)
         num_bus[PSY.get_number(b)] = ix
@@ -215,7 +217,7 @@ function _buildybus(
     y12 = zeros(ComplexF64, branchcount)
     y21 = zeros(ComplexF64, branchcount)
     y22 = zeros(ComplexF64, branchcount)
-    ysh = zeros(ComplexF64, fa_count)
+    ysh = zeros(ComplexF64, fa_count + sa_count)
 
     for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
@@ -223,7 +225,7 @@ function _buildybus(
         end
         PSY.get_available(b) && _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb)
     end
-    for (ix, fa) in enumerate(fixed_admittances)
+    for (ix, fa) in enumerate([fixed_admittances; switched_admittances])
         PSY.get_available(fa) && _ybus!(ysh, fa, num_bus, ix, sb)
     end
     return (
@@ -247,7 +249,8 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 function Ybus(
     branches::Vector,
     buses::Vector{PSY.ACBus},
-    fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}();
+    fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
+    switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}();
     check_connectivity::Bool = true,
     make_branch_admittance_matrices::Bool = false,
 )
@@ -256,7 +259,8 @@ function Ybus(
     bus_lookup = make_ax_ref(bus_ax)
     busnumber = length(buses)
     look_up = (bus_lookup, bus_lookup)
-    y11, y12, y21, y22, ysh, fb, tb, sb = _buildybus(branches, buses, fixed_admittances)
+    y11, y12, y21, y22, ysh, fb, tb, sb =
+        _buildybus(branches, buses, fixed_admittances, switched_admittances)
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
@@ -303,10 +307,12 @@ function Ybus(sys::PSY.System; kwargs...)
     branches = get_ac_branches(sys)
     buses = get_buses(sys)
     fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
+    switched_admittances = collect(PSY.get_components(PSY.SwitchedAdmittance, sys))
     return Ybus(
         branches,
         buses,
-        fixed_admittances;
+        fixed_admittances,
+        switched_admittances;
         kwargs...,
     )
 end
