@@ -112,6 +112,81 @@ function _ybus!(
     y12::Vector{ComplexF64},
     y21::Vector{ComplexF64},
     y22::Vector{ComplexF64},
+    br::PSY.Transformer3W,
+    num_bus::Dict{Int, Int},
+    branch_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
+    stb::Int64,
+)
+    primary_secondary_arc = PSY.get_primary_secondary_arc(br)
+    secondary_tertiary_arc = PSY.get_secondary_tertiary_arc(br)
+    primary_tertiary_arc = PSY.get_primary_tertiary_arc(br)
+    start_bus = PSY.get_star_bus(br)
+
+    bus_ps_from_no = num_bus[primary_secondary_arc.from.number]
+    bus_st_from_no = num_bus[secondary_tertiary_arc.from.number]
+    bus_pt_to_no = num_bus[primary_tertiary_arc.to.number]
+
+    fb[branch_ix + stb] = bus_ps_from_no
+    fb[branch_ix + stb + 1] = bus_st_from_no
+    fb[branch_ix + stb + 2] = bus_pt_to_no
+
+    tb[branch_ix + stb] = num_bus[start_bus.number]
+    tb[branch_ix + stb + 1] = num_bus[start_bus.number]
+    tb[branch_ix + stb + 2] = num_bus[start_bus.number]
+
+    Y_t1 = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
+    Y11 = Y_t1
+    Y_t2 = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
+    Y22 = Y_t2
+    Y_t3 = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
+    Y33 = Y_t3
+
+    # Y_12 = 1 / (PSY.get_r_12(br) + PSY.get_x_12(br) * 1im)
+    # Y_23 = 1 / (PSY.get_r_23(br) + PSY.get_x_23(br) * 1im)
+    # Y_13 = 1 / (PSY.get_r_13(br) + PSY.get_x_13(br) * 1im)
+
+    b = PSY.get_b(br) # shunt susceptance (star bus to ground)
+
+    # if !isfinite(Y11) || !isfinite(Y22) || !isfinite(Y33) || !isfinite(b) ||
+    #    !isfinite(Y_12) || !isfinite(Y_23) || !isfinite(Y_13)
+    if !isfinite(Y11) || !isfinite(Y22) || !isfinite(Y33) || !isfinite(b)
+        error(
+            "Data in $(PSY.get_name(br)) is incorrect.
+            r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)),
+            r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)),
+            r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br))",
+            # r_ps = $(PSY.get_r_12(br)), x_ps = $(PSY.get_x_12(br)),
+            # r_st = $(PSY.get_r_23(br)), x_st = $(PSY.get_x_23(br)),
+            # r_pt = $(PSY.get_r_13(br)), x_pt = $(PSY.get_x_13(br))",
+        )
+    end
+
+    y11[branch_ix + stb] = Y11 - (1im * b)
+    y11[branch_ix + stb + 1] = Y22 - (1im * b)
+    y11[branch_ix + stb + 2] = Y33 - (1im * b)
+
+    y12[branch_ix + stb] = -Y_t1
+    y12[branch_ix + stb + 1] = -Y_t2
+    y12[branch_ix + stb + 2] = -Y_t3
+
+    y21[branch_ix + stb] = -Y_t1
+    y21[branch_ix + stb + 1] = -Y_t2
+    y21[branch_ix + stb + 2] = -Y_t3
+
+    y22[branch_ix + stb] = Y11
+    y22[branch_ix + stb + 1] = Y22
+    y22[branch_ix + stb + 2] = Y33
+
+    return
+end
+
+function _ybus!(
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
     br::PSY.TapTransformer,
     num_bus::Dict{Int, Int},
     reverse_bus_search_map::Dict{Int, Int},
@@ -210,6 +285,7 @@ function _buildybus(
     num_bus = Dict{Int, Int}()
     reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
     branchcount = length(branches) + 3 * length(transformer_3W)
+    branchcount_no_3w = length(branches)
     fa_count = length(fixed_admittances)
     sa_count = length(switched_admittances)
     fb = zeros(Int64, branchcount)
@@ -233,6 +309,18 @@ function _buildybus(
         PSY.get_available(b) &&
             _ybus!(y11, y12, y21, y22, b, num_bus, reverse_bus_search_map, ix, fb, tb)
     end
+
+    stb = 0
+    for (ix, b) in enumerate(transformer_3W)
+        if PSY.get_name(b) == "init"
+            throw(DataFormatError("The data in Transformer3W is invalid"))
+        end
+        PSY.get_available(b) &&
+            _ybus!(y11, y12, y21, y22, b, num_bus, ix + branchcount_no_3w, fb, tb, stb)
+
+        stb = stb + 2
+    end
+
     for (ix, fa) in enumerate([fixed_admittances; switched_admittances])
         PSY.get_available(fa) && _ybus!(ysh, fa, num_bus, ix, sb)
     end
@@ -257,6 +345,7 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 function Ybus(
     branches::Vector,
     buses::Vector{PSY.ACBus},
+    transformer_3W::Vector{PSY.Transformer3W} = Vector{PSY.Transformer3W}(),
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
     switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}();
     check_connectivity::Bool = true,
@@ -268,7 +357,7 @@ function Ybus(
     busnumber = length(buses)
     look_up = (bus_lookup, bus_lookup)
     y11, y12, y21, y22, ysh, fb, tb, sb =
-        _buildybus(branches, buses, fixed_admittances, switched_admittances, network_reduction)
+        _buildybus(branches, transformer_3W, buses, fixed_admittances, switched_admittances,  network_reduction)
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
@@ -279,6 +368,7 @@ function Ybus(
     SparseArrays.dropzeros!(ybus)
     if check_connectivity && length(buses) > 1
         islands = find_subnetworks(ybus, bus_ax)
+        println(islands)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
     return Ybus(ybus, axes, look_up, network_reduction)
@@ -311,6 +401,7 @@ function Ybus(
     return Ybus(
         branches,
         buses,
+        transformer_3W,
         fixed_admittances,
         switched_admittances;
         network_reduction = network_reduction,
