@@ -4,6 +4,14 @@ function _add_to_collection!(collection::Vector{PSY.ACBranch}, branch::PSY.ACBra
 end
 
 function _add_to_collection!(
+    collection::Vector{PSY.Transformer3W},
+    transformer_3W::PSY.Transformer3W,
+)
+    push!(collection, transformer_3W)
+    return
+end
+
+function _add_to_collection!(
     ::Vector{PSY.ACBranch},
     ::Union{PSY.TwoTerminalGenericHVDCLine, PSY.TwoTerminalVSCLine, PSY.TwoTerminalLCCLine},
 )
@@ -52,7 +60,6 @@ Gets the AC branches from a given Systems.
 """
 function get_transformers_3w(
     sys::PSY.System,
-    radial_branches::Set{String} = Set{String}(),
 )::Vector{PSY.Transformer3W}
     collection = Vector{PSY.Transformer3W}()
     for br in PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys)
