@@ -143,23 +143,14 @@ function _ybus!(
     Y_t3 = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
     Y33 = Y_t3
 
-    # Y_12 = 1 / (PSY.get_r_12(br) + PSY.get_x_12(br) * 1im)
-    # Y_23 = 1 / (PSY.get_r_23(br) + PSY.get_x_23(br) * 1im)
-    # Y_13 = 1 / (PSY.get_r_13(br) + PSY.get_x_13(br) * 1im)
-
     b = PSY.get_b(br) # shunt susceptance (star bus to ground)
 
-    # if !isfinite(Y11) || !isfinite(Y22) || !isfinite(Y33) || !isfinite(b) ||
-    #    !isfinite(Y_12) || !isfinite(Y_23) || !isfinite(Y_13)
     if !isfinite(Y11) || !isfinite(Y22) || !isfinite(Y33) || !isfinite(b)
         error(
             "Data in $(PSY.get_name(br)) is incorrect.
             r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)),
             r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)),
             r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br))",
-            # r_ps = $(PSY.get_r_12(br)), x_ps = $(PSY.get_x_12(br)),
-            # r_st = $(PSY.get_r_23(br)), x_st = $(PSY.get_x_23(br)),
-            # r_pt = $(PSY.get_r_13(br)), x_pt = $(PSY.get_x_13(br))",
         )
     end
 
