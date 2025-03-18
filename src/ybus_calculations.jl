@@ -154,6 +154,7 @@ function _ybus!(
         )
     end
 
+
     y11[branch_ix + stb] = Y11 - (1im * b)
     y11[branch_ix + stb + 1] = Y22 - (1im * b)
     y11[branch_ix + stb + 2] = Y33 - (1im * b)
@@ -359,7 +360,6 @@ function Ybus(
     SparseArrays.dropzeros!(ybus)
     if check_connectivity && length(buses) > 1
         islands = find_subnetworks(ybus, bus_ax)
-        println(islands)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
     return Ybus(ybus, axes, look_up, network_reduction)
