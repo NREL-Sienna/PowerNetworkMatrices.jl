@@ -154,7 +154,6 @@ function _ybus!(
         )
     end
 
-
     y11[branch_ix + stb] = Y11 - (1im * b)
     y11[branch_ix + stb + 1] = Y22 - (1im * b)
     y11[branch_ix + stb + 2] = Y33 - (1im * b)

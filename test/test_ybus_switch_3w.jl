@@ -21,8 +21,8 @@
     println("PSSE Complex Y-bus matrix:")
     Ybus_psse = sparse(row_indices, col_indices, y_values)
     # Insert missing PSSE Ymatrix elements
-    Ybus_psse[1,1] = 8.43881+0.0535936im
-    Ybus_psse[1,2] = -8.43881+0.00712136im
+    Ybus_psse[1, 1] = 8.43881 + 0.0535936im
+    Ybus_psse[1, 2] = -8.43881 + 0.00712136im
 
     nrows = size(Ybus_pnm)[1]
     ncols = size(Ybus_pnm)[2]
