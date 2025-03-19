@@ -1,13 +1,10 @@
-function _add_to_collection!(collection::Vector{PSY.ACBranch}, branch::PSY.ACBranch)
-    push!(collection, branch)
-    return
-end
-
 function _add_to_collection!(
-    collection::Vector{PSY.Transformer3W},
-    transformer_3W::PSY.Transformer3W,
+    collection_br::Vector{PSY.ACBranch}, 
+    collection_3WT::Vector{PSY.Transformer3W}, 
+    branch::PSY.ACBranch,
+    tr3w::PSY.Transformer3W
 )
-    push!(collection, transformer_3W)
+    push!(collection, branch)
     return
 end
 
@@ -19,16 +16,15 @@ function _add_to_collection!(
 end
 
 """
-Gets the AC branches from a given Systems.
+Gets the AC branches & 3W Transformers from a given Systems.
 """
 function get_ac_branches(
     sys::PSY.System,
-    radial_branches::Set{String} = Set{String}(),
 )::Vector{PSY.ACBranch}
-    collection = Vector{PSY.ACBranch}()
+    collection_br  = Vector{PSY.ACBranch}()
     for br in PSY.get_components(
         x -> PSY.get_available(x) && !(typeof(x) <: PSY.Transformer3W),
-        PSY.ACBranch,
+        PSY.ACBranch, 
         sys,
     )
         arc = PSY.get_arc(br)
@@ -46,23 +42,16 @@ function get_ac_branches(
                 ),
             )
         end
-        if PSY.get_name(br) ∉ radial_branches
-            _add_to_collection!(collection, br)
-        end
+        
+        _add_to_collection!(collection_br, br)
     end
-    return sort!(collection;
-        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
-    )
-end
 
-"""
-Gets the AC branches from a given Systems.
-"""
-function get_transformers_3w(
-    sys::PSY.System,
-)::Vector{PSY.Transformer3W}
-    collection = Vector{PSY.Transformer3W}()
-    for br in PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys)
+    collection_3WT = Vector{PSY.Transformer3W}()
+    for br_3w in PSY.get_components(
+        x -> PSY.get_available(x), 
+        PSY.Transformer3W, 
+        sys
+    )
         ps_arc = PSY.get_primary_secondary_arc(br)
         st_arc = PSY.get_secondary_tertiary_arc(br)
         if PSY.get_bustype(ps_arc.from) == ACBusTypes.ISOLATED
@@ -86,15 +75,20 @@ function get_transformers_3w(
                 ),
             )
         end
-        _add_to_collection!(collection, br)
+        _add_to_collection!(collection_3WT, br)
     end
-    return sort!(collection;
+
+    sort!(collection_br;
+        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
+    )
+    sort!(collection_3WT;
         by = x -> (
             PSY.get_number(PSY.get_primary_secondary_arc(x).from),
             PSY.get_number(PSY.get_primary_secondary_arc(x).to),
             PSY.get_number(PSY.get_primary_tertiary_arc(x).to),
         ),
     )
+    return vcat(collection_br, collection_3WT)
 end
 
 """
