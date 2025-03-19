@@ -103,7 +103,7 @@ end
 
 function _add_branch_to_lookup!(
     branch_lookup::Dict{String, Int},
-    transformer_3w_lookup::Dict{String, Vector{Int}},
+    ::Dict{String, Vector{Int}},
     branch_type::Vector{DataType},
     branch::PSY.ACBranch,
     branch_number::Int,
@@ -134,19 +134,19 @@ end
 function get_branch_lookups(branches)
     branch_lookup = Dict{String, Int}()
     transformer_3w_lookup = Dict{String, Vector{Int}}()
-    branch_types = Vector{DataType}()
+    branch_type = Vector{DataType}()
     branch_number = 0
     for b in branches
         branch_number = _next_branch_number(b, branch_number)
         _add_branch_to_lookup!(
             branch_lookup,
             transformer_3w_lookup,
-            branch_types,
+            branch_type,
             b,
             branch_number,
         )
     end
-    return branch_lookup, transformer_3w_lookup, branch_types
+    return branch_lookup, transformer_3w_lookup, branch_type
 end
 
 """
