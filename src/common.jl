@@ -1,5 +1,5 @@
 function _add_to_collection!(
-    collection_br::Vector{PSY.ACBranch}, 
+    collection_br::Vector{PSY.ACBranch},
     branch::PSY.ACBranch,
 )
     push!(collection_br, branch)
@@ -7,7 +7,7 @@ function _add_to_collection!(
 end
 
 function _add_to_collection!(
-    collection_tr3w::Vector{PSY.Transformer3W}, 
+    collection_tr3w::Vector{PSY.Transformer3W},
     transformer_tr3w::PSY.Transformer3W,
 )
     push!(collection_tr3w, transformer_tr3w)
@@ -26,11 +26,11 @@ Gets the AC branches & 3W Transformers from a given Systems.
 """
 function get_ac_branches(
     sys::PSY.System,
-)::Vector{PSY.ACBranch}
-    collection_br  = Vector{PSY.ACBranch}()
+)::Union{Vector{PSY.ACBranch}, Vector{PSY.Transformer3W}}
+    collection_br = Vector{PSY.ACBranch}()
     for br in PSY.get_components(
         x -> PSY.get_available(x) && !(typeof(x) <: PSY.Transformer3W),
-        PSY.ACBranch, 
+        PSY.ACBranch,
         sys,
     )
         arc = PSY.get_arc(br)
@@ -48,15 +48,15 @@ function get_ac_branches(
                 ),
             )
         end
-        
+
         _add_to_collection!(collection_br, br)
     end
 
     collection_3WT = Vector{PSY.Transformer3W}()
     for br_3w in PSY.get_components(
-        x -> PSY.get_available(x), 
-        PSY.Transformer3W, 
-        sys
+        x -> PSY.get_available(x),
+        PSY.Transformer3W,
+        sys,
     )
         ps_arc = PSY.get_primary_secondary_arc(br_3w)
         st_arc = PSY.get_secondary_tertiary_arc(br_3w)
@@ -97,11 +97,11 @@ function get_ac_branches(
     return vcat(collection_br, collection_3WT)
 end
 
-function _next_branch_number(br::PSY.ACBranch, branch_number::Int)
+function _next_branch_number!(br::PSY.ACBranch, branch_number::Int)
     return branch_number + 1
 end
 
-function _next_branch_number(tr3w::Transformer3W, branch_number::Int)
+function _next_branch_number!(tr3w::Transformer3W, branch_number::Int)
     return branch_number + 3
 end
 
