@@ -97,6 +97,62 @@ function get_transformers_3w(
     )
 end
 
+function _next_branch_number(::ACBranch, branch_number::Int)
+    return branch_number + 1
+end
+
+function _next_branch_number(::Transformer3W, branch_number::Int)
+    return branch_number + 3
+end
+
+function _add_branch_to_lookup!(
+    branch_lookup::Dict{String, Int},
+    transformer_3w_lookup::Dict{String, Vector{Int}},
+    branch_type::Vector{DataType},
+    branch::PSY.ACBranch,
+    branch_number::Int,
+)
+    branch_lookup[PSY.get_name(branch)] = branch_number
+    push!(branch_type, typeof(branch))
+    return
+end
+
+function _add_branch_to_lookup!(
+    branch_lookup::Dict{String, Int},
+    transformer_3w_lookup::Dict{String, Vector{Int}},
+    branch_type::Vector{DataType},
+    branch::PSY.Transformer3W,
+    branch_number::Int,
+)
+    tr3w_name = PSY.get_name(branch)
+    transformer_3w_lookup[tr3w_name] = Vector{Int}(undef, 3)
+    for (i, side) in enumerate(["primary", "secondary", "tertiary"])
+        side_name = "$(tr3w_name)__$side"
+        branch_lookup[side_name] = branch_number - 3 + i
+        transformer_3w_lookup[tr3w_name] = side_name
+        push!(branch_type, typeof(branch))
+    end
+    return
+end
+
+function get_branch_lookups(branches)
+    branch_lookup = Dict{String, Int}()
+    transformer_3w_lookup = Dict{String, Vector{Int}}()
+    branch_types = Vector{DataType}()
+    branch_number = 0
+    for b in branches
+        branch_number = _next_branch_number(b, branch_number)
+        _add_branch_to_lookup!(
+            branch_lookup,
+            transformer_3w_lookup,
+            branch_types,
+            b,
+            branch_number,
+        )
+    end
+    return branch_lookup, transformer_3w_lookup, branch_types
+end
+
 """
 Gets the non-isolated buses from a given System
 """
