@@ -293,8 +293,8 @@ function _buildybus(
     y22 = zeros(ComplexF64, branchcount)
     ysh = zeros(ComplexF64, fa_count + sa_count)
 
-    # stb = 0
-    for (ix, b) in enumerate(branches)
+    ix = 0
+    for b in branches
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
@@ -302,16 +302,16 @@ function _buildybus(
             _ybus!(y11, y12, y21, y22, b, num_bus, reverse_bus_search_map, ix, fb, tb)
     end
 
-    stb = 0
-    for (ix, b) in enumerate(transformer_3W)
-        if PSY.get_name(b) == "init"
-            throw(DataFormatError("The data in Transformer3W is invalid"))
-        end
-        PSY.get_available(b) &&
-            _ybus!(y11, y12, y21, y22, b, num_bus, ix + branchcount_no_3w, fb, tb, stb)
+    # stb = 0
+    # for (ix, b) in enumerate(transformer_3W)
+    #     if PSY.get_name(b) == "init"
+    #         throw(DataFormatError("The data in Transformer3W is invalid"))
+    #     end
+    #     PSY.get_available(b) &&
+    #         _ybus!(y11, y12, y21, y22, b, num_bus, ix + branchcount_no_3w, fb, tb, stb)
 
-        stb = stb + 2
-    end
+    #     stb = stb + 2
+    # end
 
     for (ix, fa) in enumerate([fixed_admittances; switched_admittances])
         PSY.get_available(fa) && _ybus!(ysh, fa, num_bus, ix, sb)
