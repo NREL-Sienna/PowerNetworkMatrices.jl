@@ -267,7 +267,7 @@ end
 
 function _buildybus(
     branches,
-    transformer_3W,
+    # transformer_3W,
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
@@ -293,6 +293,7 @@ function _buildybus(
     y22 = zeros(ComplexF64, branchcount)
     ysh = zeros(ComplexF64, fa_count + sa_count)
 
+    # stb = 0
     for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
@@ -336,7 +337,7 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 function Ybus(
     branches::Vector,
     buses::Vector{PSY.ACBus},
-    transformer_3W::Vector{PSY.Transformer3W} = Vector{PSY.Transformer3W}(),
+    # transformer_3W::Vector{PSY.Transformer3W} = Vector{PSY.Transformer3W}(),
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
     switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}();
     check_connectivity::Bool = true,
@@ -391,7 +392,7 @@ function Ybus(
     return Ybus(
         branches,
         buses,
-        transformer_3W,
+        xfrm_3w,
         fixed_admittances,
         switched_admittances;
         network_reduction = network_reduction,
