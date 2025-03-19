@@ -262,15 +262,14 @@ end
 
 function _buildybus(
     branches,
-    transformer_3W,
+    # transformer_3W,
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
 )
     num_bus = Dict{Int, Int}()
 
-    branchcount = length(branches) + 3 * length(transformer_3W)
-    branchcount_no_3w = length(branches)
+    branchcount = length(branches)
     fa_count = length(fixed_admittances)
     sa_count = length(switched_admittances)
     fb = zeros(Int64, branchcount)
@@ -287,11 +286,14 @@ function _buildybus(
     y22 = zeros(ComplexF64, branchcount)
     ysh = zeros(ComplexF64, fa_count + sa_count)
 
+    # stb = 0
     for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        PSY.get_available(b) && _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb)
+        PSY.get_available(b) && _ybus!(y11, y12, y21, y22, b, num_bus, ix+branchcount, fb, tb)
+
+        # stb = stb + 2
     end
 
     stb = 0
@@ -329,7 +331,7 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 function Ybus(
     branches::Vector,
     buses::Vector{PSY.ACBus},
-    transformer_3W::Vector{PSY.Transformer3W} = Vector{PSY.Transformer3W}(),
+    # transformer_3W::Vector{PSY.Transformer3W} = Vector{PSY.Transformer3W}(),
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
     switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}();
     check_connectivity::Bool = true,
@@ -341,7 +343,8 @@ function Ybus(
     busnumber = length(buses)
     look_up = (bus_lookup, bus_lookup)
     y11, y12, y21, y22, ysh, fb, tb, sb =
-        _buildybus(branches, transformer_3W, buses, fixed_admittances, switched_admittances)
+        # _buildybus(branches, transformer_3W, buses, fixed_admittances, switched_admittances)
+        _buildybus(branches, buses, fixed_admittances, switched_admittances)
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
@@ -386,14 +389,14 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 """
 function Ybus(sys::PSY.System; kwargs...)
     branches = get_ac_branches(sys)
-    transformer_3W = get_transformers_3w(sys)
+    # transformer_3W = get_transformers_3w(sys)
     buses = get_buses(sys)
     fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
     switched_admittances = collect(PSY.get_components(PSY.SwitchedAdmittance, sys))
     return Ybus(
         branches,
         buses,
-        transformer_3W,
+        # transformer_3W,
         fixed_admittances,
         switched_admittances;
         kwargs...,
