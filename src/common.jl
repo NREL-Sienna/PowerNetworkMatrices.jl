@@ -1,6 +1,5 @@
 function _add_to_collection!(
     collection_br::Vector{PSY.ACTransmission},
-    collection_3WT::Vector{PSY.Transformer3W},
     branch::PSY.ACBranch,
 )
     push!(collection_br, branch)
@@ -100,11 +99,11 @@ function get_ac_branches(
     return vcat(collection_br, collection_3WT)
 end
 
-function _next_branch_number(br::PSY.ACBranch, branch_number::Int)
+function _next_branch_number!(br::PSY.ACBranch, branch_number::Int)
     return branch_number + 1
 end
 
-function _next_branch_number(tr3w::Transformer3W, branch_number::Int)
+function _next_branch_number!(tr3w::Transformer3W, branch_number::Int)
     return branch_number + 3
 end
 
