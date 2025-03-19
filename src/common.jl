@@ -1,10 +1,17 @@
 function _add_to_collection!(
-    collection_br::Vector{PSY.ACBranch},
+    collection_br::Vector{PSY.ACTransmission},
     collection_3WT::Vector{PSY.Transformer3W},
     branch::PSY.ACBranch,
-    tr3w::PSY.Transformer3W
 )
-    push!(collection, branch)
+    push!(collection_br, branch)
+    return
+end
+
+function _add_to_collection!(
+    collection_tr3w::Vector{PSY.Transformer3W},
+    transformer_tr3w::PSY.Transformer3W,
+)
+    push!(collection_tr3w, transformer_tr3w)
     return
 end
 
@@ -54,30 +61,30 @@ function get_ac_branches(
         PSY.Transformer3W,
         sys
     )
-        ps_arc = PSY.get_primary_secondary_arc(br)
-        st_arc = PSY.get_secondary_tertiary_arc(br)
+        ps_arc = PSY.get_primary_secondary_arc(br_3w)
+        st_arc = PSY.get_secondary_tertiary_arc(br_3w)
         if PSY.get_bustype(ps_arc.from) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
-                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.from))",
+                    "Branch $(PSY.get_name(br_3w)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.from))",
                 ),
             )
         end
         if PSY.get_bustype(ps_arc.to) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
-                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.to))",
+                    "Branch $(PSY.get_name(br_3w)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.to))",
                 ),
             )
         end
         if PSY.get_bustype(st_arc.to) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
-                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(st_arc.to))",
+                    "Branch $(PSY.get_name(br_3w)) is set available and connected to isolated bus $(PSY.get_name(st_arc.to))",
                 ),
             )
         end
-        _add_to_collection!(collection_3WT, br)
+        _add_to_collection!(collection_3WT, br_3w)
     end
 
     sort!(collection_br;
@@ -93,11 +100,11 @@ function get_ac_branches(
     return vcat(collection_br, collection_3WT)
 end
 
-function _next_branch_number(::ACBranch, branch_number::Int)
+function _next_branch_number(branch_number::Int)
     return branch_number + 1
 end
 
-function _next_branch_number(::Transformer3W, branch_number::Int)
+function _next_branch_number(branch_number::Int)
     return branch_number + 3
 end
 
