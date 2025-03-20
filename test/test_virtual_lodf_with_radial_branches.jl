@@ -1,4 +1,4 @@
-@testset "Test VirtualLODF with radial lines" begin
+@testset failfast = true "Test VirtualLODF with radial lines" begin
     # get the system
     sys = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys")
     nr = get_radial_reduction(sys)
