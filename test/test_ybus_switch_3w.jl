@@ -1,8 +1,8 @@
 @testset "Test 3W Integration to Ybus Matrix" begin
-    sys = System("test/test_data/6bus_3w_system_updated.raw")
+    # sys = PSB.build_system(PSSEParsingTestSystems, "pti_case6_3w_sys")
     Ybus_pnm = Ybus(sys)
 
-    data = readlines("test/test_data/6bus_3w_system_updated_Ymx.txt")
+    data = readlines("test/test_data/pti_case6_3w_Ymx.txt")
     from_buses, to_buses, y_values = Int[], Int[], ComplexF64[]
     for line in data
         vals = split(strip(line), r",\s*")
