@@ -1,13 +1,16 @@
-function _add_to_collection!(collection::Vector{PSY.ACBranch}, branch::PSY.ACBranch)
-    push!(collection, branch)
+function _add_to_collection!(
+    collection_br::Vector{PSY.ACBranch},
+    branch::PSY.ACBranch,
+)
+    push!(collection_br, branch)
     return
 end
 
 function _add_to_collection!(
-    collection::Vector{PSY.Transformer3W},
-    transformer_3W::PSY.Transformer3W,
+    collection_tr3w::Vector{PSY.Transformer3W},
+    transformer_tr3w::PSY.Transformer3W,
 )
-    push!(collection, transformer_3W)
+    push!(collection_tr3w, transformer_tr3w)
     return
 end
 
@@ -19,13 +22,12 @@ function _add_to_collection!(
 end
 
 """
-Gets the AC branches from a given Systems.
+Gets the AC branches & 3W Transformers from a given Systems.
 """
 function get_ac_branches(
     sys::PSY.System,
-    radial_branches::Set{String} = Set{String}(),
-)::Vector{PSY.ACBranch}
-    collection = Vector{PSY.ACBranch}()
+)::Union{Vector{PSY.ACBranch}, Vector{PSY.Transformer3W}}
+    collection_br = Vector{PSY.ACBranch}()
     for br in PSY.get_components(
         x -> PSY.get_available(x) && !(typeof(x) <: PSY.Transformer3W),
         PSY.ACBranch,
@@ -46,55 +48,53 @@ function get_ac_branches(
                 ),
             )
         end
-        if PSY.get_name(br) ∉ radial_branches
-            _add_to_collection!(collection, br)
-        end
-    end
-    return sort!(collection;
-        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
-    )
-end
 
-"""
-Gets the AC branches from a given Systems.
-"""
-function get_transformers_3w(
-    sys::PSY.System,
-)::Vector{PSY.Transformer3W}
-    collection = Vector{PSY.Transformer3W}()
-    for br in PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys)
-        ps_arc = PSY.get_primary_secondary_arc(br)
-        st_arc = PSY.get_secondary_tertiary_arc(br)
+        _add_to_collection!(collection_br, br)
+    end
+
+    collection_3WT = Vector{PSY.Transformer3W}()
+    for br_3w in PSY.get_components(
+        x -> PSY.get_available(x),
+        PSY.Transformer3W,
+        sys,
+    )
+        ps_arc = PSY.get_primary_secondary_arc(br_3w)
+        st_arc = PSY.get_secondary_tertiary_arc(br_3w)
         if PSY.get_bustype(ps_arc.from) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
-                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.from))",
+                    "Branch $(PSY.get_name(br_3w)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.from))",
                 ),
             )
         end
         if PSY.get_bustype(ps_arc.to) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
-                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.to))",
+                    "Branch $(PSY.get_name(br_3w)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.to))",
                 ),
             )
         end
         if PSY.get_bustype(st_arc.to) == ACBusTypes.ISOLATED
             throw(
                 IS.ConflictingInputsError(
-                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(st_arc.to))",
+                    "Branch $(PSY.get_name(br_3w)) is set available and connected to isolated bus $(PSY.get_name(st_arc.to))",
                 ),
             )
         end
-        _add_to_collection!(collection, br)
+        _add_to_collection!(collection_3WT, br_3w)
     end
-    return sort!(collection;
+
+    sort!(collection_br;
+        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
+    )
+    sort!(collection_3WT;
         by = x -> (
             PSY.get_number(PSY.get_primary_secondary_arc(x).from),
             PSY.get_number(PSY.get_primary_secondary_arc(x).to),
             PSY.get_number(PSY.get_primary_tertiary_arc(x).to),
         ),
     )
+    return vcat(collection_br, collection_3WT)
 end
 
 """
