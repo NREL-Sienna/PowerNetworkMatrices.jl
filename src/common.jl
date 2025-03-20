@@ -26,7 +26,7 @@ Gets the AC branches & 3W Transformers from a given Systems.
 """
 function get_ac_branches(
     sys::PSY.System,
-)::Union{Vector{PSY.ACBranch}, Vector{PSY.Transformer3W}}
+)::Vector{PSY.ACBranch}
     collection_br = Vector{PSY.ACBranch}()
     for br in PSY.get_components(
         x -> PSY.get_available(x) && !(typeof(x) <: PSY.Transformer3W),
@@ -97,11 +97,11 @@ function get_ac_branches(
     return vcat(collection_br, collection_3WT)
 end
 
-function _next_branch_number!(br::PSY.ACBranch, branch_number::Int)
+function _next_branch_number!(::PSY.ACBranch, branch_number::Int)
     return branch_number + 1
 end
 
-function _next_branch_number!(tr3w::Transformer3W, branch_number::Int)
+function _next_branch_number!(::PSY.Transformer3W, branch_number::Int)
     return branch_number + 3
 end
 
