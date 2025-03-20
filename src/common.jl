@@ -49,7 +49,8 @@ function get_ac_branches(
                 ),
             )
         end
-        if PSY.get_name(br) ∉ removed_branches
+
+        if PSY.get_name(br) ∉ radial_branches
             _add_to_collection!(collection_br, br)
         end
     end
