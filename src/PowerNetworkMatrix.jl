@@ -14,10 +14,16 @@ abstract type PowerNetworkMatrix{T} <: AbstractArray{T, 2} end
 Evaluates the bus indices for the given branch.
 
 # Arguments
-- `branch`:
+- `branch::PSY.ACBranch`:
         system's branch
-- `bus_lookup`:
+- `bus_lookup::Dict{Int, Int}`:
         dictionary mapping the system's buses and branches
+
+# Returns
+- `fr_b::Int`:
+        from bus index
+- `to_b::Int`:
+        to bus index
 """
 function get_bus_indices(branch, bus_lookup, reverse_bus_search_map)
     fr_bus_number = PSY.get_number(PSY.get_from(PSY.get_arc(branch)))
@@ -36,6 +42,33 @@ function get_bus_indices(branch, bus_lookup, reverse_bus_search_map)
 end
 
 """
+    get_bus_indices(branch::PSY.Transformer3W, bus_lookup::Dict{Int, Int})
+
+Retrieve the bus indices for the primary-secondary, secondary-tertiary, and primary-tertiary arcs of a 3-winding transformer.
+
+# Arguments
+- `branch::PSY.Transformer3W`: The 3-winding transformer branch.
+- `bus_lookup`: A dictionary mapping bus numbers to their indices.
+
+# Returns
+- A tuple containing three tuples:
+  - `(ps_from, ps_to)`: from and to buses for the primary-secondary arc.
+  - `(st_from, st_to)`: from and to buses for the secondary-tertiary arc.
+  - `(pt_from, pt_to)`: from and to buses for the primary-tertiary arc.
+"""
+function get_bus_indices(branch::PSY.Transformer3W, bus_lookup::Dict{Int, Int})
+    ps_from =
+        bus_lookup[PSY.get_number(PSY.get_from(PSY.get_primary_secondary_arc(branch)))]
+    ps_to = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_primary_secondary_arc(branch)))]
+    st_from =
+        bus_lookup[PSY.get_number(PSY.get_from(PSY.get_secondary_tertiary_arc(branch)))]
+    st_to = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_secondary_tertiary_arc(branch)))]
+    pt_from = bus_lookup[PSY.get_number(PSY.get_from(PSY.get_primary_tertiary_arc(branch)))]
+    pt_to = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_primary_tertiary_arc(branch)))]
+    return (ps_from, ps_to), (st_from, st_to), (pt_from, pt_to)
+end
+
+"""
 Evaluates the map linking the system's buses and branches.
 
 # Arguments
@@ -47,7 +80,7 @@ function make_ax_ref(buses::AbstractVector{PSY.ACBus})
 end
 
 """
-Checkes if repetitions are present in the dictionary mapping buses and branches.
+Checks if repetitions are present in the dictionary mapping buses and branches.
 
 # Arguments
 - `ax::AbstractVector`:
