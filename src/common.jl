@@ -26,6 +26,7 @@ Gets the AC branches & 3W Transformers from a given Systems.
 """
 function get_ac_branches(
     sys::PSY.System,
+    radial_branches::Set{String} = Set{String}(),
 )::Vector{PSY.ACBranch}
     collection_br = Vector{PSY.ACBranch}()
     for br in PSY.get_components(
@@ -49,7 +50,9 @@ function get_ac_branches(
             )
         end
 
-        _add_to_collection!(collection_br, br)
+        if PSY.get_name(br) ∉ radial_branches
+            _add_to_collection!(collection_br, br)
+        end
     end
 
     collection_3WT = Vector{PSY.Transformer3W}()
