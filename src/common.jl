@@ -116,7 +116,7 @@ end
 
 function _add_branch_to_lookup!(
     branch_lookup::Dict{String, Int},
-    ::Dict{String, Vector{Int}},
+    ::Dict{String, Vector{String}},
     branch_type::Vector{DataType},
     branch::PSY.ACBranch,
     branch_number::Int,
@@ -128,17 +128,17 @@ end
 
 function _add_branch_to_lookup!(
     branch_lookup::Dict{String, Int},
-    transformer_3w_lookup::Dict{String, Vector{Int}},
+    transformer_3w_lookup::Dict{String, Vector{String}},
     branch_type::Vector{DataType},
     branch::PSY.Transformer3W,
     branch_number::Int,
 )
     tr3w_name = PSY.get_name(branch)
-    transformer_3w_lookup[tr3w_name] = Vector{Int}(undef, 3)
+    transformer_3w_lookup[tr3w_name] = Vector{String}(undef, 3)
     for (i, side) in enumerate(["primary", "secondary", "tertiary"])
         side_name = "$(tr3w_name)__$side"
         branch_lookup[side_name] = branch_number - 3 + i
-        transformer_3w_lookup[tr3w_name] = side_name
+        transformer_3w_lookup[tr3w_name][i] = side_name
         push!(branch_type, typeof(branch))
     end
     return
@@ -146,7 +146,7 @@ end
 
 function get_branch_lookups(branches)
     branch_lookup = Dict{String, Int}()
-    transformer_3w_lookup = Dict{String, Vector{Int}}()
+    transformer_3w_lookup = Dict{String, Vector{String}}()
     branch_type = Vector{DataType}()
     branch_number = 0
     for b in branches
