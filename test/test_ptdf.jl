@@ -1,85 +1,87 @@
-@testset "Test PTDF matrices, w/ and w/o tolerance" begin
+@testset failfast = true "Test PTDF matrices, w/ and w/o tolerance" for solver in (
+    "KLU",
+    "Dense",
+    "MKLPardiso",
+)
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    for solver in ["KLU", "Dense", "MKLPardiso"]
-        if PowerNetworkMatrices.USE_AA && solver == "MKLPardiso"
-            @info "Skipped MKLPardiso tests on Apple"
-            continue
+    if PowerNetworkMatrices.USE_AA && solver == "MKLPardiso"
+        @info "Skipped MKLPardiso tests on Apple"
+        continue
+    end
+    for approach in ["standard", "separate_matrices"]
+        buses_5 = nodes5()
+        branches_5 = branches5(buses_5)
+        if approach == "standard"
+            P5 = PTDF(branches_5, buses_5; linear_solver = solver)
+            P5_bis = PTDF(sys5; linear_solver = solver)
+            P5_sparse = PTDF(branches_5, buses_5; linear_solver = solver, tol = 1e-3)
+        elseif approach == "separate_matrices"
+            if solver == "Dense"
+                continue
+            else
+                A = IncidenceMatrix(sys5)
+                BA = BA_Matrix(sys5)
+                P5 = PTDF(A, BA; linear_solver = solver)
+                P5_sparse = PTDF(A, BA; linear_solver = solver, tol = 1e-3)
+            end
         end
-        for approach in ["standard", "separate_matrices"]
-            buses_5 = nodes5()
-            branches_5 = branches5(buses_5)
-            if approach == "standard"
-                P5 = PTDF(branches_5, buses_5; linear_solver = solver)
-                P5_bis = PTDF(sys5; linear_solver = solver)
-                P5_sparse = PTDF(branches_5, buses_5; linear_solver = solver, tol = 1e-3)
-            elseif approach == "separate_matrices"
-                if solver == "Dense"
-                    continue
-                else
-                    A = IncidenceMatrix(sys5)
-                    BA = BA_Matrix(sys5)
-                    P5 = PTDF(A, BA; linear_solver = solver)
-                    P5_sparse = PTDF(A, BA; linear_solver = solver, tol = 1e-3)
-                end
-            end
 
-            # test method with branches and buses
-            @test isapprox(maximum(P5.data), maximum(S5_slackB4), atol = 1e-3)
-            @test isapprox(P5[branches_5[1], buses_5[1]], 0.1939166051164976)
-            # test method with whole system
-            if approach == "standard"
-                @test isapprox(maximum(P5_bis.data), maximum(S5_slackB4), atol = 1e-3)
-                @test isapprox(P5_bis[branches_5[1], buses_5[1]], 0.1939166051164976)
-            end
-
-            # additional test with other set of branches and buses
-            buses_14 = nodes14()
-            branches_14 = branches14(buses_14)
-            P14 = PTDF(branches_14, buses_14)
-            @test isapprox(maximum(P14.data), maximum(S14_slackB1), atol = 1e-3)
-
-            # check getindex (line name and bus number)
-            P5NS = PTDF([branches_5[b] for b in Br5NS_ids], [buses_5[b] for b in Bu5NS_ids])
-            for br in Br5NS_ids, b in Bu5NS_ids
-                @test isapprox(
-                    getindex(P5NS, string(br), b),
-                    S5_slackB4[br, b],
-                    atol = 1e-3,
-                )
-            end
-
-            # check getindex (iterated accoring to rows and columns)
-            P5NS_mod = zeros(size(S5_slackB4))
-            for br in Br5NS_ids, b in Bu5NS_ids
-                # get the correct indices
-                row = P5NS.lookup[2][string(br)]
-                col = P5NS.lookup[1][b]
-                P5NS_mod[row, col] = S5_slackB4[br, b]
-                @test isapprox(
-                    getindex(P5NS, row, col),
-                    S5_slackB4[br, b],
-                    atol = 1e-3,
-                )
-            end
-
-            # adjust the matrix to have same indexing
-            @test isapprox(get_ptdf_data(P5NS), P5NS_mod, atol = 1e-3)
-
-            PRTS = PTDF(RTS; linear_solver = solver)
-            PRTS_mod = zeros(size(SRTS_GMLC))
-            PRTS_sparse = PTDF(RTS; linear_solver = solver, tol = 1e-3)
-            bnums = sort([PSY.get_number(b) for b in PSY.get_components(Bus, RTS)])
-            for (ibr, br) in enumerate(RTS_branchnames), (ib, b) in enumerate(bnums)
-                row = PRTS.lookup[2][string(br)]
-                col = PRTS.lookup[1][b]
-                PRTS_mod[row, col] = SRTS_GMLC[ibr, ib]
-                @test isapprox(getindex(PRTS, br, b), SRTS_GMLC[ibr, ib], atol = 1e-3)
-            end
-
-            # manually sparsify the matrix
-            PRTS.data[abs.(PRTS.data) .< 1e-3] .= 0
-            @test sum(abs.(get_ptdf_data(PRTS) - get_ptdf_data(PRTS_sparse)) .> 1e-3) == 0
+        # test method with branches and buses
+        @test isapprox(maximum(P5.data), maximum(S5_slackB4), atol = 1e-3)
+        @test isapprox(P5[branches_5[1], buses_5[1]], 0.1939166051164976)
+        # test method with whole system
+        if approach == "standard"
+            @test isapprox(maximum(P5_bis.data), maximum(S5_slackB4), atol = 1e-3)
+            @test isapprox(P5_bis[branches_5[1], buses_5[1]], 0.1939166051164976)
         end
+
+        # additional test with other set of branches and buses
+        buses_14 = nodes14()
+        branches_14 = branches14(buses_14)
+        P14 = PTDF(branches_14, buses_14)
+        @test isapprox(maximum(P14.data), maximum(S14_slackB1), atol = 1e-3)
+
+        # check getindex (line name and bus number)
+        P5NS = PTDF([branches_5[b] for b in Br5NS_ids], [buses_5[b] for b in Bu5NS_ids])
+        for br in Br5NS_ids, b in Bu5NS_ids
+            @test isapprox(
+                getindex(P5NS, string(br), b),
+                S5_slackB4[br, b],
+                atol = 1e-3,
+            )
+        end
+
+        # check getindex (iterated accoring to rows and columns)
+        P5NS_mod = zeros(size(S5_slackB4))
+        for br in Br5NS_ids, b in Bu5NS_ids
+            # get the correct indices
+            row = P5NS.lookup[2][string(br)]
+            col = P5NS.lookup[1][b]
+            P5NS_mod[row, col] = S5_slackB4[br, b]
+            @test isapprox(
+                getindex(P5NS, row, col),
+                S5_slackB4[br, b],
+                atol = 1e-3,
+            )
+        end
+
+        # adjust the matrix to have same indexing
+        @test isapprox(get_ptdf_data(P5NS), P5NS_mod, atol = 1e-3)
+
+        PRTS = PTDF(RTS; linear_solver = solver)
+        PRTS_mod = zeros(size(SRTS_GMLC))
+        PRTS_sparse = PTDF(RTS; linear_solver = solver, tol = 1e-3)
+        bnums = sort([PSY.get_number(b) for b in PSY.get_components(Bus, RTS)])
+        for (ibr, br) in enumerate(RTS_branchnames), (ib, b) in enumerate(bnums)
+            row = PRTS.lookup[2][string(br)]
+            col = PRTS.lookup[1][b]
+            PRTS_mod[row, col] = SRTS_GMLC[ibr, ib]
+            @test isapprox(getindex(PRTS, br, b), SRTS_GMLC[ibr, ib], atol = 1e-3)
+        end
+
+        # manually sparsify the matrix
+        PRTS.data[abs.(PRTS.data) .< 1e-3] .= 0
+        @test sum(abs.(get_ptdf_data(PRTS) - get_ptdf_data(PRTS_sparse)) .> 1e-3) == 0
     end
 
     # check axes values
@@ -114,7 +116,7 @@ end
     @test isapprox(ptdf_first_area, ptdf_second_area, atol = 1e-6)
 end
 
-@testset "Test serialization of PTDF matrices to HDF5" begin
+@testset failfast = true "Test serialization of PTDF matrices to HDF5" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     buses_5 = nodes5()
     branches_5 = branches5(buses_5)
