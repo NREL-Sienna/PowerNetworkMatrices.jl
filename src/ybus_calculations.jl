@@ -289,7 +289,7 @@ function _buildybus(
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        ix = _next_branch_number!(b, ix)
+        ix = _next_branch_number(b, ix)
         PSY.get_available(b) && _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb)
     end
 
