@@ -118,22 +118,26 @@ function _ybus!(
     fb::Vector{Int64},
     tb::Vector{Int64},
 )
-    primary_secondary_arc = PSY.get_primary_secondary_arc(br)
-    secondary_tertiary_arc = PSY.get_secondary_tertiary_arc(br)
-    primary_tertiary_arc = PSY.get_primary_tertiary_arc(br)
-    start_bus = PSY.get_star_bus(br)
+    arcs = (
+        PSY.get_primary_secondary_arc(br),
+        PSY.get_secondary_tertiary_arc(br),
+        PSY.get_primary_tertiary_arc(br),
+    )
 
-    bus_ps_from_no = num_bus[primary_secondary_arc.from.number]
-    bus_st_from_no = num_bus[secondary_tertiary_arc.from.number]
-    bus_pt_to_no = num_bus[primary_tertiary_arc.to.number]
+    for i in -2:0
+        if i != 0
+            arc_bus_fr = PSY.get_from(arcs[i + 3])
+            fb[branch_ix + i] = num_bus[PSY.get_number(arc_bus_fr)]
+        else
+            arc_bus_to = PSY.get_to(arcs[i + 3])
+            fb[branch_ix + i] = num_bus[PSY.get_number(arc_bus_to)]
+        end
+    end
 
-    fb[branch_ix - 2] = bus_ps_from_no
-    fb[branch_ix - 1] = bus_st_from_no
-    fb[branch_ix] = bus_pt_to_no
-
-    tb[branch_ix - 2] = num_bus[start_bus.number]
-    tb[branch_ix - 1] = num_bus[start_bus.number]
-    tb[branch_ix] = num_bus[start_bus.number]
+    start_bus_num = PSY.get_number(PSY.get_star_bus(br))
+    for i in -2:0
+        tb[branch_ix + i] = num_bus[start_bus_num]
+    end
 
     Y_t1 = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
     Y11 = Y_t1
