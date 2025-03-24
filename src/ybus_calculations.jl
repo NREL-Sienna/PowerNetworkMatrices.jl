@@ -250,7 +250,6 @@ function Ybus(
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}();
     check_connectivity::Bool = true,
-    network_reduction = NetworkReduction(),
     make_branch_admittance_matrices::Bool = false,
     network_reduction = NetworkReduction(),
 )
