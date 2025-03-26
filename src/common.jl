@@ -1,24 +1,12 @@
-function _add_to_collection!(collection::Vector{PSY.ACBranch}, branch::PSY.ACBranch)
-    push!(collection, branch)
-    return
-end
-
-function _add_to_collection!(
-    ::Vector{PSY.ACBranch},
-    ::Union{PSY.TwoTerminalGenericHVDCLine, PSY.TwoTerminalVSCLine, PSY.TwoTerminalLCCLine},
-)
-    return
-end
-
 """
 Gets the AC branches from a given Systems.
 """
 function get_ac_branches(
     sys::PSY.System,
     radial_branches::Set{String} = Set{String}(),
-)::Vector{PSY.ACBranch}
-    collection = Vector{PSY.ACBranch}()
-    for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
+)::Vector{PSY.ACTransmission}
+    collection = Vector{PSY.ACTransmission}()
+    for br in PSY.get_components(PSY.get_available, PSY.ACTransmission, sys)
         arc = PSY.get_arc(br)
         if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
             throw(
@@ -35,7 +23,7 @@ function get_ac_branches(
             )
         end
         if PSY.get_name(br) ∉ radial_branches
-            _add_to_collection!(collection, br)
+            push!(collection, br)
         end
     end
     return sort!(collection;
