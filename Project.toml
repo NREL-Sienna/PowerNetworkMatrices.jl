@@ -4,7 +4,6 @@ authors = ["Jose Daniel Lara", "Alessandro Francesco Castelli", "Sourabh Dalvi"]
 version = "0.13.0"
 
 [deps]
-AppleAccelerate = "13e28ba4-7ad8-5781-acae-3021b1ed3924"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 InfrastructureSystems = "2cd47ed4-ca9b-11e9-27f2-ab636a7671f1"
@@ -17,7 +16,6 @@ PowerSystems = "bcd98974-b02a-5e2f-9ee0-a103f5c450dd"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-AppleAccelerate = "^0.4"
 DocStringExtensions = "~0.8, ~0.9"
 HDF5 = "0.17"
 InfrastructureSystems = "2"
