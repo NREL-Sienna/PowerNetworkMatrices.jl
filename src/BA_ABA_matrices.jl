@@ -88,6 +88,7 @@ struct ABA_Matrix{
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
+    ref_bus_numbers::Set{Int}
     K::F
     radial_network_reduction::RadialNetworkReduction
 end
@@ -122,7 +123,11 @@ function ABA_Matrix(
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
 
     bus_ax = [PSY.get_number(bus) for bus in buses]
-    bus_ax_ = setdiff(bus_ax, ref_bus_positions)
+    ref_bus_numbers = Set([
+        PSY.get_number(bus) for bus in buses
+        if PSY.get_bustype(bus) == PSY.ACBusTypes.REF
+    ])
+    bus_ax_ = setdiff(bus_ax, ref_bus_numbers)
     axes = (bus_ax_, bus_ax_)
     bus_ax_ref = make_ax_ref(bus_ax_)
     lookup = (bus_ax_ref, bus_ax_ref)
@@ -136,6 +141,7 @@ function ABA_Matrix(
         axes,
         lookup,
         ref_bus_positions,
+        ref_bus_numbers,
         K,
         rb,
     )
@@ -154,6 +160,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.axes),
         deepcopy(ABA.lookup),
         deepcopy(ABA.ref_bus_positions),
+        deepcopy(ABA.ref_bus_numbers),
         klu(ABA.data),
         deepcopy(ABA.radial_network_reduction),
     )
@@ -181,16 +188,20 @@ function Base.getindex(
     return A.data[bus_number, line_number]
 end
 
+_is_ref_bus(bus::Int, ref_bus_numbers::Set{Int}) = (bus in ref_bus_numbers)
+_is_ref_bus(bus::PSY.ACBus, ref_bus_numbers::Set{Int}) =
+    (PSY.get_number(bus) in ref_bus_numbers)
+_is_ref_bus(::Colon, ::Set{Int}) = false
 # get_index functions: ABA_Matrix stores a square matrix whose number of rows
 # and column is equal to the number of the system's buses minus the slack ones,
-# NOTE: bus_1, bus_2 are bus numbers not row and column indices!
+# NOTE: bus_1, bus_2 are bus numbers (or PSY.ACBus objects) not row and column indices!
 function Base.getindex(A::ABA_Matrix, bus_1, bus_2)
-    if bus_1 in A.ref_bus_positions || bus_2 in A.ref_bus_positions
+    if _is_ref_bus(bus_1, A.ref_bus_numbers) || _is_ref_bus(bus_2, A.ref_bus_numbers)
         err_msg = string(
             " Rows and columns related to slack buses are not defined for the ABA matrix. \n",
             "Indices must be referred to any bus number that is not a slack one. \n",
             "For the current Systems the reference slack buses are: ",
-            collect(A.ref_bus_positions), ". \n")
+            collect(A.ref_bus_numbers), ". \n")
         error(err_msg)
     else
         i, j = to_index(A, bus_1, bus_2)
