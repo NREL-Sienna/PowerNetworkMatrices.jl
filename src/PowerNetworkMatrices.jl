@@ -11,6 +11,7 @@ export get_lodf_data
 export get_bus_reduction_map
 export get_radial_reduction
 export get_ward_reduction
+export get_zero_impedance_reduction
 export get_removed_branches
 export get_reduction_type
 export IncidenceMatrix
@@ -70,6 +71,7 @@ include("definitions.jl")
 include("network_reduction.jl")
 include("incedence_matrix.jl")
 include("adjacency_matrix.jl")
+include("zero_impedance_reduction.jl")
 include("radial_reduction.jl")
 include("ward_reduction.jl")
 include("common.jl")
