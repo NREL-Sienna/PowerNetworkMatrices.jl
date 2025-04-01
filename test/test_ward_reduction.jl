@@ -1,8 +1,8 @@
 function _basic_test_ward_reduction(sys, study_buses)
     wr = get_ward_reduction(sys, study_buses)
     @test isa(wr, NetworkReduction)
-    @test get_reduction_type(wr) == NetworkReductionTypes.WARD
-    external_buses =
+    @test get_reduction_type(wr) == [NetworkReductionTypes.WARD]
+        external_buses =
         setdiff([get_number(x) for x in get_components(ACBus, sys)], study_buses)
     @test !isempty(wr.added_admittances)
     @test !isempty(wr.added_branches)
