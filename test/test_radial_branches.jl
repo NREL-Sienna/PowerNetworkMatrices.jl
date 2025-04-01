@@ -27,7 +27,7 @@
     rb = get_radial_reduction(sys)
     @test get_bus_reduction_map(rb)[7] == Set([61, 8])
     @test get_removed_branches(rb) == Set(["tl", "Trans4"])
-    @test get_reduction_type(rb) == NetworkReductionTypes.RADIAL
+    @test get_reduction_type(rb) == [NetworkReductionTypes.RADIAL]
 end
 
 @testset "Radial Branches Large" begin
