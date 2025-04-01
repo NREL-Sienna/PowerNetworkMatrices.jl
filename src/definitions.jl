@@ -8,4 +8,4 @@ const ROW_PERSISTENT_CACHE_WARN = 1 * GiB
 
 DEFAULT_LODF_CHUNK_SIZE = 18_000
 
-IS.@scoped_enum(NetworkReductionTypes, RADIAL = 1, WARD = 2, RADIAL_THEN_WARD = 3) # Performing WARD and then RADIAL isn't supported
+IS.@scoped_enum(NetworkReductionTypes, ZERO_IMPEDANCE = 1, RADIAL = 2, WARD = 3) # Performing WARD and then RADIAL isn't supported
