@@ -22,7 +22,7 @@ function _ybus!(
     y12::Vector{ComplexF64},
     y21::Vector{ComplexF64},
     y22::Vector{ComplexF64},
-    br::PSY.ACBranch,
+    br::PSY.ACTransmission,
     num_bus::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
