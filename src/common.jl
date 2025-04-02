@@ -1,6 +1,6 @@
 function _add_to_collection!(
     collection_br::Vector{PSY.ACTransmission},
-    branch::PSY.ACBranch,
+    branch::PSY.ACTransmission,
 )
     push!(collection_br, branch)
     return
@@ -14,24 +14,17 @@ function _add_to_collection!(
     return
 end
 
-function _add_to_collection!(
-    ::Vector{PSY.ACBranch},
-    ::Union{PSY.TwoTerminalGenericHVDCLine, PSY.TwoTerminalVSCLine, PSY.TwoTerminalLCCLine},
-)
-    return
-end
-
 """
 Gets the AC branches & 3W Transformers from a given Systems.
 """
 function get_ac_branches(
     sys::PSY.System,
-    removed_branches::Set{String} = Set{String}(),
+    radial_branches::Set{String} = Set{String}(),
 )::Vector{PSY.ACTransmission}
-    collection = Vector{PSY.ACTransmission}()
+    collection_br = Vector{PSY.ACTransmission}()
     for br in PSY.get_components(
         x -> PSY.get_available(x) && !(typeof(x) <: PSY.Transformer3W),
-        PSY.ACBranch,
+        PSY.ACTransmission,
         sys,
     )
         arc = PSY.get_arc(br)
@@ -101,9 +94,9 @@ function get_ac_branches(
 end
 
 """
-Because we need to differentiate between Transformer3W that has 3 arcs and ACBranch that has 2 arcs, we need this function to know the increment for the branch number
+Because we need to differentiate between Transformer3W that has 3 arcs and ACTransmission that has 2 arcs, we need this function to know the increment for the branch number
 """
-function _next_branch_number(::PSY.ACBranch, branch_number::Int)
+function _next_branch_number(::PSY.ACTransmission, branch_number::Int)
     return branch_number + 1
 end
 
@@ -118,7 +111,7 @@ function _add_branch_to_lookup!(
     branch_lookup::Dict{String, Int},
     ::Dict{String, Vector{String}},
     branch_type::Vector{DataType},
-    branch::PSY.ACBranch,
+    branch::PSY.ACTransmission,
     branch_number::Int,
 )
     branch_lookup[PSY.get_name(branch)] = branch_number
@@ -228,7 +221,7 @@ function validate_linear_solver(linear_solver::String)
 end
 
 function _add_branch_to_A_matrix!(
-    b::PSY.ACBranch,
+    b::PSY.ACTransmission,
     ix::Int,
     bus_lookup::Dict{Int, Int},
     A_I::Vector{Int},
@@ -282,7 +275,7 @@ NOTE:
   reference buses (each column is related to a system's bus).
 """
 function calculate_A_matrix(
-    branches::Vector{<:PSY.ACBranch},
+    branches::Vector{<:PSY.ACTransmission},
     buses::Vector{PSY.ACBus},
     network_reduction::NetworkReduction,
 )
@@ -326,7 +319,7 @@ function calculate_adjacency(
 end
 
 function _add_branch_to_adjacency!(
-    b::PSY.ACBranch,
+    b::PSY.ACTransmission,
     bus_lookup::Dict{Int, Int},
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
@@ -383,7 +376,7 @@ function calculate_adjacency(
 end
 
 function _add_branch_to_BA_matrix!(
-    b::PSY.ACBranch,
+    b::PSY.ACTransmission,
     ix::Int,
     bus_lookup::Dict{Int, Int},
     BA_I::Vector{Int},
