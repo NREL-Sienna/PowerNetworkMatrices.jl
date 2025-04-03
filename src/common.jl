@@ -3,7 +3,7 @@ Gets the AC branches from a given Systems.
 """
 function get_ac_branches(
     sys::PSY.System,
-    radial_branches::Set{String} = Set{String}(),
+    removed_branches::Set{String} = Set{String}(),
 )::Vector{PSY.ACTransmission}
     collection = Vector{PSY.ACTransmission}()
     for br in PSY.get_components(PSY.get_available, PSY.ACTransmission, sys)
@@ -22,7 +22,7 @@ function get_ac_branches(
                 ),
             )
         end
-        if PSY.get_name(br) ∉ radial_branches
+        if PSY.get_name(br) ∉ removed_branches
             push!(collection, br)
         end
     end
