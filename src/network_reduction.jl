@@ -5,7 +5,7 @@ struct NetworkReduction
     retained_branches::Set{String}
     added_branches::Vector{PSY.ACBranch}
     added_admittances::Vector{PSY.FixedAdmittance}
-    reduction_type::Union{Nothing, Vector{NetworkReductionTypes}}
+    reduction_type::Vector{NetworkReductionTypes}
 end
 
 get_bus_reduction_map(rb::NetworkReduction) = rb.bus_reduction_map
@@ -33,7 +33,7 @@ function NetworkReduction(;
     retained_branches::Set{String} = Set{String}(),
     added_branches::Vector{PSY.ACBranch} = Vector{PSY.ACBranch}(),
     added_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
-    reduction_type::Union{Nothing, Vector{NetworkReductionTypes}} = nothing,
+    reduction_type::Vector{NetworkReductionTypes} = Vector{NetworkReductionTypes}(),
 )
     return NetworkReduction(
         bus_reduction_map,
@@ -48,9 +48,9 @@ end
 
 function validate_reduction_type(
     reduction_type::NetworkReductionTypes,
-    prior_reduction_types::Union{Nothing, Vector{NetworkReductionTypes}},
+    prior_reduction_types::Vector{NetworkReductionTypes},
 )
-    if prior_reduction_types === nothing
+    if length(prior_reduction_types) == 0
         return
     else
         if reduction_type ∈ prior_reduction_types
@@ -58,11 +58,15 @@ function validate_reduction_type(
         end
         if reduction_type == NetworkReductionTypes.BREAKER_SWITCH
             if NetworkReductionTypes.WARD ∈ prior_reduction_types
-                throw(IS.DataFormatError("Cannot apply $reduction_type after Ward Reduction"))
+                throw(
+                    IS.DataFormatError("Cannot apply $reduction_type after Ward Reduction"),
+                )
             end
         elseif reduction_type == NetworkReductionTypes.RADIAL
             if NetworkReductionTypes.WARD ∈ prior_reduction_types
-                throw(IS.DataFormatError("Cannot apply $reduction_type after Ward Reduction"))
+                throw(
+                    IS.DataFormatError("Cannot apply $reduction_type after Ward Reduction"),
+                )
             end
         elseif reduction_type == NetworkReductionTypes.WARD
         else
@@ -83,11 +87,6 @@ function compose_reductions(nr_1::NetworkReduction, nr_2::NetworkReduction, n_bu
         end
     end
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map, n_buses)
-    if nr_1.reduction_type === nothing
-        reductions = nr_2.reduction_type
-    else
-        reductions = vcat(nr_1.reduction_type, nr_2.reduction_type)
-    end
     return NetworkReduction(
         bus_reduction_map,
         reverse_bus_search_map,
@@ -95,7 +94,7 @@ function compose_reductions(nr_1::NetworkReduction, nr_2::NetworkReduction, n_bu
         setdiff(nr_1.retained_branches, nr_2.removed_branches),
         vcat(nr_1.added_branches, nr_2.added_branches),
         vcat(nr_1.added_admittances, nr_2.added_admittances),
-        reductions,
+        vcat(nr_1.reduction_type, nr_2.reduction_type),
     )
 end
 
