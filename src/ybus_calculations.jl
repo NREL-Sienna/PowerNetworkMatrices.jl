@@ -117,27 +117,19 @@ function _ybus!(
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
+    stb::Int64,
 )
-    arcs = (
-        PSY.get_primary_secondary_arc(br),
-        PSY.get_secondary_tertiary_arc(br),
-        PSY.get_primary_tertiary_arc(br),
-    )
+    primary_secondary_arc = PSY.get_primary_secondary_arc(br)
+    secondary_tertiary_arc = PSY.get_secondary_tertiary_arc(br)
+    primary_tertiary_arc = PSY.get_primary_tertiary_arc(br)
+    fb[branch_ix + stb] = num_bus[PSY.get_number(PSY.get_from(primary_secondary_arc))]
+    fb[branch_ix + stb + 1] = num_bus[PSY.get_number(PSY.get_from(secondary_tertiary_arc))]
+    fb[branch_ix + stb + 2] = num_bus[PSY.get_number(PSY.get_to(primary_tertiary_arc))]
 
-    for i in -2:0
-        if i != 0
-            arc_bus_fr = PSY.get_from(arcs[i + 3])
-            fb[branch_ix + i] = num_bus[PSY.get_number(arc_bus_fr)]
-        else
-            arc_bus_to = PSY.get_to(arcs[i + 3])
-            fb[branch_ix + i] = num_bus[PSY.get_number(arc_bus_to)]
-        end
-    end
-
-    start_bus_num = PSY.get_number(PSY.get_star_bus(br))
-    for i in -2:0
-        tb[branch_ix + i] = num_bus[start_bus_num]
-    end
+    start_bus = PSY.get_number(PSY.get_star_bus(br))
+    tb[branch_ix + stb] = num_bus[start_bus]
+    tb[branch_ix + stb + 1] = num_bus[start_bus]
+    tb[branch_ix + stb + 2] = num_bus[start_bus]
 
     Y_t1 = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
     Y11 = Y_t1
@@ -157,21 +149,21 @@ function _ybus!(
         )
     end
 
-    y11[branch_ix - 2] = Y11 - (1im * b)
-    y11[branch_ix - 1] = Y22 - (1im * b)
-    y11[branch_ix] = Y33 - (1im * b)
+    y11[branch_ix + stb] = Y11 - (1im * b)
+    y11[branch_ix + stb + 1] = Y22 - (1im * b)
+    y11[branch_ix + stb + 2] = Y33 - (1im * b)
 
-    y12[branch_ix - 2] = -Y_t1
-    y12[branch_ix - 1] = -Y_t2
-    y12[branch_ix] = -Y_t3
+    y12[branch_ix + stb] = -Y_t1
+    y12[branch_ix + stb + 1] = -Y_t2
+    y12[branch_ix + stb + 2] = -Y_t3
 
-    y21[branch_ix - 2] = -Y_t1
-    y21[branch_ix - 1] = -Y_t2
-    y21[branch_ix] = -Y_t3
+    y21[branch_ix + stb] = -Y_t1
+    y21[branch_ix + stb + 1] = -Y_t2
+    y21[branch_ix + stb + 2] = -Y_t3
 
-    y22[branch_ix - 2] = Y11
-    y22[branch_ix - 1] = Y22
-    y22[branch_ix] = Y33
+    y22[branch_ix + stb] = Y11
+    y22[branch_ix + stb + 1] = Y22
+    y22[branch_ix + stb + 2] = Y33
 
     return
 end
@@ -270,14 +262,15 @@ end
 
 function _buildybus(
     branches,
+    transformer_3w::Vector{PSY.Transformer3W},
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
     network_reduction::NetworkReduction = NetworkReduction()
 )
     num_bus = Dict{Int, Int}()
-    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
-    branchcount = length(branches) + 3 * length(transformer_3W)
+
+    branchcount = length(branches) + 3 * length(transformer_3w)
     branchcount_no_3w = length(branches)
     fa_count = length(fixed_admittances)
     sa_count = length(switched_admittances)
@@ -295,13 +288,22 @@ function _buildybus(
     y22 = zeros(ComplexF64, branchcount)
     ysh = zeros(ComplexF64, fa_count + sa_count)
 
-    ix = 0
-    for b in branches
+    for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        ix = _next_branch_number(b, ix)
         PSY.get_available(b) && _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb)
+    end
+
+    stb = 0
+    for (ix, b) in enumerate(transformer_3w)
+        if PSY.get_name(b) == "init"
+            throw(DataFormatError("The data in Transformer3W is invalid"))
+        end
+        PSY.get_available(b) &&
+            _ybus!(y11, y12, y21, y22, b, num_bus, ix + branchcount_no_3w, fb, tb, stb)
+
+        stb = stb + 2
     end
 
     for (ix, fa) in enumerate([fixed_admittances; switched_admittances])
@@ -328,6 +330,7 @@ Builds a Ybus from a collection of buses and branches. The return is a Ybus Arra
 function Ybus(
     branches::Vector,
     buses::Vector{PSY.ACBus},
+    transformer_3w::Vector{PSY.Transformer3W} = Vector{PSY.Transformer3W}(),
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
     switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}();
     check_connectivity::Bool = true,
@@ -339,7 +342,8 @@ function Ybus(
     busnumber = length(buses)
     look_up = (bus_lookup, bus_lookup)
     y11, y12, y21, y22, ysh, fb, tb, sb =
-        _buildybus(branches, transformer_3W, buses, fixed_admittances, switched_admittances,  network_reduction)
+        _buildybus(branches, transformer_3w, buses, fixed_admittances, switched_admittances)
+
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
