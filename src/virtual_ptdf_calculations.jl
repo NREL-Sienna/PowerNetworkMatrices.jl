@@ -108,11 +108,12 @@ function VirtualPTDF(
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
     axes = (line_ax, bus_ax)
-    M, bus_ax_ref = calculate_adjacency(branches, buses)
+    M, bus_ax_ref = calculate_adjacency(branches, buses, network_reduction)
     line_ax_ref = make_ax_ref(line_ax)
     look_up = (line_ax_ref, bus_ax_ref)
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_ax_ref)
+    A, ref_bus_positions =
+        calculate_A_matrix(branches, buses, network_reduction)
+    BA = calculate_BA_matrix(branches, bus_ax_ref, network_reduction)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     ref_bus_positions = find_slack_positions(buses)
     subnetworks = find_subnetworks(M, bus_ax)

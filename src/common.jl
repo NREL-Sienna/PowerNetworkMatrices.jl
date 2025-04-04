@@ -122,8 +122,9 @@ NOTE:
   reference buses (each column is related to a system's bus).
 """
 function calculate_A_matrix(
-    branches,
-    buses::Vector{PSY.ACBus},
+    branches,                
+    buses::Vector{PSY.ACBus},   
+    network_reduction::NetworkReduction,
 )
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
@@ -131,10 +132,10 @@ function calculate_A_matrix(
     A_I = Int[]
     A_J = Int[]
     A_V = Int8[]
-
+    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
     # build incidence matrix A (lines x buses)
     for (ix, b) in enumerate(branches)
-        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup, reverse_bus_search_map)
 
         # change column number
         push!(A_I, ix)
@@ -150,7 +151,7 @@ function calculate_A_matrix(
 end
 
 """
-Evaluates the Adjacency matrix given the banches and buses of a given System.
+Evaluates the Adjacency matrix given the branches and buses of a given System.
 
 # Arguments
 - `branches`:
@@ -158,9 +159,18 @@ Evaluates the Adjacency matrix given the banches and buses of a given System.
 - `buses::Vector{PSY.ACBus}`:
         vector containing the buses of the considered system.
 """
-function calculate_adjacency(branches, buses::Vector{PSY.ACBus})
+function calculate_adjacency(
+    branches,
+    buses::Vector{PSY.ACBus},
+    network_reduction::NetworkReduction,
+)
     bus_ax = PSY.get_number.(buses)
-    return calculate_adjacency(branches, buses, make_ax_ref(bus_ax))
+    return calculate_adjacency(
+        branches,
+        buses,
+        make_ax_ref(bus_ax),
+        network_reduction,
+    )
 end
 
 """
@@ -174,12 +184,14 @@ function calculate_adjacency(
     branches,
     buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
+    network_reduction::NetworkReduction,
 )
     buscount = length(buses)
     a = SparseArrays.spzeros(Int8, buscount, buscount)
+    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
 
     for b in branches
-        fr_b, to_b = get_bus_indices(b, bus_lookup)
+        fr_b, to_b = get_bus_indices(b, bus_lookup, reverse_bus_search_map)
         a[fr_b, to_b] = 1
         a[to_b, fr_b] = -1
     end
@@ -210,13 +222,15 @@ Evaluates the transposed BA matrix given the System's banches, reference bus pos
 """
 function calculate_BA_matrix(
     branches,
-    bus_lookup::Dict{Int, Int})
+    bus_lookup::Dict{Int, Int},
+    network_reduction::NetworkReduction,
+)
     BA_I = Int[]
     BA_J = Int[]
     BA_V = Float64[]
-
+    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
     for (ix, b) in enumerate(branches)
-        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
+        (fr_b, to_b) = get_bus_indices(b, bus_lookup, reverse_bus_search_map)
         b_val = PSY.get_series_susceptance(b)
 
         if !isfinite(b_val)

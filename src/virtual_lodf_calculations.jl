@@ -151,9 +151,10 @@ function VirtualLODF(
     bus_ax = [PSY.get_number(bus) for bus in buses]
     axes = (line_ax, line_ax)
     # get matrices
-    M, bus_ax_ref = calculate_adjacency(branches, buses)
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_ax_ref)
+    M, bus_ax_ref = calculate_adjacency(branches, buses, network_reduction)
+    A, ref_bus_positions =
+        calculate_A_matrix(branches, buses, network_reduction)
+    BA = calculate_BA_matrix(branches, bus_ax_ref, network_reduction)
     K = klu(calculate_ABA_matrix(A, BA, ref_bus_positions))
     # get lookups, reference bus positions and subnetworks
     line_ax_ref = make_ax_ref(line_ax)
