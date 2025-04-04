@@ -21,13 +21,12 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.ACBranch,
     num_bus::Dict{Int, Int},
+    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
 )
-    arc = PSY.get_arc(br)
-    bus_from_no = num_bus[arc.from.number]
-    bus_to_no = num_bus[arc.to.number]
+    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
@@ -54,11 +53,23 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
+    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
 )
-    _ybus!(y11, y12, y21, y22, br.branch, num_bus, branch_ix, fb, tb)
+    _ybus!(
+        y11,
+        y12,
+        y21,
+        y22,
+        br.branch,
+        num_bus,
+        reverse_bus_search_map,
+        branch_ix,
+        fb,
+        tb,
+    )
     return
 end
 
@@ -69,13 +80,12 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.Transformer2W,
     num_bus::Dict{Int, Int},
+    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
 )
-    arc = PSY.get_arc(br)
-    bus_from_no = num_bus[arc.from.number]
-    bus_to_no = num_bus[arc.to.number]
+    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
@@ -104,13 +114,12 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.TapTransformer,
     num_bus::Dict{Int, Int},
+    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
 )
-    arc = PSY.get_arc(br)
-    bus_from_no = num_bus[arc.from.number]
-    bus_to_no = num_bus[arc.to.number]
+    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
 
@@ -142,13 +151,12 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.PhaseShiftingTransformer,
     num_bus::Dict{Int, Int},
+    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
 )
-    arc = PSY.get_arc(br)
-    bus_from_no = num_bus[arc.from.number]
-    bus_to_no = num_bus[arc.to.number]
+    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
@@ -195,9 +203,10 @@ function _buildybus(
     branches,
     buses::Vector{PSY.ACBus},
     fixed_admittances::Vector{PSY.FixedAdmittance},
+    network_reduction::NetworkReduction,
 )
     num_bus = Dict{Int, Int}()
-
+    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
     branchcount = length(branches)
     fa_count = length(fixed_admittances)
     fb = zeros(Int64, branchcount)
@@ -218,7 +227,8 @@ function _buildybus(
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        PSY.get_available(b) && _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb)
+        PSY.get_available(b) &&
+            _ybus!(y11, y12, y21, y22, b, num_bus, reverse_bus_search_map, ix, fb, tb)
     end
     for (ix, fa) in enumerate(fixed_admittances)
         PSY.get_available(fa) && _ybus!(ysh, fa, num_bus, ix, sb)
@@ -253,7 +263,8 @@ function Ybus(
     bus_lookup = make_ax_ref(bus_ax)
     busnumber = length(buses)
     look_up = (bus_lookup, bus_lookup)
-    y11, y12, y21, y22, ysh, fb, tb, sb = _buildybus(branches, buses, fixed_admittances)
+    y11, y12, y21, y22, ysh, fb, tb, sb =
+        _buildybus(branches, buses, fixed_admittances, network_reduction)
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
@@ -294,73 +305,10 @@ function Ybus(
         branches,
         buses,
         fixed_admittances;
+        network_reduction = network_reduction,
         kwargs...,
     )
 end
-
-#= """
-Nodal incidence matrix (Adjacency) is an N x N matrix describing a power system with N buses. It represents the directed connectivity of the buses in a power system.
-
-The Adjacency Struct is indexed using the Bus Numbers, no need for them to be sequential
-"""
-struct Adjacency{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int}
-    data::SparseArrays.SparseMatrixCSC{Int, Int}
-    axes::Ax
-    lookup::L
-end
-
-"""
-Builds a Adjacency from a collection of buses and branches. The return is an N x N Adjacency Array indexed with the bus numbers.
-
-# Keyword arguments
-- `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
-"""
-function Adjacency(branches, nodes; check_connectivity::Bool = true, kwargs...)
-    buscount = length(nodes)
-    bus_ax = PSY.get_number.(nodes)
-    axes = (bus_ax, bus_ax)
-    bus_lookup = make_ax_ref(bus_ax)
-    look_up = (bus_lookup, bus_lookup)
-
-    a = SparseArrays.spzeros(Int, buscount, buscount)
-
-    for b in branches
-        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
-        a[fr_b, to_b] = 1
-        a[to_b, fr_b] = -1
-        a[fr_b, fr_b] = 1
-        a[to_b, to_b] = 1
-    end
-
-    if check_connectivity
-        connected = validate_connectivity(a, nodes, bus_lookup; kwargs...)
-        !connected && throw(DataFormatError("Network not connected"))
-    end
-
-    return Adjacency(a, axes, look_up)
-end
-
-"""
-Builds a Adjacency from the system. The return is an N x N Adjacency Array indexed with the bus numbers.
-
-# Keyword arguments
-- `check_connectivity::Bool`: Checks connectivity of the network using Goderya's algorithm
-- `connectivity_method::Function = goderya_connectivity`: method (`goderya_connectivity` or `dfs_connectivity`) for connectivity validation
-"""
-function Adjacency(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
-    nodes = sort!(
-        collect(
-            PSY.get_components(
-                x -> PSY.get_bustype(x) != ACBusTypes.ISOLATED,
-                PSY.ACBus,
-                sys,
-            ),
-        );
-        by = x -> PSY.get_number(x),
-    )
-    branches = PSY.get_components(PSY.get_available, PSY.Branch, sys)
-    return Adjacency(branches, nodes; check_connectivity = check_connectivity, kwargs...)
-end =#
 
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
     node_count = size(ybus)[1]
