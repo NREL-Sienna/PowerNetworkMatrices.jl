@@ -24,12 +24,10 @@ function get_bus_indices(branch, bus_lookup, reverse_bus_search_map)
     to_bus_number = PSY.get_number(PSY.get_to(PSY.get_arc(branch)))
     if haskey(reverse_bus_search_map, fr_bus_number)
         fr_bus_ix = bus_lookup[reverse_bus_search_map[fr_bus_number]]
-        @error "HAS REDUCTION KEY"
     else
         fr_bus_ix = bus_lookup[fr_bus_number]
     end
     if haskey(reverse_bus_search_map, to_bus_number)
-        @error "HAS REDUCTION KEY"
         to_bus_ix = bus_lookup[reverse_bus_search_map[to_bus_number]]
     else
         to_bus_ix = bus_lookup[to_bus_number]
