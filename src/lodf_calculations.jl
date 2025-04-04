@@ -290,7 +290,13 @@ function LODF(
     bus_ax = [PSY.get_number(bus) for bus in buses]
     bus_lookup = make_ax_ref(bus_ax)
     # get network matrices
-    ptdf_t, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, Float64[])
+    ptdf_t, a = calculate_PTDF_matrix_KLU(
+        branches,
+        buses,
+        bus_lookup,
+        network_reduction,
+        Float64[],
+    )
 
     if tol > eps()
         lodf_t = _buildlodf(a, ptdf_t, linear_solver)

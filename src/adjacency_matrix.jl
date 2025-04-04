@@ -72,7 +72,7 @@ function AdjacencyMatrix(
     network_reduction::NetworkReduction = NetworkReduction(),
     kwargs...,
 )
-    M, bus_lookup = calculate_adjacency(branches, buses)
+    M, bus_lookup = calculate_adjacency(branches, buses, network_reduction)
     bus_ax = PSY.get_number.(buses)
     axes = (bus_ax, bus_ax)
     look_up = (bus_lookup, bus_lookup)

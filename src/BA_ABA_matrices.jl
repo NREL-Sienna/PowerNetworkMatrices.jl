@@ -51,7 +51,8 @@ function BA_Matrix(
     bus_ax = [PSY.get_number(bus) for bus in setdiff(buses, ref_bus_positions)]
     axes = (bus_ax, line_ax)
     lookup = (make_ax_ref(bus_ax), make_ax_ref(line_ax))
-    data = calculate_BA_matrix(branches, bus_lookup)
+    data =
+        calculate_BA_matrix(branches, bus_lookup, network_reduction)
     return BA_Matrix(data, axes, lookup, ref_bus_positions, network_reduction)
 end
 
@@ -113,8 +114,9 @@ function ABA_Matrix(
     buses = get_buses(sys, network_reduction.bus_reduction_map)
     bus_lookup = make_ax_ref(buses)
 
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_lookup)
+    A, ref_bus_positions =
+        calculate_A_matrix(branches, buses, network_reduction)
+    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
 
     bus_ax = [PSY.get_number(bus) for bus in buses]

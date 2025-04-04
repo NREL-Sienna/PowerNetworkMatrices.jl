@@ -4,8 +4,20 @@ Builds a NetworkReduction by removing radially connected buses.
 # Arguments
 - `sys::System`
 """
-function get_radial_reduction(sys::PSY.System; exempt_buses::Vector{Int64} = Int64[])
-    return get_radial_reduction(IncidenceMatrix(sys); exempt_buses = exempt_buses)
+function get_radial_reduction(
+    sys::PSY.System;
+    prior_reduction::NetworkReduction = NetworkReduction(),
+    exempt_buses::Vector{Int64} = Int64[],
+)
+    validate_reduction_type(
+        NetworkReductionTypes.RADIAL,
+        get_reduction_type(prior_reduction),
+    )
+    return get_radial_reduction(
+        IncidenceMatrix(sys);
+        prior_reduction = prior_reduction,
+        exempt_buses = exempt_buses,
+    )
 end
 
 """
@@ -14,23 +26,24 @@ Builds a NetworkReduction by removing radially connected buses.
 # Arguments
 - `A::IncidenceMatrix`: IncidenceMatrix
 """
-function get_radial_reduction(A::IncidenceMatrix; exempt_buses::Vector{Int64} = Int64[])
+function get_radial_reduction(
+    A::IncidenceMatrix;
+    prior_reduction::NetworkReduction = NetworkReduction(),
+    exempt_buses::Vector{Int64} = Int64[],
+)
     exempt_bus_positions = [A.lookup[2][x] for x in exempt_buses]
-    return calculate_radial_branches(
+    new_reduction = calculate_radial_branches(
         A.data,
         A.lookup[1],
         A.lookup[2],
         union(A.ref_bus_positions, Set(exempt_bus_positions)),
     )
+    if isempty(prior_reduction)
+        return new_reduction
+    else
+        return compose_reductions(prior_reduction, new_reduction, length(A.lookup[2]))
+    end
 end
-
-#TODO: functions for composing multiple reductions
-#= function apply_radial_reduction!(network_reduction::NetworkReduction, A::IncidenceMatrix)
-    return 
-end 
-function apply_radial_reduction!(network_reduction::NetworkReduction, sys::PSY.System)
-    apply_radial_reduction!(network_reduction, IncidenceMatrix(sys))
-end  =#
 
 function _find_upstream_bus(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},

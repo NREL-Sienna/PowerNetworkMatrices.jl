@@ -19,10 +19,22 @@ Evaluates the bus indices for the given branch.
 - `bus_lookup`:
         dictionary mapping the system's buses and branches
 """
-function get_bus_indices(branch, bus_lookup)
-    fr_b = bus_lookup[PSY.get_number(PSY.get_from(PSY.get_arc(branch)))]
-    to_b = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_arc(branch)))]
-    return fr_b, to_b
+function get_bus_indices(branch, bus_lookup, reverse_bus_search_map)
+    fr_bus_number = PSY.get_number(PSY.get_from(PSY.get_arc(branch)))
+    to_bus_number = PSY.get_number(PSY.get_to(PSY.get_arc(branch)))
+    if haskey(reverse_bus_search_map, fr_bus_number)
+        fr_bus_ix = bus_lookup[reverse_bus_search_map[fr_bus_number]]
+        @error "HAS REDUCTION KEY"
+    else
+        fr_bus_ix = bus_lookup[fr_bus_number]
+    end
+    if haskey(reverse_bus_search_map, to_bus_number)
+        @error "HAS REDUCTION KEY"
+        to_bus_ix = bus_lookup[reverse_bus_search_map[to_bus_number]]
+    else
+        to_bus_ix = bus_lookup[to_bus_number]
+    end
+    return fr_bus_ix, to_bus_ix
 end
 
 """
