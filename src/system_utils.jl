@@ -10,7 +10,7 @@ function _find_subnetworks(sys::PSY.System)
     buses = get_buses(sys)
     branches = get_ac_branches(sys)
     @info "Validating connectivity with depth first search (network traversal)"
-    M, bus_lookup = calculate_adjacency(branches, buses)
+    M, bus_lookup = calculate_adjacency(branches, buses, NetworkReduction())
     ref_positions = find_slack_positions(buses, bus_lookup)
     ref_buses = [k for (k, v) in bus_lookup if v in ref_positions]
     return find_subnetworks(M, PSY.get_number.(buses)), ref_buses

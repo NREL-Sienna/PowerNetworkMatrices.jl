@@ -5,10 +5,17 @@ Builds a NetworkReduction corresponding to Ward reduction
 - `sys::System`
 - `study_buses::Vector{Int}`: Bus numbers corresponding to the area of study (the retained area)
 """
-function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
-    _validate_study_buses(sys, study_buses)
+function get_ward_reduction(
+    sys::PSY.System,
+    study_buses::Vector{Int};
+    prior_reduction::NetworkReduction = NetworkReduction(),
+)
+    validate_reduction_type(NetworkReductionTypes.WARD, get_reduction_type(prior_reduction))
+    _validate_study_buses(sys, study_buses, prior_reduction)
+    y_bus = Ybus(sys; network_reduction = prior_reduction, check_connectivity = false)
+    Z_full = KLU.solve!(klu(y_bus.data), Matrix(one(y_bus.data)))       #TODO: change implementation for large systems (row by row)
     boundary_buses = Vector{Int64}()
-    for branch in PSY.get_components(PSY.ACBranch, sys)
+    for branch in get_ac_branches(sys, prior_reduction.removed_branches)
         from_bus = PSY.get_number(PSY.get_from(PSY.get_arc(branch)))
         to_bus = PSY.get_number(PSY.get_to(PSY.get_arc(branch)))
         if (from_bus ∈ study_buses) && (to_bus ∉ study_buses)
@@ -18,7 +25,8 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
             push!(boundary_buses, to_bus)
         end
     end
-    all_buses = [PSY.get_number(b) for b in PSY.get_components(PSY.ACBus, sys)]
+    all_buses =
+        [PSY.get_number(b) for b in get_buses(sys, prior_reduction.bus_reduction_map)]
     external_buses = setdiff(all_buses, study_buses)
     boundary_buses = unique(boundary_buses)
     n_external = length(external_buses)
@@ -26,7 +34,7 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
 
     retained_branches = Set{String}()
     removed_branches = Set{String}()
-    for branch in PSY.get_components(PSY.Branch, sys)
+    for branch in get_ac_branches(sys, prior_reduction.removed_branches)
         arc = PSY.get_arc(branch)
         from_bus = PSY.get_number(PSY.get_from(arc))
         to_bus = PSY.get_number(PSY.get_to(arc))
@@ -38,8 +46,6 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
             push!(retained_branches, PSY.get_name(branch))
         end
     end
-    y_bus = Ybus(sys; check_connectivity = false)
-    Z_full = KLU.solve!(klu(y_bus.data), Matrix(one(y_bus.data))) #TODO: change implementation for large systems (row by row)
 
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
     bus_lookup = y_bus.lookup[1]    #y_bus and Z have same lookup
@@ -135,8 +141,7 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
             end
         end
     end
-
-    return NetworkReduction(;
+    new_reduction = NetworkReduction(;
         bus_reduction_map = bus_reduction_map_index,
         reverse_bus_search_map = reverse_bus_search_map,
         removed_branches = removed_branches,
@@ -145,17 +150,22 @@ function get_ward_reduction(sys::PSY.System, study_buses::Vector{Int})
         added_admittances = added_admittances,
         reduction_type = [NetworkReductionTypes.WARD],
     )
+    if isempty(prior_reduction)
+        return new_reduction
+    else
+        return compose_reductions(prior_reduction, new_reduction, length(all_buses))
+    end
 end
 
-function _validate_study_buses(sys, study_buses)
-    buses = get_buses(sys, Dict{Int64, Set{Int64}}())
-    branches = get_ac_branches(sys, Set{String}())
+function _validate_study_buses(sys::PSY.System, study_buses::Vector{Int}, network_reduction::NetworkReduction)
+    buses = get_buses(sys, network_reduction.bus_reduction_map)
+    branches = get_ac_branches(sys, network_reduction.removed_branches)
 
     bus_numbers = PSY.get_number.(buses)
     for b in study_buses
         b ∉ bus_numbers && throw(IS.DataFormatError("Study bus $b not found in system"))
     end
-    M, _ = calculate_adjacency(branches, buses)
+    M, _ = calculate_adjacency(branches, buses, network_reduction)
     bus_ax = PSY.get_number.(buses)
     sub_nets = find_subnetworks(M, bus_ax)
     if length(sub_nets) > 1

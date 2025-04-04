@@ -66,7 +66,7 @@ function evaluate_A_matrix_values(
     buses = get_buses(sys, nr.bus_reduction_map)
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
-    data, ref_bus_positions = calculate_A_matrix(branches, buses)
+    data, ref_bus_positions = calculate_A_matrix(branches, buses, nr)
     axes = (line_ax, bus_ax)
     lookup = (make_ax_ref(line_ax), make_ax_ref(bus_ax))
     return data, axes, lookup, ref_bus_positions

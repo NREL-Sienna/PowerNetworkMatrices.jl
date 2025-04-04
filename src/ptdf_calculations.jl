@@ -46,6 +46,7 @@ PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
 function _buildptdf(
     branches,
     buses::Vector{PSY.ACBus},
+    network_reduction::NetworkReduction,
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
     linear_solver::String)
@@ -54,6 +55,7 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
+            network_reduction,
             dist_slack,
         )
     elseif linear_solver == "Dense"
@@ -61,6 +63,7 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
+            network_reduction,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
@@ -73,6 +76,7 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
+            network_reduction,
             dist_slack,
         )
     end
@@ -172,9 +176,10 @@ function calculate_PTDF_matrix_KLU(
     branches,
     buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
+    network_reduction::NetworkReduction,
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_lookup)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses, network_reduction)
+    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
     PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
 end
@@ -261,9 +266,10 @@ function calculate_PTDF_matrix_DENSE(
     branches,
     buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
+    network_reduction::NetworkReduction,
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_lookup)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses, network_reduction)
+    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
     PTDFm = _calculate_PTDF_matrix_DENSE(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
 end
@@ -357,9 +363,10 @@ function calculate_PTDF_matrix_MKLPardiso(
     branches,
     buses::Vector{PSY.ACBus},
     bus_lookup::Dict{Int, Int},
+    network_reduction::NetworkReduction,
     dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_lookup)
+    A, ref_bus_positions = calculate_A_matrix(branches, buses, network_reduction)
+    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
     PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
 end
@@ -398,7 +405,7 @@ function PTDF(
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in buses]
     axes = (bus_ax, line_ax)
-    M, bus_ax_ref = calculate_adjacency(branches, buses)
+    M, bus_ax_ref = calculate_adjacency(branches, buses, network_reduction)
     ref_bus_positions = find_slack_positions(buses, bus_ax_ref)
     subnetworks =
         assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
@@ -409,6 +416,7 @@ function PTDF(
     S, _ = _buildptdf(
         branches,
         buses,
+        network_reduction,
         look_up[1],
         dist_slack,
         linear_solver,
