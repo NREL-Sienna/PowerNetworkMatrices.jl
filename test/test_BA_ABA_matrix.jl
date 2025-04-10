@@ -1,7 +1,11 @@
 @testset "Test A, BA, and ABA matrix creation" begin
-    # test on 5 and 14 bus system
-    for name in ["c_sys5", "c_sys14"]
-        sys = PSB.build_system(PSB.PSITestSystems, name)
+    # test on 5 and 14 bus system, and RTS.
+    for (category, name) in [
+        (PSITestSystems, "c_sys5"),
+        (PSITestSystems, "c_sys14"),
+        (PSISystems, "RTS_GMLC_DA_sys"),
+    ]
+        sys = PSB.build_system(category, name)
         # at first let's see if factorization flag works
         ABA_no_lu = ABA_Matrix(sys)
         @test isnothing(ABA_no_lu.K)
@@ -38,7 +42,7 @@
 end
 
 @testset "Test BA and ABA matrix indexing" begin
-    sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    sys = PSB.build_system(PSB.PSISystems, "RTS_GMLC_DA_sys")
 
     # get the matrices
     ba = BA_Matrix(sys)
@@ -66,7 +70,8 @@ end
     end
 
     # test if error is correctly thrown when ref bus is called
-    rb = collect(ba.ref_bus_positions)[1]
+    buses = get_components(PSY.ACBus, sys)
+    rb = [bus for bus in buses if get_bustype(bus) == PSY.ACBusTypes.REF][1]
     @test_throws ErrorException aba[rb, :]
 end
 
