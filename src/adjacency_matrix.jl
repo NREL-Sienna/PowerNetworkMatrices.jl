@@ -18,12 +18,15 @@ The AdjacencyMatrix Struct is indexed using the Bus Numbers, no need for them to
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the reference buses
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 struct AdjacencyMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
+    network_reduction::NetworkReduction
 end
 
 # functions to get stored data
@@ -38,13 +41,19 @@ Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix
 - `check_connectivity::Bool`:
         Checks connectivity of the network using Depth First Search (DFS) algorithm
 """
-function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
-    buses = get_buses(sys)
-    branches = get_ac_branches(sys)
+function AdjacencyMatrix(
+    sys::PSY.System;
+    check_connectivity::Bool = true,
+    network_reduction::NetworkReduction = NetworkReduction(),
+    kwargs...,
+)
+    buses = get_buses(sys, network_reduction.bus_reduction_map)
+    branches = get_ac_branches(sys, network_reduction.removed_branches)
     return AdjacencyMatrix(
         branches,
         buses;
         check_connectivity = check_connectivity,
+        network_reduction = network_reduction,
         kwargs...,
     )
 end
@@ -60,9 +69,10 @@ function AdjacencyMatrix(
     branches,
     buses::Vector{PSY.ACBus};
     check_connectivity::Bool = true,
+    network_reduction::NetworkReduction = NetworkReduction(),
     kwargs...,
 )
-    M, bus_lookup = calculate_adjacency(branches, buses)
+    M, bus_lookup = calculate_adjacency(branches, buses, network_reduction)
     bus_ax = PSY.get_number.(buses)
     axes = (bus_ax, bus_ax)
     look_up = (bus_lookup, bus_lookup)
@@ -72,7 +82,7 @@ function AdjacencyMatrix(
         length(sub_nets) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
 
-    return AdjacencyMatrix(M, axes, look_up, find_slack_positions(buses))
+    return AdjacencyMatrix(M, axes, look_up, find_slack_positions(buses), network_reduction)
 end
 
 """
