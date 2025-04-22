@@ -57,9 +57,9 @@ function get_buses(
         end
     end
 
-    count_i = 1
     all_buses = PSY.get_components(PSY.ACBus, sys)
-    buses = Vector{PSY.ACBus}(undef, length(all_buses))
+    buses = Vector{PSY.ACBus}()
+    sizehint!(buses, length(all_buses))
     for b in all_buses
         if PSY.get_bustype(b) == ACBusTypes.ISOLATED
             continue
@@ -68,11 +68,10 @@ function get_buses(
         if PSY.get_number(b) ∈ leaf_buses
             continue
         end
-        buses[count_i] = b
-        count_i += 1
+        push!(buses, b)
     end
 
-    return sort!(deleteat!(buses, count_i:length(buses)); by = x -> PSY.get_number(x))
+    return sort!(buses; by = x -> PSY.get_number(x))
 end
 
 """
