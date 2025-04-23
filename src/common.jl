@@ -1,24 +1,32 @@
-function _add_to_collection!(collection::Vector{PSY.ACBranch}, branch::PSY.ACBranch)
-    push!(collection, branch)
+function _add_to_collection!(
+    collection_br::Vector{PSY.ACTransmission},
+    branch::PSY.ACTransmission,
+)
+    push!(collection_br, branch)
     return
 end
 
 function _add_to_collection!(
-    ::Vector{PSY.ACBranch},
-    ::Union{PSY.TwoTerminalGenericHVDCLine, PSY.TwoTerminalVSCLine, PSY.TwoTerminalLCCLine},
+    collection_tr3w::Vector{PSY.Transformer3W},
+    transformer_tr3w::PSY.Transformer3W,
 )
+    push!(collection_tr3w, transformer_tr3w)
     return
 end
 
 """
-Gets the AC branches from a given Systems.
+Gets the AC branches & 3W Transformers from a given Systems.
 """
 function get_ac_branches(
     sys::PSY.System,
     radial_branches::Set{String} = Set{String}(),
-)::Vector{PSY.ACBranch}
-    collection = Vector{PSY.ACBranch}()
-    for br in PSY.get_components(PSY.get_available, PSY.ACBranch, sys)
+)::Vector{PSY.ACTransmission}
+    collection_br = Vector{PSY.ACTransmission}()
+    for br in PSY.get_components(
+        x -> PSY.get_available(x) && !(typeof(x) <: PSY.Transformer3W),
+        PSY.ACTransmission,
+        sys,
+    )
         arc = PSY.get_arc(br)
         if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
             throw(
@@ -34,13 +42,116 @@ function get_ac_branches(
                 ),
             )
         end
+
         if PSY.get_name(br) ∉ radial_branches
-            _add_to_collection!(collection, br)
+            _add_to_collection!(collection_br, br)
         end
     end
-    return sort!(collection;
+
+    return sort!(collection_br;
         by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
     )
+end
+
+function get_transformers_3w(
+    sys::PSY.System,
+)::Vector{PSY.Transformer3W}
+    collection = Vector{PSY.Transformer3W}()
+    for br in PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys)
+        ps_arc = PSY.get_primary_secondary_arc(br)
+        st_arc = PSY.get_secondary_tertiary_arc(br)
+        if PSY.get_bustype(ps_arc.from) == ACBusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.from))",
+                ),
+            )
+        end
+        if PSY.get_bustype(ps_arc.to) == ACBusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(ps_arc.to))",
+                ),
+            )
+        end
+        if PSY.get_bustype(st_arc.to) == ACBusTypes.ISOLATED
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(st_arc.to))",
+                ),
+            )
+        end
+        _add_to_collection!(collection, br)
+    end
+    return sort!(collection;
+        by = x -> (
+            PSY.get_number(PSY.get_primary_secondary_arc(x).from),
+            PSY.get_number(PSY.get_primary_secondary_arc(x).to),
+            PSY.get_number(PSY.get_primary_tertiary_arc(x).to),
+        ),
+    )
+end
+
+"""
+Because we need to differentiate between Transformer3W that has 3 arcs and ACTransmission that has 2 arcs, we need this function to know the increment for the branch number
+"""
+function _next_branch_number(::PSY.ACTransmission, branch_number::Int)
+    return branch_number + 1
+end
+
+"""
+Because Transformer3w have 3 arcs, we need to increment the branch number by 3
+"""
+function _next_branch_number(::PSY.Transformer3W, branch_number::Int)
+    return branch_number + 3
+end
+
+function _add_branch_to_lookup!(
+    branch_lookup::Dict{String, Int},
+    ::Dict{String, Vector{String}},
+    branch_type::Vector{DataType},
+    branch::PSY.ACTransmission,
+    branch_number::Int,
+)
+    branch_lookup[PSY.get_name(branch)] = branch_number
+    push!(branch_type, typeof(branch))
+    return
+end
+
+function _add_branch_to_lookup!(
+    branch_lookup::Dict{String, Int},
+    transformer_3w_lookup::Dict{String, Vector{String}},
+    branch_type::Vector{DataType},
+    branch::PSY.Transformer3W,
+    branch_number::Int,
+)
+    tr3w_name = PSY.get_name(branch)
+    transformer_3w_lookup[tr3w_name] = Vector{String}(undef, 3)
+    for (i, side) in enumerate(["primary", "secondary", "tertiary"])
+        side_name = "$(tr3w_name)__$side"
+        branch_lookup[side_name] = branch_number - 3 + i
+        transformer_3w_lookup[tr3w_name][i] = side_name
+        push!(branch_type, typeof(branch))
+    end
+    return
+end
+
+function get_branch_lookups(branches)
+    branch_lookup = Dict{String, Int}()
+    transformer_3w_lookup = Dict{String, Vector{String}}()
+    branch_type = Vector{DataType}()
+    branch_number = 0
+    for b in branches
+        branch_number = _next_branch_number(b, branch_number)
+        _add_branch_to_lookup!(
+            branch_lookup,
+            transformer_3w_lookup,
+            branch_type,
+            b,
+            branch_number,
+        )
+    end
+    return branch_lookup, transformer_3w_lookup, branch_type
 end
 
 """
@@ -108,6 +219,47 @@ function validate_linear_solver(linear_solver::String)
     return
 end
 
+function _add_branch_to_A_matrix!(
+    b::PSY.ACTransmission,
+    ix::Int,
+    bus_lookup::Dict{Int, Int},
+    A_I::Vector{Int},
+    A_J::Vector{Int},
+    A_V::Vector{Int8},
+)
+    fr_b, to_b = get_bus_indices(b, bus_lookup)
+    # change column number
+    push!(A_I, ix)
+    push!(A_J, fr_b)
+    push!(A_V, 1)
+
+    push!(A_I, ix)
+    push!(A_J, to_b)
+    push!(A_V, -1)
+    return
+end
+
+function _add_branch_to_A_matrix!(
+    b::PSY.Transformer3W,
+    ix::Int,
+    bus_lookup::Dict{Int, Int},
+    A_I::Vector{Int},
+    A_J::Vector{Int},
+    A_V::Vector{Int8},
+)
+    for (iix, (fr_b, to_b)) in enumerate(get_bus_indices(b, bus_lookup))
+        # for a 2-terminal branch, the value of ix must be incremented by 0, for a Transformer3W by 0, 1, 2
+        push!(A_I, ix + iix - 1)
+        push!(A_J, fr_b)
+        push!(A_V, 1)
+
+        push!(A_I, ix + iix - 1)
+        push!(A_J, to_b)
+        push!(A_V, -1)
+    end
+    return
+end
+
 """
 Evaluates the Incidence matrix A given the branches and node of a System.
 
@@ -122,7 +274,7 @@ NOTE:
   reference buses (each column is related to a system's bus).
 """
 function calculate_A_matrix(
-    branches,
+    branches::Vector{<:PSY.ACTransmission},
     buses::Vector{PSY.ACBus},
 )
     ref_bus_positions = find_slack_positions(buses)
@@ -134,16 +286,8 @@ function calculate_A_matrix(
 
     # build incidence matrix A (lines x buses)
     for (ix, b) in enumerate(branches)
-        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
-
-        # change column number
-        push!(A_I, ix)
-        push!(A_J, fr_b)
-        push!(A_V, 1)
-
-        push!(A_I, ix)
-        push!(A_J, to_b)
-        push!(A_V, -1)
+        # we offload the logic to separate functions because we need to treat Transformer3W differently
+        _add_branch_to_A_matrix!(b, ix, bus_lookup, A_I, A_J, A_V)
     end
 
     return SparseArrays.sparse(A_I, A_J, A_V), ref_bus_positions
@@ -163,6 +307,29 @@ function calculate_adjacency(branches, buses::Vector{PSY.ACBus})
     return calculate_adjacency(branches, buses, make_ax_ref(bus_ax))
 end
 
+function _add_branch_to_adjacency!(
+    b::PSY.ACTransmission,
+    bus_lookup::Dict{Int, Int},
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+)
+    fr_b, to_b = get_bus_indices(b, bus_lookup)
+    a[fr_b, to_b] = 1
+    a[to_b, fr_b] = -1
+    return
+end
+
+function _add_branch_to_adjacency!(
+    b::PSY.Transformer3W,
+    bus_lookup::Dict{Int, Int},
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+)
+    for (fr_b, to_b) in get_bus_indices(b, bus_lookup)
+        a[fr_b, to_b] = 1
+        a[to_b, fr_b] = -1
+    end
+    return
+end
+
 """
 Evaluates the Adjacency matrix given the System's banches, buses and bus_lookup.
 
@@ -179,9 +346,8 @@ function calculate_adjacency(
     a = SparseArrays.spzeros(Int8, buscount, buscount)
 
     for b in branches
-        fr_b, to_b = get_bus_indices(b, bus_lookup)
-        a[fr_b, to_b] = 1
-        a[to_b, fr_b] = -1
+        # we offload the logic to separate functions because we need to treat Transformer3W differently
+        _add_branch_to_adjacency!(b, bus_lookup, a)
     end
 
     # If a line is disconnected needs to check for the buses correctly
@@ -194,6 +360,48 @@ function calculate_adjacency(
 
     # Return both for type stability
     return a, bus_lookup
+end
+
+function _add_branch_to_BA_matrix!(
+    b::PSY.ACTransmission,
+    ix::Int,
+    bus_lookup::Dict{Int, Int},
+    BA_I::Vector{Int},
+    BA_J::Vector{Int},
+    BA_V::Vector{Float64},
+)
+    b_val = PSY.get_series_susceptance(b)
+    fr_b, to_b = get_bus_indices(b, bus_lookup)
+    push!(BA_I, fr_b)
+    push!(BA_J, ix)
+    push!(BA_V, b_val)
+
+    push!(BA_I, to_b)
+    push!(BA_J, ix)
+    push!(BA_V, -b_val)
+    return
+end
+
+function _add_branch_to_BA_matrix!(
+    b::PSY.Transformer3W,
+    ix::Int,
+    bus_lookup::Dict{Int, Int},
+    BA_I::Vector{Int},
+    BA_J::Vector{Int},
+    BA_V::Vector{Float64},
+)
+    b_vals = PSY.get_series_susceptance(b)
+    for (iix, (fr_b, to_b)) in enumerate(get_bus_indices(b, bus_lookup))
+        b_val = b_vals[iix]
+        push!(BA_I, fr_b)
+        push!(BA_J, ix + iix - 1)
+        push!(BA_V, b_val)
+
+        push!(BA_I, to_b)
+        push!(BA_J, ix + iix - 1)
+        push!(BA_V, -b_val)
+    end
+    return
 end
 
 """
@@ -216,20 +424,8 @@ function calculate_BA_matrix(
     BA_V = Float64[]
 
     for (ix, b) in enumerate(branches)
-        (fr_b, to_b) = get_bus_indices(b, bus_lookup)
-        b_val = PSY.get_series_susceptance(b)
-
-        if !isfinite(b_val)
-            error("Invalid value for branch $(PSY.summary(b)), $b_val")
-        end
-
-        push!(BA_I, fr_b)
-        push!(BA_J, ix)
-        push!(BA_V, b_val)
-
-        push!(BA_I, to_b)
-        push!(BA_J, ix)
-        push!(BA_V, -b_val)
+        # we offload the logic to separate functions because we need to treat Transformer3W differently
+        _add_branch_to_BA_matrix!(b, ix, bus_lookup, BA_I, BA_J, BA_V)
     end
 
     BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
