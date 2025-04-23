@@ -239,7 +239,12 @@ function _getindex(
         # evaluate the value for the PTDF column
         # Needs improvement
         valid_ix = vptdf.valid_ix
-        lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[valid_ix, row]))
+        try
+            lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[valid_ix, row]))
+        catch e
+            @error "Can't solve the inversion problem for row = $(row) with $(vptdf.BA[valid_ix, row])"
+            rethrow(e)
+        end
         buscount = size(vptdf, 1)
 
         if !isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) != 1
@@ -294,14 +299,7 @@ function Base.getindex(vptdf::VirtualPTDF, row::Integer, column::Integer)
     return _getindex(vptdf, row, column)
 end
 
-"""
-!!! STILL TO IMPLEMENT !!!
-"""
 Base.setindex!(::VirtualPTDF, _, idx...) = error("Operation not supported by VirtualPTDF")
-
-"""
-!!! STILL TO IMPLEMENT !!!
-"""
 Base.setindex!(::VirtualPTDF, _, ::CartesianIndex) =
     error("Operation not supported by VirtualPTDF")
 
