@@ -16,16 +16,15 @@ Structure containing the BA matrix and other relevant data.
 - `ref_bus_positions::Set{Int}`:
         Set containing the indexes of the columns of the BA matrix corresponding
         to the reference buses
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
-    radial_network_reduction::RadialNetworkReduction
+    network_reduction::NetworkReduction
 end
 
 """
@@ -34,26 +33,27 @@ Build the BA matrix from a given System
 # Arguments
 - `sys::PSY.System`:
         PSY system for which the matrix is constructed
-- `reduce_radial_branches::Bool`:
-        if True the matrix is build considering radial branches removed from
-        the system
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
-function BA_Matrix(sys::PSY.System; reduce_radial_branches::Bool = false)
-    if reduce_radial_branches
-        rb = RadialNetworkReduction(IncidenceMatrix(sys))
-    else
-        rb = RadialNetworkReduction()
+function BA_Matrix(
+    sys::PSY.System;
+    network_reduction::NetworkReduction = NetworkReduction(),
+)
+    branches = get_ac_branches(sys, network_reduction.removed_branches)
+    buses = get_buses(sys, network_reduction.bus_reduction_map)
+    if !isempty(network_reduction.added_branches)
+        branches = vcat(branches, network_reduction.added_branches)
     end
-    branches = get_ac_branches(sys, rb.radial_branches)
-    buses = get_buses(sys, rb.bus_reduction_map)
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
     line_ax = [PSY.get_name(branch) for branch in branches]
     bus_ax = [PSY.get_number(bus) for bus in setdiff(buses, ref_bus_positions)]
     axes = (bus_ax, line_ax)
     lookup = (make_ax_ref(bus_ax), make_ax_ref(line_ax))
-    data = calculate_BA_matrix(branches, bus_lookup)
-    return BA_Matrix(data, axes, lookup, ref_bus_positions, rb)
+    data =
+        calculate_BA_matrix(branches, bus_lookup, network_reduction)
+    return BA_Matrix(data, axes, lookup, ref_bus_positions, network_reduction)
 end
 
 """
@@ -75,9 +75,8 @@ Structure containing the ABA matrix and other relevant data.
         to the reference buses
 - `K<:Union{Nothing, KLU.KLUFactorization{Float64, Int}}`:
         either nothing or a container for KLU factorization matrices (LU factorization)
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 struct ABA_Matrix{
     Ax,
@@ -90,7 +89,7 @@ struct ABA_Matrix{
     ref_bus_positions::Set{Int}
     ref_bus_numbers::Set{Int}
     K::F
-    radial_network_reduction::RadialNetworkReduction
+    network_reduction::NetworkReduction
 end
 
 """
@@ -106,20 +105,18 @@ Builds the ABA matrix from a System
 function ABA_Matrix(
     sys::PSY.System;
     factorize = false,
-    reduce_radial_branches::Bool = false,
+    network_reduction::NetworkReduction = NetworkReduction(),
 )
-    if reduce_radial_branches
-        rb = RadialNetworkReduction(IncidenceMatrix(sys))
-    else
-        rb = RadialNetworkReduction()
+    branches = get_ac_branches(sys, network_reduction.removed_branches)
+    if !isempty(network_reduction.added_branches)
+        branches = vcat(branches, network_reduction.added_branches)
     end
-
-    branches = get_ac_branches(sys, rb.radial_branches)
-    buses = get_buses(sys, rb.bus_reduction_map)
+    buses = get_buses(sys, network_reduction.bus_reduction_map)
     bus_lookup = make_ax_ref(buses)
 
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_lookup)
+    A, ref_bus_positions =
+        calculate_A_matrix(branches, buses, network_reduction)
+    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
 
     bus_ax = [PSY.get_number(bus) for bus in buses]
@@ -143,7 +140,7 @@ function ABA_Matrix(
         ref_bus_positions,
         ref_bus_numbers,
         K,
-        rb,
+        network_reduction,
     )
 end
 
@@ -162,7 +159,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.ref_bus_positions),
         deepcopy(ABA.ref_bus_numbers),
         klu(ABA.data),
-        deepcopy(ABA.radial_network_reduction),
+        deepcopy(ABA.network_reduction),
     )
     return ABA_lu
 end
