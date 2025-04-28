@@ -260,6 +260,34 @@ function _ybus!(
     return
 end
 
+function _ybus!(
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
+    br::PSY.DiscreteControlledACBranch,
+    num_bus::Dict{Int, Int},
+    reverse_bus_search_map::Dict{Int, Int},
+    branch_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
+)
+    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
+    Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
+    if !isfinite(Y_l)
+        error(
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+        )
+    end
+    y11[branch_ix] = Y_l
+    y12[branch_ix] = -Y_l
+    y21[branch_ix] = -Y_l
+    y22[branch_ix] = Y_l
+    return
+end
+
 function _buildybus(
     branches,
     transformer_3w::Vector{PSY.Transformer3W},
@@ -342,8 +370,14 @@ function Ybus(
     busnumber = length(buses)
     look_up = (bus_lookup, bus_lookup)
     y11, y12, y21, y22, ysh, fb, tb, sb =
-        _buildybus(branches, transformer_3w, buses, fixed_admittances, switched_admittances)
-
+        _buildybus(
+            branches,
+            transformer_3w,
+            buses,
+            fixed_admittances,
+            switched_admittances,
+            network_reduction,
+        )
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
@@ -370,6 +404,12 @@ function Ybus(
     network_reduction::NetworkReduction = NetworkReduction(),
     kwargs...,
 )
+    if has_breaker_switch(sys) &&
+       NetworkReductionTypes.BREAKER_SWITCH ∉ get_reduction_type(network_reduction)
+        @warn "Ybus requested for a system with breakers and/or switches. Applying automatic network reduction"
+        network_reduction =
+            get_breaker_switch_reduction(sys; prior_reduction = network_reduction)
+    end
     branches = get_ac_branches(sys, network_reduction.removed_branches)
     buses = get_buses(sys, network_reduction.bus_reduction_map)
     fixed_admittances =
