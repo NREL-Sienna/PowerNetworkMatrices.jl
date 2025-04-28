@@ -39,7 +39,6 @@ function get_bus_indices(branch, bus_lookup, reverse_bus_search_map)
         to_bus_ix = bus_lookup[to_bus_number]
     end
     return fr_bus_ix, to_bus_ix
-
 end
 
 """
@@ -57,7 +56,11 @@ Retrieve the bus indices for the primary-secondary, secondary-tertiary, and prim
   - `(st_from, st_to)`: from and to buses for the secondary-tertiary arc.
   - `(pt_from, pt_to)`: from and to buses for the primary-tertiary arc.
 """
-function get_bus_indices(branch::PSY.Transformer3W, bus_lookup::Dict{Int, Int})
+function get_bus_indices(
+    branch::PSY.Transformer3W,
+    bus_lookup::Dict{Int, Int},
+    reverse_bus_search_map,
+)
     ps_from =
         bus_lookup[PSY.get_number(PSY.get_from(PSY.get_primary_secondary_arc(branch)))]
     ps_to = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_primary_secondary_arc(branch)))]

@@ -50,14 +50,14 @@ end
 
     nr1 = get_breaker_switch_reduction(sys)
     nr2 = get_radial_reduction(sys; prior_reduction = nr1)
-    nr3 = get_ward_reduction(sys, [7, 6, 12, 3, 1]; prior_reduction = nr2)  
+    nr3 = get_ward_reduction(sys, [7, 6, 12, 3, 1]; prior_reduction = nr2)
     @test length(get_reduction_type(nr3)) == 3
 end
 
-@testset "Multi-reduction validation" begin 
+@testset "Multi-reduction validation" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
-    nr1 = get_ward_reduction(sys,  [7, 6, 12, 3, 1])
+    nr1 = get_ward_reduction(sys, [7, 6, 12, 3, 1])
     @test_throws IS.DataFormatError get_radial_reduction(sys; prior_reduction = nr1)
     @test_throws IS.DataFormatError get_breaker_switch_reduction(sys; prior_reduction = nr1)
-    @test_throws IS.DataFormatError get_ward_reduction(sys, [1,2]; prior_reduction = nr1)
-end 
+    @test_throws IS.DataFormatError get_ward_reduction(sys, [1, 2]; prior_reduction = nr1)
+end

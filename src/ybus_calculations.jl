@@ -348,7 +348,14 @@ function Ybus(
     busnumber = length(buses)
     look_up = (bus_lookup, bus_lookup)
     y11, y12, y21, y22, ysh, fb, tb, sb =
-        _buildybus(branches, transformer_3w, buses, fixed_admittances, switched_admittances, network_reduction)
+        _buildybus(
+            branches,
+            transformer_3w,
+            buses,
+            fixed_admittances,
+            switched_admittances,
+            network_reduction,
+        )
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
@@ -407,8 +414,10 @@ function Ybus(
     if !isempty(network_reduction.added_admittances)
         fixed_admittances = vcat(fixed_admittances, network_reduction.added_admittances)
     end
-    switched_admittances = 
-          collect(PSY.get_components(x -> PSY.get_bus(x) in buses, PSY.SwitchedAdmittance, sys))
+    switched_admittances =
+        collect(
+            PSY.get_components(x -> PSY.get_bus(x) in buses, PSY.SwitchedAdmittance, sys),
+        )
     return Ybus(
         branches,
         buses,
