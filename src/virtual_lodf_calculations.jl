@@ -38,9 +38,8 @@ The VirtualLODF struct is indexed using branch names.
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
@@ -55,7 +54,7 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
-    radial_network_reduction::RadialNetworkReduction
+    network_reduction::NetworkReduction
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
@@ -103,25 +102,19 @@ struct with an empty cache.
         PSY system for which the matrix is constructed
 
 # Keyword Arguments
-- `reduce_radial_branches::Bool=false`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
 function VirtualLODF(
     sys::PSY.System;
-    reduce_radial_branches::Bool = false,
+    network_reduction::NetworkReduction = NetworkReduction(),
     kwargs...,
 )
-    if reduce_radial_branches
-        rb = RadialNetworkReduction(IncidenceMatrix(sys))
-    else
-        rb = RadialNetworkReduction()
-    end
-    branches = get_ac_branches(sys, rb.radial_branches)
-    buses = get_buses(sys, rb.bus_reduction_map)
-    return VirtualLODF(branches, buses; radial_network_reduction = rb, kwargs...)
+    branches = get_ac_branches(sys, network_reduction.removed_branches)
+    buses = get_buses(sys, network_reduction.bus_reduction_map)
+    return VirtualLODF(branches, buses; network_reduction = network_reduction, kwargs...)
 end
 
 """
@@ -141,9 +134,8 @@ VirtualLODF struct with an empty cache.
         max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 function VirtualLODF(
     branches,
@@ -151,7 +143,7 @@ function VirtualLODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_lines::Vector{String} = String[],
-    radial_network_reduction::RadialNetworkReduction = RadialNetworkReduction(),
+    network_reduction::NetworkReduction = NetworkReduction(),
 )
 
     #Get axis names and lookups
@@ -159,9 +151,10 @@ function VirtualLODF(
     bus_ax = [PSY.get_number(bus) for bus in buses]
     axes = (line_ax, line_ax)
     # get matrices
-    M, bus_ax_ref = calculate_adjacency(branches, buses)
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_ax_ref)
+    M, bus_ax_ref = calculate_adjacency(branches, buses, network_reduction)
+    A, ref_bus_positions =
+        calculate_A_matrix(branches, buses, network_reduction)
+    BA = calculate_BA_matrix(branches, bus_ax_ref, network_reduction)
     K = klu(calculate_ABA_matrix(A, BA, ref_bus_positions))
     # get lookups, reference bus positions and subnetworks
     line_ax_ref = make_ax_ref(line_ax)
@@ -209,7 +202,7 @@ function VirtualLODF(
         empty_cache,
         subnetworks,
         Ref(tol),
-        radial_network_reduction,
+        network_reduction,
     )
 end
 

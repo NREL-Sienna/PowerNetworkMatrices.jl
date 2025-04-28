@@ -9,12 +9,18 @@ export from_hdf5
 export get_ptdf_data
 export get_lodf_data
 export get_bus_reduction_map
-export get_radial_branches
+export get_radial_reduction
+export get_ward_reduction
+export get_breaker_switch_reduction
+export get_removed_branches
+export get_reduction_type
 export IncidenceMatrix
 export is_factorized
 export LODF
 export PTDF
-export RadialNetworkReduction
+export NetworkReduction
+export NetworkReductionTypes
+
 export to_hdf5
 export validate_connectivity
 export VirtualLODF
@@ -62,12 +68,15 @@ import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 
 # network calculations
 include("PowerNetworkMatrix.jl")
+include("definitions.jl")
+include("network_reduction.jl")
 include("incedence_matrix.jl")
 include("adjacency_matrix.jl")
-include("network_radial_reduction.jl")
+include("breaker_switch_reduction.jl")
+include("radial_reduction.jl")
+include("ward_reduction.jl")
 include("common.jl")
 include("BA_ABA_matrices.jl")
-include("definitions.jl")
 include("ptdf_calculations.jl")
 include("ybus_calculations.jl")
 include("row_cache.jl")
