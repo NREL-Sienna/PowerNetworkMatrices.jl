@@ -27,7 +27,6 @@ function get_ac_branches(
         PSY.ACTransmission,
         sys,
     )
-
         arc = PSY.get_arc(br)
         if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
             throw(
@@ -226,8 +225,9 @@ function _add_branch_to_A_matrix!(
     A_I::Vector{Int},
     A_J::Vector{Int},
     A_V::Vector{Int8},
+    reverse_bus_search_map::Dict{Int, Int},
 )
-    fr_b, to_b = get_bus_indices(b, bus_lookup)
+    fr_b, to_b = get_bus_indices(b, bus_lookup, reverse_bus_search_map)
     # change column number
     push!(A_I, ix)
     push!(A_J, fr_b)
@@ -246,8 +246,10 @@ function _add_branch_to_A_matrix!(
     A_I::Vector{Int},
     A_J::Vector{Int},
     A_V::Vector{Int8},
+    reverse_bus_search_map::Dict{Int, Int},
 )
-    for (iix, (fr_b, to_b)) in enumerate(get_bus_indices(b, bus_lookup))
+    for (iix, (fr_b, to_b)) in
+        enumerate(get_bus_indices(b, bus_lookup, reverse_bus_search_map))
         # for a 2-terminal branch, the value of ix must be incremented by 0, for a Transformer3W by 0, 1, 2
         push!(A_I, ix + iix - 1)
         push!(A_J, fr_b)
@@ -274,13 +276,13 @@ NOTE:
   reference buses (each column is related to a system's bus).
 """
 function calculate_A_matrix(
-    branches,                
-    buses::Vector{PSY.ACBus},   
+    branches,
+    buses::Vector{PSY.ACBus},
     network_reduction::NetworkReduction,
 )
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
-
+    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
     A_I = Int[]
     A_J = Int[]
     A_V = Int8[]
@@ -288,7 +290,7 @@ function calculate_A_matrix(
     # build incidence matrix A (lines x buses)
     for (ix, b) in enumerate(branches)
         # we offload the logic to separate functions because we need to treat Transformer3W differently
-        _add_branch_to_A_matrix!(b, ix, bus_lookup, A_I, A_J, A_V)
+        _add_branch_to_A_matrix!(b, ix, bus_lookup, A_I, A_J, A_V, reverse_bus_search_map)
     end
 
     return SparseArrays.sparse(A_I, A_J, A_V), ref_bus_positions
@@ -321,8 +323,9 @@ function _add_branch_to_adjacency!(
     b::PSY.ACTransmission,
     bus_lookup::Dict{Int, Int},
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    reverse_bus_search_map::Dict{Int, Int},
 )
-    fr_b, to_b = get_bus_indices(b, bus_lookup)
+    fr_b, to_b = get_bus_indices(b, bus_lookup, reverse_bus_search_map)
     a[fr_b, to_b] = 1
     a[to_b, fr_b] = -1
     return
@@ -332,8 +335,9 @@ function _add_branch_to_adjacency!(
     b::PSY.Transformer3W,
     bus_lookup::Dict{Int, Int},
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    reverse_bus_search_map::Dict{Int, Int},
 )
-    for (fr_b, to_b) in get_bus_indices(b, bus_lookup)
+    for (fr_b, to_b) in get_bus_indices(b, bus_lookup, reverse_bus_search_map)
         a[fr_b, to_b] = 1
         a[to_b, fr_b] = -1
     end
@@ -359,7 +363,7 @@ function calculate_adjacency(
 
     for b in branches
         # we offload the logic to separate functions because we need to treat Transformer3W differently
-        _add_branch_to_adjacency!(b, bus_lookup, a)
+        _add_branch_to_adjacency!(b, bus_lookup, a, reverse_bus_search_map)
     end
 
     # If a line is disconnected needs to check for the buses correctly
@@ -381,9 +385,10 @@ function _add_branch_to_BA_matrix!(
     BA_I::Vector{Int},
     BA_J::Vector{Int},
     BA_V::Vector{Float64},
+    reverse_bus_search_map::Dict{Int, Int},
 )
     b_val = PSY.get_series_susceptance(b)
-    fr_b, to_b = get_bus_indices(b, bus_lookup)
+    fr_b, to_b = get_bus_indices(b, bus_lookup, reverse_bus_search_map)
     push!(BA_I, fr_b)
     push!(BA_J, ix)
     push!(BA_V, b_val)
@@ -401,9 +406,11 @@ function _add_branch_to_BA_matrix!(
     BA_I::Vector{Int},
     BA_J::Vector{Int},
     BA_V::Vector{Float64},
+    reverse_bus_search_map::Dict{Int, Int},
 )
     b_vals = PSY.get_series_susceptance(b)
-    for (iix, (fr_b, to_b)) in enumerate(get_bus_indices(b, bus_lookup))
+    for (iix, (fr_b, to_b)) in
+        enumerate(get_bus_indices(b, bus_lookup, reverse_bus_search_map))
         b_val = b_vals[iix]
         push!(BA_I, fr_b)
         push!(BA_J, ix + iix - 1)
@@ -439,7 +446,15 @@ function calculate_BA_matrix(
     reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
     for (ix, b) in enumerate(branches)
         # we offload the logic to separate functions because we need to treat Transformer3W differently
-        _add_branch_to_BA_matrix!(b, ix, bus_lookup, BA_I, BA_J, BA_V)
+        _add_branch_to_BA_matrix!(
+            b,
+            ix,
+            bus_lookup,
+            BA_I,
+            BA_J,
+            BA_V,
+            reverse_bus_search_map,
+        )
     end
 
     BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
@@ -603,4 +618,8 @@ function _dfs(
         end
     end
     return
+end
+
+function has_breaker_switch(sys::PSY.System)
+    length(PSY.get_components(PSY.DiscreteControlledACBranch, sys)) > 0
 end
