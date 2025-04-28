@@ -14,18 +14,22 @@ abstract type PowerNetworkMatrix{T} <: AbstractArray{T, 2} end
 Evaluates the bus indices for the given branch.
 
 # Arguments
-- `branch::PSY.ACBranch`:
+- `branch::PSY.ACTransmission`:
         system's branch
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the system's buses and branches
-        
+- `bus_lookup::Dict{Int, Int}`: A dictionary mapping bus numbers to their indices.
+- `reverse_bus_search_map::Dict{Int, Int}`: map for reduced buses.
+
 # Returns
 - `fr_b::Int`:
         from bus index
 - `to_b::Int`:
         to bus index
 """
-function get_bus_indices(branch, bus_lookup, reverse_bus_search_map)
+function get_bus_indices(
+    branch::PSY.ACTransmission,
+    bus_lookup::Dict{Int, Int},
+    reverse_bus_search_map::Dict{Int, Int},
+)
     fr_bus_number = PSY.get_number(PSY.get_from(PSY.get_arc(branch)))
     to_bus_number = PSY.get_number(PSY.get_to(PSY.get_arc(branch)))
     if haskey(reverse_bus_search_map, fr_bus_number)
@@ -39,7 +43,6 @@ function get_bus_indices(branch, bus_lookup, reverse_bus_search_map)
         to_bus_ix = bus_lookup[to_bus_number]
     end
     return fr_bus_ix, to_bus_ix
-
 end
 
 """
@@ -49,7 +52,8 @@ Retrieve the bus indices for the primary-secondary, secondary-tertiary, and prim
 
 # Arguments
 - `branch::PSY.Transformer3W`: The 3-winding transformer branch.
-- `bus_lookup`: A dictionary mapping bus numbers to their indices.
+- `bus_lookup::Dict{Int, Int}`: A dictionary mapping bus numbers to their indices.
+- `reverse_bus_search_map::Dict{Int, Int}`: map for reduced buses.
 
 # Returns
 - A tuple containing three tuples:
@@ -57,15 +61,53 @@ Retrieve the bus indices for the primary-secondary, secondary-tertiary, and prim
   - `(st_from, st_to)`: from and to buses for the secondary-tertiary arc.
   - `(pt_from, pt_to)`: from and to buses for the primary-tertiary arc.
 """
-function get_bus_indices(branch::PSY.Transformer3W, bus_lookup::Dict{Int, Int})
-    ps_from =
-        bus_lookup[PSY.get_number(PSY.get_from(PSY.get_primary_secondary_arc(branch)))]
-    ps_to = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_primary_secondary_arc(branch)))]
-    st_from =
-        bus_lookup[PSY.get_number(PSY.get_from(PSY.get_secondary_tertiary_arc(branch)))]
-    st_to = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_secondary_tertiary_arc(branch)))]
-    pt_from = bus_lookup[PSY.get_number(PSY.get_from(PSY.get_primary_tertiary_arc(branch)))]
-    pt_to = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_primary_tertiary_arc(branch)))]
+function get_bus_indices(
+    branch::PSY.Transformer3W,
+    bus_lookup::Dict{Int, Int},
+    reverse_bus_search_map::Dict{Int, Int},
+)
+    ps_from_bus_number = PSY.get_number(PSY.get_from(PSY.get_primary_secondary_arc(branch)))
+    if haskey(reverse_bus_search_map, ps_from_bus_number)
+        ps_from = bus_lookup[reverse_bus_search_map[ps_from_bus_number]]
+    else
+        ps_from = bus_lookup[ps_from_bus_number]
+    end
+
+    ps_to_bus_number = PSY.get_number(PSY.get_to(PSY.get_primary_secondary_arc(branch)))
+    if haskey(reverse_bus_search_map, ps_to_bus_number)
+        ps_to = bus_lookup[reverse_bus_search_map[ps_to_bus_number]]
+    else
+        ps_to = bus_lookup[ps_to_bus_number]
+    end
+
+    st_from_bus_number =
+        PSY.get_number(PSY.get_from(PSY.get_secondary_tertiary_arc(branch)))
+    if haskey(reverse_bus_search_map, st_from_bus_number)
+        st_from = bus_lookup[reverse_bus_search_map[st_from_bus_number]]
+    else
+        st_from = bus_lookup[st_from_bus_number]
+    end
+
+    st_to_bus_number = PSY.get_number(PSY.get_to(PSY.get_secondary_tertiary_arc(branch)))
+    if haskey(reverse_bus_search_map, st_to_bus_number)
+        st_to = bus_lookup[reverse_bus_search_map[st_to_bus_number]]
+    else
+        st_to = bus_lookup[st_to_bus_number]
+    end
+
+    pt_from_bus_number = PSY.get_number(PSY.get_from(PSY.get_primary_tertiary_arc(branch)))
+    if haskey(reverse_bus_search_map, pt_from_bus_number)
+        pt_from = bus_lookup[reverse_bus_search_map[pt_from_bus_number]]
+    else
+        pt_from = bus_lookup[pt_from_bus_number]
+    end
+
+    pt_to_bus_number = PSY.get_number(PSY.get_to(PSY.get_primary_tertiary_arc(branch)))
+    if haskey(reverse_bus_search_map, pt_to_bus_number)
+        pt_to = bus_lookup[reverse_bus_search_map[pt_to_bus_number]]
+    else
+        pt_to = bus_lookup[pt_to_bus_number]
+    end
     return (ps_from, ps_to), (st_from, st_to), (pt_from, pt_to)
 end
 
