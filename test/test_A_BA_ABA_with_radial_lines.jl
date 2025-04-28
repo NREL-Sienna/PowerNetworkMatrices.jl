@@ -19,6 +19,11 @@
         # now extract A matrix anc compare
         @test all(isapprox.(BA.data[bus_idx, br_idx], BA_rad.data))
     end
+    bus_idx = setdiff(1:size(BA.data, 1), [BA.lookup[1][i] for i in bus_numbers])
+    # ... and radial branches
+    br_idx = setdiff(1:size(BA.data, 2), [BA.lookup[2][i] for i in rb.radial_branches])
+    # now extract A matrix anc compare
+    @test all(isapprox.(BA.data[bus_idx, br_idx], BA_rad.data))
 end
 
 @testset "Test ABA matrix with radial lines" begin
