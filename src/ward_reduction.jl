@@ -157,7 +157,11 @@ function get_ward_reduction(
     end
 end
 
-function _validate_study_buses(sys::PSY.System, study_buses::Vector{Int}, network_reduction::NetworkReduction)
+function _validate_study_buses(
+    sys::PSY.System,
+    study_buses::Vector{Int},
+    network_reduction::NetworkReduction,
+)
     buses = get_buses(sys, network_reduction.bus_reduction_map)
     branches = get_ac_branches(sys, network_reduction.removed_branches)
 
