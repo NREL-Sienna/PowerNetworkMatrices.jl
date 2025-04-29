@@ -3,6 +3,8 @@ struct NetworkReduction
     reverse_bus_search_map::Dict{Int, Int}
     removed_branches::Set{String}
     retained_branches::Set{String}
+    series_branch_aggregation::Dict
+    parallel_branch_aggregation::Dict
     added_branches::Vector{PSY.ACBranch}
     added_admittances::Vector{PSY.FixedAdmittance}
     reduction_type::Vector{NetworkReductionTypes}
@@ -11,17 +13,18 @@ end
 get_bus_reduction_map(rb::NetworkReduction) = rb.bus_reduction_map
 get_reverse_bus_search_map(rb::NetworkReduction) = rb.reverse_bus_search_map
 get_removed_branches(rb::NetworkReduction) = rb.removed_branches
+get_series_branch_aggregation(rb::NetworkReduction) = rb.series_branch_aggregation
+get_parallel_branch_aggregation(rb::NetworkReduction) = rb.parallel_branch_aggregation
 get_retained_branches(rb::NetworkReduction) = rb.retained_branches
 get_added_branches(rb::NetworkReduction) = rb.added_branches
 get_added_admittances(rb::NetworkReduction) = rb.added_admittances
 get_reduction_type(rb::NetworkReduction) = rb.reduction_type
 
 function Base.isempty(rb::NetworkReduction)
-    if !isempty(rb.bus_reduction_map)
-        return false
-    end
-    if !isempty(rb.reverse_bus_search_map)
-        return false
+    for field in fieldnames(typeof(rb))
+        if !isempty(getfield(rb, field))
+            return false
+        end
     end
     return true
 end
@@ -31,6 +34,8 @@ function NetworkReduction(;
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}(),
     removed_branches::Set{String} = Set{String}(),
     retained_branches::Set{String} = Set{String}(),
+    series_branch_aggregation = Dict(),
+    parallel_branch_aggregation = Dict(),
     added_branches::Vector{PSY.ACBranch} = Vector{PSY.ACBranch}(),
     added_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
     reduction_type::Vector{NetworkReductionTypes} = Vector{NetworkReductionTypes}(),
@@ -40,6 +45,8 @@ function NetworkReduction(;
         reverse_bus_search_map,
         removed_branches,
         retained_branches,
+        series_branch_aggregation,
+        parallel_branch_aggregation,
         added_branches,
         added_admittances,
         reduction_type,
