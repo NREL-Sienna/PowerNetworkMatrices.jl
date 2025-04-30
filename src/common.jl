@@ -48,11 +48,8 @@ function get_ac_branches(
         end
     end
 
-    collection_3WT = Vector{PSY.Transformer3W}()
-    for br_3w in PSY.get_components(
-        x -> PSY.get_available(x),
-        PSY.Transformer3W,
-        sys
+    return sort!(collection_br;
+        by = x -> (PSY.get_number(PSY.get_arc(x).from), PSY.get_number(PSY.get_arc(x).to)),
     )
 end
 
