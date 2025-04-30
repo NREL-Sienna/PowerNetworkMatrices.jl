@@ -83,7 +83,7 @@ function get_ward_reduction(
     # Eq. (2.16) from  https://core.ac.uk/download/pdf/79564835.pdf
     y_eq = y_be * KLU.solve!(klu(y_ee), Matrix(y_eb))
 
-    added_branches = Vector{PSY.ACBranch}()
+    added_branches = Vector{PSY.ACTransmission}()
     added_admittances = Vector{PSY.FixedAdmittance}()
     virtual_admittance_name_index = 1
     virtual_branch_name_index = 1
