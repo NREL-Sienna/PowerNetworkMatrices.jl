@@ -15,7 +15,7 @@ function _add_to_collection!(
 end
 
 """
-Gets the AC branches & 3W Transformers from a given Systems.
+Gets the AC branches for a system
 """
 function get_ac_branches(
     sys::PSY.System,
@@ -53,6 +53,7 @@ function get_ac_branches(
     )
 end
 
+#TODO - this needs to take into account network reduction
 function get_transformers_3w(
     sys::PSY.System,
 )::Vector{PSY.Transformer3W}
@@ -90,6 +91,28 @@ function get_transformers_3w(
             PSY.get_number(PSY.get_primary_tertiary_arc(x).to),
         ),
     )
+end
+
+function get_switched_admittances(sys::PSY.System, reverse_bus_search_map)
+    collection = Vector{PSY.SwitchedAdmittance}()
+    for sa in
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.SwitchedAdmittance, sys))
+        if !haskey(reverse_bus_search_map, PSY.get_number(PSY.get_bus(sa)))
+            push!(collection, sa)
+        end
+    end
+    return collection
+end
+
+function get_fixed_admittances(sys::PSY.System, reverse_bus_search_map)
+    collection = Vector{PSY.FixedAdmittance}()
+    for sa in
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.FixedAdmittance, sys))
+        if !haskey(reverse_bus_search_map, PSY.get_number(PSY.get_bus(sa)))
+            push!(collection, sa)
+        end
+    end
+    return collection
 end
 
 """
