@@ -54,7 +54,7 @@ function get_breaker_switch_reduction(sys::PSY.System; prior_reduction = Network
         reverse_bus_search_map,
         removed_branches,
         retained_branches,
-        Vector{PSY.ACBranch}(),
+        Vector{PSY.ACTransmission}(),
         Vector{PSY.FixedAdmittance}(),
         [NetworkReductionTypes.BREAKER_SWITCH],
     )
