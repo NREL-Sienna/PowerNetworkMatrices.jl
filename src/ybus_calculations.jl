@@ -12,6 +12,10 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     axes::Ax
     lookup::L
     network_reduction::NetworkReduction
+    yft::Union{SparseArrays.SparseMatrixCSC{ComplexF64, Int}, Nothing}
+    ytf::Union{SparseArrays.SparseMatrixCSC{ComplexF64, Int}, Nothing}
+    fb::Union{Vector{Int64}, Nothing}
+    tb::Union{Vector{Int64}, Nothing}
 end
 
 function _ybus!(
@@ -363,6 +367,7 @@ function Ybus(
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
     switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}();
     check_connectivity::Bool = true,
+    make_branch_admittance_matrices::Bool = false,
     network_reduction = NetworkReduction(),
 )
     bus_ax = PSY.get_number.(buses)
@@ -391,7 +396,28 @@ function Ybus(
         islands = find_subnetworks(ybus, bus_ax)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
-    return Ybus(ybus, axes, look_up, network_reduction)
+    if make_branch_admittance_matrices
+        yft = SparseArrays.sparse(
+            [1:length(fb); 1:length(fb)],
+            [fb; tb],
+            [y11; y12],
+            length(fb),
+            length(buses),
+        )
+        ytf = SparseArrays.sparse(
+            [1:length(tb); 1:length(tb)],
+            [tb; fb],
+            [y22; y21],
+            length(tb),
+            length(buses),
+        )
+    else
+        yft = nothing
+        ytf = nothing
+        fb = nothing
+        tb = nothing
+    end
+    return Ybus(ybus, axes, look_up, network_reduction, yft, ytf, fb, tb)
 end
 
 """
