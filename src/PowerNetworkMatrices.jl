@@ -11,8 +11,6 @@ export get_lodf_data
 export get_bus_reduction_map
 export get_radial_reduction
 export get_ward_reduction
-export get_breaker_switch_reduction
-export get_removed_branches
 export get_reduction_type
 export IncidenceMatrix
 export is_factorized

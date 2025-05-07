@@ -1,19 +1,27 @@
 struct NetworkReduction
     bus_reduction_map::Dict{Int, Set{Int}}
     reverse_bus_search_map::Dict{Int, Int}
-    removed_branches::Set{String}
-    retained_branches::Set{String}
-    added_branches::Vector{PSY.ACTransmission}
-    added_admittances::Vector{PSY.FixedAdmittance}
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch}
+    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}}
+    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
+    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}}
+    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
+    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.Transformer3W, Int}}
+    reverse_transformer3W_map::Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}} #Int to represent the primary, secondary, or tertiary arc; makes keys unique in reverse map
     reduction_type::Vector{NetworkReductionTypes}
 end
 
 get_bus_reduction_map(rb::NetworkReduction) = rb.bus_reduction_map
 get_reverse_bus_search_map(rb::NetworkReduction) = rb.reverse_bus_search_map
-get_removed_branches(rb::NetworkReduction) = rb.removed_branches
-get_retained_branches(rb::NetworkReduction) = rb.retained_branches
-get_added_branches(rb::NetworkReduction) = rb.added_branches
-get_added_admittances(rb::NetworkReduction) = rb.added_admittances
+get_direct_branch_map(rb::NetworkReduction) = rb.direct_branch_map
+get_reverse_direct_branch_map(rb::NetworkReduction) = rb.reverse_direct_branch_map
+get_parallel_branch_map(rb::NetworkReduction) = rb.parallel_branch_map
+get_reverse_parallel_branch_map(rb::NetworkReduction) = rb.reverse_parallel_branch_map
+get_series_branch_map(rb::NetworkReduction) = rb.series_branch_map
+get_reverse_series_branch_map(rb::NetworkReduction) = rb.reverse_series_branch_map
+get_transformer3W_map(rb::NetworkReduction) = rb.transformer3W_map
+get_reverse_transformer3W_map(rb::NetworkReduction) = rb.reverse_transformer3W_map
 get_reduction_type(rb::NetworkReduction) = rb.reduction_type
 
 function Base.isempty(rb::NetworkReduction)
@@ -29,19 +37,51 @@ end
 function NetworkReduction(;
     bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}(),
-    removed_branches::Set{String} = Set{String}(),
-    retained_branches::Set{String} = Set{String}(),
-    added_branches::Vector{PSY.ACTransmission} = Vector{PSY.ACTransmission}(),
-    added_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch} = Dict{
+        Tuple{Int, Int},
+        PSY.Branch,
+    }(),
+    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{
+        PSY.Branch,
+        Tuple{Int, Int},
+    }(),
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{
+        Tuple{Int, Int},
+        Set{PSY.Branch},
+    }(),
+    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{
+        PSY.Branch,
+        Tuple{Int, Int},
+    }(),
+    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{
+        Tuple{Int, Int},
+        Set{PSY.Branch},
+    }(),
+    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{
+        PSY.Branch,
+        Tuple{Int, Int},
+    }(),
+    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.Transformer3W, Int}} = Dict{
+        Tuple{Int, Int},
+        Tuple{PSY.Transformer3W, Int},
+    }(),
+    reverse_transformer3W_map::Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}} = Dict{
+        Tuple{PSY.Transformer3W, Int},
+        Tuple{Int, Int},
+    }(),
     reduction_type::Vector{NetworkReductionTypes} = Vector{NetworkReductionTypes}(),
 )
     return NetworkReduction(
         bus_reduction_map,
         reverse_bus_search_map,
-        removed_branches,
-        retained_branches,
-        added_branches,
-        added_admittances,
+        direct_branch_map,
+        reverse_direct_branch_map,
+        parallel_branch_map,
+        reverse_parallel_branch_map,
+        series_branch_map,
+        reverse_series_branch_map,
+        transformer3W_map,
+        reverse_transformer3W_map,
         reduction_type,
     )
 end
