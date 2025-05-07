@@ -9,6 +9,7 @@ Using yft, ytf, and the voltage vector, the branch currents and power flows can 
 """
 struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     data::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
+    adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
     network_reduction::NetworkReduction
@@ -18,6 +19,64 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     tb::Union{Vector{Int64}, Nothing}
 end
 
+function add_to_branch_maps!(nr::NetworkReduction, arc::PSY.Arc, br::PSY.Branch)
+    direct_branch_map = get_direct_branch_map(nr)
+    reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
+    parallel_branch_map = get_parallel_branch_map(nr)
+    reverse_parallel_branch_map = get_reverse_parallel_branch_map(nr)
+    arc_tuple = (PSY.get_number(PSY.get_from(arc)), PSY.get_number(PSY.get_to(arc)))
+    if haskey(parallel_branch_map, arc_tuple)
+        push!(parallel_branch_map[arc_tuple], br)
+        reverse_parallel_branch_map[br] = arc_tuple
+    elseif haskey(direct_branch_map, arc_tuple)
+        corresponding_branch = direct_branch_map[arc_tuple]
+        delete!(direct_branch_map, arc_tuple)
+        delete!(reverse_direct_branch_map, corresponding_branch)
+        parallel_branch_map[arc_tuple] = Set([corresponding_branch, br])
+        reverse_parallel_branch_map[corresponding_branch] = arc_tuple
+        reverse_parallel_branch_map[br] = arc_tuple
+    else
+        direct_branch_map[arc_tuple] = br
+        reverse_direct_branch_map[br] = arc_tuple
+    end
+    return
+end
+
+function add_to_branch_maps!(
+    nr::NetworkReduction,
+    primary_star_arc::PSY.Arc,
+    secondary_star_arc::PSY.Arc,
+    tertiary_star_arc::PSY.Arc,
+    br::PSY.Transformer3W,
+)
+    primary_star_arc_tuple = (
+        PSY.get_number(PSY.get_from(primary_star_arc)),
+        PSY.get_number(PSY.get_to(primary_star_arc)),
+    )
+    secondary_star_arc_tuple = (
+        PSY.get_number(PSY.get_from(secondary_star_arc)),
+        PSY.get_number(PSY.get_to(secondary_star_arc)),
+    )
+    tertiary_star_arc_tuple = (
+        PSY.get_number(PSY.get_from(tertiary_star_arc)),
+        PSY.get_number(PSY.get_to(tertiary_star_arc)),
+    )
+
+    transformer3W_map = get_transformer3W_map(nr)
+    reverse_transformer3W_map = get_reverse_transformer3W_map(nr)
+
+    transformer3W_map[primary_star_arc_tuple] = (br, 1)
+    reverse_transformer3W_map[(br, 1)] = primary_star_arc_tuple
+
+    transformer3W_map[secondary_star_arc_tuple] = (br, 2)
+    reverse_transformer3W_map[(br, 2)] = secondary_star_arc_tuple
+
+    transformer3W_map[tertiary_star_arc_tuple] = (br, 3)
+    reverse_transformer3W_map[(br, 3)] = tertiary_star_arc_tuple
+
+    return
+end
+
 function _ybus!(
     y11::Vector{ComplexF64},
     y12::Vector{ComplexF64},
@@ -25,12 +84,17 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.ACTransmission,
     num_bus::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
+    nr::NetworkReduction,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
-    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
+    arc = PSY.get_arc(br)
+    add_to_branch_maps!(nr, arc, br)
+    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
@@ -61,6 +125,8 @@ function _ybus!(
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
+    nr::NetworkReduction,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     _ybus!(
         y11,
@@ -73,6 +139,8 @@ function _ybus!(
         branch_ix,
         fb,
         tb,
+        nr,
+        adj,
     )
     return
 end
@@ -84,12 +152,17 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.Transformer2W,
     num_bus::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
+    nr::NetworkReduction,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
-    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
+    arc = PSY.get_arc(br)
+    add_to_branch_maps!(nr, arc, br)
+    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
@@ -122,18 +195,31 @@ function _ybus!(
     fb::Vector{Int64},
     tb::Vector{Int64},
     stb::Int64,
+    nr::NetworkReduction,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
-    primary_secondary_arc = PSY.get_primary_secondary_arc(br)
-    secondary_tertiary_arc = PSY.get_secondary_tertiary_arc(br)
-    primary_tertiary_arc = PSY.get_primary_tertiary_arc(br)
-    fb[branch_ix + stb] = num_bus[PSY.get_number(PSY.get_from(primary_secondary_arc))]
-    fb[branch_ix + stb + 1] = num_bus[PSY.get_number(PSY.get_from(secondary_tertiary_arc))]
-    fb[branch_ix + stb + 2] = num_bus[PSY.get_number(PSY.get_to(primary_tertiary_arc))]
+    primary_star_arc = PSY.get_primary_star_arc(br)
+    secondary_star_arc = PSY.get_secondary_star_arc(br)
+    tertiary_star_arc = PSY.get_tertiary_star_arc(br)
+    add_to_branch_maps!(nr, primary_star_arc, secondary_star_arc, tertiary_star_arc, br)
 
-    start_bus = PSY.get_number(PSY.get_star_bus(br))
-    tb[branch_ix + stb] = num_bus[start_bus]
-    tb[branch_ix + stb + 1] = num_bus[start_bus]
-    tb[branch_ix + stb + 2] = num_bus[start_bus]
+    primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
+    secondary_ix, _ = get_bus_indices(secondary_star_arc, num_bus, nr)
+    tertiary_ix, _ = get_bus_indices(tertiary_star_arc, num_bus, nr)
+    adj[primary_ix, star_ix] = 1
+    adj[star_ix, primary_ix] = -1
+    adj[secondary_ix, star_ix] = 1
+    adj[star_ix, secondary_ix] = -1
+    adj[tertiary_ix, star_ix] = 1
+    adj[star_ix, tertiary_ix] = -1
+
+    fb[branch_ix + stb] = primary_ix
+    fb[branch_ix + stb + 1] = secondary_ix
+    fb[branch_ix + stb + 2] = tertiary_ix
+
+    tb[branch_ix + stb] = star_ix
+    tb[branch_ix + stb + 1] = star_ix
+    tb[branch_ix + stb + 2] = star_ix
 
     Y_t1 = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
     Y11 = Y_t1
@@ -179,12 +265,17 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.TapTransformer,
     num_bus::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
+    nr::NetworkReduction,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
-    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
+    arc = PSY.get_arc(br)
+    add_to_branch_maps!(nr, arc, br)
+    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
 
@@ -216,12 +307,17 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.PhaseShiftingTransformer,
     num_bus::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
+    nr::NetworkReduction,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
-    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
+    arc = PSY.get_arc(br)
+    add_to_branch_maps!(nr, arc, br)
+    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
@@ -247,20 +343,48 @@ end
 
 function _ybus!(
     ysh::Vector{ComplexF64},
-    fa::Union{PSY.FixedAdmittance, PSY.SwitchedAdmittance},
+    fa::PSY.FixedAdmittance,
     num_bus::Dict{Int, Int},
     fa_ix::Int64,
     sb::Vector{Int64},
+    nr::NetworkReduction,
 )
-    bus = PSY.get_bus(fa)
-    bus_no = num_bus[PSY.get_number(bus)]
+    bus_no = get_bus_index(fa, num_bus, nr)
+    Y = PSY.get_Y(fa)
+    sb[fa_ix] = bus_no
+    if !isfinite(Y)
+        error(
+            "Data in $(PSY.get_name(fa)) is incorrect. Y = $(Y)",
+        )
+    end
+    ysh[fa_ix] = Y
+    return
+end
+
+function _ybus!(
+    ysh::Vector{ComplexF64},
+    fa::PSY.SwitchedAdmittance,
+    num_bus::Dict{Int, Int},
+    fa_ix::Int64,
+    sb::Vector{Int64},
+    nr::NetworkReduction,
+)
+    bus_no = get_bus_index(fa, num_bus, nr)
+    Y = PSY.get_Y(fa)
+    number_of_steps = PSY.get_number_of_steps(fa)
+    Y_increase = PSY.get_Y_increase(fa)
+    if isempty(number_of_steps) && isempty(Y_increase)
+        Y_total = Y
+    else
+        Y_total = Y + (number_of_steps[1] * Y_increase[1])  #TODO - debug with PSSE discrepancy in SwitchedAdmittance 
+    end
     sb[fa_ix] = bus_no
     if !isfinite(fa.Y)
         error(
             "Data in $(PSY.get_name(fa)) is incorrect. Y = $(fa.Y)",
         )
     end
-    ysh[fa_ix] = fa.Y
+    ysh[fa_ix] = Y_total
     return
 end
 
@@ -271,12 +395,15 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.DiscreteControlledACBranch,
     num_bus::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
+    nr::NetworkReduction,
 )
-    bus_from_no, bus_to_no = get_bus_indices(br, num_bus, reverse_bus_search_map)
+    arc = PSY.get_arc(br)
+    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
@@ -292,16 +419,15 @@ function _ybus!(
     return
 end
 
-function _buildybus(
+function _buildybus!(
+    network_reduction::NetworkReduction,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
     branches,
     transformer_3w::Vector{PSY.Transformer3W},
-    buses::Vector{PSY.ACBus},
+    num_bus::Dict{Int, Int},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
-    network_reduction::NetworkReduction = NetworkReduction(),
 )
-    num_bus = Dict{Int, Int}()
-    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
     branchcount = length(branches) + 3 * length(transformer_3w)
     branchcount_no_3w = length(branches)
     fa_count = length(fixed_admittances)
@@ -309,10 +435,6 @@ function _buildybus(
     fb = zeros(Int64, branchcount)
     tb = zeros(Int64, branchcount)
     sb = zeros(Int64, fa_count + sa_count)
-
-    for (ix, b) in enumerate(buses)
-        num_bus[PSY.get_number(b)] = ix
-    end
 
     y11 = zeros(ComplexF64, branchcount)
     y12 = zeros(ComplexF64, branchcount)
@@ -325,7 +447,7 @@ function _buildybus(
             throw(DataFormatError("The data in Branch is invalid"))
         end
         PSY.get_available(b) &&
-            _ybus!(y11, y12, y21, y22, b, num_bus, reverse_bus_search_map, ix, fb, tb)
+            _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb, network_reduction, adj)
     end
 
     stb = 0
@@ -334,13 +456,26 @@ function _buildybus(
             throw(DataFormatError("The data in Transformer3W is invalid"))
         end
         PSY.get_available(b) &&
-            _ybus!(y11, y12, y21, y22, b, num_bus, ix + branchcount_no_3w, fb, tb, stb)
+            _ybus!(
+                y11,
+                y12,
+                y21,
+                y22,
+                b,
+                num_bus,
+                ix + branchcount_no_3w,
+                fb,
+                tb,
+                stb,
+                network_reduction,
+                adj,
+            )
 
         stb = stb + 2
     end
 
     for (ix, fa) in enumerate([fixed_admittances; switched_admittances])
-        PSY.get_available(fa) && _ybus!(ysh, fa, num_bus, ix, sb)
+        PSY.get_available(fa) && _ybus!(ysh, fa, num_bus, ix, sb, network_reduction)
     end
     return (
         y11,
@@ -375,14 +510,17 @@ function Ybus(
     bus_lookup = make_ax_ref(bus_ax)
     busnumber = length(buses)
     look_up = (bus_lookup, bus_lookup)
+    adj = SparseArrays.spdiagm(ones(Int8, busnumber))
+
     y11, y12, y21, y22, ysh, fb, tb, sb =
-        _buildybus(
+        _buildybus!(
+            network_reduction,
+            adj,
             branches,
             transformer_3w,
-            buses,
+            bus_lookup,
             fixed_admittances,
             switched_admittances,
-            network_reduction,
         )
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
@@ -417,7 +555,7 @@ function Ybus(
         fb = nothing
         tb = nothing
     end
-    return Ybus(ybus, axes, look_up, network_reduction, yft, ytf, fb, tb)
+    return Ybus(ybus, adj, axes, look_up, network_reduction, yft, ytf, fb, tb)
 end
 
 """
@@ -428,39 +566,92 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 """
 function Ybus(
     sys::PSY.System;
-    network_reduction::NetworkReduction = NetworkReduction(),
+    check_connectivity::Bool = true,
+    nr::NetworkReduction = NetworkReduction(),
     kwargs...,
 )
-    if has_breaker_switch(sys) &&
-       NetworkReductionTypes.BREAKER_SWITCH ∉ get_reduction_type(network_reduction)
-        @warn "Ybus requested for a system with breakers and/or switches. Applying automatic network reduction"
-        network_reduction =
-            get_breaker_switch_reduction(sys; prior_reduction = network_reduction)
-    end
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    fixed_admittances =
-        collect(PSY.get_components(x -> PSY.get_bus(x) in buses, PSY.FixedAdmittance, sys))
-    if !isempty(network_reduction.added_branches)
-        branches = vcat(branches, network_reduction.added_branches)
-    end
-    if !isempty(network_reduction.added_admittances)
-        fixed_admittances = vcat(fixed_admittances, network_reduction.added_admittances)
-    end
-    xfrm_3w = get_transformers_3w(sys)
+    bus_reduction_map = get_bus_reduction_map(nr)
+    reverse_bus_search_map = get_reverse_bus_search_map(nr)
 
-    fixed_admittances = get_fixed_admittances(sys, network_reduction.reverse_bus_search_map)
-    switched_admittances =
-        get_switched_admittances(sys, network_reduction.reverse_bus_search_map)
-    return Ybus(
-        branches,
-        buses,
-        xfrm_3w,
-        fixed_admittances,
-        switched_admittances;
-        network_reduction = network_reduction,
-        kwargs...,
+    #Checking for isolated buses; building bus map. 
+    for b in PSY.get_components(x -> PSY.get_available(x), PSY.ACBus, sys)
+        if PSY.get_bustype(b) != ACBusTypes.ISOLATED
+            bus_reduction_map[PSY.get_number(b)] = Set{Int}()
+        end
+    end
+
+    #Building map for removed Breaker/Switches
+    for br in
+        PSY.get_components(x -> PSY.get_available(x), PSY.DiscreteControlledACBranch, sys)
+        r = PSY.get_r(br)
+        x = PSY.get_x(br)
+        status = PSY.get_branch_status(br)
+        if r == 0.0 && x < ZERO_IMPEDANCE_LINE_REACTANCE_THRESHOLD
+            if status == PSY.DiscreteControlledBranchStatus.CLOSED
+                from_bus_number = PSY.get_number(PSY.get_from(PSY.get_arc(br)))
+                to_bus_number = PSY.get_number(PSY.get_to(PSY.get_arc(br)))
+                if haskey(reverse_bus_search_map, from_bus_number)
+                    reduced_from_bus_number = reverse_bus_search_map[from_bus_number]
+                    push!(
+                        get!(bus_reduction_map, reduced_from_bus_number, Set{Int}),
+                        to_bus_number,
+                    )
+                    delete!(bus_reduction_map, to_bus_number)
+                    reverse_bus_search_map[to_bus_number] = reduced_from_bus_number
+                else
+                    push!(get!(bus_reduction_map, from_bus_number, Set{Int}), to_bus_number)
+                    delete!(bus_reduction_map, to_bus_number)
+                    reverse_bus_search_map[to_bus_number] = from_bus_number
+                end
+            end
+        end
+    end
+
+    bus_ax = sort!([x for x in keys(bus_reduction_map)])
+    axes = (bus_ax, bus_ax)
+    bus_lookup = Dict{Int, Int}()
+    lookup = (bus_lookup, bus_lookup)
+    busnumber = length(bus_ax)
+    for (ix, b) in enumerate(bus_ax)
+        bus_lookup[b] = ix
+    end
+    adj = SparseArrays.spdiagm(ones(Int8, busnumber))
+    branches = collect(
+        PSY.get_components(
+            x -> typeof(x) ∉ [PSY.Transformer3W, PSY.DiscreteControlledACBranch],
+            PSY.ACTransmission,
+            sys,
+        ),
     )
+    transformer_3W = collect(PSY.get_components(PSY.Transformer3W, sys))
+    fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
+    switched_admittances = collect(PSY.get_components(PSY.SwitchedAdmittance, sys))
+
+    y11, y12, y21, y22, ysh, fb, tb, sb =
+        _buildybus!(
+            nr,
+            adj,
+            branches,
+            transformer_3W,
+            bus_lookup,
+            fixed_admittances,
+            switched_admittances,
+        )
+
+    ybus = SparseArrays.sparse(
+        [fb; fb; tb; tb; sb],  # row indices
+        [fb; tb; fb; tb; sb],  # column indices
+        [y11; y12; y21; y22; ysh],  # values
+        busnumber,  # size (rows) - setting this explicitly is necessary for the case there are no branches
+        busnumber,  # size (columns) - setting this explicitly is necessary for the case there are no branches
+    )
+    SparseArrays.dropzeros!(ybus)
+
+    if check_connectivity && length(bus_lookup) > 1
+        islands = find_subnetworks(ybus, bus_ax)
+        length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
+    end
+    return Ybus(ybus, adj, axes, lookup, nr)
 end
 
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
