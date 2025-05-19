@@ -23,18 +23,18 @@ function get_bus_indices(
     fr_bus_number = PSY.get_number(PSY.get_from(arc))
     if haskey(reverse_bus_search_map, fr_bus_number)
         fr_bus_number_reduced = reverse_bus_search_map[fr_bus_number]
-    else 
+    else
         fr_bus_number_reduced = fr_bus_number
-    end 
-    fr_bus_ix = bus_lookup[fr_bus_number_reduced] 
+    end
+    fr_bus_ix = bus_lookup[fr_bus_number_reduced]
 
     to_bus_number = PSY.get_number(PSY.get_to(arc))
     if haskey(reverse_bus_search_map, to_bus_number)
         to_bus_number_reduced = reverse_bus_search_map[to_bus_number]
-    else 
+    else
         to_bus_number_reduced = to_bus_number
-    end 
-    to_bus_ix = bus_lookup[to_bus_number_reduced] 
+    end
+    to_bus_ix = bus_lookup[to_bus_number_reduced]
     return fr_bus_ix, to_bus_ix
 end
 
@@ -47,10 +47,10 @@ function get_bus_index(
     bus_number = PSY.get_number(PSY.get_bus(dev))
     if haskey(reverse_bus_search_map, bus_number)
         bus_number_reduced = reverse_bus_search_map[bus_number]
-    else 
+    else
         bus_number_reduced = bus_number
-    end 
-    return bus_lookup[bus_number_reduced] 
+    end
+    return bus_lookup[bus_number_reduced]
 end
 
 """
