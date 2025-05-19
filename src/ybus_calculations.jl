@@ -617,14 +617,19 @@ function Ybus(
     adj = SparseArrays.spdiagm(ones(Int8, busnumber))
     branches = collect(
         PSY.get_components(
-            x -> PSY.get_available(x) && typeof(x) ∉ [PSY.Transformer3W, PSY.DiscreteControlledACBranch],
+            x ->
+                PSY.get_available(x) &&
+                    typeof(x) ∉ [PSY.Transformer3W, PSY.DiscreteControlledACBranch],
             PSY.ACTransmission,
             sys,
         ),
     )
-    transformer_3W = collect(PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys))
-    fixed_admittances = collect(PSY.get_components(x -> PSY.get_available(x), PSY.FixedAdmittance, sys))
-    switched_admittances = collect(PSY.get_components(x -> PSY.get_available(x), PSY.SwitchedAdmittance, sys))
+    transformer_3W =
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys))
+    fixed_admittances =
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.FixedAdmittance, sys))
+    switched_admittances =
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.SwitchedAdmittance, sys))
 
     y11, y12, y21, y22, ysh, fb, tb, sb =
         _buildybus!(
@@ -673,7 +678,6 @@ function Ybus(
         tb = nothing
     end
     return Ybus(ybus, adj, axes, lookup, nr, yft, ytf, fb, tb)
-
 end
 
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
