@@ -446,8 +446,7 @@ function _buildybus!(
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        PSY.get_available(b) &&
-            _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb, network_reduction, adj)
+        _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb, network_reduction, adj)
     end
 
     stb = 0
@@ -455,27 +454,26 @@ function _buildybus!(
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Transformer3W is invalid"))
         end
-        PSY.get_available(b) &&
-            _ybus!(
-                y11,
-                y12,
-                y21,
-                y22,
-                b,
-                num_bus,
-                ix + branchcount_no_3w,
-                fb,
-                tb,
-                stb,
-                network_reduction,
-                adj,
-            )
+        _ybus!(
+            y11,
+            y12,
+            y21,
+            y22,
+            b,
+            num_bus,
+            ix + branchcount_no_3w,
+            fb,
+            tb,
+            stb,
+            network_reduction,
+            adj,
+        )
 
         stb = stb + 2
     end
 
     for (ix, fa) in enumerate([fixed_admittances; switched_admittances])
-        PSY.get_available(fa) && _ybus!(ysh, fa, num_bus, ix, sb, network_reduction)
+        _ybus!(ysh, fa, num_bus, ix, sb, network_reduction)
     end
     return (
         y11,
@@ -567,6 +565,7 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 function Ybus(
     sys::PSY.System;
     check_connectivity::Bool = true,
+    make_branch_admittance_matrices::Bool = false,
     nr::NetworkReduction = NetworkReduction(),
     kwargs...,
 )
@@ -618,14 +617,19 @@ function Ybus(
     adj = SparseArrays.spdiagm(ones(Int8, busnumber))
     branches = collect(
         PSY.get_components(
-            x -> typeof(x) ∉ [PSY.Transformer3W, PSY.DiscreteControlledACBranch],
+            x ->
+                PSY.get_available(x) &&
+                    typeof(x) ∉ [PSY.Transformer3W, PSY.DiscreteControlledACBranch],
             PSY.ACTransmission,
             sys,
         ),
     )
-    transformer_3W = collect(PSY.get_components(PSY.Transformer3W, sys))
-    fixed_admittances = collect(PSY.get_components(PSY.FixedAdmittance, sys))
-    switched_admittances = collect(PSY.get_components(PSY.SwitchedAdmittance, sys))
+    transformer_3W =
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys))
+    fixed_admittances =
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.FixedAdmittance, sys))
+    switched_admittances =
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.SwitchedAdmittance, sys))
 
     y11, y12, y21, y22, ysh, fb, tb, sb =
         _buildybus!(
@@ -651,7 +655,29 @@ function Ybus(
         islands = find_subnetworks(ybus, bus_ax)
         length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
     end
-    return Ybus(ybus, adj, axes, lookup, nr)
+
+    if make_branch_admittance_matrices
+        yft = SparseArrays.sparse(
+            [1:length(fb); 1:length(fb)],
+            [fb; tb],
+            [y11; y12],
+            length(fb),
+            busnumber,
+        )
+        ytf = SparseArrays.sparse(
+            [1:length(tb); 1:length(tb)],
+            [tb; fb],
+            [y22; y21],
+            length(tb),
+            busnumber,
+        )
+    else
+        yft = nothing
+        ytf = nothing
+        fb = nothing
+        tb = nothing
+    end
+    return Ybus(ybus, adj, axes, lookup, nr, yft, ytf, fb, tb)
 end
 
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
