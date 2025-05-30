@@ -361,6 +361,7 @@ function _ybus!(
     return
 end
 
+#Note - PSSE does not include switched admittances in ymatrix
 function _ybus!(
     ysh::Vector{ComplexF64},
     fa::PSY.SwitchedAdmittance,
@@ -370,21 +371,28 @@ function _ybus!(
     nr::NetworkReduction,
 )
     bus_no = get_bus_index(fa, num_bus, nr)
-    Y = PSY.get_Y(fa)
-    number_of_steps = PSY.get_number_of_steps(fa)
-    Y_increase = PSY.get_Y_increase(fa)
-    if isempty(number_of_steps) && isempty(Y_increase)
-        Y_total = Y
-    else
-        Y_total = Y + (number_of_steps[1] * Y_increase[1])  #TODO - debug with PSSE discrepancy in SwitchedAdmittance 
-    end
     sb[fa_ix] = bus_no
-    if !isfinite(fa.Y)
+    ysh[fa_ix] = 0.0
+    return
+end
+
+function _ybus!(
+    ysh::Vector{ComplexF64},
+    fa::PSY.StandardLoad,
+    num_bus::Dict{Int, Int},
+    fa_ix::Int64,
+    sb::Vector{Int64},
+    nr::NetworkReduction,
+)
+    bus_no = get_bus_index(fa, num_bus, nr)
+    Y = PSY.get_impedance_active_power(fa) + im * PSY.get_impedance_reactive_power(fa)
+    sb[fa_ix] = bus_no
+    if !isfinite(Y)
         error(
-            "Data in $(PSY.get_name(fa)) is incorrect. Y = $(fa.Y)",
+            "Data in $(PSY.get_name(fa)) is incorrect. Y = $(Y)",
         )
     end
-    ysh[fa_ix] = Y_total
+    ysh[fa_ix] = Y
     return
 end
 
@@ -427,20 +435,22 @@ function _buildybus!(
     num_bus::Dict{Int, Int},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
+    standard_loads::Vector{PSY.StandardLoad}, 
 )
     branchcount = length(branches) + 3 * length(transformer_3w)
     branchcount_no_3w = length(branches)
     fa_count = length(fixed_admittances)
     sa_count = length(switched_admittances)
+    sl_count = length(standard_loads)
     fb = zeros(Int64, branchcount)
     tb = zeros(Int64, branchcount)
-    sb = zeros(Int64, fa_count + sa_count)
+    sb = zeros(Int64, fa_count + sa_count + sl_count)
 
     y11 = zeros(ComplexF64, branchcount)
     y12 = zeros(ComplexF64, branchcount)
     y21 = zeros(ComplexF64, branchcount)
     y22 = zeros(ComplexF64, branchcount)
-    ysh = zeros(ComplexF64, fa_count + sa_count)
+    ysh = zeros(ComplexF64, fa_count + sa_count + sl_count)
 
     for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
@@ -471,8 +481,7 @@ function _buildybus!(
 
         stb = stb + 2
     end
-
-    for (ix, fa) in enumerate([fixed_admittances; switched_admittances])
+    for (ix, fa) in enumerate([fixed_admittances; switched_admittances; standard_loads])
         _ybus!(ysh, fa, num_bus, ix, sb, network_reduction)
     end
     return (
@@ -498,7 +507,8 @@ function Ybus(
     buses::Vector{PSY.ACBus},
     transformer_3w::Vector{PSY.Transformer3W} = Vector{PSY.Transformer3W}(),
     fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
-    switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}();
+    switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}(),
+    standard_loads::Vector{PSY.StandardLoad} = Vector{PSY.StandardLoad}();
     check_connectivity::Bool = true,
     make_branch_admittance_matrices::Bool = false,
     network_reduction = NetworkReduction(),
@@ -519,6 +529,7 @@ function Ybus(
             bus_lookup,
             fixed_admittances,
             switched_admittances,
+            standard_loads, 
         )
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
@@ -630,7 +641,8 @@ function Ybus(
         collect(PSY.get_components(x -> PSY.get_available(x), PSY.FixedAdmittance, sys))
     switched_admittances =
         collect(PSY.get_components(x -> PSY.get_available(x), PSY.SwitchedAdmittance, sys))
-
+    standard_loads =
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.StandardLoad, sys))
     y11, y12, y21, y22, ysh, fb, tb, sb =
         _buildybus!(
             nr,
@@ -640,6 +652,7 @@ function Ybus(
             bus_lookup,
             fixed_admittances,
             switched_admittances,
+            standard_loads,
         )
 
     ybus = SparseArrays.sparse(
