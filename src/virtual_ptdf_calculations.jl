@@ -85,7 +85,7 @@ VirtualPTDF struct with an empty cache.
 - `tol::Float64 = eps()`:
         Tolerance related to sparsification and values to drop.
 - `max_cache_size::Int`:
-        max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
+        max cache size in MiB (initialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
 - `network_reduction::NetworkReduction`:
@@ -163,7 +163,7 @@ struct with an empty cache.
 # Keyword Arguments
 - `dist_slack::Vector{Float64}=Float64[]`:
         vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buse
+        The distributed slack vector has to be the same length as the number of buses
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
@@ -240,7 +240,7 @@ function _getindex(
 
         if !isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) != 1
             error(
-                "Distibuted slack is not supported for systems with multiple reference buses.",
+                "Distributed slack is not supported for systems with multiple reference buses.",
             )
         elseif isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) < buscount
             for i in eachindex(valid_ix)
