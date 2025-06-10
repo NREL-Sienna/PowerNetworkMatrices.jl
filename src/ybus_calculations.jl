@@ -167,14 +167,14 @@ function _ybus!(
     tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     Y11 = Y_t
-    b = PSY.get_primary_shunt(br)
-    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(b)
+    y_shunt = PSY.get_primary_shunt(br)
+    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
 
-    y11[branch_ix] = Y11 - (1im * b)
+    y11[branch_ix] = Y11 + y_shunt
     Y12 = -Y_t
     y12[branch_ix] = Y12
     Y21 = Y12
@@ -191,73 +191,96 @@ function _ybus!(
     y22::Vector{ComplexF64},
     br::PSY.Transformer3W,
     num_bus::Dict{Int, Int},
-    branch_ix::Int64,
+    offset_ix::Int64,
     fb::Vector{Int64},
     tb::Vector{Int64},
-    stb::Int64,
+    ix::Int64,
     nr::NetworkReduction,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     primary_star_arc = PSY.get_primary_star_arc(br)
     secondary_star_arc = PSY.get_secondary_star_arc(br)
     tertiary_star_arc = PSY.get_tertiary_star_arc(br)
-    add_to_branch_maps!(nr, primary_star_arc, secondary_star_arc, tertiary_star_arc, br)
-
-    primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
-    secondary_ix, _ = get_bus_indices(secondary_star_arc, num_bus, nr)
-    tertiary_ix, _ = get_bus_indices(tertiary_star_arc, num_bus, nr)
-    adj[primary_ix, star_ix] = 1
-    adj[star_ix, primary_ix] = -1
-    adj[secondary_ix, star_ix] = 1
-    adj[star_ix, secondary_ix] = -1
-    adj[tertiary_ix, star_ix] = 1
-    adj[star_ix, tertiary_ix] = -1
-
-    fb[branch_ix + stb] = primary_ix
-    fb[branch_ix + stb + 1] = secondary_ix
-    fb[branch_ix + stb + 2] = tertiary_ix
-
-    tb[branch_ix + stb] = star_ix
-    tb[branch_ix + stb + 1] = star_ix
-    tb[branch_ix + stb + 2] = star_ix
-
-    Y_t1 = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
-    Y11 = Y_t1
-    Y_t2 = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
-    Y22 = Y_t2
-    Y_t3 = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
-    Y33 = Y_t3
-
-    b = PSY.get_b(br) # shunt susceptance (star bus to ground)
-
-    if !isfinite(Y11) || !isfinite(Y22) || !isfinite(Y33) || !isfinite(b)
-        error(
-            "Data in $(PSY.get_name(br)) is incorrect.
-            r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)),
-            r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)),
-            r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br))",
-        )
+    add_to_branch_maps!(nr, primary_star_arc, secondary_star_arc, tertiary_star_arc, br)    #TODO - check this for case of some arcs unavailable
+    primary_available = PSY.get_available_primary(br)
+    secondary_available = PSY.get_available_secondary(br)
+    tertiary_available = PSY.get_available_tertiary(br)
+    n_entries = 0
+    y_shunt = PSY.get_b(br) + im * PSY.get_g(br)
+    if primary_available
+        primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
+        adj[primary_ix, star_ix] = 1
+        adj[star_ix, primary_ix] = -1
+        fb[offset_ix + ix + n_entries] = primary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+        c = 1 / PSY.get_primary_turns_ratio(br)
+        Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
+        Y11 = (Y_t * c^2)
+        if !isfinite(Y11) || !isfinite(y_shunt)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+            )
+        end
+        y11[offset_ix + ix + n_entries] = Y11 + y_shunt
+        Y12 = (-Y_t * c)
+        y12[offset_ix + ix + n_entries] = Y12
+        Y21 = Y12
+        y21[offset_ix + ix + n_entries] = Y21
+        Y22 = Y_t
+        y22[offset_ix + ix + n_entries] = Y22
+        n_entries += 1
     end
-
-    y11[branch_ix + stb] = Y11 - (1im * b)
-    y11[branch_ix + stb + 1] = Y22 - (1im * b)
-    y11[branch_ix + stb + 2] = Y33 - (1im * b)
-
-    y12[branch_ix + stb] = -Y_t1
-    y12[branch_ix + stb + 1] = -Y_t2
-    y12[branch_ix + stb + 2] = -Y_t3
-
-    y21[branch_ix + stb] = -Y_t1
-    y21[branch_ix + stb + 1] = -Y_t2
-    y21[branch_ix + stb + 2] = -Y_t3
-
-    y22[branch_ix + stb] = Y11
-    y22[branch_ix + stb + 1] = Y22
-    y22[branch_ix + stb + 2] = Y33
-
-    return
+    if secondary_available
+        secondary_ix, star_ix = get_bus_indices(secondary_star_arc, num_bus, nr)
+        adj[secondary_ix, star_ix] = 1
+        adj[star_ix, secondary_ix] = -1
+        fb[offset_ix + ix + n_entries] = secondary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+        c = 1 / PSY.get_secondary_turns_ratio(br)
+        Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
+        Y11 = (Y_t * c^2)
+        if !isfinite(Y11) || !isfinite(y_shunt)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+            )
+        end
+        y11[offset_ix + ix + n_entries] = Y11 
+        Y12 = (-Y_t * c)
+        y12[offset_ix + ix + n_entries] = Y12
+        Y21 = Y12
+        y21[offset_ix + ix + n_entries] = Y21
+        Y22 = Y_t
+        y22[offset_ix + ix + n_entries] = Y22
+        n_entries += 1
+    end
+    if tertiary_available
+        tertiary_ix, star_ix = get_bus_indices(tertiary_star_arc, num_bus, nr)
+        adj[tertiary_ix, star_ix] = 1
+        adj[star_ix, tertiary_ix] = -1
+        fb[offset_ix + ix + n_entries] = tertiary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+        c = 1 / PSY.get_tertiary_turns_ratio(br)
+        Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
+        Y11 = (Y_t * c^2)
+        if !isfinite(Y11) || !isfinite(y_shunt)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+            )
+        end
+        y11[offset_ix + ix + n_entries] = Y11 
+        Y12 = (-Y_t * c)
+        y12[offset_ix + ix + n_entries] = Y12
+        Y21 = Y12
+        y21[offset_ix + ix + n_entries] = Y21
+        Y22 = Y_t
+        y22[offset_ix + ix + n_entries] = Y22
+        n_entries += 1
+    end
+    return n_entries
 end
-
 function _ybus!(
     y11::Vector{ComplexF64},
     y12::Vector{ComplexF64},
@@ -281,12 +304,12 @@ function _ybus!(
 
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     c = 1 / PSY.get_tap(br)
-    b = PSY.get_primary_shunt(br)
+    y_shunt = PSY.get_primary_shunt(br)
 
     Y11 = (Y_t * c^2)
-    y11[branch_ix] = Y11
+    y11[branch_ix] = Y11 + y_shunt
     Y12 = (-Y_t * c)
-    if !isfinite(Y11) || !isfinite(Y12) || !isfinite(b)
+    if !isfinite(Y11) || !isfinite(Y12) || !isfinite(y_shunt)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
@@ -323,15 +346,15 @@ function _ybus!(
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     tap = (PSY.get_tap(br) * exp(PSY.get_α(br) * 1im))
     c_tap = (PSY.get_tap(br) * exp(-1 * PSY.get_α(br) * 1im))
-    b = PSY.get_primary_shunt(br)
+    y_shunt = PSY.get_primary_shunt(br)
     Y11 = (Y_t / abs(tap)^2)
-    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(b * c_tap)
+    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
 
-    y11[branch_ix] = Y11 - (1im * b)
+    y11[branch_ix] = Y11 + y_shunt
     Y12 = (-Y_t / c_tap)
     y12[branch_ix] = Y12
     Y21 = (-Y_t / tap)
@@ -435,9 +458,17 @@ function _buildybus!(
     num_bus::Dict{Int, Int},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
-    standard_loads::Vector{PSY.StandardLoad}, 
+    standard_loads::Vector{PSY.StandardLoad},
 )
-    branchcount = length(branches) + 3 * length(transformer_3w)
+    branch_entries_transformer_3w = 0
+    for br in transformer_3w
+        branch_entries_transformer_3w += count([
+            PSY.get_available_primary(br),
+            PSY.get_available_secondary(br),
+            PSY.get_available_tertiary(br),
+        ])
+    end
+    branchcount = length(branches) + branch_entries_transformer_3w
     branchcount_no_3w = length(branches)
     fa_count = length(fixed_admittances)
     sa_count = length(switched_admittances)
@@ -459,27 +490,26 @@ function _buildybus!(
         _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb, network_reduction, adj)
     end
 
-    stb = 0
-    for (ix, b) in enumerate(transformer_3w)
+    ix = 1
+    for b in transformer_3w
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Transformer3W is invalid"))
         end
-        _ybus!(
+        n_entries = _ybus!(
             y11,
             y12,
             y21,
             y22,
             b,
             num_bus,
-            ix + branchcount_no_3w,
+            branchcount_no_3w,
             fb,
             tb,
-            stb,
+            ix,
             network_reduction,
             adj,
         )
-
-        stb = stb + 2
+        ix += n_entries
     end
     for (ix, fa) in enumerate([fixed_admittances; switched_admittances; standard_loads])
         _ybus!(ysh, fa, num_bus, ix, sb, network_reduction)
@@ -529,7 +559,7 @@ function Ybus(
             bus_lookup,
             fixed_admittances,
             switched_admittances,
-            standard_loads, 
+            standard_loads,
         )
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
@@ -654,7 +684,6 @@ function Ybus(
             switched_admittances,
             standard_loads,
         )
-
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
