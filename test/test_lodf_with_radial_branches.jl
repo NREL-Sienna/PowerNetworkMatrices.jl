@@ -62,9 +62,9 @@
             deepcopy(bus_activepower_injection - bus_activepower_withdrawals)
         # get the flows with the PTDF matrix
         ref_flow_values = transpose(ptdf.data) * power_injection
-        # evalaute according to the matrix with no radial branches
+        # evaluate according to the matrix with no radial branches
         reduce_flow_values = zeros((length(br_idx),))
-        # change power injection for affrefated leaf buses
+        # change power injection for aggregated leaf buses
         power_injection2 = deepcopy(power_injection)
         for i in keys(rb.bus_reduction_map)
             for j in rb.bus_reduction_map[i]
