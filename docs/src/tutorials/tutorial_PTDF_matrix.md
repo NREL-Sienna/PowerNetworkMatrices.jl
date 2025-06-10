@@ -33,7 +33,7 @@ ba_matrix = BA_Matrix(sys);
 a_matrix = IncidenceMatrix(sys);
 
 # get the PTDF matrix starting from the values of the 
-# previosly cumputed matrices
+# previously computed matrices
 ptdf_2 = PTDF(a_matrix, ba_matrix);
 get_ptdf_data(ptdf_2)
 
@@ -63,7 +63,7 @@ Please note that either the `KLU` or `Dense` method is used, the resulting `PTDF
 
 ## Evaluating the `PTDF` matrix considering distributed slack bus
 
-Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus. To do so, a vector of type `Vector{Float64}` needs to be defined, specifying the weights for each bus of the system. These weights identify how the load on the slakc bus is redistributed accross the system.
+Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus. To do so, a vector of type `Vector{Float64}` needs to be defined, specifying the weights for each bus of the system. These weights identify how the load on the slack bus is redistributed accross the system.
 
 ``` @repl tutorial_PTDF_matrix
 # consider equal distribution accross each bus for this example
@@ -89,7 +89,7 @@ get_ptdf_data(ptdf_distr)
 
 ## "Sparse" `PTDF` matrix
 
-The `PTFD` matrix can be computed in a "sparse" fashion by defining the input argument `tol`. If this argument is defined, then elements of the `PTDF` matrix whose absolute values are below the set threshold are dropped. In addition, the matrix will be stored as a sparse one of type `SparseArrays.SparseMatrixCSC{Float64, Int64}` instead of `Matrix{Float64}`.
+The `PTDF` matrix can be computed in a "sparse" fashion by defining the input argument `tol`. If this argument is defined, then elements of the `PTDF` matrix whose absolute values are below the set threshold are dropped. In addition, the matrix will be stored as a sparse one of type `SparseArrays.SparseMatrixCSC{Float64, Int64}` instead of `Matrix{Float64}`.
 
 By considering an "extreme" value of 0.2 as `tol`, the `PTDF` matrix can be computed as follows:
 

@@ -7,7 +7,7 @@
         # ... and with radial lines
         network_reduction = get_radial_reduction(sys)
         BA_rad = BA_Matrix(sys; network_reduction = network_reduction)
-        # get inidices for the leaf nodes
+        # get indices for the leaf nodes
         nr = BA_rad.network_reduction
         bus_numbers = []
         for i in keys(nr.bus_reduction_map)
@@ -16,7 +16,7 @@
         bus_idx = setdiff(1:size(BA.data, 1), [BA.lookup[1][i] for i in bus_numbers])
         # ... and radial branches
         br_idx = setdiff(1:size(BA.data, 2), [BA.lookup[2][i] for i in nr.removed_branches])
-        # now extract A matrix anc compare
+        # now extract A matrix and compare
         @test all(isapprox.(BA.data[bus_idx, br_idx], BA_rad.data))
     end
 end
@@ -39,7 +39,7 @@ end
         ABA = ABA_Matrix(sys; factorize = true)
         ABA_rad = ABA_Matrix(sys; factorize = true, network_reduction = nr)
 
-        # check if the same angles and flows are coputed with the matrices of the reduced systems
+        # check if the same angles and flows are computed with the matrices of the reduced systems
         # get the indices for the reduced system
         bus_numbers = []
         for i in keys(nr.bus_reduction_map)
@@ -51,7 +51,7 @@ end
         )
         br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in nr.removed_branches])
 
-        # now get the injuctions from the system
+        # now get the injunctions from the system
         n_buses = length(axes(BA, 1))
         bus_lookup = BA.lookup[1]
         branch_lookup = BA.lookup[2]
@@ -97,10 +97,10 @@ end
         ref_bus_angles[valid_ix] = ABA.K \ power_injection[valid_ix]
         ref_flow_values = transpose(BA.data) * ref_bus_angles
 
-        # evalaute according to the matrices with no radial branches
+        # evaluate according to the matrices with no radial branches
         reduced_bus_angles = zeros((length(bus_idx) + length(A.ref_bus_positions),))
         reduce_flow_values = zeros((length(br_idx),))
-        # change power injection for affrefated leaf buses
+        # change power injection for affected leaf buses
         power_injection2 = deepcopy(power_injection)
         for i in keys(nr.bus_reduction_map)
             for j in nr.bus_reduction_map[i]

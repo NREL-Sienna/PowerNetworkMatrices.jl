@@ -1,7 +1,7 @@
 # LODF matrix
 
 In this tutorial the methods for computing the Line Outage Distribution Factor (`LODF`) are presented.
-Before diving into this tutorial we encourage the user to load `PowerNetworkMatrices`, hit the `?` key in the REPL terminal and look for the documentiont of the different `LODF` methods avialable.
+Before diving into this tutorial we encourage the user to load `PowerNetworkMatrices`, hit the `?` key in the REPL terminal and look for the documentation of the different `LODF` methods available.
 
 ## Evaluation of the `LODF` matrix
 
@@ -48,7 +48,7 @@ lodf_3 = LODF(branches, buses);
 a = IncidenceMatrix(sys);
 ptdf = PTDF(sys);
 
-# compute LODF matrix with the two netwrok matrices
+# compute LODF matrix with the two network matrices
 lodf_4 = LODF(a, ptdf);
 
 # CASE 3
@@ -58,7 +58,7 @@ lodf_4 = LODF(a, ptdf);
 ba = BA_Matrix(sys);
 aba = ABA_Matrix(sys, factorize = true);
 
-# compute LODF matrix with the three netwrok matrices
+# compute LODF matrix with the three network matrices
 lodf_5 = LODF(a, aba, ba);
 ```
 
@@ -67,7 +67,7 @@ lodf_5 = LODF(a, aba, ba);
 
 ## Available methods for the computation of the `LODF` matrix
 
-For those methods that either require the evaluation of the `PTDF` matrix, or that execute this evaluation internally, two different approaches casen be used.
+For those methods that either require the evaluation of the `PTDF` matrix, or that execute this evaluation internally, two different approaches can be used.
 
 As for the `PTDF` matrix, here too the optional argument `linear_solver` can be specified with either `KLU` (for sparse matrix calculation) or `Dense` (for sparse matrix calculation).
 
@@ -76,7 +76,7 @@ lodf_dense = LODF(sys, linear_solver="Dense");
 ```
 
 **NOTE (1):** by default the "KLU" method is selected, which appeared to require significant less time and memory with respect to "Dense".
-Please note that wether the `KLU` or `Dense` method is used, the resultig `LODF` matrix is stored as a dense one.
+Please note that wether the `KLU` or `Dense` method is used, the resulting `LODF` matrix is stored as a dense one.
 
 **NOTE (2):** for the moment, the method `LODF(a::IncidenceMatrix, aba::ABA_Matrix, ba::BA_Matrix)` will take `KLU` as `linear_solver` option.
 

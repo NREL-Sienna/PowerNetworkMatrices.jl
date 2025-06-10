@@ -7,7 +7,7 @@ Structure containing the BA matrix and other relevant data.
         Matrix A and the Matrix of Susceptance B
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors, the first one contains the names of each
-        buse of the network (each one related to a row of the Matrix in "data"),
+        buses of the network (each one related to a row of the Matrix in "data"),
         the second one contains the names of each line of the network (each one
         related to a column of the Matrix in "data")
 - `lookup<:NTuple{2, Dict}`:

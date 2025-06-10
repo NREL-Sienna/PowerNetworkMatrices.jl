@@ -15,7 +15,7 @@
         ptdf_rad = PTDF(sys; network_reduction = rb)
         ptdf_rad_A_BA = PTDF(A_rad, BA_rad)
 
-        # check if the same angles and flows are coputed with the matrices of the reduced systems
+        # check if the same angles and flows are computed with the matrices of the reduced systems
         # get the indices for the reduced system
         bus_numbers = []
         for i in keys(rb.bus_reduction_map)
@@ -55,9 +55,9 @@
         # get the flows with the PTDF matrix
         ref_flow_values = transpose(ptdf.data) * power_injection
 
-        # evalaute according to the matrix with no radial branches
+        # evaluate according to the matrix with no radial branches
         reduce_flow_values = zeros((length(br_idx),))
-        # change power injection for affrefated leaf buses
+        # change power injection for aggregated leaf buses
         power_injection2 = deepcopy(power_injection)
         for i in keys(rb.bus_reduction_map)
             for j in rb.bus_reduction_map[i]
@@ -135,9 +135,9 @@ end
         # get the flows with the PTDF matrix
         ref_flow_values = transpose(ptdf.data) * power_injection
 
-        # evalaute according to the matrix with no radial branches
+        # evaluate according to the matrix with no radial branches
         reduce_flow_values = zeros((length(br_idx),))
-        # change power injection for affrefated leaf buses
+        # change power injection for aggregated leaf buses
         power_injection2 = deepcopy(power_injection)
         for i in keys(rb.bus_reduction_map)
             for j in rb.bus_reduction_map[i]
