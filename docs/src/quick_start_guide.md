@@ -24,7 +24,7 @@ sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
 ## Computation of the PTDF matrix
 
-Once system data is loaded, netwrok matrices can be evaluated. The following
+Once system data is loaded, network matrices can be evaluated. The following
 example shows how the PTDF matrix is computed.
 
 The function `PTDF` is called for the evaluation of the matrix and other data. These
