@@ -131,7 +131,7 @@ VirtualLODF struct with an empty cache.
 - `tol::Float64 = eps()`:
         Tolerance related to sparsification and values to drop.
 - `max_cache_size::Int`:
-        max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
+        max cache size in MiB (initialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
 - `network_reduction::NetworkReduction`:

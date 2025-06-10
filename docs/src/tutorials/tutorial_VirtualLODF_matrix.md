@@ -14,7 +14,7 @@ Once the `VirtualLODF` is initialized, each row of the matrix can be evaluated s
 1. Define the `VirtualPTDF` structure
 2. Call any element of the matrix to define and store the relative row as well as showing the selected element
 
-Regarding point 2, if the row has been stored previosly then the desired element is just loaded from the cache and shown.
+Regarding point 2, if the row has been stored previously then the desired element is just loaded from the cache and shown.
 
 The flowchart below shows how the `VirtualLODF` is structured and how it works. Examples will be presented in the following sections.
 
@@ -60,7 +60,7 @@ el_C31_2_105_bis = v_lodf[row_number, col_number]
 
 **NOTE**: this example was made for the sake of completeness and considering the actual branch names is recommended.
 
-As previosly mentioned, in order to evaluate a single element of the `VirtualLODF`, the entire row related to the selected branch must be considered. For this reason it is cached for later calls.
+As previously mentioned, in order to evaluate a single element of the `VirtualLODF`, the entire row related to the selected branch must be considered. For this reason it is cached for later calls.
 This is evident by looking at the following example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
