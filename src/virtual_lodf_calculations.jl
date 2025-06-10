@@ -1,7 +1,7 @@
 """
 The Virtual Line Outage Distribution Factor (VirtualLODF) structure gathers
 the rows of the LODF matrix as they are evaluated on-the-go. These rows are
-evalauted independently, cached in the structure and do not require the
+evaluated independently, cached in the structure and do not require the
 computation of the whole matrix (therefore significantly reducing the
 computational requirements).
 

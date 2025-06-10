@@ -1,7 +1,7 @@
 """
 The Virtual Power Transfer Distribution Factor (VirtualPTDF) structure gathers
 the rows of the PTDF matrix as they are evaluated on-the-go. These rows are
-evalauted independently, cached in the structure and do not require the
+evaluated independently, cached in the structure and do not require the
 computation of the whole matrix (therefore significantly reducing the
 computational requirements).
 
@@ -14,7 +14,7 @@ matrix.
 - `K::KLU.KLUFactorization{Float64, Int}`:
         LU factorization matrices of the ABA matrix, evaluated by means of KLU
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        BA matric
+        BA matrix
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the reference buses
