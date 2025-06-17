@@ -54,55 +54,7 @@ function _test_psse_reduction_row(psse_row, reverse_bus_search_map)
 end
 
 @testset "14 bus system" begin
-    sys = System(joinpath(pwd(), "test", "test_data", "modified_14bus_system.raw"))
-    Ybus_pnm = Ybus(sys; check_connectivity = false)
-    ref_bus_numbers = [
-        get_number(x) for
-        x in get_components(x -> get_bustype(x) == PSY.ACBusTypes.REF, ACBus, sys)
-    ]
-    skip_indices = indexin(ref_bus_numbers, Ybus_pnm.axes[1])
-    n_ref_bus_elements = nnz(Ybus_pnm.data[skip_indices, :])
-    nr = Ybus_pnm.network_reduction
-    # Test the NetworkReduction:
-    #Test breaker/switch reduction: 
-    @test length(nr.bus_reduction_map) == 14
-    @test length(nr.reverse_bus_search_map) == 2
-    #Test direct branch maps (1:1):
-    @test length(keys(nr.direct_branch_map)) ==
-          length(keys(nr.reverse_direct_branch_map)) == 13
-    #Test double circuit maps:
-    @test length(nr.parallel_branch_map) == 1
-    @test length(nr.parallel_branch_map[(106, 111)]) == 2
-    @test length(nr.reverse_parallel_branch_map) == 2
-    #Test 3WT maps (1:1):
-    @test length(nr.transformer3W_map) == length(nr.reverse_transformer3W_map) == 6
-    #Test adjacency and Ybus have same non-zero elements
-    findnz(Ybus_pnm.data)[1] == findnz(Ybus_pnm.adjacency_data)[1]
-    findnz(Ybus_pnm.data)[2] == findnz(Ybus_pnm.adjacency_data)[2]
-
-    # Compare with PSSE
-    Ybus_psse, b_ix_psse, row_buses, col_buses, y_values, reduced_bus_pairs_psse =
-        parse_psse_ybus("test/test_data/modified_14bus_system_Ymx_SWTBRK.txt")  # NOTE: manually changed the ybus numbers in this file. 
-    # Compare breaker/switch reductions
-    for x in reduced_bus_pairs_psse
-        _test_psse_reduction_row(x, nr.reverse_bus_search_map)
-    end
-    #Test number of nonzero elements matches
-    @test nnz(Ybus_pnm.data) == length(filter(!iszero, y_values)) + n_ref_bus_elements
-    #Test values match 
-    for (row_bus, col_bus, val) in zip(row_buses, col_buses, y_values)
-        if row_bus ∈ keys(nr.reverse_bus_search_map)
-            row_bus = nr.reverse_bus_search_map[row_bus]
-        end
-        if col_bus ∈ keys(nr.reverse_bus_search_map)
-            col_bus = nr.reverse_bus_search_map[col_bus]
-        end
-        @test isapprox(Ybus_pnm[row_bus, col_bus], val, atol = 1e-3)
-    end
-end
-
-@testset "14 bus system - re-exported from PowerFlows.jl" begin
-    sys = System(joinpath(pwd(), "test", "test_data", "exported_modified_case14_sys 1.raw"))
+    sys = build_system(PSSEParsingTestSystems, "psse_ybus_14_test_system")
     Ybus_pnm = Ybus(sys)
     ref_bus_numbers = [
         get_number(x) for
@@ -118,7 +70,7 @@ end
 
     # Compare with PSSE
     Ybus_psse, b_ix_psse, row_buses, col_buses, y_values, reduced_bus_pairs_psse =
-        parse_psse_ybus("test/test_data/exported_modified_case14_sys_Ymx.txt")
+        parse_psse_ybus("test/test_data/14bus_Ymx.txt")         #TODO - required manual remapping of star buses
     # Compare breaker/switch reductions
     for x in reduced_bus_pairs_psse
         _test_psse_reduction_row(x, nr.reverse_bus_search_map)
