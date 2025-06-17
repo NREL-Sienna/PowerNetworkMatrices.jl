@@ -206,7 +206,7 @@ function _ybus!(
     secondary_available = PSY.get_available_secondary(br)
     tertiary_available = PSY.get_available_tertiary(br)
     n_entries = 0
-    y_shunt = PSY.get_b(br) + im * PSY.get_g(br)
+    y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
     if primary_available
         primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
         adj[primary_ix, star_ix] = 1
@@ -246,7 +246,7 @@ function _ybus!(
                 r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
             )
         end
-        y11[offset_ix + ix + n_entries] = Y11 
+        y11[offset_ix + ix + n_entries] = Y11
         Y12 = (-Y_t * c)
         y12[offset_ix + ix + n_entries] = Y12
         Y21 = Y12
@@ -270,7 +270,7 @@ function _ybus!(
                 r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
             )
         end
-        y11[offset_ix + ix + n_entries] = Y11 
+        y11[offset_ix + ix + n_entries] = Y11
         Y12 = (-Y_t * c)
         y12[offset_ix + ix + n_entries] = Y12
         Y21 = Y12
