@@ -116,10 +116,10 @@ function VirtualPTDF(
     BA = calculate_BA_matrix(branches, bus_ax_ref, network_reduction)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     ref_bus_positions = find_slack_positions(buses)
-    subnetworks = find_subnetworks(M, bus_ax)
+    subnetworks =
+        assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
-        subnetworks = assign_reference_buses!(subnetworks, ref_bus_positions, bus_ax_ref)
     end
     temp_data = zeros(length(bus_ax))
 
