@@ -14,6 +14,23 @@ function _add_to_collection!(
     return
 end
 
+function get_bus_index(bus_no::Int, bus_lookup::Dict{Int, Int}, nr::NetworkReduction)
+    if haskey(nr.reverse_bus_search_map, bus_no)
+        return bus_lookup[nr.reverse_bus_search_map[bus_no]]
+    else
+        return bus_lookup[bus_no]
+    end
+end
+
+function get_bus_index(
+    dev::PSY.Component,
+    bus_lookup::Dict{Int, Int},
+    nr::NetworkReduction,
+)
+    bus_number = PSY.get_number(PSY.get_bus(dev))
+    return get_bus_index(bus_number, bus_lookup, nr)
+end
+
 function get_bus_indices(
     arc::PSY.Arc,
     bus_lookup::Dict{Int, Int},
@@ -36,21 +53,6 @@ function get_bus_indices(
     end
     to_bus_ix = bus_lookup[to_bus_number_reduced]
     return fr_bus_ix, to_bus_ix
-end
-
-function get_bus_index(
-    dev::PSY.Component,
-    bus_lookup::Dict{Int, Int},
-    nr::NetworkReduction,
-)
-    reverse_bus_search_map = get_reverse_bus_search_map(nr)
-    bus_number = PSY.get_number(PSY.get_bus(dev))
-    if haskey(reverse_bus_search_map, bus_number)
-        bus_number_reduced = reverse_bus_search_map[bus_number]
-    else
-        bus_number_reduced = bus_number
-    end
-    return bus_lookup[bus_number_reduced]
 end
 
 """
