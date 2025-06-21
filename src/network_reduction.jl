@@ -8,7 +8,9 @@ struct NetworkReduction
     series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}}
     reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
     transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.Transformer3W, Int}}
-    reverse_transformer3W_map::Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}} #Int to represent the primary, secondary, or tertiary arc; makes keys unique in reverse map
+    reverse_transformer3W_map::Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}}    #Int to represent the primary, secondary, or tertiary arc; makes keys unique in reverse map
+    removed_buses::Set{Int}
+    removed_arcs::Set{Tuple{Int, Int}}
     reduction_type::Vector{NetworkReductionTypes}
 end
 
@@ -69,6 +71,8 @@ function NetworkReduction(;
         Tuple{PSY.Transformer3W, Int},
         Tuple{Int, Int},
     }(),
+    removed_buses::Set{Int} = Set{Int}(),
+    removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}(),
     reduction_type::Vector{NetworkReductionTypes} = Vector{NetworkReductionTypes}(),
 )
     return NetworkReduction(
@@ -82,6 +86,8 @@ function NetworkReduction(;
         reverse_series_branch_map,
         transformer3W_map,
         reverse_transformer3W_map,
+        removed_buses,
+        removed_arcs,
         reduction_type,
     )
 end
