@@ -1,25 +1,9 @@
-#NOTE: hardcoded for testing system 
 function get_reduction(
     A::IncidenceMatrix,
     sys::PSY.System,
     ::Val{NetworkReductionTypes.RADIAL},
 )
-    @error "RADIAL HARDCODED REDUCTION FOR 14 BUS SYSTEM"
-    return NetworkReduction(
-        Dict{Int, Set{Int}}(),
-        Dict{Int, Int}(108 => 107),
-        Dict{Tuple{Int, Int}, PSY.Branch}(),
-        Dict{PSY.Branch, Tuple{Int, Int}}(),
-        Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
-        Dict{PSY.Branch, Tuple{Int, Int}}(),
-        Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
-        Dict{PSY.Branch, Tuple{Int, Int}}(),
-        Dict{Tuple{Int, Int}, Tuple{PSY.Transformer3W, Int}}(),
-        Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}}(),
-        Set{Int}(),
-        Set{Tuple{Int, Int}}([(107, 108)]),
-        Vector{NetworkReductionTypes}([NetworkReductionTypes.RADIAL]),
-    )
+    return get_radial_reduction(A)
 end
 
 """
@@ -50,24 +34,18 @@ Builds a NetworkReduction by removing radially connected buses.
 # Arguments
 - `A::IncidenceMatrix`: IncidenceMatrix
 """
-#= function get_radial_reduction(
+function get_radial_reduction(
     A::IncidenceMatrix;
-    prior_reduction::NetworkReduction = NetworkReduction(),
     exempt_buses::Vector{Int64} = Int64[],
 )
     exempt_bus_positions = [A.lookup[2][x] for x in exempt_buses]
-    new_reduction = calculate_radial_arcs(
+    return calculate_radial_arcs(
         A.data,
         A.lookup[1],
         A.lookup[2],
         union(A.ref_bus_positions, Set(exempt_bus_positions)),
     )
-    if isempty(prior_reduction)
-        return new_reduction
-    else
-        return compose_reductions(prior_reduction, new_reduction, length(A.lookup[2]))
-    end
-end =#
+end
 
 function _find_upstream_bus(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
@@ -224,14 +202,12 @@ function calculate_radial_arcs(
         end
         push!(meshed_arcs, k)
     end
-    #TODO - update this to the new NetworkReduction object. 
-    @error radial_arcs
-    @error meshed_arcs
+
     return NetworkReduction(
         bus_reduction_map_index,
         reverse_bus_search_map,
-        Dict{Tuple{Int, Int}, PSY.Branch}(), #radial_arcs,    #convert to direct_branch_map and reverse_direct_branch_map
-        Dict{PSY.Branch, Tuple{Int, Int}}(), #meshed_arcs,
+        Dict{Tuple{Int, Int}, PSY.Branch}(),
+        Dict{PSY.Branch, Tuple{Int, Int}}(), 
         Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
         Dict{PSY.Branch, Tuple{Int, Int}}(),
         Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
@@ -239,6 +215,7 @@ function calculate_radial_arcs(
         Dict{Tuple{Int, Int}, Tuple{PSY.Transformer3W, Int}}(),
         Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}}(),
         Set{Int}(),
+        radial_arcs,
         [NetworkReductionTypes.RADIAL],
     )
 end
