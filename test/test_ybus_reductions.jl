@@ -1,5 +1,5 @@
 # TODO - problem with radial reduction algorithm and three winding transformers. 
-sys = System(joinpath(pwd(), "test", "test_data", "case14_parsing.raw"))
+sys = System(joinpath(pwd(), "test", "test_data", "case14_reductions.raw"))
 
 # Full Matrix 
 ybus = Ybus(sys)
@@ -25,8 +25,8 @@ A_radial_degree_two = IncidenceMatrix(ybus_radial_degree_two)
 nr_radial_degree_two = ybus_radial_degree_two.network_reduction;
 
 @test length(nr_radial_degree_two.series_branch_map) == 1 #One set of series lines 
-@test length(nr_radial_degree_two.reverse_bus_search_map) == 3 #Two breaker/switches and a radial line 
-@test length(nr_radial_degree_two.removed_arcs) == 5    #Two degree two connected arcs and the radial arc and the breaker/switches
+@test length(nr_radial_degree_two.reverse_bus_search_map) == 4 #Two breaker/switches and a two radial arcs 
+@test length(nr_radial_degree_two.removed_arcs) == 6    #Two degree two connected arcs and the radial arc and the breaker/switches
 @test length(nr_radial_degree_two.removed_buses) == 1   #The degree two bus 
 @test length(nr_radial_degree_two.parallel_branch_map) == 1   #We have a parallel branch in original system
 
