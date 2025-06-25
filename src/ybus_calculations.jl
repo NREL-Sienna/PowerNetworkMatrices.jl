@@ -49,31 +49,32 @@ function add_to_branch_maps!(
     tertiary_star_arc::PSY.Arc,
     br::PSY.Transformer3W,
 )
-    primary_star_arc_tuple = (
-        PSY.get_number(PSY.get_from(primary_star_arc)),
-        PSY.get_number(PSY.get_to(primary_star_arc)),
-    )
-    secondary_star_arc_tuple = (
-        PSY.get_number(PSY.get_from(secondary_star_arc)),
-        PSY.get_number(PSY.get_to(secondary_star_arc)),
-    )
-    tertiary_star_arc_tuple = (
-        PSY.get_number(PSY.get_from(tertiary_star_arc)),
-        PSY.get_number(PSY.get_to(tertiary_star_arc)),
-    )
-
     transformer3W_map = get_transformer3W_map(nr)
     reverse_transformer3W_map = get_reverse_transformer3W_map(nr)
-
-    transformer3W_map[primary_star_arc_tuple] = (br, 1)
-    reverse_transformer3W_map[(br, 1)] = primary_star_arc_tuple
-
-    transformer3W_map[secondary_star_arc_tuple] = (br, 2)
-    reverse_transformer3W_map[(br, 2)] = secondary_star_arc_tuple
-
-    transformer3W_map[tertiary_star_arc_tuple] = (br, 3)
-    reverse_transformer3W_map[(br, 3)] = tertiary_star_arc_tuple
-
+    if PSY.get_available_primary(br)
+        primary_star_arc_tuple = (
+            PSY.get_number(PSY.get_from(primary_star_arc)),
+            PSY.get_number(PSY.get_to(primary_star_arc)),
+        )
+        transformer3W_map[primary_star_arc_tuple] = (br, 1)
+        reverse_transformer3W_map[(br, 1)] = primary_star_arc_tuple
+    end
+    if PSY.get_available_secondary(br)
+        secondary_star_arc_tuple = (
+            PSY.get_number(PSY.get_from(secondary_star_arc)),
+            PSY.get_number(PSY.get_to(secondary_star_arc)),
+        )
+        transformer3W_map[secondary_star_arc_tuple] = (br, 2)
+        reverse_transformer3W_map[(br, 2)] = secondary_star_arc_tuple
+    end
+    if PSY.get_available_tertiary(br)
+        tertiary_star_arc_tuple = (
+            PSY.get_number(PSY.get_from(tertiary_star_arc)),
+            PSY.get_number(PSY.get_to(tertiary_star_arc)),
+        )
+        transformer3W_map[tertiary_star_arc_tuple] = (br, 3)
+        reverse_transformer3W_map[(br, 3)] = tertiary_star_arc_tuple
+    end
     return
 end
 
@@ -642,9 +643,16 @@ function Ybus(
                     delete!(bus_reduction_map, to_bus_number)
                     reverse_bus_search_map[to_bus_number] = reduced_from_bus_number
                 else
-                    push!(get!(bus_reduction_map, from_bus_number, Set{Int}), to_bus_number)
+                    s1 = get(bus_reduction_map, from_bus_number, Set{Int}())
+                    s2 = union(
+                        get(bus_reduction_map, to_bus_number, Set{Int}(to_bus_number)),
+                        to_bus_number,
+                    )
+                    bus_reduction_map[from_bus_number] = union(s1, s2)
                     delete!(bus_reduction_map, to_bus_number)
-                    reverse_bus_search_map[to_bus_number] = from_bus_number
+                    for x in s2
+                        reverse_bus_search_map[x] = from_bus_number
+                    end
                 end
                 push!(nr.removed_arcs, (from_bus_number, to_bus_number))
             end
