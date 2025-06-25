@@ -49,31 +49,32 @@ function add_to_branch_maps!(
     tertiary_star_arc::PSY.Arc,
     br::PSY.Transformer3W,
 )
-    primary_star_arc_tuple = (
-        PSY.get_number(PSY.get_from(primary_star_arc)),
-        PSY.get_number(PSY.get_to(primary_star_arc)),
-    )
-    secondary_star_arc_tuple = (
-        PSY.get_number(PSY.get_from(secondary_star_arc)),
-        PSY.get_number(PSY.get_to(secondary_star_arc)),
-    )
-    tertiary_star_arc_tuple = (
-        PSY.get_number(PSY.get_from(tertiary_star_arc)),
-        PSY.get_number(PSY.get_to(tertiary_star_arc)),
-    )
-
     transformer3W_map = get_transformer3W_map(nr)
     reverse_transformer3W_map = get_reverse_transformer3W_map(nr)
-
-    transformer3W_map[primary_star_arc_tuple] = (br, 1)
-    reverse_transformer3W_map[(br, 1)] = primary_star_arc_tuple
-
-    transformer3W_map[secondary_star_arc_tuple] = (br, 2)
-    reverse_transformer3W_map[(br, 2)] = secondary_star_arc_tuple
-
-    transformer3W_map[tertiary_star_arc_tuple] = (br, 3)
-    reverse_transformer3W_map[(br, 3)] = tertiary_star_arc_tuple
-
+    if PSY.get_available_primary(br)
+        primary_star_arc_tuple = (
+            PSY.get_number(PSY.get_from(primary_star_arc)),
+            PSY.get_number(PSY.get_to(primary_star_arc)),
+        )
+        transformer3W_map[primary_star_arc_tuple] = (br, 1)
+        reverse_transformer3W_map[(br, 1)] = primary_star_arc_tuple
+    end
+    if PSY.get_available_secondary(br)
+        secondary_star_arc_tuple = (
+            PSY.get_number(PSY.get_from(secondary_star_arc)),
+            PSY.get_number(PSY.get_to(secondary_star_arc)),
+        )
+        transformer3W_map[secondary_star_arc_tuple] = (br, 2)
+        reverse_transformer3W_map[(br, 2)] = secondary_star_arc_tuple
+    end
+    if PSY.get_available_tertiary(br)
+        tertiary_star_arc_tuple = (
+            PSY.get_number(PSY.get_from(tertiary_star_arc)),
+            PSY.get_number(PSY.get_to(tertiary_star_arc)),
+        )
+        transformer3W_map[tertiary_star_arc_tuple] = (br, 3)
+        reverse_transformer3W_map[(br, 3)] = tertiary_star_arc_tuple
+    end
     return
 end
 
