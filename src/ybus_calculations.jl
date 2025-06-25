@@ -639,9 +639,16 @@ function Ybus(
                     delete!(bus_reduction_map, to_bus_number)
                     reverse_bus_search_map[to_bus_number] = reduced_from_bus_number
                 else
-                    push!(get!(bus_reduction_map, from_bus_number, Set{Int}), to_bus_number)
+                    s1 = get(bus_reduction_map, from_bus_number, Set{Int}())
+                    s2 = union(
+                        get(bus_reduction_map, to_bus_number, Set{Int}(to_bus_number)),
+                        to_bus_number,
+                    )
+                    bus_reduction_map[from_bus_number] = union(s1, s2)
                     delete!(bus_reduction_map, to_bus_number)
-                    reverse_bus_search_map[to_bus_number] = from_bus_number
+                    for x in s2
+                        reverse_bus_search_map[x] = from_bus_number
+                    end
                 end
             end
         end
