@@ -120,6 +120,43 @@ function _ybus!(
     y12::Vector{ComplexF64},
     y21::Vector{ComplexF64},
     y22::Vector{ComplexF64},
+    br::PSY.DiscreteControlledACBranch,
+    num_bus::Dict{Int, Int},
+    branch_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
+    nr::NetworkReduction,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
+)
+    arc = PSY.get_arc(br)
+    add_to_branch_maps!(nr, arc, br)
+    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
+    Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
+    Y11 = Y_l
+    if !isfinite(Y11) || !isfinite(Y_l)
+        error(
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+        )
+    end
+    y11[branch_ix] = Y11
+    Y12 = -Y_l
+    y12[branch_ix] = Y12
+    Y21 = Y12
+    y21[branch_ix] = Y21
+    Y22 = Y_l
+    y22[branch_ix] = Y22
+    return
+end
+
+function _ybus!(
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
     br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
     reverse_bus_search_map::Dict{Int, Int},
@@ -622,13 +659,14 @@ function Ybus(
     end
 
     #Building map for removed Breaker/Switches
+    breaker_switches = Vector{PSY.DiscreteControlledACBranch}()
     for br in
         PSY.get_components(x -> PSY.get_available(x), PSY.DiscreteControlledACBranch, sys)
         r = PSY.get_r(br)
         x = PSY.get_x(br)
         status = PSY.get_branch_status(br)
-        if r == 0.0 && x < ZERO_IMPEDANCE_LINE_REACTANCE_THRESHOLD
-            if status == PSY.DiscreteControlledBranchStatus.CLOSED
+        if status == PSY.DiscreteControlledBranchStatus.CLOSED
+            if r == 0.0 && x < ZERO_IMPEDANCE_LINE_REACTANCE_THRESHOLD
                 from_bus_number = PSY.get_number(PSY.get_from(PSY.get_arc(br)))
                 to_bus_number = PSY.get_number(PSY.get_to(PSY.get_arc(br)))
                 if haskey(reverse_bus_search_map, from_bus_number)
@@ -651,6 +689,8 @@ function Ybus(
                         reverse_bus_search_map[x] = from_bus_number
                     end
                 end
+            else
+                push!(breaker_switches, br)
             end
         end
     end
@@ -673,6 +713,7 @@ function Ybus(
             sys,
         ),
     )
+    branches = vcat(branches, breaker_switches)
     transformer_3W =
         collect(PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys))
     fixed_admittances =
