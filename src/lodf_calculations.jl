@@ -144,7 +144,7 @@ function _pardiso_sequential_LODF!(
     ptdf_denominator_t::Matrix{Float64},
     chunk_size::Int = DEFAULT_LODF_CHUNK_SIZE,
 )
-    @info "Line Count too large for single compute using Pardiso. Employing Sequential Calulations using a chunk_size=$(chunk_size)"
+    @info "Line Count too large for single compute using Pardiso. Employing Sequential Calculations using a chunk_size=$(chunk_size)"
     linecount = size(lodf_t, 1)
     @assert LinearAlgebra.ishermitian(A)
     ps = Pardiso.MKLPardisoSolver()
@@ -354,7 +354,7 @@ the PTDF method).
 - `A::IncidenceMatrix`:
         Structure containing the Incidence matrix of the system.
 - `PTDFm::PTDF`:
-        Strucutre containing the transposed PTDF matrix of the system.
+        Structure containing the transposed PTDF matrix of the system.
 - `linear_solver::String`:
         Linear solver to be used. Options are "Dense" and "KLU".
 - `tol::Float64`:

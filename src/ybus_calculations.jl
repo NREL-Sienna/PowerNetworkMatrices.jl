@@ -833,7 +833,7 @@ function goderya_connectivity(M, nodes::Vector{PSY.ACBus}, bus_lookup::Dict{Int6
 end
 
 """
-Finds the set of bus numbers that belong to each connnected component in the System
+Finds the set of bus numbers that belong to each connected component in the System
 """
 # this function extends the PowerModels.jl implementation to accept a System
 function find_connected_components(sys::PSY.System)

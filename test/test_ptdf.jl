@@ -51,7 +51,7 @@
             )
         end
 
-        # check getindex (iterated accoring to rows and columns)
+        # check getindex (iterated according to rows and columns)
         P5NS_mod = zeros(size(S5_slackB4))
         for br in Br5NS_ids, b in Bu5NS_ids
             # get the correct indices
@@ -104,7 +104,7 @@ end
     @test sum(ptdf_complete_klu.data - ptdf_complete_dense.data) < 1e-9
     @test isapprox(ptdf_complete_klu.data, ptdf_complete_dense.data, atol = 1e-6)
 
-    # check submatrices: siunce connected by a single bus, areas must have the same numbers
+    # check submatrices: since connected by a single bus, areas must have the same numbers
     branch_number = length(ptdf_complete_klu.axes[1])
     bus_number = length(ptdf_complete_klu.axes[2])
     ptdf_first_area =
@@ -239,7 +239,7 @@ end
 
     @test_throws ErrorException ptdf_1 = PTDF(sys; dist_slack = slack_array)
 
-    # incorrect dist_slack arrya length
+    # incorrect dist_slack array length
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     buscount = length(PNM.get_buses(sys5)) + 1
     dist_slack = 1 / buscount * ones(buscount)
