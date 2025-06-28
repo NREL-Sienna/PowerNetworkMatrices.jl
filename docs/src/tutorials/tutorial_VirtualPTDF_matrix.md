@@ -1,7 +1,7 @@
 # VirtualPTDF
 
-Contrary to the traditional `PTDF` matrix, the `VirtualPTDF` is a stucture contatining rows of the original matrix, related to specific system branches.
-The different rows of the `PTDF` matrix are cached in the `VirtualPTDF` structure as they are evaluated. This allows to keep just the portion of the original matrix which is of interest to the user, avoiding the unecessary computation of the whole matrix.
+Contrary to the traditional `PTDF` matrix, the `VirtualPTDF` is a structure containing rows of the original matrix, related to specific system branches.
+The different rows of the `PTDF` matrix are cached in the `VirtualPTDF` structure as they are evaluated. This allows to keep just the portion of the original matrix which is of interest to the user, avoiding the unnecessary computation of the whole matrix.
 
 Refer to the different arguments of the `VirtualPTDF` methods by looking at the "Public API Reference" page.
 
@@ -13,7 +13,7 @@ Once the `VirtualPTDF` is initialized, each row of the PTDF matrix can be evalua
 1. Define the `VirtualPTDF` structure
 2. Call any element of the matrix to define and store the relative row as well as showing the selected element
 
-Regarding point 2, if the row has been stored previosly then the desired element is just loaded from the cache and shown.
+Regarding point 2, if the row has been stored previously then the desired element is just loaded from the cache and shown.
 
 The flowchart below shows how the `VirtualPTDF` is structured and how it works. Examples will be presented in the following sections.
 
@@ -57,7 +57,7 @@ el_C31_2_105_bis = v_ptdf[row_number, col_number]
 
 **NOTE**: this example was made for the sake of completeness and considering the actual branch name and bus number is reccomended.
 
-As previosly mentioned, in order to evaluate a single element of the `VirtualPTDF`, the entire row related to the selected branch must be considered. For this reason it is cached in the `VirtualPTDF` structure for later calls.
+As previously mentioned, in order to evaluate a single element of the `VirtualPTDF`, the entire row related to the selected branch must be considered. For this reason it is cached in the `VirtualPTDF` structure for later calls.
 This is evident by looking at the following example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
@@ -74,7 +74,7 @@ v_ptdf_2k = VirtualPTDF(sys_2k);
 
 ## `VirtualPTDF` with distributed slack bus
 
-As for the `PTDF` matrix, here too each row can be evaluated considering distibuted slack buses.
+As for the `PTDF` matrix, here too each row can be evaluated considering distributed slack buses.
 A vector of type `Vector{Float64}` is defined, specifying the weights for each bus of the system. 
 
 ``` @repl tutorial_VirtualPTDF_matrix
@@ -87,7 +87,7 @@ dist_slack = 1 / buscount * ones(buscount);
 dist_slack_array = dist_slack / sum(dist_slack);
 ```
 
-Now initialize the `VirtualPTDF` by defining the `dist_slack` field with the vector of weights previosly computed:
+Now initialize the `VirtualPTDF` by defining the `dist_slack` field with the vector of weights previously computed:
 
 ``` @repl tutorial_VirtualPTDF_matrix
 v_ptdf_distr = VirtualPTDF(sys_2, dist_slack=dist_slack_array);
