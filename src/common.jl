@@ -631,37 +631,23 @@ function assign_reference_buses!(
     return assign_reference_buses!(subnetworks, ref_buses)
 end
 
-"""
-Finds the subnetworks present in the considered System. This is evaluated by taking
-a the ABA or Adjacency Matrix.
+"""Find part of the union-find disjoint set data structure. Vector because nodes are 1:n."""
+function get_rep(uf::Vector{Int}, x::Int)
+    while uf[x] != x
+        uf[x] = uf[uf[x]] # path compression
+        x = uf[x]
+    end
+    return x
+end
 
-# Arguments
-- `M::SparseArrays.SparseMatrixCSC`:
-        input sparse matrix.
-- `bus_numbers::Vector{Int}`:
-        vector containing the indices of the system's buses.
-"""
-function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
-    rows = SparseArrays.rowvals(M)
-    uf = UnionFind(bus_numbers)
-    for (ix, bus_number) in enumerate(bus_numbers)
-        neighbors = SparseArrays.nzrange(M, ix)
-        if length(neighbors) <= 1
-            @warn "Bus $bus_number is islanded"
-            continue
-        end
-        for j in SparseArrays.nzrange(M, ix)
-            row_ix = rows[j]
-            union_sets!(uf, bus_number, bus_numbers[row_ix])
-        end
+"""Union part of the union-find disjoint set data structure. Vector because nodes are 1:n."""
+function union_sets!(uf::Vector{Int}, x::Int, y::Int)
+    x == y && return
+    rootX = get_rep(uf, x)
+    rootY = get_rep(uf, y)
+    if rootX != rootY
+        uf[rootY] = rootX
     end
-    subnetworks = Dict{Int, Set{Int}}()
-    for bus_number in bus_numbers
-        root = get_rep(uf, bus_number)
-        get!(subnetworks, root, Set{Int}())
-        push!(subnetworks[root], bus_number)
-    end
-    return subnetworks
 end
 
 """
@@ -674,6 +660,38 @@ a the ABA or Adjacency Matrix.
 - `bus_numbers::Vector{Int}`:
         vector containing the indices of the system's buses.
 """
+function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
+    rows = SparseArrays.rowvals(M)
+    # find connected components working with indices, so can use a vector instead of a set.
+    uf = collect(1:size(bus_numbers, 1))
+    for ix in 1:size(bus_numbers, 1)
+        neighbors = SparseArrays.nzrange(M, ix)
+        if length(neighbors) <= 1
+            @warn "Bus $bus_number is islanded"
+            continue
+        end
+        for j in SparseArrays.nzrange(M, ix)
+            row_ix = rows[j]
+            union_sets!(uf, ix, row_ix)
+        end
+    end
+    for i in 1:length(uf)
+        uf[i] = get_rep(uf, i)
+    end
+    # now we have the representatives, so assemble the subnetworks.
+    subnetworks = Dict{Int, Set{Int}}()
+    # num_subnetworks = length(unique(uf))
+    # avg_size = div(length(bus_numbers), num_subnetworks)
+    for (rep, bus_num) in zip(uf, bus_numbers)
+        if !(bus_numbers[rep] in keys(subnetworks))
+            subnetworks[bus_numbers[rep]] = Set{Int}()
+            # sizehint!(subnetworks[rep], avg_size)
+        end
+        push!(subnetworks[bus_numbers[rep]], bus_num)
+    end
+    return subnetworks
+end
+
 function find_subnetworks_old(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
     rows = SparseArrays.rowvals(M)
     touched = Set{Int}()
