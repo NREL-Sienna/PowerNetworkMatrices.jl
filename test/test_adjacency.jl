@@ -18,9 +18,9 @@ end
     n = 11
     buses = 100 .+ collect(1:n)
     edge_inds = [(1, 2), (2, 3), (3, 1), # cycle
-                (4, 5), (6, 7), (8, 4), (8, 6), # two short chains that merge.
-                # 9 is isolated.
-                (10, 11)]
+        (4, 5), (6, 7), (8, 4), (8, 6), # two short chains that merge.
+        # 9 is isolated.
+        (10, 11)]
     edges = [(buses[i], buses[j]) for (i, j) in edge_inds]
     A = SparseArrays.sparse(I(n))
     for (i, j) in edge_inds
@@ -28,7 +28,8 @@ end
         A[j, i] = 1
     end
     test_subnetworks = PNM.find_subnetworks(A, buses)
-    expected = [Set(100 .+ (1:3)), Set(100 .+ (4:8)), Set(100 .+ (9:9)), Set(100 .+ (10:11))]
+    expected =
+        [Set(100 .+ (1:3)), Set(100 .+ (4:8)), Set(100 .+ (9:9)), Set(100 .+ (10:11))]
     @test length(values(test_subnetworks)) == length(expected)
     for (k, v) in test_subnetworks
         @test k in v
