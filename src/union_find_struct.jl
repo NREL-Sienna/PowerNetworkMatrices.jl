@@ -12,7 +12,7 @@ function get_rep(uf::UnionFind, x::Int)
     return x
 end
 
-function union!(uf::UnionFind, x::Int, y::Int)
+function union_sets!(uf::UnionFind, x::Int, y::Int)
     rootX = get_rep(uf, x)
     rootY = get_rep(uf, y)
     if rootX != rootY
