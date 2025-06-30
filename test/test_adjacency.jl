@@ -14,7 +14,7 @@
     @test all([4, 9] .∈ keys(subnetworks_sys))
 end
 
-@testset "Test find subnetworks" begin
+@testset failfast = true "Test find subnetworks" begin
     n = 11
     buses = 100 .+ collect(1:n)
     edge_inds = [(1, 2), (2, 3), (3, 1), # cycle
