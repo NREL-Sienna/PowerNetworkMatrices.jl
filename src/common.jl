@@ -593,7 +593,7 @@ function assign_reference_buses!(
 end
 
 """Find part of the union-find disjoint set data structure. Vector because nodes are 1:n."""
-function get_rep(uf::Vector{Int}, x::Int)
+function get_representative(uf::Vector{Int}, x::Int)
     while uf[x] != x
         uf[x] = uf[uf[x]] # path compression
         x = uf[x]
@@ -604,8 +604,8 @@ end
 """Union part of the union-find disjoint set data structure. Vector because nodes are 1:n."""
 function union_sets!(uf::Vector{Int}, x::Int, y::Int)
     x == y && return
-    rootX = get_rep(uf, x)
-    rootY = get_rep(uf, y)
+    rootX = get_representative(uf, x)
+    rootY = get_representative(uf, y)
     if rootX != rootY
         uf[rootY] = rootX
     end
@@ -624,75 +624,29 @@ a the ABA or Adjacency Matrix.
 function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
     rows = SparseArrays.rowvals(M)
     # find connected components working with indices, so can use a vector instead of a set.
+    # uf for union-find data structure: initially, each bus as its own set of a single element.
     uf = collect(1:size(bus_numbers, 1))
     for ix in 1:size(bus_numbers, 1)
         neighbors = SparseArrays.nzrange(M, ix)
         if length(neighbors) <= 1
-            @warn "Bus $bus_number is islanded"
+            @warn "Bus $(bus_numbers[ix]) is islanded"
             continue
         end
-        for j in SparseArrays.nzrange(M, ix)
+        for j in neighbors
             row_ix = rows[j]
             union_sets!(uf, ix, row_ix)
         end
     end
     for i in 1:length(uf)
-        uf[i] = get_rep(uf, i)
+        uf[i] = get_representative(uf, i)
     end
     # now we have the representatives, so assemble the subnetworks.
     subnetworks = Dict{Int, Set{Int}}()
-    # num_subnetworks = length(unique(uf))
-    # avg_size = div(length(bus_numbers), num_subnetworks)
-    for (rep, bus_num) in zip(uf, bus_numbers)
-        if !(bus_numbers[rep] in keys(subnetworks))
-            subnetworks[bus_numbers[rep]] = Set{Int}()
-            # sizehint!(subnetworks[rep], avg_size)
-        end
-        push!(subnetworks[bus_numbers[rep]], bus_num)
+    for (representative, bus_num) in zip(uf, bus_numbers)
+        subnetwork = get!(subnetworks, bus_numbers[representative], Set{Int}())
+        push!(subnetwork, bus_num)
     end
     return subnetworks
-end
-
-function find_subnetworks_old(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
-    rows = SparseArrays.rowvals(M)
-    touched = Set{Int}()
-    subnetworks = Dict{Int, Set{Int}}()
-    for (ix, bus_number) in enumerate(bus_numbers)
-        neighbors = SparseArrays.nzrange(M, ix)
-        if length(neighbors) <= 1
-            @warn "Bus $bus_number is islanded"
-            subnetworks[bus_number] = Set{Int}(bus_number)
-            continue
-        end
-        for j in SparseArrays.nzrange(M, ix)
-            row_ix = rows[j]
-            if bus_number ∉ touched
-                push!(touched, bus_number)
-                subnetworks[bus_number] = Set{Int}(bus_number)
-                _dfs(row_ix, M, bus_numbers, subnetworks[bus_number], touched)
-            end
-        end
-    end
-    return subnetworks
-end
-
-function _dfs(
-    index::Int,
-    M::SparseArrays.SparseMatrixCSC,
-    bus_numbers::Vector{Int},
-    bus_group::Set{Int},
-    touched::Set{Int},
-)
-    rows = SparseArrays.rowvals(M)
-    for j in SparseArrays.nzrange(M, index)
-        row_ix = rows[j]
-        if bus_numbers[row_ix] ∉ touched
-            push!(touched, bus_numbers[row_ix])
-            push!(bus_group, bus_numbers[row_ix])
-            _dfs(row_ix, M, bus_numbers, bus_group, touched)
-        end
-    end
-    return
 end
 
 function has_breaker_switch(sys::PSY.System)
