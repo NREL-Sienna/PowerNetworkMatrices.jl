@@ -21,7 +21,6 @@ end
         (4, 5), (6, 7), (8, 4), (8, 6), # two short chains that merge.
         # 9 is isolated.
         (10, 11)]
-    edges = [(buses[i], buses[j]) for (i, j) in edge_inds]
     A = SparseArrays.sparse(I(n))
     for (i, j) in edge_inds
         A[i, j] = 1
