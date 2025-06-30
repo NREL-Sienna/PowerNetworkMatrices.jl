@@ -142,6 +142,7 @@ end
         PSY.ACBus(;
             number = 6,
             name = "isolated_node_1",
+            available = true,
             bustype = PSY.ACBusTypes.ISOLATED,
             angle = 0.0,
             magnitude = 1.1,
@@ -154,6 +155,7 @@ end
         PSY.ACBus(;
             number = 7,
             name = "isolated_node_2",
+            available = true,
             bustype = PSY.ACBusTypes.ISOLATED,
             angle = 0.0,
             magnitude = 1.1,
@@ -173,6 +175,7 @@ end
         PSY.ACBus(;
             number = 6,
             name = "isolated_node_1",
+            available = true,
             bustype = PSY.ACBusTypes.ISOLATED,
             angle = 0.0,
             magnitude = 1.1,
