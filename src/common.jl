@@ -613,7 +613,7 @@ function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{I
         end
         for j in SparseArrays.nzrange(M, ix)
             row_ix = rows[j]
-            union!(uf, bus_number, bus_numbers[row_ix])
+            union_sets!(uf, bus_number, bus_numbers[row_ix])
         end
     end
     subnetworks = Dict{Int, Set{Int}}()
@@ -623,4 +623,60 @@ function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{I
         push!(subnetworks[root], bus_number)
     end
     return subnetworks
+end
+
+"""
+Finds the subnetworks present in the considered System. This is evaluated by taking
+a the ABA or Adjacency Matrix.
+
+# Arguments
+- `M::SparseArrays.SparseMatrixCSC`:
+        input sparse matrix.
+- `bus_numbers::Vector{Int}`:
+        vector containing the indices of the system's buses.
+"""
+function find_subnetworks_old(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
+    rows = SparseArrays.rowvals(M)
+    touched = Set{Int}()
+    subnetworks = Dict{Int, Set{Int}}()
+    for (ix, bus_number) in enumerate(bus_numbers)
+        neighbors = SparseArrays.nzrange(M, ix)
+        if length(neighbors) <= 1
+            @warn "Bus $bus_number is islanded"
+            subnetworks[bus_number] = Set{Int}(bus_number)
+            continue
+        end
+        for j in SparseArrays.nzrange(M, ix)
+            row_ix = rows[j]
+            if bus_number ∉ touched
+                push!(touched, bus_number)
+                subnetworks[bus_number] = Set{Int}(bus_number)
+                _dfs(row_ix, M, bus_numbers, subnetworks[bus_number], touched)
+            end
+        end
+    end
+    return subnetworks
+end
+
+function _dfs(
+    index::Int,
+    M::SparseArrays.SparseMatrixCSC,
+    bus_numbers::Vector{Int},
+    bus_group::Set{Int},
+    touched::Set{Int},
+)
+    rows = SparseArrays.rowvals(M)
+    for j in SparseArrays.nzrange(M, index)
+        row_ix = rows[j]
+        if bus_numbers[row_ix] ∉ touched
+            push!(touched, bus_numbers[row_ix])
+            push!(bus_group, bus_numbers[row_ix])
+            _dfs(row_ix, M, bus_numbers, bus_group, touched)
+        end
+    end
+    return
+end
+
+function has_breaker_switch(sys::PSY.System)
+    length(PSY.get_components(PSY.DiscreteControlledACBranch, sys)) > 0
 end
