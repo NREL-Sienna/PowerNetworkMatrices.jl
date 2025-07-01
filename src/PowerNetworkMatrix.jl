@@ -39,7 +39,7 @@ function make_ax_ref(ax::AbstractVector)
     return ref
 end
 
-# AbstractArray interface: overloadig methods
+# AbstractArray interface: overloading methods
 Base.isempty(A::PowerNetworkMatrix) = isempty(A.data)
 Base.size(A::PowerNetworkMatrix) = size(A.data)
 Base.LinearIndices(A::PowerNetworkMatrix) =
@@ -142,7 +142,7 @@ Structure to store the keys of a power network matrix
 
 # Arguments
 - `I<:Tuple`:
-        turple containing the indices of the matrix
+        tuple containing the indices of the matrix
 """
 struct PowerNetworkMatrixKey{T <: Tuple}
     I::T

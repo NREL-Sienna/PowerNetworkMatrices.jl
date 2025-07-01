@@ -1,7 +1,7 @@
 """
 The Virtual Power Transfer Distribution Factor (VirtualPTDF) structure gathers
 the rows of the PTDF matrix as they are evaluated on-the-go. These rows are
-evalauted independently, cached in the structure and do not require the
+evaluated independently, cached in the structure and do not require the
 computation of the whole matrix (therefore significantly reducing the
 computational requirements).
 
@@ -14,7 +14,7 @@ matrix.
 - `K::KLU.KLUFactorization{Float64, Int}`:
         LU factorization matrices of the ABA matrix, evaluated by means of KLU
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        BA matric
+        BA matrix
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the reference buses
@@ -85,7 +85,7 @@ VirtualPTDF struct with an empty cache.
 - `tol::Float64 = eps()`:
         Tolerance related to sparsification and values to drop.
 - `max_cache_size::Int`:
-        max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
+        max cache size in MiB (initialized as MAX_CACHE_SIZE_MiB).
 - `persistent_lines::Vector{String}`:
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
 - `network_reduction::NetworkReduction`:
@@ -116,10 +116,10 @@ function VirtualPTDF(
     BA = calculate_BA_matrix(branches, bus_ax_ref, network_reduction)
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     ref_bus_positions = find_slack_positions(buses)
-    subnetworks = find_subnetworks(M, bus_ax)
+    subnetworks =
+        assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
-        subnetworks = assign_reference_buses!(subnetworks, ref_bus_positions, bus_ax_ref)
     end
     temp_data = zeros(length(bus_ax))
 
@@ -163,7 +163,7 @@ struct with an empty cache.
 # Keyword Arguments
 - `dist_slack::Vector{Float64}=Float64[]`:
         vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buse
+        The distributed slack vector has to be the same length as the number of buses
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
@@ -240,7 +240,7 @@ function _getindex(
 
         if !isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) != 1
             error(
-                "Distibuted slack is not supported for systems with multiple reference buses.",
+                "Distributed slack is not supported for systems with multiple reference buses.",
             )
         elseif isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) < buscount
             for i in eachindex(valid_ix)
