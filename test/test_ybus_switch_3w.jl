@@ -2,7 +2,7 @@
     # sys = PSB.build_system(PSSEParsingTestSystems, "pti_case6_3w_sys")
     Ybus_pnm = Ybus(sys)
 
-    data = readlines("test/test_data/pti_case6_3w_Ymx.txt")
+    data = readlines(joinpath(TEST_DATA_DIR, "pti_case6_3w_Ymx.txt"))
     from_buses, to_buses, y_values = Int[], Int[], ComplexF64[]
     for line in data
         vals = split(strip(line), r",\s*")
