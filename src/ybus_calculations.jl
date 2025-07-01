@@ -645,9 +645,10 @@ function Ybus(
     sys::PSY.System;
     check_connectivity::Bool = true,
     make_branch_admittance_matrices::Bool = false,
-    nr::NetworkReduction = NetworkReduction(),
+    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
     kwargs...,
 )
+    nr = NetworkReduction()
     bus_reduction_map = get_bus_reduction_map(nr)
     reverse_bus_search_map = get_reverse_bus_search_map(nr)
 
@@ -655,6 +656,8 @@ function Ybus(
     for b in PSY.get_components(x -> PSY.get_available(x), PSY.ACBus, sys)
         if PSY.get_bustype(b) != ACBusTypes.ISOLATED
             bus_reduction_map[PSY.get_number(b)] = Set{Int}()
+        else
+            push!(nr.removed_buses, PSY.get_number(b))
         end
     end
 
@@ -691,6 +694,7 @@ function Ybus(
                 end
             else
                 push!(breaker_switches, br)
+                push!(nr.removed_arcs, (from_bus_number, to_bus_number))
             end
         end
     end
@@ -768,7 +772,11 @@ function Ybus(
         fb = nothing
         tb = nothing
     end
-    return Ybus(ybus, adj, axes, lookup, nr, yft, ytf, fb, tb)
+    ybus = Ybus(ybus, adj, axes, lookup, nr, yft, ytf, fb, tb)
+    for nr in network_reductions
+        ybus = build_reduced_ybus(ybus, sys, nr)
+    end
+    return ybus
 end
 
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
@@ -871,4 +879,86 @@ function dfs_connectivity(M, ::Vector{PSY.ACBus}, bus_lookup::Dict{Int64, Int64}
         connected = true
     end
     return connected
+end
+
+function build_reduced_ybus(ybus::Ybus, sys::PSY.System, reduction::NetworkReductionTypes)
+    A = IncidenceMatrix(ybus)
+    nr = get_reduction(A, sys, Val(reduction))
+    return _apply_reduction(ybus, nr)
+end
+
+function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
+    data = get_data(ybus)
+    adjacency_data = ybus.adjacency_data    #TODO - add getters 
+    axes = ybus.axes                        #TODO add getters 
+    lookup = get_lookup(ybus)
+    bus_lookup = lookup[1]
+    nr = ybus.network_reduction
+    #reduced_ybus = deepcopy(ybus)   #TODO - don't deepcopy. just grab each component and then rebuild at the end... 
+
+    #nr = reduced_ybus.network_reduction
+    bus_numbers_to_remove = Vector{Int}()
+    for (k, v) in nr_new.reverse_bus_search_map
+        nr.reverse_bus_search_map[k] = v
+        push!(bus_numbers_to_remove, k)
+    end
+    for x in nr_new.removed_buses
+        push!(nr.removed_buses, x)
+        push!(bus_numbers_to_remove, x)
+    end
+    for x in nr_new.removed_arcs
+        push!(nr.removed_arcs, x)
+        if haskey(nr.direct_branch_map, x)
+            pop!(nr.direct_branch_map, x)
+        elseif haskey(nr.parallel_branch_map, x)
+            pop!(nr.parallel_branch_map, x)
+        elseif haskey(nr.series_branch_map, x)
+            pop!(nr.series_branch_map, x)
+        elseif haskey(nr.transformer3W_map, x)
+            pop!(nr.transformer3W_map, x)
+        end
+    end
+    # TODO - order matters; can we depend on ordered branches from the degree_two_reduction algorithm or need to compute here from arbitrary set of branches
+    for (k, v) in nr_new.series_branch_map
+        nr.series_branch_map[k] = v
+        total_series_impedance_from_to = 0.0
+        total_series_impedance_to_from = 0.0
+        total_shunt_admittance = 0.0
+        for x in v
+            fr_bus_no = x.arc.from.number
+            to_bus_no = x.arc.to.number
+            total_series_impedance_from_to +=
+                1 / data[bus_lookup[fr_bus_no], bus_lookup[to_bus_no]]
+            total_series_impedance_to_from +=
+                1 / data[bus_lookup[to_bus_no], bus_lookup[fr_bus_no]]
+            if fr_bus_no ∉ k
+                total_shunt_admittance += data[bus_lookup[fr_bus_no], bus_lookup[fr_bus_no]]
+            end
+            if to_bus_no ∉ k
+                total_shunt_admittance += data[bus_lookup[to_bus_no], bus_lookup[to_bus_no]]
+            end
+        end
+        data[bus_lookup[k[1]], bus_lookup[k[2]]] += 1 / total_series_impedance_from_to
+        data[bus_lookup[k[2]], bus_lookup[k[1]]] += 1 / total_series_impedance_to_from
+        data[bus_lookup[k[1]], bus_lookup[k[1]]] += total_shunt_admittance / 2
+        data[bus_lookup[k[2]], bus_lookup[k[2]]] += total_shunt_admittance / 2
+    end
+
+    bus_ax = setdiff(ybus.axes[1], bus_numbers_to_remove)
+    bus_lookup = make_ax_ref(bus_ax)
+    bus_ix = [ybus.lookup[1][x] for x in bus_ax]
+    adjacency_data = adjacency_data[bus_ix, bus_ix]
+    data = data[bus_ix, bus_ix]
+    #TODO - doesn't yet account for reduction in yft, ytf, fb, tb
+    return Ybus(
+        data,
+        adjacency_data,
+        (bus_ax, bus_ax),
+        (bus_lookup, bus_lookup),
+        nr,
+        ybus.yft,
+        ybus.ytf,
+        ybus.fb,
+        ybus.tb,
+    )
 end
