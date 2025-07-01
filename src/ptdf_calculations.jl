@@ -11,7 +11,7 @@ The PTDF struct is indexed using the Bus numbers and Branch names.
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors: the first one showing the bus numbers,
         the second showing the branch names. The information contained in this
-        field matches the axes of the fiels `data`.
+        field matches the axes of the fields `data`.
 - `lookup<:NTuple{2, Dict}`:
         Tuple containing two dictionaries mapping the bus numbers and branch
         names with the indices of the matrix contained in `data`.
@@ -109,7 +109,7 @@ function _buildptdf_from_matrices(
 end
 
 """
-Funciton for internal use only.
+Function for internal use only.
 
 Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
 
@@ -133,13 +133,13 @@ function _calculate_PTDF_matrix_KLU(
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     K = klu(ABA)
-    # inizialize matrices for evaluation
+    # initialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
     copyto!(PTDFm_t, BA)
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
-            "Distibuted slack is not supported for systems with multiple reference buses.",
+            "Distributed slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
@@ -198,7 +198,7 @@ function _binfo_check(binfo::Int)
 end
 
 """
-Funciton for internal use only.
+Function for internal use only.
 
 Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
 
@@ -228,7 +228,7 @@ function _calculate_PTDF_matrix_DENSE(
     BA = Matrix(BA[valid_ixs, :])
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
-            "Distibuted slack is not supported for systems with multiple reference buses.",
+            "Distributed slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         getrs!('N', ABA, bipiv, BA)
@@ -275,7 +275,7 @@ function calculate_PTDF_matrix_DENSE(
 end
 
 """
-Funciton for internal use only.
+Function for internal use only.
 
 Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 
@@ -285,7 +285,7 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix
 - `ref_bus_positions::Set{Int}`:
-        vector containing the indexes of the referece slack buses.
+        vector containing the indexes of the reference slack buses.
 - `dist_slack::Vector{Float64}`:
         vector containing the weights for the distributed slacks.
 """
@@ -316,14 +316,14 @@ function _calculate_PTDF_matrix_MKLPardiso(
     Pardiso.set_iparm!(ps, 13, 0)
     Pardiso.set_iparm!(ps, 32, 1)
 
-    # inizialize matrices for evaluation
+    # initialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
 
     full_BA = Matrix(BA[valid_ix, :])
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
-            "Distibuted slack is not supported for systems with multiple reference buses.",
+            "Distributed slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
         Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
@@ -454,7 +454,7 @@ Note that `dist_slack` and `network_reduction` kwargs are explicitly mentioned b
 # Keyword Arguments
 - `dist_slack::Vector{Float64}=Float64[]`:
         vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buse
+        The distributed slack vector has to be the same length as the number of buses
 - `network_reduction::NetworkReduction=NetworkReduction()`:
         Structure containing the details of the network reduction applied when computing the matrix
 """
