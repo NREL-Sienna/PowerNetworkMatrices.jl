@@ -70,7 +70,7 @@ end
 
     # Compare with PSSE
     Ybus_psse, b_ix_psse, row_buses, col_buses, y_values, reduced_bus_pairs_psse =
-        parse_psse_ybus("test/test_data/14bus_Ymx.txt")         #TODO - required manual remapping of star buses
+        parse_psse_ybus(joinpath(TEST_DATA_DIR, "14bus_Ymx.txt"))         #TODO - required manual remapping of star buses
     # Compare breaker/switch reductions
     for x in reduced_bus_pairs_psse
         _test_psse_reduction_row(x, nr.reverse_bus_search_map)
@@ -91,7 +91,7 @@ end
 
 @testset "WECC 240 bus" begin
     sys_240 = System(
-        joinpath(pwd(), "test", "test_data", "240busWECC_2018_PSS33.raw");
+        joinpath(TEST_DATA_DIR, "240busWECC_2018_PSS33.raw");
         runchecks = false,
     )
     Ybus_pnm = Ybus(sys_240)
@@ -105,7 +105,7 @@ end
 
     # Compare with PSSE
     Ybus_psse, b_ix_psse, row_buses, col_buses, y_values, reduced_bus_pairs_psse =
-        parse_psse_ybus("test/test_data/240busWECC_2018_PSS33_Ymatrix.txt")
+        parse_psse_ybus(joinpath(TEST_DATA_DIR, "240busWECC_2018_PSS33_Ymatrix.txt"))
 
     # Compare breaker/switch reductions
     for x in reduced_bus_pairs_psse

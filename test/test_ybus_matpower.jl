@@ -1,5 +1,3 @@
-using DelimitedFiles
-
 @testset "Ybus - ACTIVSg10k" begin
     sys =
         @test_logs (:error, r"no active generators found at bus") match_mode = :any build_system(
@@ -7,11 +5,11 @@ using DelimitedFiles
             "matpower_ACTIVSg10k_sys",
         )
     matpower_cols =
-        readdlm(joinpath(pwd(), "test", "test_data", "ybus_10k_cols.csv"), Int64)
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_cols.csv"), Int64)
     matpower_rows =
-        readdlm(joinpath(pwd(), "test", "test_data", "ybus_10k_rows.csv"), Int64)
-    matpower_vals_re = readdlm(joinpath(pwd(), "test", "test_data", "ybus_10k_vals_re.csv"))
-    matpower_vals_im = readdlm(joinpath(pwd(), "test", "test_data", "ybus_10k_vals_im.csv"))
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_rows.csv"), Int64)
+    matpower_vals_re = readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_vals_re.csv"))
+    matpower_vals_im = readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_vals_im.csv"))
     ybus_pnm = Ybus(sys)
     @test nnz(ybus_pnm.data) ==
           length(filter(!iszero, matpower_vals_re .+ im .* matpower_vals_im))
@@ -22,15 +20,15 @@ using DelimitedFiles
 end
 
 @testset "Ybus - CATS" begin
-    sys = System(joinpath(pwd(), "test", "test_data", "CaliforniaTestSystem.m"))
+    sys = System(joinpath(TEST_DATA_DIR, "CaliforniaTestSystem.m"))
     matpower_cols =
-        readdlm(joinpath(pwd(), "test", "test_data", "ybus_cats_cols.csv"), Int64)
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_cols.csv"), Int64)
     matpower_rows =
-        readdlm(joinpath(pwd(), "test", "test_data", "ybus_cats_rows.csv"), Int64)
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_rows.csv"), Int64)
     matpower_vals_re =
-        readdlm(joinpath(pwd(), "test", "test_data", "ybus_cats_vals_re.csv"))
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_vals_re.csv"))
     matpower_vals_im =
-        readdlm(joinpath(pwd(), "test", "test_data", "ybus_cats_vals_im.csv"))
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_vals_im.csv"))
     ybus_pnm = Ybus(sys)
     @test nnz(ybus_pnm.data) ==
           length(filter(!iszero, matpower_vals_re .+ im .* matpower_vals_im))
@@ -41,22 +39,23 @@ end
 end
 
 @testset "Ybus - 5bus - transformers" begin
+    # this build system is erroring for me.
     sys = build_system(MatpowerTestSystems, "matpower_case5_transformer")
     transformer_connected_buses = [1, 2, 3, 4, 5]
     matpower_cols =
         readdlm(
-            joinpath(pwd(), "test", "test_data", "ybus_case5_transformers_cols.csv"),
+            joinpath(TEST_DATA_DIR, "ybus_case5_transformers_cols.csv"),
             Int64,
         )
     matpower_rows =
         readdlm(
-            joinpath(pwd(), "test", "test_data", "ybus_case5_transformers_rows.csv"),
+            joinpath(TEST_DATA_DIR, "ybus_case5_transformers_rows.csv"),
             Int64,
         )
     matpower_vals_re =
-        readdlm(joinpath(pwd(), "test", "test_data", "ybus_case5_transformers_vals_re.csv"))
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_case5_transformers_vals_re.csv"))
     matpower_vals_im =
-        readdlm(joinpath(pwd(), "test", "test_data", "ybus_case5_transformers_vals_im.csv"))
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_case5_transformers_vals_im.csv"))
     ybus_pnm = Ybus(sys)
     @test nnz(ybus_pnm.data) ==
           length(filter(!iszero, matpower_vals_re .+ im .* matpower_vals_im))
