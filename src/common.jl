@@ -34,9 +34,8 @@ end
 function get_bus_indices(
     arc::PSY.Arc,
     bus_lookup::Dict{Int, Int},
-    nr::NetworkReduction,
+    reverse_bus_search_map::Dict{Int, Int},
 )
-    reverse_bus_search_map = get_reverse_bus_search_map(nr)
     fr_bus_number = PSY.get_number(PSY.get_from(arc))
     if haskey(reverse_bus_search_map, fr_bus_number)
         fr_bus_number_reduced = reverse_bus_search_map[fr_bus_number]
