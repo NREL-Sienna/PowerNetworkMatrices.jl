@@ -629,7 +629,7 @@ function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{I
     for ix in 1:size(bus_numbers, 1)
         neighbors = SparseArrays.nzrange(M, ix)
         if length(neighbors) <= 1
-            @warn "Bus $(bus_numbers[ix]) is islanded"
+            @warn "Bus $(bus_numbers[ix]) is not connected to the network"
             continue
         end
         for j in neighbors
