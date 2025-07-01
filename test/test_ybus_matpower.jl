@@ -1,7 +1,11 @@
 using DelimitedFiles
 
 @testset "Ybus - ACTIVSg10k" begin
-    sys = build_system(MatpowerTestSystems, "matpower_ACTIVSg10k_sys")
+    sys =
+        @test_logs (:error, r"no active generators found at bus") match_mode = :any build_system(
+            MatpowerTestSystems,
+            "matpower_ACTIVSg10k_sys",
+        )
     matpower_cols =
         readdlm(joinpath(pwd(), "test", "test_data", "ybus_10k_cols.csv"), Int64)
     matpower_rows =
