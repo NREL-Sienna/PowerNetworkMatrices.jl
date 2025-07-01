@@ -1,3 +1,11 @@
+function get_reduction(
+    A::IncidenceMatrix,
+    sys::PSY.System,
+    ::Val{NetworkReductionTypes.RADIAL},
+)
+    return get_radial_reduction(A)
+end
+
 """
 Builds a NetworkReduction by removing radially connected buses. 
 
@@ -28,28 +36,22 @@ Builds a NetworkReduction by removing radially connected buses.
 """
 function get_radial_reduction(
     A::IncidenceMatrix;
-    prior_reduction::NetworkReduction = NetworkReduction(),
     exempt_buses::Vector{Int64} = Int64[],
 )
     exempt_bus_positions = [A.lookup[2][x] for x in exempt_buses]
-    new_reduction = calculate_radial_branches(
+    return calculate_radial_arcs(
         A.data,
         A.lookup[1],
         A.lookup[2],
         union(A.ref_bus_positions, Set(exempt_bus_positions)),
     )
-    if isempty(prior_reduction)
-        return new_reduction
-    else
-        return compose_reductions(prior_reduction, new_reduction, length(A.lookup[2]))
-    end
 end
 
 function _find_upstream_bus(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
     j::Int,
-    reverse_line_map::Dict{Int64, String},
-    radial_branches::Set{String},
+    reverse_arc_map::Dict{Int64, Tuple{Int, Int}},
+    radial_arcs::Set{Tuple{Int, Int}},
     reduced_buses::Set{Int},
     reverse_bus_map::Dict{Int, Int},
 )
@@ -59,7 +61,7 @@ function _find_upstream_bus(
         row_ix = A.rowval[A.colptr[j] + 1]
         parent = setdiff!(A[row_ix, :].nzind, j)[1]
     end
-    push!(radial_branches, reverse_line_map[row_ix])
+    push!(radial_arcs, reverse_arc_map[row_ix])
     return parent
 end
 
@@ -67,8 +69,8 @@ function _new_parent(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
     parent::Int,
     bus_reduction_map_index::Dict{Int, Set{Int}},
-    reverse_line_map::Dict{Int64, String},
-    radial_branches::Set{String},
+    reverse_arc_map::Dict{Int64, Tuple{Int, Int}},
+    radial_arcs::Set{Tuple{Int, Int}},
     reverse_bus_map::Dict{Int, Int},
 )
     if length(SparseArrays.nzrange(A, parent)) == 2
@@ -76,8 +78,8 @@ function _new_parent(
         new_parent_val = _find_upstream_bus(
             A,
             parent,
-            reverse_line_map,
-            radial_branches,
+            reverse_arc_map,
+            radial_arcs,
             bus_reduction_map_index[parent_bus_number],
             reverse_bus_map,
         )
@@ -95,8 +97,8 @@ function _new_parent(
             A,
             new_parent_val,
             bus_reduction_map_index,
-            reverse_line_map,
-            radial_branches,
+            reverse_arc_map,
+            radial_arcs,
             reverse_bus_map,
         )
     end
@@ -107,8 +109,8 @@ function _reverse_search(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
     j::Int,
     bus_reduction_map_index::Dict{Int, Set{Int}},
-    reverse_line_map::Dict{Int64, String},
-    radial_branches::Set{String},
+    reverse_arc_map::Dict{Int64, Tuple{Int, Int}},
+    radial_arcs::Set{Tuple{Int, Int}},
     reverse_bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},
 )
@@ -121,8 +123,8 @@ function _reverse_search(
     parent = _find_upstream_bus(
         A,
         j,
-        reverse_line_map,
-        radial_branches,
+        reverse_arc_map,
+        radial_arcs,
         reduction_set,
         reverse_bus_map,
     )
@@ -135,8 +137,8 @@ function _reverse_search(
         A,
         parent,
         bus_reduction_map_index,
-        reverse_line_map,
-        radial_branches,
+        reverse_arc_map,
+        radial_arcs,
         reverse_bus_map,
     )
     return
@@ -165,16 +167,16 @@ ignored in the models by exploring the structure of the incidence matrix
         Set containing the indexes of the columns of the BA matrix corresponding
         to the reference buses
 """
-function calculate_radial_branches(
+function calculate_radial_arcs(
     A::SparseArrays.SparseMatrixCSC{Int8, Int64},
-    line_map::Dict{String, Int},
+    arc_map::Dict{Tuple{Int, Int}, Int},
     bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},
 )
     lk = ReentrantLock()
     buscount = length(bus_map)
-    radial_branches = Set{String}()
-    reverse_line_map = Dict(reverse(kv) for kv in line_map)
+    radial_arcs = Set{Tuple{Int, Int}}()
+    reverse_arc_map = Dict(reverse(kv) for kv in arc_map)
     reverse_bus_map = Dict(reverse(kv) for kv in bus_map)
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in keys(bus_map))
     Threads.@threads for j in 1:buscount
@@ -184,8 +186,8 @@ function calculate_radial_branches(
                     A,
                     j,
                     bus_reduction_map_index,
-                    reverse_line_map,
-                    radial_branches,
+                    reverse_arc_map,
+                    radial_arcs,
                     reverse_bus_map,
                     ref_bus_positions,
                 )
@@ -193,20 +195,27 @@ function calculate_radial_branches(
         end
     end
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map_index, buscount)
-    meshed_branches = Set{String}()
-    for k in keys(line_map)
-        if k in radial_branches
+    meshed_arcs = Set{Tuple{Int, Int}}()
+    for k in keys(arc_map)
+        if k in radial_arcs
             continue
         end
-        push!(meshed_branches, k)
+        push!(meshed_arcs, k)
     end
+
     return NetworkReduction(
         bus_reduction_map_index,
         reverse_bus_search_map,
-        radial_branches,
-        meshed_branches,
-        Vector{PSY.ACBranch}(),
-        Vector{PSY.FixedAdmittance}(),
+        Dict{Tuple{Int, Int}, PSY.Branch}(),
+        Dict{PSY.Branch, Tuple{Int, Int}}(), 
+        Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
+        Dict{PSY.Branch, Tuple{Int, Int}}(),
+        Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
+        Dict{PSY.Branch, Tuple{Int, Int}}(),
+        Dict{Tuple{Int, Int}, Tuple{PSY.Transformer3W, Int}}(),
+        Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}}(),
+        Set{Int}(),
+        radial_arcs,
         [NetworkReductionTypes.RADIAL],
     )
 end
