@@ -692,9 +692,9 @@ function Ybus(
                         reverse_bus_search_map[x] = from_bus_number
                     end
                 end
+                push!(nr.removed_arcs, (from_bus_number, to_bus_number))
             else
                 push!(breaker_switches, br)
-                push!(nr.removed_arcs, (from_bus_number, to_bus_number))
             end
         end
     end
