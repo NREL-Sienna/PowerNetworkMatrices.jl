@@ -1,7 +1,6 @@
 module PowerNetworkMatrices
 
 export ABA_Matrix
-export AdjacencyMatrix
 export BA_Matrix
 export factorize
 export find_subnetworks
@@ -70,7 +69,6 @@ include("definitions.jl")
 include("network_reduction.jl")
 include("ybus_calculations.jl")
 include("incedence_matrix.jl")
-include("adjacency_matrix.jl")
 include("breaker_switch_reduction.jl")
 include("radial_reduction.jl")
 include("degree_two_reduction.jl")
