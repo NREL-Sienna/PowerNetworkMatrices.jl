@@ -11,6 +11,7 @@ export get_bus_reduction_map
 export get_radial_reduction
 export get_ward_reduction
 export get_reduction_type
+export get_network_reduction
 export IncidenceMatrix
 export is_factorized
 export LODF
