@@ -14,22 +14,12 @@ function _add_to_collection!(
     return
 end
 
-function get_bus_indices(br::PSY.ACTransmission,
-    bus_lookup::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
-)
-    get_bus_indices(PSY.get_arc(br), bus_lookup, reverse_bus_search_map)
-end
-
-# this version is used in ybus_calculations.jl
-get_bus_indices(arc::PSY.Arc, bus_lookup::Dict{Int, Int}, nr::NetworkReduction) =
-    get_bus_indices(arc, bus_lookup, get_reverse_bus_search_map(nr))
-
 function get_bus_indices(
     arc::PSY.Arc,
     bus_lookup::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
+    nr::NetworkReduction,
 )
+    reverse_bus_search_map = get_reverse_bus_search_map(nr)
     fr_bus_number = PSY.get_number(PSY.get_from(arc))
     if haskey(reverse_bus_search_map, fr_bus_number)
         fr_bus_number_reduced = reverse_bus_search_map[fr_bus_number]

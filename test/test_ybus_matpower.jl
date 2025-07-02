@@ -35,7 +35,6 @@ end
 end
 
 @testset "Ybus - 5bus - transformers" begin
-    # this build system is erroring for me.
     sys = build_system(MatpowerTestSystems, "matpower_case5_transformer")
     transformer_connected_buses = [1, 2, 3, 4, 5]
     matpower_cols =
