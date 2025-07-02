@@ -20,6 +20,8 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     tb::Union{Vector{Int64}, Nothing}
 end
 
+get_network_reduction(y::Ybus) = y.network_reduction
+
 function add_to_branch_maps!(nr::NetworkReduction, arc::PSY.Arc, br::PSY.Branch)
     direct_branch_map = get_direct_branch_map(nr)
     reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
@@ -891,6 +893,10 @@ function build_reduced_ybus(ybus::Ybus, sys::PSY.System, reduction::NetworkReduc
 end
 
 function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
+    remake_reverse_direct_branch_map = false
+    remake_reverse_parallel_branch_map = false
+    remake_reverse_series_branch_map = false
+    remake_reverse_transformer3W_map = false
     data = get_data(ybus)
     adjacency_data = ybus.adjacency_data    #TODO - add getters
     axes = ybus.axes                        #TODO add getters
@@ -909,15 +915,26 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
         push!(nr.removed_buses, x)
         push!(bus_numbers_to_remove, x)
     end
+    for (k, v) in nr_new.bus_reduction_map
+        if haskey(nr.bus_reduction_map, k)
+            union!(nr.bus_reduction_map[k], nr_new.bus_reduction_map[k])
+        else
+            error("Bus $k was previously reduced")
+        end
+    end
     for x in nr_new.removed_arcs
         push!(nr.removed_arcs, x)
         if haskey(nr.direct_branch_map, x)
+            remake_reverse_direct_branch_map = true
             pop!(nr.direct_branch_map, x)
         elseif haskey(nr.parallel_branch_map, x)
+            remake_reverse_parallel_branch_map = true
             pop!(nr.parallel_branch_map, x)
         elseif haskey(nr.series_branch_map, x)
+            remake_reverse_series_branch_map = true
             pop!(nr.series_branch_map, x)
         elseif haskey(nr.transformer3W_map, x)
+            remake_reverse_transformer3W_map = true
             pop!(nr.transformer3W_map, x)
         end
     end
@@ -947,6 +964,12 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
         data[bus_lookup[k[2]], bus_lookup[k[2]]] += total_shunt_admittance / 2
     end
 
+    remake_reverse_direct_branch_map && _remake_reverse_direct_branch_map!(nr)
+    remake_reverse_parallel_branch_map && _remake_reverse_parallel_branch_map!(nr)
+    remake_reverse_series_branch_map && _remake_reverse_series_branch_map!(nr)
+    remake_reverse_transformer3W_map && _remake_reverse_transformer3W_map!(nr)
+
+    push!(nr.reduction_type, nr_new.reduction_type[1])
     bus_ax = setdiff(ybus.axes[1], bus_numbers_to_remove)
     bus_lookup = make_ax_ref(bus_ax)
     bus_ix = [ybus.lookup[1][x] for x in bus_ax]
@@ -965,6 +988,39 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
         ybus.fb,
         ybus.tb,
     )
+end
+
+function _remake_reverse_direct_branch_map!(nr::NetworkReduction)
+    reverse_direct_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    for (k, v) in nr.direct_branch_map
+        reverse_direct_branch_map[v] = k
+    end
+    nr.reverse_direct_branch_map = reverse_direct_branch_map
+end
+function _remake_reverse_parallel_branch_map!(nr::NetworkReduction)
+    reverse_parallel_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    for (k, v) in nr.parallel_branch_map
+        for x in v
+            reverse_parallel_branch_map[x] = k
+        end
+    end
+    nr.reverse_parallel_branch_map = reverse_parallel_branch_map
+end
+function _remake_reverse_series_branch_map!(nr::NetworkReduction)
+    reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    for (k, v) in nr.series_branch_map
+        for x in v
+            reverse_series_branch_map[x] = k
+        end
+    end
+    nr.reverse_series_branch_map = reverse_series_branch_map
+end
+function _remake_reverse_transformer3W_map!(nr::NetworkReduction)
+    reverse_transformer3W_map = Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}}()
+    for (k, v) in nr.transformer3W_map
+        reverse_transformer3W_map[v] = k
+    end
+    nr.reverse_transformer3W_map = reverse_transformer3W_map
 end
 
 """
