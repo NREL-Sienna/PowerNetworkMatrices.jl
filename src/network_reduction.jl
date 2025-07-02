@@ -1,4 +1,4 @@
-struct NetworkReduction
+mutable struct NetworkReduction
     bus_reduction_map::Dict{Int, Set{Int}}
     reverse_bus_search_map::Dict{Int, Int}
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch}
