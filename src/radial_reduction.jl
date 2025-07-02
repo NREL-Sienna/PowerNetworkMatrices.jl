@@ -38,12 +38,13 @@ function get_radial_reduction(
     A::IncidenceMatrix;
     exempt_buses::Vector{Int64} = Int64[],
 )
-    exempt_bus_positions = [A.lookup[2][x] for x in exempt_buses]
+    exempt_bus_numbers = union(A.ref_bus_numbers, Set(exempt_buses))
+    exempt_bus_positions = Set([A.lookup[2][x] for x in exempt_bus_numbers])
     return calculate_radial_arcs(
         A.data,
         A.lookup[1],
         A.lookup[2],
-        union(A.ref_bus_positions, Set(exempt_bus_positions)),
+        exempt_bus_positions,
     )
 end
 
@@ -195,13 +196,6 @@ function calculate_radial_arcs(
         end
     end
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map_index, buscount)
-    meshed_arcs = Set{Tuple{Int, Int}}()
-    for k in keys(arc_map)
-        if k in radial_arcs
-            continue
-        end
-        push!(meshed_arcs, k)
-    end
 
     return NetworkReduction(
         bus_reduction_map_index,
