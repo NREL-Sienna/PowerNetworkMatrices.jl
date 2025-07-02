@@ -600,7 +600,7 @@ the reference bus withing each subnetwork.
 """
 function assign_reference_buses!(
     subnetworks::Dict{Int, Set{Int}},
-    ref_buses::Vector{Int},
+    ref_buses::Set{Int},
 )
     if isempty(ref_buses) || length(ref_buses) != length(subnetworks)
         @warn "The reference bus positions are not consistent with the subnetworks. References buses will be assigned arbitrarily"
@@ -670,7 +670,7 @@ function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{I
     for ix in 1:size(bus_numbers, 1)
         neighbors = SparseArrays.nzrange(M, ix)
         if length(neighbors) <= 1
-            @warn "Bus $(bus_numbers[ix]) is not connected to the network"
+            @warn "Bus $(bus_numbers[ix]) is islanded"
             continue
         end
         for j in neighbors

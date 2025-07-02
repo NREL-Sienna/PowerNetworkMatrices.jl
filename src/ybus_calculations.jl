@@ -10,6 +10,7 @@ Using yft, ytf, and the voltage vector, the branch currents and power flows can 
 struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     data::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
     adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int}
+    ref_bus_numbers::Set{Int}
     axes::Ax
     lookup::L
     network_reduction::NetworkReduction
@@ -648,6 +649,7 @@ function Ybus(
     network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
     kwargs...,
 )
+    ref_bus_numbers = Set{Int}()
     nr = NetworkReduction()
     bus_reduction_map = get_bus_reduction_map(nr)
     reverse_bus_search_map = get_reverse_bus_search_map(nr)
@@ -656,6 +658,9 @@ function Ybus(
     for b in PSY.get_components(x -> PSY.get_available(x), PSY.ACBus, sys)
         if PSY.get_bustype(b) != ACBusTypes.ISOLATED
             bus_reduction_map[PSY.get_number(b)] = Set{Int}()
+            if PSY.get_bustype(b) == ACBusTypes.REF
+                push!(ref_bus_numbers, PSY.get_number(b))
+            end
         else
             push!(nr.removed_buses, PSY.get_number(b))
         end
@@ -772,7 +777,7 @@ function Ybus(
         fb = nothing
         tb = nothing
     end
-    ybus = Ybus(ybus, adj, axes, lookup, nr, yft, ytf, fb, tb)
+    ybus = Ybus(ybus, adj, ref_bus_numbers, axes, lookup, nr, yft, ytf, fb, tb)
     for nr in network_reductions
         ybus = build_reduced_ybus(ybus, sys, nr)
     end
@@ -889,14 +894,10 @@ end
 
 function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
     data = get_data(ybus)
-    adjacency_data = ybus.adjacency_data    #TODO - add getters 
-    axes = ybus.axes                        #TODO add getters 
+    adjacency_data = ybus.adjacency_data    #TODO add getters 
     lookup = get_lookup(ybus)
     bus_lookup = lookup[1]
     nr = ybus.network_reduction
-    #reduced_ybus = deepcopy(ybus)   #TODO - don't deepcopy. just grab each component and then rebuild at the end... 
-
-    #nr = reduced_ybus.network_reduction
     bus_numbers_to_remove = Vector{Int}()
     for (k, v) in nr_new.reverse_bus_search_map
         nr.reverse_bus_search_map[k] = v
@@ -953,6 +954,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
     return Ybus(
         data,
         adjacency_data,
+        setdiff(ybus.ref_bus_numbers, bus_numbers_to_remove),
         (bus_ax, bus_ax),
         (bus_lookup, bus_lookup),
         nr,
@@ -961,4 +963,21 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
         ybus.fb,
         ybus.tb,
     )
+end
+
+"""
+Validates connectivity by checking that the number of subnetworks is 1 (fully connected network).
+"""
+function validate_connectivity(M::Ybus)
+    sub_nets = find_subnetworks(M)
+    return length(sub_nets) == 1
+end
+
+"""
+Evaluates subnetworks by looking for the subsets of buses connected each other,
+but not connected with buses of other subsets.
+"""
+function find_subnetworks(M::Ybus)
+    bus_numbers = M.axes[2]
+    return find_subnetworks(M.adjacency_data, bus_numbers)
 end
