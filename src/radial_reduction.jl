@@ -207,7 +207,7 @@ function calculate_radial_arcs(
         bus_reduction_map_index,
         reverse_bus_search_map,
         Dict{Tuple{Int, Int}, PSY.Branch}(),
-        Dict{PSY.Branch, Tuple{Int, Int}}(), 
+        Dict{PSY.Branch, Tuple{Int, Int}}(),
         Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
         Dict{PSY.Branch, Tuple{Int, Int}}(),
         Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
