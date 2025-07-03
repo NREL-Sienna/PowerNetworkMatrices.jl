@@ -6,6 +6,7 @@ using PowerSystems
 using InfrastructureSystems
 using PowerSystemCaseBuilder
 using TimeSeries
+using DelimitedFiles
 
 const IS = InfrastructureSystems
 const PSY = PowerSystems
@@ -13,6 +14,11 @@ const PSB = PowerSystemCaseBuilder
 const PNM = PowerNetworkMatrices
 
 const BASE_DIR = dirname(dirname(Base.find_package("PowerSystems")))
+const TEST_DATA_DIR = joinpath(
+    dirname(dirname(Base.find_package("PowerNetworkMatrices"))),
+    "test",
+    "test_data",
+)
 const DATA_DIR = PSB.DATA_DIR
 
 import Aqua
