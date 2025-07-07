@@ -95,9 +95,9 @@ function _buildptdf_from_matrices(
     elseif linear_solver == "Dense"
         # Convert SparseMatrices to Dense
         PTDFm = _calculate_PTDF_matrix_DENSE(
-            Matrix(A),
-            Matrix(BA),
-            A.ref_bus_positions,
+            A,
+            BA,
+            ref_bus_positions,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
@@ -159,7 +159,7 @@ function _calculate_PTDF_matrix_KLU(
     return
 end
 
-"""
+#= """
 Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
 
 # Arguments
@@ -183,7 +183,7 @@ function calculate_PTDF_matrix_KLU(
     PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
 end
-
+ =#
 function _binfo_check(binfo::Int)
     if binfo != 0
         if binfo < 0
@@ -249,7 +249,7 @@ function _calculate_PTDF_matrix_DENSE(
     return
 end
 
-"""
+#= """
 Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
 
 # Arguments
@@ -272,7 +272,7 @@ function calculate_PTDF_matrix_DENSE(
     BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
     PTDFm = _calculate_PTDF_matrix_DENSE(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
-end
+end =#
 
 """
 Function for internal use only.
@@ -346,7 +346,7 @@ function _calculate_PTDF_matrix_MKLPardiso(
     return
 end
 
-"""
+#= """
 Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 
 # Arguments
@@ -370,8 +370,9 @@ function calculate_PTDF_matrix_MKLPardiso(
     PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     return PTDFm, A
 end
+ =#
 
-"""
+#= """
 Builds the PTDF matrix from a group of branches and buses. The return is a PTDF array indexed with the bus numbers.
 
 # Arguments
@@ -442,8 +443,34 @@ function PTDF(
         network_reduction,
     )
 end
+ =#
+function PTDF(sys::PSY.System;
+    dist_slack::Vector{Float64} = Float64[],
+    linear_solver = "KLU",
+    tol::Float64 = eps(),
+    check_connectivity::Bool = true,
+    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
+    kwargs...,
+)
+    Ymatrix = Ybus(
+        sys;
+        check_connectivity = check_connectivity,
+        network_reductions = network_reductions,
+        kwargs...,
+    )
+    A = IncidenceMatrix(Ymatrix)
+    BA = BA_Matrix(Ymatrix)
+    return PTDF(
+        A,
+        BA;
+        subnetworks = Ymatrix.subnetworks,
+        dist_slack = dist_slack,
+        linear_solver = linear_solver,
+        tol = tol,
+    )
+end
 
-"""
+#= """
 Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
 Note that `dist_slack` and `network_reduction` kwargs are explicitly mentioned because needed inside of the function.
 
@@ -481,7 +508,7 @@ function PTDF(
         kwargs...,
     )
 end
-
+ =#
 """
 Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
 
@@ -503,6 +530,7 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
+    subnetworks::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
     dist_slack::Vector{Float64} = Float64[],
     linear_solver = "KLU",
     tol::Float64 = eps(),
@@ -528,7 +556,7 @@ function PTDF(
             sparsify(S, tol),
             axes,
             lookup,
-            Dict{Int, Set{Int}}(),
+            subnetworks,
             BA.ref_bus_positions,
             Ref(tol),
             BA.network_reduction,
@@ -538,7 +566,7 @@ function PTDF(
             S,
             axes,
             lookup,
-            Dict{Int, Set{Int}}(),
+            subnetworks,
             BA.ref_bus_positions,
             Ref(tol),
             BA.network_reduction,
@@ -550,9 +578,15 @@ end
 ########################### Auxiliary functions ##############################
 ##############################################################################
 
+function Base.getindex(A::PTDF, branch_name::String, bus)
+    multiplier, arc = get_branch_multiplier(A, branch_name)
+    i, j = to_index(A, bus, arc)
+    return A.data[i, j] * multiplier
+end
+
 # PTDF stores the transposed matrix. Overload indexing and how data is exported.
-function Base.getindex(A::PTDF, line, bus)
-    i, j = to_index(A, bus, line)
+function Base.getindex(A::PTDF, arc, bus)
+    i, j = to_index(A, bus, arc)
     return A.data[i, j]
 end
 
