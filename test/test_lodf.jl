@@ -8,15 +8,20 @@
     buses_5 = nodes5()
     branches_5 = branches5(buses_5)
 
-    # get LODF with buses and branches
-    L5 = LODF(branches_5, buses_5)
-    @test isapprox(maximum(L5.data), maximum(Lodf_5), atol = 1e-3)
-    @test isapprox(L5[branches_5[1], branches_5[2]], 0.3447946513849093)
-
     # get LODF with system
+    ix_to_tuple_map =
+        Dict(1 => (1, 2), 2 => (1, 4), 3 => (1, 5), 4 => (2, 3), 5 => (3, 4), 6 => (4, 5))
     L5NS = LODF(sys5)
-    @test getindex(L5NS, "5", "6") - -0.3071 <= 1e-4
-    total_error = abs.(L5NS.data' .- Lodf_5)
+    @test getindex(L5NS, (3, 4), (4, 5)) - -0.3071 <= 1e-4
+    @test isapprox(maximum(L5NS.data), maximum(Lodf_5), atol = 1e-3)
+    @test isapprox(
+        L5NS[PSY.get_name(branches_5[1]), PSY.get_name(branches_5[2])],
+        0.3447946513849093,
+    )
+    total_error = 0.0
+    for ix in 1:6, jx in 1:6
+        total_error += abs(L5NS[ix_to_tuple_map[ix], ix_to_tuple_map[jx]] .- Lodf_5[ix, jx])
+    end
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
 
     # A and PTDF case
@@ -26,8 +31,14 @@
     L5NS_from_ptdf2 = LODF(A, P5; linear_solver = "Dense")
     @test getindex(L5NS_from_ptdf, "5", "6") - -0.3071 <= 1e-4
     @test getindex(L5NS_from_ptdf2, "5", "6") - -0.3071 <= 1e-4
-    total_error = abs.(L5NS_from_ptdf.data' .- Lodf_5)
-    total_error2 = abs.(L5NS_from_ptdf2.data' .- Lodf_5)
+    total_error = 0.0
+    total_error2 = 0.0
+    for ix in 1:6, jx in 1:6
+        total_error +=
+            abs(L5NS_from_ptdf[ix_to_tuple_map[ix], ix_to_tuple_map[jx]] .- Lodf_5[ix, jx])
+        total_error2 +=
+            abs(L5NS_from_ptdf2[ix_to_tuple_map[ix], ix_to_tuple_map[jx]] .- Lodf_5[ix, jx])
+    end
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
     @test isapprox(sum(total_error2), 0.0, atol = 1e-3)
 
@@ -43,14 +54,30 @@
     BA = BA_Matrix(sys5)
     L5NS_from_ba_aba = LODF(A, ABA, BA)
     @test getindex(L5NS_from_ba_aba, "5", "6") - -0.3071 <= 1e-4
-    total_error = abs.(L5NS_from_ba_aba.data' .- Lodf_5)
+    total_error = 0.0
+    for ix in 1:6, jx in 1:6
+        total_error += abs(
+            L5NS_from_ba_aba[ix_to_tuple_map[ix], ix_to_tuple_map[jx]] .- Lodf_5[ix, jx],
+        )
+    end
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
 
     for i in axes(Lodf_5, 1)
-        @test isapprox(L5[i, :], Lodf_5[i, :], atol = 1e-3)
-        @test isapprox(L5NS[i, :], Lodf_5[i, :], atol = 1e-3)
-        @test isapprox(L5NS_from_ptdf[i, :], Lodf_5[i, :], atol = 1e-3)
-        @test isapprox(L5NS_from_ba_aba[i, :], Lodf_5[i, :], atol = 1e-3)
+        @test isapprox(
+            [L5NS[ix_to_tuple_map[i], ix_to_tuple_map[x]] for x in 1:6],
+            Lodf_5[i, :],
+            atol = 1e-3,
+        )
+        @test isapprox(
+            [L5NS_from_ptdf[ix_to_tuple_map[i], ix_to_tuple_map[x]] for x in 1:6],
+            Lodf_5[i, :],
+            atol = 1e-3,
+        )
+        @test isapprox(
+            [L5NS_from_ba_aba[ix_to_tuple_map[i], ix_to_tuple_map[x]] for x in 1:6],
+            Lodf_5[i, :],
+            atol = 1e-3,
+        )
     end
 
     # test if error is thrown in case other linear solvers are called
@@ -68,12 +95,21 @@
     # get 14 bus system
     buses_14 = nodes14()
     branches_14 = branches14(buses_14)
-    L14 = LODF(branches_14, buses_14)
+    sys_14 = System(100.0)
+    for b in buses_14
+        add_component!(sys_14, b)
+    end
+    for br in branches_14
+        add_component!(sys_14, br)
+    end
+    L14 = LODF(sys_14)
     @test isapprox(maximum(L14.data), maximum(Lodf_14), atol = 1e-3)
 end
 
 @testset "Test sparse LODF matrix" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    ix_to_tuple_map =
+        Dict(1 => (1, 2), 2 => (1, 4), 3 => (1, 5), 4 => (2, 3), 5 => (3, 4), 6 => (4, 5))
 
     # basic case: system
     L5NS_1 = LODF(sys5; tol = 0.4)
@@ -92,10 +128,18 @@ end
     ref_sparse_Lodf_5 = deepcopy(Lodf_5')
     ref_sparse_Lodf_5[abs.(ref_sparse_Lodf_5) .< PNM.get_tol(L5NS_1)] .= 0
 
+    L5NS_1_rearranged = zeros(size(L5NS_1.data))
+    L5NS_3_rearranged = zeros(size(L5NS_3.data))
+    L5NS_4_rearranged = zeros(size(L5NS_4.data))
+    for ix in 1:size(L5NS_1_rearranged)[1], jx in 1:size(L5NS_1_rearranged)[2]
+        L5NS_1_rearranged[ix, jx] = L5NS_1[ix_to_tuple_map[jx], ix_to_tuple_map[ix]]
+        L5NS_3_rearranged[ix, jx] = L5NS_3[ix_to_tuple_map[jx], ix_to_tuple_map[ix]]
+        L5NS_4_rearranged[ix, jx] = L5NS_4[ix_to_tuple_map[jx], ix_to_tuple_map[ix]]
+    end
     # tests
-    @test isapprox(Matrix(L5NS_1.data), ref_sparse_Lodf_5, atol = 1e-3)
-    @test isapprox(Matrix(L5NS_1.data), L5NS_3.data, atol = 1e-3)
-    @test isapprox(Matrix(L5NS_1.data), L5NS_4.data, atol = 1e-3)
+    @test isapprox(L5NS_1_rearranged, ref_sparse_Lodf_5, atol = 1e-3)
+    @test isapprox(L5NS_1_rearranged, L5NS_3_rearranged, atol = 1e-3)
+    @test isapprox(L5NS_1_rearranged, L5NS_4_rearranged, atol = 1e-3)
 end
 
 @testset "Test LODF getindex and get_lodf_data" begin

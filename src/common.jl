@@ -361,7 +361,7 @@ function calculate_A_matrix(
     return SparseArrays.sparse(A_I, A_J, A_V), ref_bus_positions
 end
 
-"""
+#= """
 Evaluates the Adjacency matrix given the branches and buses of a given System.
 
 # Arguments
@@ -382,9 +382,9 @@ function calculate_adjacency(
         make_ax_ref(bus_ax),
         network_reduction,
     )
-end
+end =#
 
-function _add_branch_to_adjacency!(
+#= function _add_branch_to_adjacency!(
     b::PSY.ACTransmission,
     bus_lookup::Dict{Int, Int},
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -394,9 +394,9 @@ function _add_branch_to_adjacency!(
     a[fr_b, to_b] = 1
     a[to_b, fr_b] = -1
     return
-end
+end =#
 
-function _add_branch_to_adjacency!(
+#= function _add_branch_to_adjacency!(
     b::PSY.Transformer3W,
     bus_lookup::Dict{Int, Int},
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -407,9 +407,9 @@ function _add_branch_to_adjacency!(
         a[to_b, fr_b] = -1
     end
     return
-end
+end =#
 
-"""
+#= """
 Evaluates the Adjacency matrix given the System's banches, buses and bus_lookup.
 
 NOTE:
@@ -441,7 +441,7 @@ function calculate_adjacency(
 
     # Return both for type stability
     return a, bus_lookup
-end
+end =#
 
 function _add_branch_to_BA_matrix!(
     b::PSY.ACTransmission,
@@ -525,6 +525,9 @@ function calculate_BA_matrix(
     BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
 
     return BA
+end
+
+function calculate_BA_matrix(Ymatrix::Ybus)
 end
 
 """

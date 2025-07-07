@@ -10,6 +10,7 @@ RTS = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys");
 
 # mixed up ids for data_5bus_pu
 Br5NS_ids = [2, 3, 5, 1, 4, 6]
+Arc5NS_ids = [(1, 4), (1, 5), (3, 4), (1, 2), (2, 3), (4, 5)]
 Bu5NS_ids = [1, 3, 4, 5, 2]
 
 #PTDFs obtained from Matpower
