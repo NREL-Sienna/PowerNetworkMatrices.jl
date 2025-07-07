@@ -1,6 +1,10 @@
 # if it fails, we don't want the terminal to be flooded with errors, therefore failfast=true
 @testset failfast = true "Test Virtual PTDF matrices" begin
-    sys = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys")
+    sys =
+        @test_logs (:error, r"no active generators found at bus") match_mode = :any PSB.build_system(
+            PSB.PSYTestSystems,
+            "tamu_ACTIVSg2000_sys",
+        )
     ptdf_complete = PTDF(sys; linear_solver = "KLU")
     ptdf_virtual = VirtualPTDF(sys)
 
@@ -15,15 +19,38 @@
     @test length(ptdf_virtual.cache) == length(ptdf_virtual.axes[1])
 end
 
+#TODO - need to define a mapping from the data 
 @testset "Test Virtual PTDF matrices with tolerance" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    ix_to_arc_map = Dict()
+    ix_to_bus_map = Dict()
+    for (ix, br) in enumerate(get_components(ACBranch, sys))
+        ix_to_arc_map[ix] = (br.arc.from.number, br.arc.to.number)
+    end
+    for (ix, b) in enumerate(get_components(ACBus, sys))
+        ix_to_bus_map[ix] = get_number(b)
+    end
+
     ptdf_reference = deepcopy(S14_slackB1)
-    ptdf_reference[abs.(ptdf_reference) .<= 1e-2] .= 0
-    ptdf_virtual_with_tol = VirtualPTDF(sys; tol = 1e-2)
+    ptdf_virtual_with_tol = VirtualPTDF(sys; tol = 1e-2) #
+    ptdf_with_tol = PTDF(sys; tol = 1e-2)
+    ptdf_with_tol_rearranged = zeros(size(ptdf_reference)[2], size(ptdf_reference)[1])
+    ptdf_virtual_with_tol_rearranged = zeros(size(ptdf_reference))
+    for ix in 1:size(ptdf_reference)[1], jx in 1:size(ptdf_reference)[2]
+        v_value = ptdf_with_tol[ix_to_arc_map[ix], ix_to_bus_map[jx]]
+        @show ix, jx, v_value
+        ptdf_with_tol_rearranged[jx, ix] = v_value
+        #L5NS_3_rearranged[ix,jx]= L5NS_3[ix_to_tuple_map[jx],ix_to_tuple_map[ix] ]
+        #L5NS_4_rearranged[ix,jx]= L5NS_4[ix_to_tuple_map[jx],ix_to_tuple_map[ix] ]
+    end
+    ptdf_with_tol_rearranged
+    ptdf_virtual_with_tol_rearranged
+    #ptdf_reference[abs.(ptdf_reference) .<= 1e-2] .= 0
+    ptdf = PTDF(sys)
     for (n, i) in enumerate(axes(ptdf_virtual_with_tol, 1))
         # get the row
         @test isapprox(
-            ptdf_virtual_with_tol[i, :], ptdf_reference[n, :], atol = 1e-3)
+            ptdf[ix_to_arc_map_2[n], :], ptdf_reference[n, :], atol = 1e-3)
     end
 
     @test isapprox(
@@ -46,29 +73,33 @@ end
         @test isapprox(comp, virtual; atol = 1e-10)
     end
 
-    # check submatrices: since connected by a single bus, areas must have the same numbers
-    branch_number = length(ptdf_complete.axes[2])
-    bus_number = length(ptdf_complete.axes[1])
-    ptdf_first_area = zeros(Int(branch_number / 2), Int(bus_number / 2))
-    ptdf_second_area = zeros(Int(branch_number / 2), Int(bus_number / 2))
-
-    for i in 1:Int(branch_number / 2)
-        aa = ptdf_virtual.cache[i]
-        bb = ptdf_virtual.cache[i + Int(branch_number / 2)]
-        ptdf_first_area[i, :] .= aa[1:Int(bus_number / 2)]
-        ptdf_second_area[i, :] .= bb[(Int(bus_number / 2) + 1):end]
+    # check submatrices: system has identical areas connected by a single hvdc, areas must have the same numbers for corresponding buses and arcs
+    corresponding_buses = [(1, 6), (2, 7), (3, 8), (4, 9), (5, 10)]
+    corresponding_arcs = [
+        ((1, 2), (6, 7)),
+        ((4, 5), (9, 10)),
+        ((1, 5), (6, 10)),
+        ((1, 4), (6, 9)),
+        ((3, 4), (8, 9)),
+        ((2, 3), (7, 8)),
+    ]
+    for bus_pair in corresponding_buses, arc_pair in corresponding_arcs
+        @test isapprox(
+            ptdf_virtual[arc_pair[1], bus_pair[1]],
+            ptdf_virtual[arc_pair[2], bus_pair[2]],
+            atol = 1e-6,
+        )
     end
-    @test isapprox(ptdf_first_area, ptdf_second_area, atol = 1e-6)
 end
 
+#TODO - the ptdf of the RTS is missing an arc? 
 @testset "Test Virtual PTDF cache" begin
     RTS = build_system(PSITestSystems, "test_RTS_GMLC_sys")
-    line_names = get_name.(get_components(Line, RTS))
-    persist_lines = line_names[1:10]
+    arc_tuples = [(arc.from.number, arc.to.number) for arc in get_components(Arc, RTS)]
+    persist_arcs = arc_tuples[1:10]
 
-    vptdf = VirtualPTDF(RTS; max_cache_size = 1, persistent_lines = persist_lines)
-
-    for l in line_names
+    vptdf = VirtualPTDF(RTS; max_cache_size = 1, persistent_arcs = persist_arcs)
+    for l in arc_tuples
         @test size(vptdf[l, :]) == (73,)
     end
 
@@ -143,8 +174,8 @@ end
     @test get_ptdf_data(vptdf) == dict_
 
     # test get axes values
-    @test setdiff(PNM.get_branch_ax(vptdf), PSY.get_name.(PNM.get_ac_branches(sys))) ==
-          String[]
+    arc_tuples = [(arc.from.number, arc.to.number) for arc in get_components(Arc, sys)]
+    @test setdiff(PNM.get_branch_ax(vptdf), arc_tuples) == []
     @test setdiff(PNM.get_bus_ax(vptdf), PSY.get_number.(PNM.get_buses(sys))) == String[]
 
     # test show
