@@ -68,7 +68,7 @@ Gets bus indices to a certain branch name
 - `lookup::Dict`:
         Dictionary mapping branch and buses
 """
-function lookup_index(i::PSY.ACBranch, lookup::Dict)
+function lookup_index(i::PSY.Arc, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
 
@@ -298,7 +298,7 @@ end
 
 Base.to_index(b::PSY.ACBus) = PSY.get_number(b)
 Base.to_index(b::T) where {T <: PSY.ACBranch} = PSY.get_name(b)
-
+Base.to_index(b::PSY.Arc) = (PSY.get_number(PSY.get_from(b)), PSY.get_number(PSY.get_to(b)))
 """returns the raw array data of the `PowerNetworkMatrix`"""
 get_data(mat::PowerNetworkMatrix) = mat.data
 
@@ -309,3 +309,35 @@ get_data(mat::PowerNetworkMatrix) = mat.data
     PTDF the first dimension is branches and the second dimension is buses
 """
 get_lookup(mat::PowerNetworkMatrix) = mat.lookup
+
+function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetworkMatrix}
+    nr = A.network_reduction
+    for (k, v) in nr.reverse_direct_branch_map
+        if branch_name == PSY.get_name(k)
+            return 1.0, v
+        end
+    end
+    for (k, v) in nr.reverse_parallel_branch_map
+        if branch_name == PSY.get_name(k)
+            parallel_branch_set = nr.parallel_branch_map[v]
+            multiplier = _compute_parallel_multiplier(parallel_branch_set, branch_name)
+            @error "multiplier for entry corresponding to parallel branch: $multiplier"
+            return multiplier, v
+        end
+    end
+end
+
+function _compute_parallel_multiplier(
+    parallel_branch_set::Set{PSY.Branch},
+    branch_name::String,
+)
+    b_total = 0.0
+    b_branch = 0.0
+    for br in parallel_branch_set
+        if PSY.get_name(br) == branch_name
+            b_branch += PSY.get_series_susceptance(br)
+        end
+        b_total += PSY.get_series_susceptance(br)
+    end
+    return b_branch / b_total
+end

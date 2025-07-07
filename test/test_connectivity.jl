@@ -15,7 +15,7 @@ end
     @test(
         @test_logs (
             :warn,
-            "Bus 1 is not connected to the network",
+            "Bus 1 is islanded",
         ) match_mode = :any validate_connectivity(sys) == false
     )
 end

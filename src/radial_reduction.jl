@@ -38,13 +38,12 @@ function get_radial_reduction(
     A::IncidenceMatrix;
     exempt_buses::Vector{Int64} = Int64[],
 )
-    exempt_bus_numbers = union(A.ref_bus_numbers, Set(exempt_buses))
-    exempt_bus_positions = Set([A.lookup[2][x] for x in exempt_bus_numbers])
+    exempt_bus_positions = Set([A.lookup[2][x] for x in exempt_buses])
     return calculate_radial_arcs(
         A.data,
         A.lookup[1],
         A.lookup[2],
-        exempt_bus_positions,
+        union(A.ref_bus_positions, exempt_bus_positions),
     )
 end
 
