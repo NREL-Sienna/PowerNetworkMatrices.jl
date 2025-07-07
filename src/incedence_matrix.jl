@@ -19,14 +19,14 @@ struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
-    ref_bus_numbers::Set{Int}
+    ref_bus_positions::Set{Int}
     network_reduction::NetworkReduction
 end
 
 # functions to get stored data
 get_axes(A::IncidenceMatrix) = A.axes
 get_lookup(A::IncidenceMatrix) = A.lookup
-get_slack_positions(A::IncidenceMatrix) = [A.lookup[x] for x in A.ref_bus_numbers]
+get_slack_positions(A::IncidenceMatrix) = A.ref_bus_positions
 
 function IncidenceMatrix(sys::PSY.System;
     check_connectivity::Bool = true,
@@ -67,6 +67,6 @@ function IncidenceMatrix(ybus::Ybus)
     data = SparseArrays.sparse(A_I, A_J, A_V)
     axes = (arc_ax, bus_ax)
     lookup = (make_ax_ref(arc_ax), make_ax_ref(bus_ax))
-    ref_bus_numbers = ybus.ref_bus_numbers
-    return IncidenceMatrix(data, axes, lookup, ref_bus_numbers, ybus.network_reduction)
+    ref_bus_positions = Set([lookup[2][x] for x in ybus.ref_bus_numbers])
+    return IncidenceMatrix(data, axes, lookup, ref_bus_positions, ybus.network_reduction)
 end

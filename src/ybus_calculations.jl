@@ -13,6 +13,7 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
     ref_bus_numbers::Set{Int}
     axes::Ax
     lookup::L
+    subnetworks::Dict{Int, Set{Int}}
     network_reduction::NetworkReduction
     yft::Union{SparseArrays.SparseMatrixCSC{ComplexF64, Int}, Nothing}
     ytf::Union{SparseArrays.SparseMatrixCSC{ComplexF64, Int}, Nothing}
@@ -567,7 +568,7 @@ function _buildybus!(
     )
 end
 
-"""
+#= """
 Builds a Ybus from a collection of buses and branches. The return is a Ybus Array indexed with the bus numbers and the branch names.
 
 # Arguments
@@ -636,7 +637,7 @@ function Ybus(
         tb = nothing
     end
     return Ybus(ybus, adj, axes, look_up, network_reduction, yft, ytf, fb, tb)
-end
+end =#
 
 """
 Builds a Ybus from the system. The return is a Ybus Array indexed with the bus numbers and the branch names.
@@ -751,11 +752,6 @@ function Ybus(
     )
     SparseArrays.dropzeros!(ybus)
 
-    if check_connectivity && length(bus_lookup) > 1
-        islands = find_subnetworks(ybus, bus_ax)
-        length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
-    end
-
     if make_branch_admittance_matrices
         yft = SparseArrays.sparse(
             [1:length(fb); 1:length(fb)],
@@ -777,11 +773,46 @@ function Ybus(
         fb = nothing
         tb = nothing
     end
-    ybus = Ybus(ybus, adj, ref_bus_numbers, axes, lookup, nr, yft, ytf, fb, tb)
+    ybus = Ybus(
+        ybus,
+        adj,
+        ref_bus_numbers,
+        axes,
+        lookup,
+        Dict{Int, Set{Int}}(),
+        nr,
+        yft,
+        ytf,
+        fb,
+        tb,
+    )
     for nr in network_reductions
         ybus = build_reduced_ybus(ybus, sys, nr)
     end
-    return ybus
+    if check_connectivity && length(bus_lookup) > 1
+        subnetworks = assign_reference_buses!(
+            find_subnetworks(ybus.data, ybus.axes[1]),
+            ybus.ref_bus_numbers,
+        )
+        if length(subnetworks) > 1
+            @warn "More than one island found; Network is not connected"
+        end
+        return Ybus(
+            ybus.data,
+            ybus.adjacency_data,
+            ybus.ref_bus_numbers,
+            ybus.axes,
+            ybus.lookup,
+            subnetworks,
+            ybus.network_reduction,
+            ybus.yft,
+            ybus.ytf,
+            ybus.fb,
+            ybus.tb,
+        )
+    else
+        return ybus
+    end
 end
 
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
@@ -982,6 +1013,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
         setdiff(ybus.ref_bus_numbers, bus_numbers_to_remove),
         (bus_ax, bus_ax),
         (bus_lookup, bus_lookup),
+        Dict{Int, Set{Int}}(),
         nr,
         ybus.yft,
         ybus.ytf,

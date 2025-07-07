@@ -68,7 +68,8 @@ end
         for i in keys(rb.bus_reduction_map)
             append!(leaf_buses, collect(rb.bus_reduction_map[i]))
         end
-        @test all(a_mat.ref_bus_numbers .∉ leaf_buses)
+        leaf_positions = [a_mat.lookup[2][x] for x in leaf_buses]
+        @test all(a_mat.ref_bus_positions .∉ leaf_positions)
     end
 end
 
