@@ -128,7 +128,6 @@ end
     end
 end
 
-#TODO - failing-improve error for when key not found in get_bus_indices
 @testset "Test System with isolated buses" begin
     sys_1 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     PSY.add_component!(
