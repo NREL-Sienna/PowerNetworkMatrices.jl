@@ -51,7 +51,7 @@ function add_to_branch_maps!(
     primary_star_arc::PSY.Arc,
     secondary_star_arc::PSY.Arc,
     tertiary_star_arc::PSY.Arc,
-    br::PSY.Transformer3W,
+    br::Union{PSY.Transformer3W, PSY.PhaseShiftingTransformer3W},
 )
     transformer3W_map = get_transformer3W_map(nr)
     reverse_transformer3W_map = get_reverse_transformer3W_map(nr)
@@ -323,6 +323,109 @@ function _ybus!(
     end
     return n_entries
 end
+
+function _ybus!(
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
+    br::PSY.PhaseShiftingTransformer3W,
+    num_bus::Dict{Int, Int},
+    offset_ix::Int64,
+    fb::Vector{Int64},
+    tb::Vector{Int64},
+    ix::Int64,
+    nr::NetworkReduction,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
+)
+    primary_star_arc = PSY.get_primary_star_arc(br)
+    secondary_star_arc = PSY.get_secondary_star_arc(br)
+    tertiary_star_arc = PSY.get_tertiary_star_arc(br)
+    add_to_branch_maps!(nr, primary_star_arc, secondary_star_arc, tertiary_star_arc, br)    #TODO - check this for case of some arcs unavailable
+    primary_available = PSY.get_available_primary(br)
+    secondary_available = PSY.get_available_secondary(br)
+    tertiary_available = PSY.get_available_tertiary(br)
+    n_entries = 0
+    y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
+    if primary_available
+        primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
+        adj[primary_ix, star_ix] = 1
+        adj[star_ix, primary_ix] = -1
+        fb[offset_ix + ix + n_entries] = primary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+        Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
+        tap = (PSY.get_primary_turns_ratio(br) * exp(PSY.get_α_primary(br) * 1im))
+        c_tap = (PSY.get_primary_turns_ratio(br) * exp(-1 * PSY.get_α_primary(br) * 1im))
+        Y11 = (Y_t / abs(tap)^2)
+        if !isfinite(Y11) || !isfinite(y_shunt)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+            )
+        end
+        y11[offset_ix + ix + n_entries] = Y11 + y_shunt
+        Y12 = (-Y_t / c_tap)
+        y12[offset_ix + ix + n_entries] = Y12
+        Y21 = (-Y_t / tap)
+        y21[offset_ix + ix + n_entries] = Y21
+        Y22 = Y_t
+        y22[offset_ix + ix + n_entries] = Y22
+        n_entries += 1
+    end
+    if secondary_available
+        secondary_ix, star_ix = get_bus_indices(secondary_star_arc, num_bus, nr)
+        adj[secondary_ix, star_ix] = 1
+        adj[star_ix, secondary_ix] = -1
+        fb[offset_ix + ix + n_entries] = secondary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+        Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
+        tap = (PSY.get_secondary_turns_ratio(br) * exp(PSY.get_α_secondary(br) * 1im))
+        c_tap =
+            (PSY.get_secondary_turns_ratio(br) * exp(-1 * PSY.get_α_secondary(br) * 1im))
+        Y11 = (Y_t / abs(tap)^2)
+        if !isfinite(Y11) || !isfinite(y_shunt)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+            )
+        end
+        y11[offset_ix + ix + n_entries] = Y11
+        Y12 = (-Y_t / c_tap)
+        y12[offset_ix + ix + n_entries] = Y12
+        Y21 = (-Y_t / tap)
+        y21[offset_ix + ix + n_entries] = Y21
+        Y22 = Y_t
+        y22[offset_ix + ix + n_entries] = Y22
+        n_entries += 1
+    end
+    if tertiary_available
+        tertiary_ix, star_ix = get_bus_indices(tertiary_star_arc, num_bus, nr)
+        adj[tertiary_ix, star_ix] = 1
+        adj[star_ix, tertiary_ix] = -1
+        fb[offset_ix + ix + n_entries] = tertiary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+        Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
+        tap = (PSY.get_tertiary_turns_ratio(br) * exp(PSY.get_α_tertiary(br) * 1im))
+        c_tap = (PSY.get_tertiary_turns_ratio(br) * exp(-1 * PSY.get_α_tertiary(br) * 1im))
+        Y11 = (Y_t / abs(tap)^2)
+        if !isfinite(Y11) || !isfinite(y_shunt)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+            )
+        end
+        y11[offset_ix + ix + n_entries] = Y11
+        Y12 = (-Y_t / c_tap)
+        y12[offset_ix + ix + n_entries] = Y12
+        Y21 = (-Y_t / tap)
+        y21[offset_ix + ix + n_entries] = Y21
+        Y22 = Y_t
+        y22[offset_ix + ix + n_entries] = Y22
+        n_entries += 1
+    end
+    return n_entries
+end
+
 function _ybus!(
     y11::Vector{ComplexF64},
     y12::Vector{ComplexF64},
@@ -496,7 +599,7 @@ function _buildybus!(
     network_reduction::NetworkReduction,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
     branches,
-    transformer_3w::Vector{PSY.Transformer3W},
+    transformer_3w::Vector{Union{PSY.PhaseShiftingTransformer3W, PSY.Transformer3W}},
     num_bus::Dict{Int, Int},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
@@ -718,14 +821,24 @@ function Ybus(
         PSY.get_components(
             x ->
                 PSY.get_available(x) &&
-                    typeof(x) ∉ [PSY.Transformer3W, PSY.DiscreteControlledACBranch],
+                    typeof(x) ∉ [
+                        PSY.Transformer3W,
+                        PSY.PhaseShiftingTransformer3W,
+                        PSY.DiscreteControlledACBranch,
+                    ],
             PSY.ACTransmission,
             sys,
         ),
     )
     branches = vcat(branches, breaker_switches)
     transformer_3W =
-        collect(PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys))
+        collect(
+            PSY.get_components(
+                x -> PSY.get_available(x),
+                Union{PSY.Transformer3W, PSY.PhaseShiftingTransformer3W},
+                sys,
+            ),
+        )
     fixed_admittances =
         collect(PSY.get_components(x -> PSY.get_available(x), PSY.FixedAdmittance, sys))
     switched_admittances =
