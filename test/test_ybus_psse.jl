@@ -179,7 +179,7 @@ end
 
     # Compare with PSSE
     Ybus_psse, b_ix_psse, row_buses, col_buses, y_values, reduced_bus_pairs_psse =
-        parse_psse_ybus(joinpath(TEST_DATA_DIR, "case14_with_pst3w_ybus_no_ict.txt"))         #TODO - required manual remapping of star buses
+        parse_psse_ybus(joinpath(TEST_DATA_DIR, "case14_with_pst3w_ybus.txt"))         #TODO - required manual remapping of star buses
     # Compare breaker/switch reductions
     for x in reduced_bus_pairs_psse
         _test_psse_reduction_row(x, nr.reverse_bus_search_map)
