@@ -36,6 +36,7 @@ function get_bus_indices(
     bus_lookup::Dict{Int, Int},
     nr::NetworkReduction,
 )
+    check_arc_validity(arc, IS.get_name(arc))
     reverse_bus_search_map = get_reverse_bus_search_map(nr)
     fr_bus_number = PSY.get_number(PSY.get_from(arc))
     if haskey(reverse_bus_search_map, fr_bus_number)
@@ -55,6 +56,24 @@ function get_bus_indices(
     return fr_bus_ix, to_bus_ix
 end
 
+function check_arc_validity(arc::PSY.Arc, name::String)
+    if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
+        throw(
+            IS.ConflictingInputsError(
+                "Branch or arc $(name) is set available and connected to isolated bus $(IS.get_name(arc.from))",
+            ),
+        )
+    end
+    if PSY.get_bustype(arc.to) == ACBusTypes.ISOLATED
+        throw(
+            IS.ConflictingInputsError(
+                "Branch or arc $(name) is set available and connected to isolated bus $(IS.get_name(arc.to))",
+            ),
+        )
+    end
+    return
+end
+
 """
 Gets the AC branches for a system
 """
@@ -69,20 +88,8 @@ function get_ac_branches(
         sys,
     )
         arc = PSY.get_arc(br)
-        if PSY.get_bustype(arc.from) == ACBusTypes.ISOLATED
-            throw(
-                IS.ConflictingInputsError(
-                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.from))",
-                ),
-            )
-        end
-        if PSY.get_bustype(arc.to) == ACBusTypes.ISOLATED
-            throw(
-                IS.ConflictingInputsError(
-                    "Branch $(PSY.get_name(br)) is set available and connected to isolated bus $(PSY.get_name(arc.to))",
-                ),
-            )
-        end
+        name = PSY.get_name(br)
+        check_arc_validity(arc, name)
 
         if PSY.get_name(br) ∉ radial_branches
             _add_to_collection!(collection_br, br)
