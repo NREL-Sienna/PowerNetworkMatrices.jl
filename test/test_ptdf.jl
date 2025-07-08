@@ -73,7 +73,7 @@
 
     # check axes values
     P5 = PTDF(sys5)
-    arc_tuples = [(arc.from.number, arc.to.number) for arc in get_components(Arc, sys5)]
+    arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, sys5)]
     @test setdiff(PNM.get_branch_ax(P5), arc_tuples) ==
           Tuple{Int, Int}[]
     @test setdiff(PNM.get_bus_ax(P5), PSY.get_number.(PNM.get_buses(sys5))) == String[]
@@ -110,7 +110,6 @@ end
     end
 end
 
-#TODO - Fix serialization/deserialization of arc axes
 @testset failfast = true "Test serialization of PTDF matrices to HDF5" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     P5 = PTDF(sys5; check_connectivity = true, linear_solver = "KLU")
