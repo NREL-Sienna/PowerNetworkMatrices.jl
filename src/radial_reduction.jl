@@ -1,6 +1,6 @@
 function get_reduction(
     A::IncidenceMatrix,
-    sys::PSY.System,
+    ::PSY.System,
     ::Val{NetworkReductionTypes.RADIAL},
 )
     return get_radial_reduction(A)
@@ -14,16 +14,10 @@ Builds a NetworkReduction by removing radially connected buses.
 """
 function get_radial_reduction(
     sys::PSY.System;
-    prior_reduction::NetworkReduction = NetworkReduction(),
     exempt_buses::Vector{Int64} = Int64[],
 )
-    validate_reduction_type(
-        NetworkReductionTypes.RADIAL,
-        get_reduction_type(prior_reduction),
-    )
     return get_radial_reduction(
         IncidenceMatrix(sys);
-        prior_reduction = prior_reduction,
         exempt_buses = exempt_buses,
     )
 end

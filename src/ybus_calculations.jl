@@ -28,7 +28,7 @@ function add_to_branch_maps!(nr::NetworkReduction, arc::PSY.Arc, br::PSY.Branch)
     reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
     parallel_branch_map = get_parallel_branch_map(nr)
     reverse_parallel_branch_map = get_reverse_parallel_branch_map(nr)
-    arc_tuple = (PSY.get_number(PSY.get_from(arc)), PSY.get_number(PSY.get_to(arc)))
+    arc_tuple = get_arc_tuple(arc)
     if haskey(parallel_branch_map, arc_tuple)
         push!(parallel_branch_map[arc_tuple], br)
         reverse_parallel_branch_map[br] = arc_tuple
@@ -56,26 +56,17 @@ function add_to_branch_maps!(
     transformer3W_map = get_transformer3W_map(nr)
     reverse_transformer3W_map = get_reverse_transformer3W_map(nr)
     if PSY.get_available_primary(br)
-        primary_star_arc_tuple = (
-            PSY.get_number(PSY.get_from(primary_star_arc)),
-            PSY.get_number(PSY.get_to(primary_star_arc)),
-        )
+        primary_star_arc_tuple = get_arc_tuple(primary_star_arc)
         transformer3W_map[primary_star_arc_tuple] = (br, 1)
         reverse_transformer3W_map[(br, 1)] = primary_star_arc_tuple
     end
     if PSY.get_available_secondary(br)
-        secondary_star_arc_tuple = (
-            PSY.get_number(PSY.get_from(secondary_star_arc)),
-            PSY.get_number(PSY.get_to(secondary_star_arc)),
-        )
+        secondary_star_arc_tuple = get_arc_tuple(secondary_star_arc)
         transformer3W_map[secondary_star_arc_tuple] = (br, 2)
         reverse_transformer3W_map[(br, 2)] = secondary_star_arc_tuple
     end
     if PSY.get_available_tertiary(br)
-        tertiary_star_arc_tuple = (
-            PSY.get_number(PSY.get_from(tertiary_star_arc)),
-            PSY.get_number(PSY.get_to(tertiary_star_arc)),
-        )
+        tertiary_star_arc_tuple = get_arc_tuple(tertiary_star_arc)
         transformer3W_map[tertiary_star_arc_tuple] = (br, 3)
         reverse_transformer3W_map[(br, 3)] = tertiary_star_arc_tuple
     end
