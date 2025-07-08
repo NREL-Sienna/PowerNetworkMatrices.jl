@@ -321,7 +321,7 @@ function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetwo
         if branch_name == PSY.get_name(k)
             parallel_branch_set = nr.parallel_branch_map[v]
             multiplier = _compute_parallel_multiplier(parallel_branch_set, branch_name)
-            @error "multiplier for entry corresponding to parallel branch: $multiplier"
+            # @error "multiplier for entry corresponding to parallel branch: $multiplier"
             return multiplier, v
         end
     end
