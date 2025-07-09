@@ -50,8 +50,8 @@ end
     end
 
     @test isapprox(
-        sum(abs.(lodf_reference[lodf_virtual_with_tol.lookup[1]["Line12"], :])),
-        sum(abs.(lodf_virtual_with_tol["Line12", :])),
+        sum(abs.(lodf_reference[lodf_virtual_with_tol.lookup[1][(1, 2)], :])),
+        sum(abs.(lodf_virtual_with_tol[(1, 2), :])),
         atol = 1e-5)
 end
 
