@@ -1,5 +1,5 @@
 # TODO - problem with radial reduction algorithm and three winding transformers. 
-sys = System(joinpath(pwd(), "test", "test_data", "case14_reductions.raw"))
+sys = System(joinpath(TEST_DATA_DIR, "case14_reductions.raw"))
 
 # Full Matrix 
 ybus = Ybus(sys)
