@@ -5,6 +5,7 @@ using PowerNetworkMatrices
 using PowerSystems
 using InfrastructureSystems
 using PowerSystemCaseBuilder
+using PowerFlows
 using TimeSeries
 using DelimitedFiles
 
@@ -12,6 +13,7 @@ const IS = InfrastructureSystems
 const PSY = PowerSystems
 const PSB = PowerSystemCaseBuilder
 const PNM = PowerNetworkMatrices
+const PF = PowerFlows
 
 const BASE_DIR = dirname(dirname(Base.find_package("PowerSystems")))
 const TEST_DATA_DIR = joinpath(
@@ -29,6 +31,7 @@ Aqua.test_stale_deps(PowerNetworkMatrices; ignore = [:AppleAccelerate, :MKL, :Pa
 Aqua.test_deps_compat(PowerNetworkMatrices)
 
 include("testing_data.jl")
+include("test_utils.jl")
 
 LOG_FILE = "power-systems.log"
 LOG_LEVELS = Dict(
