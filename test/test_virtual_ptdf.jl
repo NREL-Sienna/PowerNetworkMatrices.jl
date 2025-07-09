@@ -25,7 +25,7 @@ end
     ix_to_arc_map = Dict()
     ix_to_bus_map = Dict()
     for (ix, br) in enumerate(get_components(ACBranch, sys))
-        ix_to_arc_map[ix] = (br.arc.from.number, br.arc.to.number)
+        ix_to_arc_map[ix] = PNM.get_arc_tuple(br)
     end
     for (ix, b) in enumerate(get_components(ACBus, sys))
         ix_to_bus_map[ix] = get_number(b)
@@ -50,7 +50,7 @@ end
     for (n, i) in enumerate(axes(ptdf_virtual_with_tol, 1))
         # get the row
         @test isapprox(
-            ptdf[ix_to_arc_map_2[n], :], ptdf_reference[n, :], atol = 1e-3)
+            ptdf[ix_to_arc_map[n], :], ptdf_reference[n, :], atol = 1e-3)
     end
 
     @test isapprox(
@@ -95,7 +95,7 @@ end
 #TODO - the ptdf of the RTS is missing an arc? 
 @testset "Test Virtual PTDF cache" begin
     RTS = build_system(PSITestSystems, "test_RTS_GMLC_sys")
-    arc_tuples = [(arc.from.number, arc.to.number) for arc in get_components(Arc, RTS)]
+    arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, RTS)]
     persist_arcs = arc_tuples[1:10]
 
     vptdf = VirtualPTDF(RTS; max_cache_size = 1, persistent_arcs = persist_arcs)
@@ -174,7 +174,7 @@ end
     @test get_ptdf_data(vptdf) == dict_
 
     # test get axes values
-    arc_tuples = [(arc.from.number, arc.to.number) for arc in get_components(Arc, sys)]
+    arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, sys)]
     @test setdiff(PNM.get_branch_ax(vptdf), arc_tuples) == []
     @test setdiff(PNM.get_bus_ax(vptdf), PSY.get_number.(PNM.get_buses(sys))) == String[]
 

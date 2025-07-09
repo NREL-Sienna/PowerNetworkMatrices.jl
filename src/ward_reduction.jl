@@ -16,8 +16,7 @@ function get_ward_reduction(
     Z_full = KLU.solve!(klu(y_bus.data), Matrix(one(y_bus.data)))       #TODO: change implementation for large systems (row by row)
     boundary_buses = Vector{Int64}()
     for branch in get_ac_branches(sys, prior_reduction.removed_branches)
-        from_bus = PSY.get_number(PSY.get_from(PSY.get_arc(branch)))
-        to_bus = PSY.get_number(PSY.get_to(PSY.get_arc(branch)))
+        (from_bus, to_bus) = get_arc_tuple(branch)
         if (from_bus ∈ study_buses) && (to_bus ∉ study_buses)
             push!(boundary_buses, from_bus)
         end
@@ -35,9 +34,7 @@ function get_ward_reduction(
     retained_branches = Set{String}()
     removed_branches = Set{String}()
     for branch in get_ac_branches(sys, prior_reduction.removed_branches)
-        arc = PSY.get_arc(branch)
-        from_bus = PSY.get_number(PSY.get_from(arc))
-        to_bus = PSY.get_number(PSY.get_to(arc))
+        (from_bus, to_bus) = get_arc_tuple(branch)
         if (from_bus ∈ external_buses) && (to_bus ∈ external_buses) ||
            (from_bus ∈ boundary_buses) && (to_bus ∈ external_buses) ||
            (from_bus ∈ external_buses) && (to_bus ∈ boundary_buses)

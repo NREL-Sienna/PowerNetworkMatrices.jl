@@ -297,8 +297,8 @@ function Base.show(io::IO, array::PowerNetworkMatrix)
 end
 
 Base.to_index(b::PSY.ACBus) = PSY.get_number(b)
-Base.to_index(b::T) where {T <: PSY.ACBranch} = PSY.get_name(b)
-Base.to_index(b::PSY.Arc) = (PSY.get_number(PSY.get_from(b)), PSY.get_number(PSY.get_to(b)))
+Base.to_index(b::T) where {T <: PSY.ACBranch} = get_arc_tuple(b)
+Base.to_index(b::PSY.Arc) = get_arc_tuple(b)
 """returns the raw array data of the `PowerNetworkMatrix`"""
 get_data(mat::PowerNetworkMatrix) = mat.data
 
@@ -321,7 +321,7 @@ function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetwo
         if branch_name == PSY.get_name(k)
             parallel_branch_set = nr.parallel_branch_map[v]
             multiplier = _compute_parallel_multiplier(parallel_branch_set, branch_name)
-            @error "multiplier for entry corresponding to parallel branch: $multiplier"
+            # @error "multiplier for entry corresponding to parallel branch: $multiplier"
             return multiplier, v
         end
     end

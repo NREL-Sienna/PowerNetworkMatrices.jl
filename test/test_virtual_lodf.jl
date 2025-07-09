@@ -17,6 +17,7 @@
     end
 
     # check the getindex function works properly
+    # FIXME: these tests are failing (uniformly: 30 failures = 5 buses * 6 branches.)
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     vlodf5 = VirtualLODF(sys5)
     for i in axes(Lodf_5, 1)
@@ -50,8 +51,8 @@ end
     end
 
     @test isapprox(
-        sum(abs.(lodf_reference[lodf_virtual_with_tol.lookup[1]["Line12"], :])),
-        sum(abs.(lodf_virtual_with_tol["Line12", :])),
+        sum(abs.(lodf_reference[lodf_virtual_with_tol.lookup[1][(1, 2)], :])),
+        sum(abs.(lodf_virtual_with_tol[(1, 2), :])),
         atol = 1e-5)
 end
 
