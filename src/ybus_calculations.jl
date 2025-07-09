@@ -94,20 +94,19 @@ function _ybus!(
     tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     Y11 = Y_t
-    b = PSY.get_primary_shunt(br)
-    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(b)
+    y_shunt = PSY.get_primary_shunt(br)
+    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
-
-    y11[branch_ix] = Y11 - (1im * b)
+    y11[branch_ix] = Y11 + y_shunt
     Y12 = -Y_t
     y12[branch_ix] = Y12
     Y21 = Y12
     y21[branch_ix] = Y21
     Y22 = Y_t
-    y22[branch_ix] = Y22
+    y22[branch_ix] = MATPOWER_YBUS ? Y22 + y_shunt : Y22
     return
 end
 
@@ -123,6 +122,8 @@ function _ybus!(
     tb::Vector{Int64},
     stb::Int64,
 )
+    @error "The ybus math for `Transformer3W` has not been updated for recent changes to" *
+           " the `psy5` branch of `PowerSystems.jl`. Expect incorrect results."
     primary_secondary_arc = PSY.get_primary_secondary_arc(br)
     secondary_tertiary_arc = PSY.get_secondary_tertiary_arc(br)
     primary_tertiary_arc = PSY.get_primary_tertiary_arc(br)
@@ -190,12 +191,11 @@ function _ybus!(
 
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     c = 1 / PSY.get_tap(br)
-    b = PSY.get_primary_shunt(br)
-
+    y_shunt = PSY.get_primary_shunt(br)
     Y11 = (Y_t * c^2)
-    y11[branch_ix] = Y11
+    y11[branch_ix] = MATPOWER_YBUS ? Y11 + y_shunt : (Y_t + y_shunt) * c^2
     Y12 = (-Y_t * c)
-    if !isfinite(Y11) || !isfinite(Y12) || !isfinite(b)
+    if !isfinite(Y11) || !isfinite(Y12) || !isfinite(y_shunt)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
@@ -205,7 +205,7 @@ function _ybus!(
     Y21 = Y12
     y21[branch_ix] = Y21
     Y22 = Y_t
-    y22[branch_ix] = Y22
+    y22[branch_ix] = MATPOWER_YBUS ? Y22 + y_shunt : Y22
     return
 end
 
@@ -227,21 +227,21 @@ function _ybus!(
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     tap = (PSY.get_tap(br) * exp(PSY.get_α(br) * 1im))
     c_tap = (PSY.get_tap(br) * exp(-1 * PSY.get_α(br) * 1im))
-    b = PSY.get_primary_shunt(br)
+    y_shunt = PSY.get_primary_shunt(br)
     Y11 = (Y_t / abs(tap)^2)
-    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(b * c_tap)
+    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
 
-    y11[branch_ix] = Y11 - (1im * b)
+    y11[branch_ix] = MATPOWER_YBUS ? (Y_t + y_shunt) / abs(tap)^2 : Y11 + y_shunt
     Y12 = (-Y_t / c_tap)
     y12[branch_ix] = Y12
     Y21 = (-Y_t / tap)
     y21[branch_ix] = Y21
     Y22 = Y_t
-    y22[branch_ix] = Y22
+    y22[branch_ix] = MATPOWER_YBUS ? Y22 + y_shunt : Y22
     return
 end
 

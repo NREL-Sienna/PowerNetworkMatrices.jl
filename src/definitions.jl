@@ -10,3 +10,5 @@ const ZERO_IMPEDANCE_LINE_REACTANCE_THRESHOLD = 1e-3
 DEFAULT_LODF_CHUNK_SIZE = 18_000
 
 IS.@scoped_enum(NetworkReductionTypes, BREAKER_SWITCH = 1, RADIAL = 2, WARD = 3)
+
+const MATPOWER_YBUS = false  # true = match matpower's ybus math; false = match PSSe's.
