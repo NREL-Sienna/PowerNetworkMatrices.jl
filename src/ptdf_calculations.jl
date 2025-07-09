@@ -445,7 +445,7 @@ function PTDF(
 end
  =#
 function PTDF(sys::PSY.System;
-    dist_slack::Vector{Float64} = Float64[],
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     linear_solver = "KLU",
     tol::Float64 = eps(),
     check_connectivity::Bool = true,
@@ -531,10 +531,15 @@ function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
     subnetworks::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
-    dist_slack::Vector{Float64} = Float64[],
+    dist_slack::Dict{Int, Float64},
     linear_solver = "KLU",
     tol::Float64 = eps(),
 )
+    if !(isempty(dist_slack))
+        dist_slack = redistribute_dist_slack(dist_slack, A, A.network_reduction)
+    else
+        dist_slack = Float64[]
+    end
     validate_linear_solver(linear_solver)
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
     if !isequal(A.network_reduction, BA.network_reduction)
@@ -615,24 +620,15 @@ function get_tol(ptdf::PTDF)
 end
 
 function redistribute_dist_slack(
-    dist_slack::Vector{Float64},
+    dist_slack::Dict{Int, Float64},
     A::IncidenceMatrix,
     nr::NetworkReduction,
 )
-    dist_slack1 = deepcopy(dist_slack)
-    # if original length of dist_slack is correct
-    if length(dist_slack) == size(A.data, 2)
-        for i in keys(nr.bus_reduction_map)
-            for j in nr.bus_reduction_map[i]
-                dist_slack1[A.lookup[2][i]] += dist_slack1[A.lookup[2][j]]
-                dist_slack1[A.lookup[2][j]] = -9999
-            end
-        end
-        # redefine dist_slack
-        return dist_slack1[dist_slack1 .!= -9999]
-        # otherwise throw an error
-    elseif !isempty(dist_slack) && length(dist_slack) != size(A.data, 2)
-        error("Distributed bus specification doesn't match the number of the buses.")
+    dist_slack_vector = zeros(length(A.axes[2]))
+    for (bus_no, dist_slack_factor) in dist_slack
+        bus_no_ = get(nr.reverse_bus_search_map, bus_no, bus_no)
+        ix = A.lookup[2][bus_no_]
+        dist_slack_vector[ix] += dist_slack_factor
     end
-    return dist_slack
+    return dist_slack_vector
 end
