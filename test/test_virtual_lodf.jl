@@ -17,6 +17,7 @@
     end
 
     # check the getindex function works properly
+    # FIXME: these tests are failing (uniformly: 30 failures = 5 buses * 6 branches.)
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     vlodf5 = VirtualLODF(sys5)
     for i in axes(Lodf_5, 1)
