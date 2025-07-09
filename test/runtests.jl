@@ -31,7 +31,7 @@ Aqua.test_stale_deps(PowerNetworkMatrices; ignore = [:AppleAccelerate, :MKL, :Pa
 Aqua.test_deps_compat(PowerNetworkMatrices)
 
 include("testing_data.jl")
-include("test_utils.jl")
+include("utils/test_utils.jl")
 
 LOG_FILE = "power-systems.log"
 LOG_LEVELS = Dict(

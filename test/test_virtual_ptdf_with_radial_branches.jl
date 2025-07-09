@@ -2,9 +2,8 @@
     # get the system
     sys = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys")
     # get the PTDF matrix for reference
-    nr = get_radial_reduction(sys)
-    ptdf_rad = PTDF(sys; network_reduction = nr)
-    vptdf_rad = VirtualPTDF(sys; network_reduction = nr)
+    ptdf_rad = PTDF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+    vptdf_rad = VirtualPTDF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
 
     for i in axes(ptdf_rad, 2)
         virtual = vptdf_rad[i, :]
@@ -22,12 +21,22 @@ end
     # check if VirtualPTDF have same values as PTDF row-wise
     # sys = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys")
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")   # ! remove
-    nr = get_radial_reduction(sys)
     buscount = length(PNM.get_buses(sys))
-    dist_slack = 1 / buscount * ones(buscount)
-    slack_array = dist_slack / sum(dist_slack)
-    ptdf_rad = PTDF(sys; network_reduction = nr, dist_slack = slack_array)
-    vptdf_rad = VirtualPTDF(sys; network_reduction = nr, dist_slack = slack_array)
+    dist_slack_factor = 1 / buscount #* ones(buscount)
+    dist_slack = Dict{Int, Float64}()
+    for i in 1:buscount
+        dist_slack[i] = dist_slack_factor
+    end
+    ptdf_rad = PTDF(
+        sys;
+        network_reductions = [NetworkReductionTypes.RADIAL],
+        dist_slack = dist_slack,
+    )
+    vptdf_rad = VirtualPTDF(
+        sys;
+        network_reductions = [NetworkReductionTypes.RADIAL],
+        dist_slack = dist_slack,
+    )
     for i in axes(ptdf_rad, 2)
         virtual = vptdf_rad[i, :]
         for j in axes(ptdf_rad, 1)

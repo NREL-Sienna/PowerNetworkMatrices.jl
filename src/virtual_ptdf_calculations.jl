@@ -94,16 +94,13 @@ struct with an empty cache.
 function VirtualPTDF(
     sys::PSY.System;
     check_connectivity::Bool = true,
-    dist_slack::Vector{Float64} = Float64[],
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
     network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
     kwargs...,
 )
-    if length(dist_slack) != 0
-        @info "Distributed bus"
-    end
     Ymatrix = Ybus(
         sys;
         check_connectivity = check_connectivity,
@@ -112,6 +109,11 @@ function VirtualPTDF(
     )
     ref_bus_positions = Set([Ymatrix.lookup[1][x] for x in Ymatrix.ref_bus_numbers])
     A = IncidenceMatrix(Ymatrix)
+    if !(isempty(dist_slack))
+        dist_slack_vector = redistribute_dist_slack(dist_slack, A, A.network_reduction)
+    else
+        dist_slack_vector = Float64[]
+    end
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
     #Get axis names
@@ -153,7 +155,7 @@ function VirtualPTDF(
         klu(ABA),
         BA.data,
         ref_bus_positions,
-        dist_slack,
+        dist_slack_vector,
         axes,
         look_up,
         temp_data,
