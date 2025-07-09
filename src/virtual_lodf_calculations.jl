@@ -22,6 +22,9 @@ The VirtualLODF struct is indexed using branch names.
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the rows of the transposed BA matrix
         corresponding to the reference buses.
+- `dist_slack::Vector{Float64}`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors showing the branch names.
 - `lookup<:NTuple{2, Dict}`:
@@ -47,6 +50,7 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     A::SparseArrays.SparseMatrixCSC{Int8, Int}
     inv_PTDF_A_diag::Vector{Float64}
     ref_bus_positions::Set{Int}
+    dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
     valid_ix::Vector{Int}
@@ -109,12 +113,79 @@ struct with an empty cache.
 """
 function VirtualLODF(
     sys::PSY.System;
-    network_reduction::NetworkReduction = NetworkReduction(),
+    check_connectivity::Bool = true,
+    dist_slack::Vector{Float64} = Float64[],
+    tol::Float64 = eps(),
+    max_cache_size::Int = MAX_CACHE_SIZE_MiB,
+    persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
+    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
     kwargs...,
 )
+    if length(dist_slack) != 0
+        @info "Distributed bus"
+    end
+    Ymatrix = Ybus(
+        sys;
+        check_connectivity = check_connectivity,
+        network_reductions = network_reductions,
+        kwargs...,
+    )
+    ref_bus_positions = Set([Ymatrix.lookup[1][x] for x in Ymatrix.ref_bus_numbers])
+    A = IncidenceMatrix(Ymatrix)
+    BA = BA_Matrix(Ymatrix)
+    ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
+    K = klu(ABA)
+    #Get axis names
+    line_ax = A.axes[1]
+    bus_ax = A.axes[2]
+
+    temp_data = zeros(length(bus_ax))
+    valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
+    # TODO: I'm assuming the indexing set up such that rows/cols get matched
+    # up correctly between BA.data and A.data
+    PTDF_diag = _get_PTDF_A_diag(
+        K,
+        BA.data,
+        A.data,
+        ref_bus_positions,
+    )
+    PTDF_diag[PTDF_diag .> 1 - 1e-6] .= 0.0 # TODO: magic number.
+
+    if isempty(persistent_arcs)
+        empty_cache =
+            RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
+    else
+        init_persistent_dict = Set{Int}(A.lookup[1][k] for k in persistent_arcs)
+        empty_cache =
+            RowCache(
+                max_cache_size * MiB,
+                init_persistent_dict,
+                length(bus_ax) * sizeof(Float64),
+            )
+    end
+
+    return VirtualLODF(
+        K,
+        BA.data,
+        A.data,
+        1.0 ./ (1.0 .- PTDF_diag),
+        ref_bus_positions,
+        dist_slack,
+        A.axes,
+        A.lookup,
+        valid_ix,
+        temp_data,
+        empty_cache,
+        Ymatrix.subnetworks,
+        Ref(tol),
+        Ymatrix.network_reduction,
+    )
+    # previously the code was:
+    #=
     branches = get_ac_branches(sys, network_reduction.removed_branches)
     buses = get_buses(sys, network_reduction.bus_reduction_map)
     return VirtualLODF(branches, buses; network_reduction = network_reduction, kwargs...)
+    =#
 end
 
 """
@@ -137,6 +208,8 @@ VirtualLODF struct with an empty cache.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 """
+
+#=
 function VirtualLODF(
     branches,
     buses::Vector{PSY.ACBus};
@@ -204,7 +277,7 @@ function VirtualLODF(
         Ref(tol),
         network_reduction,
     )
-end
+end=#
 
 # Overload Base functions
 
