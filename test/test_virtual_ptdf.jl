@@ -19,43 +19,28 @@
     @test length(ptdf_virtual.cache) == length(ptdf_virtual.axes[1])
 end
 
-#TODO - need to define a mapping from the data 
 @testset "Test Virtual PTDF matrices with tolerance" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    ptdf_reference = deepcopy(S14_slackB1)
     ix_to_arc_map = Dict()
     ix_to_bus_map = Dict()
-    for (ix, br) in enumerate(get_components(ACBranch, sys))
-        ix_to_arc_map[ix] = PNM.get_arc_tuple(br)
+    for (ix, l) in enumerate(S14_slackB1_branch_axis)
+        ix_to_arc_map[ix] = PNM.get_arc_tuple(get_component(ACBranch, sys, l))
     end
-    for (ix, b) in enumerate(get_components(ACBus, sys))
-        ix_to_bus_map[ix] = get_number(b)
+    for (ix, b) in enumerate(S14_slackB1_bus_axis)
+        ix_to_bus_map[ix] = b
     end
-
-    ptdf_reference = deepcopy(S14_slackB1)
-    ptdf_virtual_with_tol = VirtualPTDF(sys; tol = 1e-2) #
-    ptdf_with_tol = PTDF(sys; tol = 1e-2)
-    ptdf_with_tol_rearranged = zeros(size(ptdf_reference)[2], size(ptdf_reference)[1])
-    ptdf_virtual_with_tol_rearranged = zeros(size(ptdf_reference))
-    for ix in 1:size(ptdf_reference)[1], jx in 1:size(ptdf_reference)[2]
-        v_value = ptdf_with_tol[ix_to_arc_map[ix], ix_to_bus_map[jx]]
-        @show ix, jx, v_value
-        ptdf_with_tol_rearranged[jx, ix] = v_value
-        #L5NS_3_rearranged[ix,jx]= L5NS_3[ix_to_tuple_map[jx],ix_to_tuple_map[ix] ]
-        #L5NS_4_rearranged[ix,jx]= L5NS_4[ix_to_tuple_map[jx],ix_to_tuple_map[ix] ]
+    ptdf_reference[abs.(ptdf_reference) .<= 1e-2] .= 0
+    ptdf_virtual_with_tol = VirtualPTDF(sys; tol = 1e-2)
+    for ix in 1:size(ptdf_reference)[1]
+        row_map = [ix_to_bus_map[x] for x in 1:size(ptdf_reference)[2]]
+        row_pnm = [ptdf_virtual_with_tol[ix_to_arc_map[ix], x] for x in row_map]
+        row_ref = ptdf_reference[ix, :]
+        @test isapprox(row_pnm, row_ref, atol = 1e-3)
     end
-    ptdf_with_tol_rearranged
-    ptdf_virtual_with_tol_rearranged
-    #ptdf_reference[abs.(ptdf_reference) .<= 1e-2] .= 0
-    ptdf = PTDF(sys)
-    for (n, i) in enumerate(axes(ptdf_virtual_with_tol, 1))
-        # get the row
-        @test isapprox(
-            ptdf[ix_to_arc_map[n], :], ptdf_reference[n, :], atol = 1e-3)
-    end
-
     @test isapprox(
-        sum(abs.(ptdf_reference[ptdf_virtual_with_tol.lookup[1]["Line12"], :])),
-        sum(abs.(ptdf_virtual_with_tol["Line12", :])),
+        sum(abs.(ptdf_reference[17, :])),
+        sum(abs.(ptdf_virtual_with_tol[ix_to_arc_map[17], :])),
         atol = 1e-4)
 end
 
@@ -92,10 +77,11 @@ end
     end
 end
 
-#TODO - the ptdf of the RTS is missing an arc? 
 @testset "Test Virtual PTDF cache" begin
     RTS = build_system(PSITestSystems, "test_RTS_GMLC_sys")
-    arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, RTS)]
+    #Get Arcs from ACTransmission components (arc for HVDC is not included in matrices)
+    arc_tuples =
+        unique([PNM.get_arc_tuple(br) for br in get_components(ACTransmission, RTS)])
     persist_arcs = arc_tuples[1:10]
 
     vptdf = VirtualPTDF(RTS; max_cache_size = 1, persistent_arcs = persist_arcs)
@@ -103,7 +89,7 @@ end
         @test size(vptdf[l, :]) == (73,)
     end
 
-    for l in persist_lines
+    for l in persist_arcs
         @test vptdf.lookup[1][l] ∈ keys(vptdf.cache.temp_cache)
     end
 end
