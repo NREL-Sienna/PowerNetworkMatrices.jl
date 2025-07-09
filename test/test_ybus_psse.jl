@@ -197,4 +197,3 @@ end
         @test isapprox(Ybus_pnm[row_bus, col_bus], val; atol = 1e-1)
     end
 end
-
