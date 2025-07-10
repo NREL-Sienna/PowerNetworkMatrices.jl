@@ -194,10 +194,6 @@ function _ybus!(
     arc = PSY.get_arc(br)
     add_to_branch_maps!(nr, arc, br)
     bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     Y11 = Y_t
     y_shunt = PSY.get_primary_shunt(br)
@@ -206,6 +202,11 @@ function _ybus!(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
+
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
 
     y11[branch_ix] = Y11 + y_shunt
     Y12 = -Y_t
@@ -242,10 +243,6 @@ function _ybus!(
     y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
     if primary_available
         primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
-        adj[primary_ix, star_ix] = 1
-        adj[star_ix, primary_ix] = -1
-        fb[offset_ix + ix + n_entries] = primary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
         c = 1 / PSY.get_primary_turns_ratio(br)
         Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
         Y11 = (Y_t * c^2)
@@ -255,6 +252,12 @@ function _ybus!(
                 r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
             )
         end
+
+        adj[primary_ix, star_ix] = 1
+        adj[star_ix, primary_ix] = -1
+        fb[offset_ix + ix + n_entries] = primary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+
         y11[offset_ix + ix + n_entries] = Y11 + y_shunt
         Y12 = (-Y_t * c)
         y12[offset_ix + ix + n_entries] = Y12
@@ -266,10 +269,6 @@ function _ybus!(
     end
     if secondary_available
         secondary_ix, star_ix = get_bus_indices(secondary_star_arc, num_bus, nr)
-        adj[secondary_ix, star_ix] = 1
-        adj[star_ix, secondary_ix] = -1
-        fb[offset_ix + ix + n_entries] = secondary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
         c = 1 / PSY.get_secondary_turns_ratio(br)
         Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
         Y11 = (Y_t * c^2)
@@ -279,6 +278,12 @@ function _ybus!(
                 r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
             )
         end
+
+        adj[secondary_ix, star_ix] = 1
+        adj[star_ix, secondary_ix] = -1
+        fb[offset_ix + ix + n_entries] = secondary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+
         y11[offset_ix + ix + n_entries] = Y11
         Y12 = (-Y_t * c)
         y12[offset_ix + ix + n_entries] = Y12
@@ -290,10 +295,6 @@ function _ybus!(
     end
     if tertiary_available
         tertiary_ix, star_ix = get_bus_indices(tertiary_star_arc, num_bus, nr)
-        adj[tertiary_ix, star_ix] = 1
-        adj[star_ix, tertiary_ix] = -1
-        fb[offset_ix + ix + n_entries] = tertiary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
         c = 1 / PSY.get_tertiary_turns_ratio(br)
         Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
         Y11 = (Y_t * c^2)
@@ -303,6 +304,12 @@ function _ybus!(
                 r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
             )
         end
+
+        adj[tertiary_ix, star_ix] = 1
+        adj[star_ix, tertiary_ix] = -1
+        fb[offset_ix + ix + n_entries] = tertiary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+
         y11[offset_ix + ix + n_entries] = Y11
         Y12 = (-Y_t * c)
         y12[offset_ix + ix + n_entries] = Y12
@@ -545,12 +552,12 @@ function _ybus!(
 )
     bus_no = get_bus_index(fa, num_bus, nr)
     Y = PSY.get_impedance_active_power(fa) + im * PSY.get_impedance_reactive_power(fa)
-    sb[fa_ix] = bus_no
     if !isfinite(Y)
         error(
             "Data in $(PSY.get_name(fa)) is incorrect. Y = $(Y)",
         )
     end
+    sb[fa_ix] = bus_no
     ysh[fa_ix] = Y
     return
 end
@@ -569,16 +576,19 @@ function _ybus!(
 )
     arc = PSY.get_arc(br)
     bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
+
     if !isfinite(Y_l)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
+
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
+
     y11[branch_ix] = Y_l
     y12[branch_ix] = -Y_l
     y21[branch_ix] = -Y_l
@@ -662,77 +672,6 @@ function _buildybus!(
     )
 end
 
-#= """
-Builds a Ybus from a collection of buses and branches. The return is a Ybus Array indexed with the bus numbers and the branch names.
-
-# Arguments
-- `check_connectivity::Bool`: Checks connectivity of the network using Depth First Search (DFS)
-"""
-function Ybus(
-    branches::Vector,
-    buses::Vector{PSY.ACBus},
-    transformer_3w::Vector{PSY.Transformer3W} = Vector{PSY.Transformer3W}(),
-    fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
-    switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}(),
-    standard_loads::Vector{PSY.StandardLoad} = Vector{PSY.StandardLoad}();
-    check_connectivity::Bool = true,
-    make_branch_admittance_matrices::Bool = false,
-    network_reduction = NetworkReduction(),
-)
-    bus_ax = PSY.get_number.(buses)
-    axes = (bus_ax, bus_ax)
-    bus_lookup = make_ax_ref(bus_ax)
-    busnumber = length(buses)
-    look_up = (bus_lookup, bus_lookup)
-    adj = SparseArrays.spdiagm(ones(Int8, busnumber))
-
-    y11, y12, y21, y22, ysh, fb, tb, sb =
-        _buildybus!(
-            network_reduction,
-            adj,
-            branches,
-            transformer_3w,
-            bus_lookup,
-            fixed_admittances,
-            switched_admittances,
-            standard_loads,
-        )
-    ybus = SparseArrays.sparse(
-        [fb; fb; tb; tb; sb],  # row indices
-        [fb; tb; fb; tb; sb],  # column indices
-        [y11; y12; y21; y22; ysh],  # values
-        busnumber,  # size (rows) - setting this explicitly is necessary for the case there are no branches
-        busnumber,  # size (columns) - setting this explicitly is necessary for the case there are no branches
-    )
-    SparseArrays.dropzeros!(ybus)
-    if check_connectivity && length(buses) > 1
-        islands = find_subnetworks(ybus, bus_ax)
-        length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
-    end
-    if make_branch_admittance_matrices
-        yft = SparseArrays.sparse(
-            [1:length(fb); 1:length(fb)],
-            [fb; tb],
-            [y11; y12],
-            length(fb),
-            length(buses),
-        )
-        ytf = SparseArrays.sparse(
-            [1:length(tb); 1:length(tb)],
-            [tb; fb],
-            [y22; y21],
-            length(tb),
-            length(buses),
-        )
-    else
-        yft = nothing
-        ytf = nothing
-        fb = nothing
-        tb = nothing
-    end
-    return Ybus(ybus, adj, axes, look_up, network_reduction, yft, ytf, fb, tb)
-end =#
-
 """
 Builds a Ybus from the system. The return is a Ybus Array indexed with the bus numbers and the branch names.
 
@@ -759,6 +698,7 @@ function Ybus(
                 push!(ref_bus_numbers, PSY.get_number(b))
             end
         else
+            @debug "Found available isolated bus $(PSY.get_name(b)) with number $(PSY.get_number(b)). This is excluded from the Ybus build."
             push!(nr.removed_buses, PSY.get_number(b))
         end
     end
@@ -921,108 +861,6 @@ function Ybus(
     end
 end
 
-function _goderya(ybus::SparseArrays.SparseMatrixCSC)
-    node_count = size(ybus)[1]
-    max_I = node_count^2
-    I, J, val = SparseArrays.findnz(ybus)
-    T = SparseArrays.sparse(I, J, ones(Int, length(val)))
-    T_ = T * T
-    for n in 1:(node_count - 1)
-        I, _, _ = SparseArrays.findnz(T_)
-        if length(I) == max_I
-            @info "The System has no islands"
-            break
-        elseif length(I) < max_I
-            temp = T_ * T
-            I_temp, _, _ = SparseArrays.findnz(temp)
-            if all(I_temp == I)
-                @warn "The system contains islands" maxlog = 1
-            end
-            T_ = temp
-        else
-            @assert false
-        end
-        #@assert n < node_count - 1
-    end
-    return I
-end
-
-function validate_connectivity(
-    M,
-    nodes::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int};
-    connectivity_method::Function = goderya_connectivity,
-)
-    connected = connectivity_method(M, nodes, bus_lookup)
-    return connected
-end
-
-function goderya_connectivity(M, nodes::Vector{PSY.ACBus}, bus_lookup::Dict{Int, Int})
-    @info "Validating connectivity with Goderya algorithm"
-    length(nodes) > 15_000 &&
-        @warn "The Goderya algorithm is memory intensive on large networks and may not scale well, try `connectivity_method = dfs_connectivity"
-
-    I = _goderya(M)
-
-    node_count = length(nodes)
-    connections = Dict([i => count(x -> x == i, I) for i in Set(I)])
-
-    if length(Set(I)) == node_count
-        connected = true
-        if any(values(connections) .!= node_count)
-            cc = Set(values(connections))
-            @warn "Network has at least $(length(cc)) connected components with $cc nodes"
-            connected = false
-        end
-    else
-        disconnected_nodes = PSY.get_name.(nodes[setdiff(values(bus_lookup), I)])
-        @warn "Principal connected component does not contain:" disconnected_nodes
-        connected = false
-    end
-    return connected
-end
-
-"""
-Finds the set of bus numbers that belong to each connected component in the System
-"""
-# this function extends the PowerModels.jl implementation to accept a System
-function find_connected_components(sys::PSY.System)
-    a = Adjacency(sys; check_connectivity = false)
-    return find_connected_components(a.data, a.lookup[1])
-end
-
-# this function extends the PowerModels.jl implementation to accept an adjacency matrix and bus lookup
-function find_connected_components(M, bus_lookup::Dict{Int, Int})
-    pm_buses = Dict([i => Dict("bus_type" => 1, "bus_i" => b) for (i, b) in bus_lookup])
-
-    arcs = findall((LinearAlgebra.UpperTriangular(M) - LinearAlgebra.I) .!= 0)
-    pm_branches = Dict([
-        i => Dict("f_bus" => a[1], "t_bus" => a[2], "br_status" => 1) for
-        (i, a) in enumerate(arcs)
-    ],)
-
-    data = Dict("bus" => pm_buses, "branch" => pm_branches)
-    cc = PSY.calc_connected_components(data)
-    bus_decode = Dict(value => key for (key, value) in bus_lookup)
-    connected_components = Vector{Set{Int}}()
-    for c in cc
-        push!(connected_components, Set([bus_decode[b] for b in c]))
-    end
-    return Set(connected_components)
-end
-
-function dfs_connectivity(M, ::Vector{PSY.ACBus}, bus_lookup::Dict{Int, Int})
-    @info "Validating connectivity with depth first search (network traversal)"
-    cc = find_connected_components(M, bus_lookup)
-    if length(cc) != 1
-        @warn "Network has at least $(length(cc)) connected components with $(length.(cc)) nodes"
-        connected = false
-    else
-        connected = true
-    end
-    return connected
-end
-
 function build_reduced_ybus(ybus::Ybus, sys::PSY.System, reduction::NetworkReductionTypes)
     A = IncidenceMatrix(ybus)
     nr = get_reduction(A, sys, Val(reduction))
@@ -1150,7 +988,8 @@ function _remake_reverse_series_branch_map!(nr::NetworkReduction)
     nr.reverse_series_branch_map = reverse_series_branch_map
 end
 function _remake_reverse_transformer3W_map!(nr::NetworkReduction)
-    reverse_transformer3W_map = Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
+    reverse_transformer3W_map =
+        Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
     for (k, v) in nr.transformer3W_map
         reverse_transformer3W_map[v] = k
     end
