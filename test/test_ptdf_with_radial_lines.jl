@@ -90,7 +90,7 @@ end
         buscount = length(PNM.get_buses(sys))
         # now compute distributed slack vector
         dist_slack = 1 / buscount * ones(buscount)
-        slack_array = dist_slack / sum(dist_slack)
+        slack_dict = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
         # adjust to have the same vector with and without leaf node reduction
         bus_numbers = reduce(
             vcat,
@@ -103,19 +103,19 @@ end
         br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in rb.removed_arcs])
         for i in keys(rb.bus_reduction_map)
             for j in rb.bus_reduction_map[i]
-                slack_array[A.lookup[2][i]] += slack_array[A.lookup[2][j]]
-                slack_array[A.lookup[2][j]] = -9999
+                slack_dict[A.lookup[2][i]] += slack_dict[A.lookup[2][j]]
+                slack_dict[A.lookup[2][j]] = -9999
             end
         end
-        # redefine slack_array
-        slack_array[slack_array .== -9999] .= 0
-        slack_array1 = slack_array[slack_array .!= 0]
+        # redefine slack dict
+        modification_key = first(k for (k, val) in slack_dict if val == -9999)
+        pop!(slack_dict, modification_key)
         # now get the PTDF matrices
-        ptdf = PTDF(sys; dist_slack = slack_array)
+        ptdf = PTDF(sys; dist_slack = slack_dict)
         ptdf_rad = PTDF(
             sys;
             network_reductions = [NetworkReductionTypes.RADIAL],
-            dist_slack = slack_array1,
+            dist_slack = slack_dict,
         )
 
         # now get the injections from the system
