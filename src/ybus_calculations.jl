@@ -194,10 +194,6 @@ function _ybus!(
     arc = PSY.get_arc(br)
     add_to_branch_maps!(nr, arc, br)
     bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     Y11 = Y_t
     y_shunt = PSY.get_primary_shunt(br)
@@ -206,6 +202,11 @@ function _ybus!(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
+
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
 
     y11[branch_ix] = Y11 + y_shunt
     Y12 = -Y_t
@@ -242,10 +243,6 @@ function _ybus!(
     y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
     if primary_available
         primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
-        adj[primary_ix, star_ix] = 1
-        adj[star_ix, primary_ix] = -1
-        fb[offset_ix + ix + n_entries] = primary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
         c = 1 / PSY.get_primary_turns_ratio(br)
         Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
         Y11 = (Y_t * c^2)
@@ -255,6 +252,12 @@ function _ybus!(
                 r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
             )
         end
+
+        adj[primary_ix, star_ix] = 1
+        adj[star_ix, primary_ix] = -1
+        fb[offset_ix + ix + n_entries] = primary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+
         y11[offset_ix + ix + n_entries] = Y11 + y_shunt
         Y12 = (-Y_t * c)
         y12[offset_ix + ix + n_entries] = Y12
@@ -266,10 +269,6 @@ function _ybus!(
     end
     if secondary_available
         secondary_ix, star_ix = get_bus_indices(secondary_star_arc, num_bus, nr)
-        adj[secondary_ix, star_ix] = 1
-        adj[star_ix, secondary_ix] = -1
-        fb[offset_ix + ix + n_entries] = secondary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
         c = 1 / PSY.get_secondary_turns_ratio(br)
         Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
         Y11 = (Y_t * c^2)
@@ -279,6 +278,12 @@ function _ybus!(
                 r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
             )
         end
+
+        adj[secondary_ix, star_ix] = 1
+        adj[star_ix, secondary_ix] = -1
+        fb[offset_ix + ix + n_entries] = secondary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+
         y11[offset_ix + ix + n_entries] = Y11
         Y12 = (-Y_t * c)
         y12[offset_ix + ix + n_entries] = Y12
@@ -290,10 +295,6 @@ function _ybus!(
     end
     if tertiary_available
         tertiary_ix, star_ix = get_bus_indices(tertiary_star_arc, num_bus, nr)
-        adj[tertiary_ix, star_ix] = 1
-        adj[star_ix, tertiary_ix] = -1
-        fb[offset_ix + ix + n_entries] = tertiary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
         c = 1 / PSY.get_tertiary_turns_ratio(br)
         Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
         Y11 = (Y_t * c^2)
@@ -303,6 +304,12 @@ function _ybus!(
                 r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
             )
         end
+
+        adj[tertiary_ix, star_ix] = 1
+        adj[star_ix, tertiary_ix] = -1
+        fb[offset_ix + ix + n_entries] = tertiary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
+
         y11[offset_ix + ix + n_entries] = Y11
         Y12 = (-Y_t * c)
         y12[offset_ix + ix + n_entries] = Y12
@@ -545,12 +552,12 @@ function _ybus!(
 )
     bus_no = get_bus_index(fa, num_bus, nr)
     Y = PSY.get_impedance_active_power(fa) + im * PSY.get_impedance_reactive_power(fa)
-    sb[fa_ix] = bus_no
     if !isfinite(Y)
         error(
             "Data in $(PSY.get_name(fa)) is incorrect. Y = $(Y)",
         )
     end
+    sb[fa_ix] = bus_no
     ysh[fa_ix] = Y
     return
 end
@@ -569,16 +576,19 @@ function _ybus!(
 )
     arc = PSY.get_arc(br)
     bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
+
     if !isfinite(Y_l)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
+
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
+
     y11[branch_ix] = Y_l
     y12[branch_ix] = -Y_l
     y21[branch_ix] = -Y_l
@@ -662,77 +672,6 @@ function _buildybus!(
     )
 end
 
-#= """
-Builds a Ybus from a collection of buses and branches. The return is a Ybus Array indexed with the bus numbers and the branch names.
-
-# Arguments
-- `check_connectivity::Bool`: Checks connectivity of the network using Depth First Search (DFS)
-"""
-function Ybus(
-    branches::Vector,
-    buses::Vector{PSY.ACBus},
-    transformer_3w::Vector{PSY.Transformer3W} = Vector{PSY.Transformer3W}(),
-    fixed_admittances::Vector{PSY.FixedAdmittance} = Vector{PSY.FixedAdmittance}(),
-    switched_admittances::Vector{PSY.SwitchedAdmittance} = Vector{PSY.SwitchedAdmittance}(),
-    standard_loads::Vector{PSY.StandardLoad} = Vector{PSY.StandardLoad}();
-    check_connectivity::Bool = true,
-    make_branch_admittance_matrices::Bool = false,
-    network_reduction = NetworkReduction(),
-)
-    bus_ax = PSY.get_number.(buses)
-    axes = (bus_ax, bus_ax)
-    bus_lookup = make_ax_ref(bus_ax)
-    busnumber = length(buses)
-    look_up = (bus_lookup, bus_lookup)
-    adj = SparseArrays.spdiagm(ones(Int8, busnumber))
-
-    y11, y12, y21, y22, ysh, fb, tb, sb =
-        _buildybus!(
-            network_reduction,
-            adj,
-            branches,
-            transformer_3w,
-            bus_lookup,
-            fixed_admittances,
-            switched_admittances,
-            standard_loads,
-        )
-    ybus = SparseArrays.sparse(
-        [fb; fb; tb; tb; sb],  # row indices
-        [fb; tb; fb; tb; sb],  # column indices
-        [y11; y12; y21; y22; ysh],  # values
-        busnumber,  # size (rows) - setting this explicitly is necessary for the case there are no branches
-        busnumber,  # size (columns) - setting this explicitly is necessary for the case there are no branches
-    )
-    SparseArrays.dropzeros!(ybus)
-    if check_connectivity && length(buses) > 1
-        islands = find_subnetworks(ybus, bus_ax)
-        length(islands) > 1 && throw(IS.DataFormatError("Network not connected"))
-    end
-    if make_branch_admittance_matrices
-        yft = SparseArrays.sparse(
-            [1:length(fb); 1:length(fb)],
-            [fb; tb],
-            [y11; y12],
-            length(fb),
-            length(buses),
-        )
-        ytf = SparseArrays.sparse(
-            [1:length(tb); 1:length(tb)],
-            [tb; fb],
-            [y22; y21],
-            length(tb),
-            length(buses),
-        )
-    else
-        yft = nothing
-        ytf = nothing
-        fb = nothing
-        tb = nothing
-    end
-    return Ybus(ybus, adj, axes, look_up, network_reduction, yft, ytf, fb, tb)
-end =#
-
 """
 Builds a Ybus from the system. The return is a Ybus Array indexed with the bus numbers and the branch names.
 
@@ -759,6 +698,7 @@ function Ybus(
                 push!(ref_bus_numbers, PSY.get_number(b))
             end
         else
+            @debug "Found available isolated bus $(PSY.get_name(b)) with number $(PSY.get_number(b)). This is excluded from the Ybus build."
             push!(nr.removed_buses, PSY.get_number(b))
         end
     end
