@@ -61,19 +61,19 @@ function _should_visit_node(
 end
 
 """
-    _is_final_node(node::Int, adj_matrix::SparseMatrixCSC, reduced_indices::Set{Int})
+    _is_final_node(node::Int, adj_matrix::SparseArrays.SparseMatrixCSC, reduced_indices::Set{Int})
 
 Determines if a node is a final node in a path traversal.
 
 # Arguments
 - `node::Int`: The index of the node to check.
-- `adj_matrix::SparseMatrixCSC`: The adjacency matrix of the network.
+- `adj_matrix::SparseArrays.SparseMatrixCSC`: The adjacency matrix of the network.
 - `reduced_indices::Set{Int}`: Set of indices that have already been reduced.
 
 # Returns
 - `Bool`: `true` if the node is a final node, `false` otherwise.
 """
-function _is_final_node(node::Int, adj_matrix::SparseMatrixCSC, reduced_indices::Set{Int})
+function _is_final_node(node::Int, adj_matrix::SparseArrays.SparseMatrixCSC, reduced_indices::Set{Int})
     if !_is_2degree_node(adj_matrix, node)
         return true
     end
@@ -84,41 +84,41 @@ function _is_final_node(node::Int, adj_matrix::SparseMatrixCSC, reduced_indices:
 end
 
 """
-    _is_2degree_node(adj_matrix::SparseMatrixCSC, node::Int)
+    _is_2degree_node(adj_matrix::SparseArrays.SparseMatrixCSC, node::Int)
 
 Checks if a node has exactly two connections in the network.
 
 # Arguments
-- `adj_matrix::SparseMatrixCSC`: The adjacency matrix of the network.
+- `adj_matrix::SparseArrays.SparseMatrixCSC`: The adjacency matrix of the network.
 - `node::Int`: The index of the node to check.
 
 # Returns
 - `Bool`: `true` if the node has exactly two neighbors, `false` otherwise.
 """
-function _is_2degree_node(adj_matrix::SparseMatrixCSC, node::Int)
+function _is_2degree_node(adj_matrix::SparseArrays.SparseMatrixCSC, node::Int)
     neighbor_count = SparseArrays.nzrange(adj_matrix, node)
     return length(neighbor_count) == 2
 end
 
 """
-    _get_neighbors(adj_matrix::SparseMatrixCSC, node::Int)
+    _get_neighbors(adj_matrix::SparseArrays.SparseMatrixCSC, node::Int)
 
 Get all neighbors of a given node from the adjacency matrix.
 For undirected graphs, checks both directions.
 """
-function _get_neighbors(adj_matrix::SparseMatrixCSC, node::Int)
+function _get_neighbors(adj_matrix::SparseArrays.SparseMatrixCSC, node::Int)
     nzrange = SparseArrays.nzrange(adj_matrix, node)
     @assert length(nzrange) == 2
     return rowvals(adj_matrix)[nzrange]
 end
 
 """
-    _get_complete_chain(adj_matrix::SparseMatrixCSC, start_node::Int, reduced_indices::Set{Int}, irreducible_indices::Set{Int})
+    _get_complete_chain(adj_matrix::SparseArrays.SparseMatrixCSC, start_node::Int, reduced_indices::Set{Int}, irreducible_indices::Set{Int})
 
 Build a complete chain of degree-2 nodes starting from a given node.
 """
 function _get_complete_chain(
-    adj_matrix::SparseMatrixCSC,
+    adj_matrix::SparseArrays.SparseMatrixCSC,
     start_node::Int,
     reduced_indices::Set{Int},
     irreducible_indices::Set{Int},
@@ -147,7 +147,7 @@ function _get_complete_chain(
 end
 
 """
-    _get_partial_chain(adj_matrix::SparseMatrixCSC,
+    _get_partial_chain(adj_matrix::SparseArrays.SparseMatrixCSC,
                       current_node::Int,
                       prev_node::Int,
                       reduced_indices::Set{Int},
@@ -157,7 +157,7 @@ Recursively build a chain in one direction from current_node, avoiding prev_node
 """
 function _get_partial_chain_recursive!(
     current_chain::Vector{Int},
-    adj_matrix::SparseMatrixCSC,
+    adj_matrix::SparseArrays.SparseMatrixCSC,
     current_node::Int,
     prev_node::Int,
     reduced_indices::Set{Int},
@@ -192,11 +192,11 @@ function _get_partial_chain_recursive!(
 end
 
 """
-    _get_degree2_nodes(adj_matrix::SparseMatrixCSC, irreducible_indices::Set{Int})
+    _get_degree2_nodes(adj_matrix::SparseArrays.SparseMatrixCSC, irreducible_indices::Set{Int})
 
 Return all degree-2 nodes in the adjacency matrix, excluding irreducible indices.
 """
-function _get_degree2_nodes(adj_matrix::SparseMatrixCSC, irreducible_indices::Set{Int})
+function _get_degree2_nodes(adj_matrix::SparseArrays.SparseMatrixCSC, irreducible_indices::Set{Int})
     node_count = size(adj_matrix, 1)
     nodes = sizehint!(Vector{Int}(), node_count)
     for i in 1:node_count
@@ -211,14 +211,14 @@ function _get_degree2_nodes(adj_matrix::SparseMatrixCSC, irreducible_indices::Se
 end
 
 """
-    find_degree2_chains(adj_matrix::SparseMatrixCSC, irreducible_indices::Set{Int})
+    find_degree2_chains(adj_matrix::SparseArrays.SparseMatrixCSC, irreducible_indices::Set{Int})
 
 Find all chains of degree-2 nodes in a graph represented by a CSC adjacency matrix.
 A chain is a sequence of connected degree-2 nodes.
 
 Returns a dictionary mapping each starting node to its chain of node indices.
 """
-function find_degree2_chains(adj_matrix::SparseMatrixCSC, irreducible_indices::Set{Int})
+function find_degree2_chains(adj_matrix::SparseArrays.SparseMatrixCSC, irreducible_indices::Set{Int})
     arc_map = Dict()
     reduced_indices = Set{Int}()
     degree2_nodes = _get_degree2_nodes(adj_matrix, irreducible_indices)

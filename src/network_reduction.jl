@@ -1,24 +1,24 @@
 @kwdef mutable struct NetworkReduction
-    irreducible_buses::Set{Int}  # Buses that are not reduced in the network reduction
-    bus_reduction_map::Dict{Int, Set{Int}}
-    reverse_bus_search_map::Dict{Int, Int}
-    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch}
-    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}}
-    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
-    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}}
-    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
+    irreducible_buses::Set{Int} = Set{Int}() # Buses that are not reduced in the network reduction
+    bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}() # Maps reduced bus to the set of buses it was reduced to
+    reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}()
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch} = Dict{Tuple{Int, Int}, PSY.Branch}()
+    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{PSY.Branch, Tuple{Int, Int}}()
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
+    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{PSY.Branch, Tuple{Int, Int}}()
+    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
+    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{PSY.Branch, Tuple{Int, Int}}()
     transformer3W_map::Dict{
         Tuple{Int, Int},
         Tuple{PSY.ThreeWindingTransformer, Int},
-    }
+    } = Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}}()
     reverse_transformer3W_map::Dict{
         Tuple{PSY.ThreeWindingTransformer, Int},
         Tuple{Int, Int},
-    }    #Int to represent the primary, secondary, or tertiary arc; makes keys unique in reverse map
-    removed_buses::Set{Int}
-    removed_arcs::Set{Tuple{Int, Int}}
-    reduction_type::Vector{NetworkReductionTypes}
+    } = Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
+    removed_buses::Set{Int} = Set{Int}()
+    removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
+    reduction_type::Vector{NetworkReductionTypes} = Vector{NetworkReductionTypes}()
 end
 
 get_irreducible_buses(rb::NetworkReduction) = rb.irreducible_buses
