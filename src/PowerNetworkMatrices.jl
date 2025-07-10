@@ -26,7 +26,6 @@ export VirtualLODF
 export VirtualPTDF
 export Ybus
 
-
 using DocStringExtensions
 import InfrastructureSystems
 import PowerSystems
