@@ -795,6 +795,8 @@ function Ybus(
                     end
                 end
                 push!(nr.removed_arcs, (from_bus_number, to_bus_number))
+            else
+                push!(breaker_switches, br)
             end
         end
     end
@@ -1033,14 +1035,10 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
     remake_reverse_series_branch_map = false
     remake_reverse_transformer3W_map = false
     data = get_data(ybus)
-    adjacency_data = ybus.adjacency_data    #TODO - add getters
-    axes = ybus.axes                        #TODO add getters
+    adjacency_data = ybus.adjacency_data    #TODO add getters
     lookup = get_lookup(ybus)
     bus_lookup = lookup[1]
     nr = ybus.network_reduction
-    #reduced_ybus = deepcopy(ybus)   #TODO - don't deepcopy. just grab each component and then rebuild at the end...
-
-    #nr = reduced_ybus.network_reduction
     bus_numbers_to_remove = Vector{Int}()
     for (k, v) in nr_new.reverse_bus_search_map
         nr.reverse_bus_search_map[k] = v
