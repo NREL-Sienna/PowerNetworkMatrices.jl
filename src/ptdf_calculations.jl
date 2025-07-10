@@ -628,7 +628,11 @@ function redistribute_dist_slack(
     for (bus_no, dist_slack_factor) in dist_slack
         bus_no_ = get(nr.reverse_bus_search_map, bus_no, bus_no)
         if !haskey(A.lookup[2], bus_no_)
-            throw(IS.InvalidValue("Bus number $bus_no_ not found in the incidence matrix. Correct your slack distribution specification."))
+            throw(
+                IS.InvalidValue(
+                    "Bus number $bus_no_ not found in the incidence matrix. Correct your slack distribution specification.",
+                ),
+            )
         end
         ix = A.lookup[2][bus_no_]
         dist_slack_vector[ix] += dist_slack_factor
