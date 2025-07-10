@@ -1152,7 +1152,7 @@ function _remake_reverse_series_branch_map!(nr::NetworkReduction)
     nr.reverse_series_branch_map = reverse_series_branch_map
 end
 function _remake_reverse_transformer3W_map!(nr::NetworkReduction)
-    reverse_transformer3W_map = Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}}()
+    reverse_transformer3W_map = Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
     for (k, v) in nr.transformer3W_map
         reverse_transformer3W_map[v] = k
     end
