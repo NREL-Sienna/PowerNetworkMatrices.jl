@@ -209,7 +209,6 @@ end
 
     buscount = length(PNM.get_buses(sys5))
 
-
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 
