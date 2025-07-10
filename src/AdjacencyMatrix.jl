@@ -39,13 +39,16 @@ Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix
         Checks connectivity of the network using Depth First Search (DFS) algorithm
 """
 function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
-    buses = get_buses(sys)
-    branches = get_ac_branches(sys)
-    return AdjacencyMatrix(
-        branches,
-        buses;
+    ybus = Ybus(
+        sys;
         check_connectivity = check_connectivity,
         kwargs...,
+    )
+    return AdjacencyMatrix(
+       deepcopy(ybus.adjacency_data),
+       deepcopy(ybus.axes),
+       deepcopy(ybus.lookup),
+       deepcopy(ybus.ref_bus_positions)
     )
 end
 

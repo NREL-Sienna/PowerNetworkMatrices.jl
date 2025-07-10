@@ -13,6 +13,7 @@ export get_ward_reduction
 export get_reduction_type
 export get_network_reduction
 export IncidenceMatrix
+export AdjacencyMatrix
 export is_factorized
 export LODF
 export PTDF
@@ -24,6 +25,7 @@ export validate_connectivity
 export VirtualLODF
 export VirtualPTDF
 export Ybus
+
 
 using DocStringExtensions
 import InfrastructureSystems
@@ -68,9 +70,12 @@ include("PowerNetworkMatrix.jl")
 include("definitions.jl")
 include("network_reduction.jl")
 include("ybus_calculations.jl")
-include("incedence_matrix.jl")
+include("IncidenceMatrix.jl")
+include("AdjacencyMatrix.jl")
 include("radial_reduction.jl")
 include("degree_two_reduction.jl")
+include("connectivity_checks.jl")
+include("subnetworks.jl")
 include("ward_reduction.jl")
 include("common.jl")
 include("BA_ABA_matrices.jl")
