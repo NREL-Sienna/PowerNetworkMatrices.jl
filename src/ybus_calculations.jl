@@ -7,16 +7,16 @@ The fields yft and ytf are the branch admittance matrices for the from-to and to
 The matrix columns are mapped to buses using fb, tb arrays of the matrix columns that correspond to the `from` and `to` buses.
 Using yft, ytf, and the voltage vector, the branch currents and power flows can be calculated.
 """
-struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{T <: Complex}
-    data::SparseArrays.SparseMatrixCSC{T, Int}
+struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
+    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int}
     adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int}
     ref_bus_numbers::Set{Int}
     axes::Ax
     lookup::L
     subnetworks::Dict{Int, Set{Int}}
     network_reduction::NetworkReduction
-    yft::Union{SparseArrays.SparseMatrixCSC{T, Int}, Nothing}
-    ytf::Union{SparseArrays.SparseMatrixCSC{T, Int}, Nothing}
+    yft::Union{SparseArrays.SparseMatrixCSC{ComplexF32, Int}, Nothing}
+    ytf::Union{SparseArrays.SparseMatrixCSC{ComplexF32, Int}, Nothing}
     fb::Union{Vector{Int}, Nothing}
     tb::Union{Vector{Int}, Nothing}
 end
@@ -74,10 +74,10 @@ function add_to_branch_maps!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
-    y12::Vector{ComplexF64},
-    y21::Vector{ComplexF64},
-    y22::Vector{ComplexF64},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
     br::PSY.ACTransmission,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -111,10 +111,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
-    y12::Vector{ComplexF64},
-    y21::Vector{ComplexF64},
-    y22::Vector{ComplexF64},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
     br::PSY.DiscreteControlledACBranch,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -148,10 +148,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
-    y12::Vector{ComplexF64},
-    y21::Vector{ComplexF64},
-    y22::Vector{ComplexF64},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
     br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
     reverse_bus_search_map::Dict{Int, Int},
@@ -179,10 +179,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
-    y12::Vector{ComplexF64},
-    y21::Vector{ComplexF64},
-    y22::Vector{ComplexF64},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
     br::PSY.Transformer2W,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -218,10 +218,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
-    y12::Vector{ComplexF64},
-    y21::Vector{ComplexF64},
-    y22::Vector{ComplexF64},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
     br::PSY.Transformer3W,
     num_bus::Dict{Int, Int},
     offset_ix::Int,
@@ -316,10 +316,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
-    y12::Vector{ComplexF64},
-    y21::Vector{ComplexF64},
-    y22::Vector{ComplexF64},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
     br::PSY.PhaseShiftingTransformer3W,
     num_bus::Dict{Int, Int},
     offset_ix::Int,
@@ -418,10 +418,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
-    y12::Vector{ComplexF64},
-    y21::Vector{ComplexF64},
-    y22::Vector{ComplexF64},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
     br::PSY.TapTransformer,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -460,10 +460,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
-    y12::Vector{ComplexF64},
-    y21::Vector{ComplexF64},
-    y22::Vector{ComplexF64},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
     br::PSY.PhaseShiftingTransformer,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -501,7 +501,7 @@ function _ybus!(
 end
 
 function _ybus!(
-    ysh::Vector{ComplexF64},
+    ysh::Vector{ComplexF32},
     fa::PSY.FixedAdmittance,
     num_bus::Dict{Int, Int},
     fa_ix::Int,
@@ -522,7 +522,7 @@ end
 
 #Note - PSSE does not include switched admittances in ymatrix
 function _ybus!(
-    ysh::Vector{ComplexF64},
+    ysh::Vector{ComplexF32},
     fa::PSY.SwitchedAdmittance,
     num_bus::Dict{Int, Int},
     fa_ix::Int,
@@ -536,7 +536,7 @@ function _ybus!(
 end
 
 function _ybus!(
-    ysh::Vector{ComplexF64},
+    ysh::Vector{ComplexF32},
     fa::PSY.StandardLoad,
     num_bus::Dict{Int, Int},
     fa_ix::Int,
@@ -556,10 +556,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF64},
-    y12::Vector{ComplexF64},
-    y21::Vector{ComplexF64},
-    y22::Vector{ComplexF64},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
     br::PSY.DiscreteControlledACBranch,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -613,11 +613,11 @@ function _buildybus!(
     tb = zeros(Int, branchcount)
     sb = zeros(Int, fa_count + sa_count + sl_count)
 
-    y11 = zeros(ComplexF64, branchcount)
-    y12 = zeros(ComplexF64, branchcount)
-    y21 = zeros(ComplexF64, branchcount)
-    y22 = zeros(ComplexF64, branchcount)
-    ysh = zeros(ComplexF64, fa_count + sa_count + sl_count)
+    y11 = zeros(ComplexF32, branchcount)
+    y12 = zeros(ComplexF32, branchcount)
+    y21 = zeros(ComplexF32, branchcount)
+    y22 = zeros(ComplexF32, branchcount)
+    ysh = zeros(ComplexF32, fa_count + sa_count + sl_count)
 
     for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
