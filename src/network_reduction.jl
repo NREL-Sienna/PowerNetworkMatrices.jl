@@ -1,25 +1,27 @@
-mutable struct NetworkReduction
-    bus_reduction_map::Dict{Int, Set{Int}}
-    reverse_bus_search_map::Dict{Int, Int}
-    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch}
-    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}}
-    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
-    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}}
-    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
+@kwdef mutable struct NetworkReduction
+    irreducible_buses::Set{Int} = Set{Int}() # Buses that are not reduced in the network reduction
+    bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}() # Maps reduced bus to the set of buses it was reduced to
+    reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}()
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch} = Dict{Tuple{Int, Int}, PSY.Branch}()
+    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{PSY.Branch, Tuple{Int, Int}}()
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
+    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{PSY.Branch, Tuple{Int, Int}}()
+    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
+    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{PSY.Branch, Tuple{Int, Int}}()
     transformer3W_map::Dict{
         Tuple{Int, Int},
         Tuple{PSY.ThreeWindingTransformer, Int},
-    }
+    } = Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}}()
     reverse_transformer3W_map::Dict{
         Tuple{PSY.ThreeWindingTransformer, Int},
         Tuple{Int, Int},
-    }    #Int to represent the primary, secondary, or tertiary arc; makes keys unique in reverse map
-    removed_buses::Set{Int}
-    removed_arcs::Set{Tuple{Int, Int}}
-    reduction_type::Vector{NetworkReductionTypes}
+    } = Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
+    removed_buses::Set{Int} = Set{Int}()
+    removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
+    reduction_type::Vector{NetworkReductionTypes} = Vector{NetworkReductionTypes}()
 end
 
+get_irreducible_buses(rb::NetworkReduction) = rb.irreducible_buses
 get_bus_reduction_map(rb::NetworkReduction) = rb.bus_reduction_map
 get_reverse_bus_search_map(rb::NetworkReduction) = rb.reverse_bus_search_map
 get_direct_branch_map(rb::NetworkReduction) = rb.direct_branch_map
@@ -33,72 +35,12 @@ get_reverse_transformer3W_map(rb::NetworkReduction) = rb.reverse_transformer3W_m
 get_reduction_type(rb::NetworkReduction) = rb.reduction_type
 
 function Base.isempty(rb::NetworkReduction)
-    if !isempty(rb.bus_reduction_map)
-        return false
-    end
-    if !isempty(rb.reverse_bus_search_map)
-        return false
+    for field in fieldnames(NetworkReduction)
+        if !isempty(getfield(rb, field))
+            return false
+        end
     end
     return true
-end
-
-function NetworkReduction(;
-    bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
-    reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}(),
-    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch} = Dict{
-        Tuple{Int, Int},
-        PSY.Branch,
-    }(),
-    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{
-        PSY.Branch,
-        Tuple{Int, Int},
-    }(),
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{
-        Tuple{Int, Int},
-        Set{PSY.Branch},
-    }(),
-    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{
-        PSY.Branch,
-        Tuple{Int, Int},
-    }(),
-    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{
-        Tuple{Int, Int},
-        Set{PSY.Branch},
-    }(),
-    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{
-        PSY.Branch,
-        Tuple{Int, Int},
-    }(),
-    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}} = Dict{
-        Tuple{Int, Int},
-        Tuple{PSY.ThreeWindingTransformer, Int},
-    }(),
-    reverse_transformer3W_map::Dict{
-        Tuple{PSY.ThreeWindingTransformer, Int},
-        Tuple{Int, Int},
-    } = Dict{
-        Tuple{PSY.ThreeWindingTransformer, Int},
-        Tuple{Int, Int},
-    }(),
-    removed_buses::Set{Int} = Set{Int}(),
-    removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}(),
-    reduction_type::Vector{NetworkReductionTypes} = Vector{NetworkReductionTypes}(),
-)
-    return NetworkReduction(
-        bus_reduction_map,
-        reverse_bus_search_map,
-        direct_branch_map,
-        reverse_direct_branch_map,
-        parallel_branch_map,
-        reverse_parallel_branch_map,
-        series_branch_map,
-        reverse_series_branch_map,
-        transformer3W_map,
-        reverse_transformer3W_map,
-        removed_buses,
-        removed_arcs,
-        reduction_type,
-    )
 end
 
 function validate_reduction_type(
@@ -161,7 +103,7 @@ function isequal(
     rb1::NetworkReduction,
     rb2::NetworkReduction,
 )
-    for field in fieldnames(typeof(rb1))
+    for field in fieldnames(NetworkReduction)
         if getfield(rb1, field) != getfield(rb2, field)
             return false
         end
