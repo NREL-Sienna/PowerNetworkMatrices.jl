@@ -9,10 +9,10 @@ mutable struct NetworkReduction
     reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}}
     transformer3W_map::Dict{
         Tuple{Int, Int},
-        Tuple{Union{PSY.Transformer3W, PSY.PhaseShiftingTransformer3W}, Int},
+        Tuple{PSY.ThreeWindingTransformer, Int},
     }
     reverse_transformer3W_map::Dict{
-        Tuple{Union{PSY.Transformer3W, PSY.PhaseShiftingTransformer3W}, Int},
+        Tuple{PSY.ThreeWindingTransformer, Int},
         Tuple{Int, Int},
     }    #Int to represent the primary, secondary, or tertiary arc; makes keys unique in reverse map
     removed_buses::Set{Int}
@@ -69,12 +69,15 @@ function NetworkReduction(;
         PSY.Branch,
         Tuple{Int, Int},
     }(),
-    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.Transformer3W, Int}} = Dict{
+    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}} = Dict{
         Tuple{Int, Int},
-        Tuple{PSY.Transformer3W, Int},
+        Tuple{PSY.ThreeWindingTransformer, Int},
     }(),
-    reverse_transformer3W_map::Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}} = Dict{
-        Tuple{PSY.Transformer3W, Int},
+    reverse_transformer3W_map::Dict{
+        Tuple{PSY.ThreeWindingTransformer, Int},
+        Tuple{Int, Int},
+    } = Dict{
+        Tuple{PSY.ThreeWindingTransformer, Int},
         Tuple{Int, Int},
     }(),
     removed_buses::Set{Int} = Set{Int}(),

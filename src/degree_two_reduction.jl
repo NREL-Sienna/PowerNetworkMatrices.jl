@@ -16,8 +16,8 @@ function get_reduction(
         Dict{PSY.Branch, Tuple{Int, Int}}(),
         Dict{Tuple{Int, Int}, Set{PSY.Branch}}((101, 102) => Set([br1, br2])),          # Map from NEW arc to the series branches that comprise it.
         Dict{PSY.Branch, Tuple{Int, Int}}(br1 => (101, 102), br2 => (101, 102)),
-        Dict{Tuple{Int, Int}, Tuple{PSY.Transformer3W, Int}}(),
-        Dict{Tuple{PSY.Transformer3W, Int}, Tuple{Int, Int}}(),
+        Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}}(),
+        Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}(),
         Set{Int}([115]),
         Set{Tuple{Int, Int}}([(101, 115), (115, 102)]),                                 # Set of OLD arcs to be removed 
         Vector{NetworkReductionTypes}([NetworkReductionTypes.DEGREE_TWO]),

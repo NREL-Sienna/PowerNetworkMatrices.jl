@@ -531,7 +531,7 @@ function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
     subnetworks::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
-    dist_slack::Dict{Int, Float64},
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     linear_solver = "KLU",
     tol::Float64 = eps(),
 )

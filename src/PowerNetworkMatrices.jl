@@ -24,7 +24,6 @@ export validate_connectivity
 export VirtualLODF
 export VirtualPTDF
 export Ybus
-export get_branch_lookups
 
 using DocStringExtensions
 import InfrastructureSystems
