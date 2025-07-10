@@ -199,7 +199,7 @@ function _add_branch_to_lookup!(
     end
     return
 end
-#= 
+#=
 function get_branch_lookups(branches)
     branch_lookup = Dict{String, Int}()
     transformer_3w_lookup = Dict{String, Vector{String}}()
@@ -595,104 +595,4 @@ function sparsify(dense_array::Vector{Float64}, tol::Float64)
         end
     end
     return sparse_array
-end
-
-"""
-Takes the reference bus numbers and re-assigns the keys in the subnetwork dictionaries to use
-the reference bus withing each subnetwork.
-"""
-function assign_reference_buses!(
-    subnetworks::Dict{Int, Set{Int}},
-    ref_buses::Set{Int},
-)
-    if isempty(ref_buses) || length(ref_buses) != length(subnetworks)
-        @warn "The reference bus positions are not consistent with the subnetworks. References buses will be assigned arbitrarily"
-        return deepcopy(subnetworks)
-    end
-    bus_groups = Dict{Int, Set{Int}}()
-    for (bus_key, subnetwork_buses) in subnetworks
-        ref_bus = intersect(ref_buses, subnetwork_buses)
-        if length(ref_bus) == 1
-            bus_groups[first(ref_bus)] = pop!(subnetworks, bus_key)
-        elseif length(ref_bus) == 0
-            @warn "No reference bus in the subnetwork associated with bus $bus_key. Reference bus assigned arbitrarily"
-        elseif length(ref_bus) > 1
-            error(
-                "More than one reference bus in the subnetwork associated with bus $bus_key",
-            )
-        else
-            @assert false
-        end
-    end
-    return bus_groups
-end
-
-function assign_reference_buses!(
-    subnetworks::Dict{Int, Set{Int}},
-    ref_bus_positions::Set{Int},
-    bus_lookup::Dict{Int, Int},
-)
-    ref_buses = [k for (k, v) in bus_lookup if v in ref_bus_positions]
-    return assign_reference_buses!(subnetworks, ref_buses)
-end
-
-"""Find part of the union-find disjoint set data structure. Vector because nodes are 1:n."""
-function get_representative(uf::Vector{Int}, x::Int)
-    while uf[x] != x
-        uf[x] = uf[uf[x]] # path compression
-        x = uf[x]
-    end
-    return x
-end
-
-"""Union part of the union-find disjoint set data structure. Vector because nodes are 1:n."""
-function union_sets!(uf::Vector{Int}, x::Int, y::Int)
-    x == y && return
-    rootX = get_representative(uf, x)
-    rootY = get_representative(uf, y)
-    if rootX != rootY
-        uf[rootY] = rootX
-    end
-end
-
-"""
-Finds the subnetworks present in the considered System. This is evaluated by taking
-a the ABA or Adjacency Matrix.
-
-# Arguments
-- `M::SparseArrays.SparseMatrixCSC`:
-        input sparse matrix.
-- `bus_numbers::Vector{Int}`:
-        vector containing the indices of the system's buses.
-"""
-function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
-    rows = SparseArrays.rowvals(M)
-    # find connected components working with indices, so can use a vector instead of a set.
-    # uf for union-find data structure: initially, each bus as its own set of a single element.
-    uf = collect(1:size(bus_numbers, 1))
-    for ix in 1:size(bus_numbers, 1)
-        neighbors = SparseArrays.nzrange(M, ix)
-        if length(neighbors) <= 1
-            @warn "Bus $(bus_numbers[ix]) is islanded"
-            continue
-        end
-        for j in neighbors
-            row_ix = rows[j]
-            union_sets!(uf, ix, row_ix)
-        end
-    end
-    for i in 1:length(uf)
-        uf[i] = get_representative(uf, i)
-    end
-    # now we have the representatives, so assemble the subnetworks.
-    subnetworks = Dict{Int, Set{Int}}()
-    for (representative, bus_num) in zip(uf, bus_numbers)
-        subnetwork = get!(subnetworks, bus_numbers[representative], Set{Int}())
-        push!(subnetwork, bus_num)
-    end
-    return subnetworks
-end
-
-function has_breaker_switch(sys::PSY.System)
-    length(PSY.get_components(PSY.DiscreteControlledACBranch, sys)) > 0
 end
