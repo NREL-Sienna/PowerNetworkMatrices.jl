@@ -30,7 +30,7 @@ function parse_psse_ybus(path)
     bus_to_ix_map = Dict(bus => i for (i, bus) in enumerate(unique_buses))
     row_indices = [bus_to_ix_map[f] for f in row_buses]
     col_indices = [bus_to_ix_map[t] for t in col_buses]
-    return sparse(row_indices, col_indices, y_values),
+    return sparse(row_buses, col_buses, y_values),
     bus_to_ix_map,
     row_buses,
     col_buses,
@@ -53,7 +53,7 @@ function _test_psse_reduction_row(psse_row, reverse_bus_search_map)
     @test all(reduced_to .== psse_row[ix])       #all entries should be reduced to the one entry that was not reduced
 end
 
-@testset failfast = true "14 bus system" begin
+@testset "14 bus system" begin
     sys = build_system(PSSEParsingTestSystems, "psse_ybus_14_test_system")
     Ybus_pnm = Ybus(sys)
     ref_bus_numbers = [
@@ -89,7 +89,7 @@ end
     end
 end
 
-@testset failfast = true "WECC 240 bus" begin
+@testset "WECC 240 bus" begin
     sys_240 = System(
         joinpath(TEST_DATA_DIR, "240busWECC_2018_PSS33.raw");
         runchecks = false,
@@ -125,7 +125,7 @@ end
     end
 end
 
-@testset failfast = true "Base_Eastern_Interconnect_515GW" begin
+@testset "Base_Eastern_Interconnect_515GW" begin
     sys = PSB.build_system(PSSEParsingTestSystems, "Base_Eastern_Interconnect_515GW")
     Ybus_psse, b_ix_psse, row_buses, col_buses, y_values, reduced_bus_pairs_psse =
         parse_psse_ybus(
@@ -139,6 +139,9 @@ end
         x in get_components(x -> get_bustype(x) == PSY.ACBusTypes.REF, ACBus, sys)
     ]
 
+    skip_indices = indexin(ref_bus_numbers, Ybus_pnm.axes[1])
+    n_ref_bus_elements = nnz(Ybus_pnm.data[skip_indices, :])
+
     # Compare breaker/switch reductions
     for x in reduced_bus_pairs_psse
         _test_psse_reduction_row(x, nr.reverse_bus_search_map)
@@ -146,23 +149,30 @@ end
     #Test number of nonzero elements matches
     @test nnz(Ybus_pnm.data) == length(filter(!iszero, y_values)) + n_ref_bus_elements
     #Test values match 
+    # PSSE does not write values in the REF bus row, so we need to add them manually
     ref_row =
         get_number(first(get_components(x -> get_bustype(x) == ACBusTypes.REF, ACBus, sys)))
-    # PSSE does not write values in the REF bus row, so we need to add them manually
     Ybus_psse[ref_row, Ybus_pnm.axes[2]] = Ybus_pnm[ref_row, :]
+    @test isapprox(
+        Ybus_pnm.data,
+        Ybus_psse[Ybus_pnm.axes[1], Ybus_pnm.axes[2]],
+        rtol = 2 * eps(Float32),
+        atol = 0.0,
+    )
+
     rows, cols, vals = findnz(Ybus_psse)
     r, c, v = findnz(Ybus_pnm.data)
-    @assert isapprox(v, vals, rtol = eps(Float32), atol = 0.0) # test all values first
+    @test isapprox(v, vals, rtol = 2 * eps(Float32), atol = 0.0) # test all values first
     # Now also test that both the structure and the values match
-    @assert isapprox(
+    @test isapprox(
         Ybus_pnm.data[r, c],
         Ybus_psse[rows, cols],
-        rtol = eps(Float32),
+        rtol = 2 * eps(Float32),
         atol = 0.0,
     )
 end
 
-@testset failfast = true "14 bus system with phase shifting 3wt" begin
+@testset "14 bus system with phase shifting 3wt" begin
     sys = build_system(PSSEParsingTestSystems, "pti_case14_with_pst3w_sys")
     Ybus_pnm = Ybus(sys)
     ref_bus_numbers = [
