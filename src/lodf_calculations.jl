@@ -47,9 +47,9 @@ function _buildlodf(
 end
 
 function _buildlodf(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int64},
-    k::KLU.KLUFactorization{Float64, Int64},
-    ba::SparseArrays.SparseMatrixCSC{Float64, Int64},
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    k::KLU.KLUFactorization{Float64, Int},
+    ba::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int},
     linear_solver::String,
 )
@@ -62,10 +62,10 @@ function _buildlodf(
 end
 
 function _calculate_LODF_matrix_KLU(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int64},
-    k::KLU.KLUFactorization{Float64, Int64},
-    ba::SparseArrays.SparseMatrixCSC{Float64, Int64},
-    ref_bus_positions::Set{Int64},
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    k::KLU.KLUFactorization{Float64, Int},
+    ba::SparseArrays.SparseMatrixCSC{Float64, Int},
+    ref_bus_positions::Set{Int},
 )
     linecount = size(ba, 2)
     # get inverse of aba

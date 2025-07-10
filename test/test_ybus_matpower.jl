@@ -5,9 +5,9 @@
             "matpower_ACTIVSg10k_sys",
         )
     matpower_cols =
-        readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_cols.csv"), Int64)
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_cols.csv"), Int)
     matpower_rows =
-        readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_rows.csv"), Int64)
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_rows.csv"), Int)
     matpower_vals_re = readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_vals_re.csv"))
     matpower_vals_im = readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_vals_im.csv"))
     ybus_pnm = Ybus(sys)
@@ -22,9 +22,9 @@ end
 @testset "Ybus - CATS" begin
     sys = System(joinpath(TEST_DATA_DIR, "CaliforniaTestSystem.m"))
     matpower_cols =
-        readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_cols.csv"), Int64)
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_cols.csv"), Int)
     matpower_rows =
-        readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_rows.csv"), Int64)
+        readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_rows.csv"), Int)
     matpower_vals_re =
         readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_vals_re.csv"))
     matpower_vals_im =
@@ -44,12 +44,12 @@ end
     matpower_cols =
         readdlm(
             joinpath(TEST_DATA_DIR, "ybus_case5_transformers_cols.csv"),
-            Int64,
+            Int,
         )
     matpower_rows =
         readdlm(
             joinpath(TEST_DATA_DIR, "ybus_case5_transformers_rows.csv"),
-            Int64,
+            Int,
         )
     matpower_vals_re =
         readdlm(joinpath(TEST_DATA_DIR, "ybus_case5_transformers_vals_re.csv"))

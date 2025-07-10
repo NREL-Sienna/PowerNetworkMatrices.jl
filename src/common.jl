@@ -199,7 +199,7 @@ function _add_branch_to_lookup!(
     end
     return
 end
-#= 
+#=
 function get_branch_lookups(branches)
     branch_lookup = Dict{String, Int}()
     transformer_3w_lookup = Dict{String, Vector{String}}()
@@ -223,9 +223,9 @@ Gets the non-isolated buses from a given System
 """
 function get_buses(
     sys::PSY.System,
-    bus_reduction_map::Dict{Int64, Set{Int64}} = Dict{Int64, Set{Int64}}(),
+    bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
 )::Vector{PSY.ACBus}
-    leaf_buses = Set{PSY.Int64}()
+    leaf_buses = Set{PSY.Int}()
     if !isempty(bus_reduction_map)
         for vals in values(bus_reduction_map)
             union!(leaf_buses, vals)
