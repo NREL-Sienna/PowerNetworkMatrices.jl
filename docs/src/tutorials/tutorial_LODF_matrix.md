@@ -53,7 +53,7 @@ lodf_4 = LODF(a, ptdf);
 
 # CASE 3
 
-# get the BA and ABA matrices (ABA matrix must include LU factorization 
+# get the BA and ABA matrices (ABA matrix must include LU factorization
 # matrices)
 ba = BA_Matrix(sys);
 aba = ABA_Matrix(sys, factorize = true);
@@ -82,7 +82,7 @@ Please note that wether the `KLU` or `Dense` method is used, the resulting `LODF
 
 ## "Sparse" `LODF` matrix
 
-The `LODF` matrix can be computed in a "sparse" fashion by defining the input argument `tol`. If this argument is defined, then elements of the `LODF` matrix whose absolute values are below the set threshold are dropped. In addition, the matrix will be stored as a sparse one of type `SparseArrays.SparseMatrixCSC{Float64, Int64}` type instead of `Matrix{Float64}` one.
+The `LODF` matrix can be computed in a "sparse" fashion by defining the input argument `tol`. If this argument is defined, then elements of the `LODF` matrix whose absolute values are below the set threshold are dropped. In addition, the matrix will be stored as a sparse one of type `SparseArrays.SparseMatrixCSC{Float64, Int}` type instead of `Matrix{Float64}` one.
 
 By considering an "extreme" value of 0.4 as `tol`, the `LODF` matrix can be computed as follows:
 
