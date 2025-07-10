@@ -1,13 +1,22 @@
 #NOTE: hardcoded for testing system
 function get_reduction(
-    A::IncidenceMatrix,
+    A::AdjacencyMatrix,
     sys::PSY.System,
     ::Val{NetworkReductionTypes.DEGREE_TWO},
 )
+    irreducible_buses = Set{Int}()
+    for c in get_components(StaticInjection, sys_DA)
+        push!(irreducible_buses, PSY.get_number(PSY.get_bus(c)))
+    end
+    irreducible_indices = Set([yb.lookup[2][i] for i in irreducible_buses])
+
+    arc_maps = find_degree2_chains(A.data, irreducible_indices)
+
     @error "DEGREE TWO HARDCODED REDUCTION FOR 14 BUS SYSTEM"
     br1 = PSY.get_component(PSY.Line, sys, "BUS 101-BUS 115-i_1")
     br2 = PSY.get_component(PSY.Line, sys, "BUS 115-BUS 102-i_1")
     return NetworkReduction(
+        irreducible_buses,
         Dict{Int, Set{Int}}(),
         Dict{Int, Int}(),
         Dict{Tuple{Int, Int}, PSY.Branch}(),
@@ -37,7 +46,11 @@ Determines whether a node should be visited during network traversal.
 # Returns
 - `Bool`: `true` if the node should be visited, `false` otherwise.
 """
-function _should_visit_node(node::Int, reduced_indices::Set{Int}, irreducible_indices::Set{Int})
+function _should_visit_node(
+    node::Int,
+    reduced_indices::Set{Int},
+    irreducible_indices::Set{Int},
+)
     if node ∈ irreducible_indices
         return false
     end
@@ -104,13 +117,32 @@ end
 
 Build a complete chain of degree-2 nodes starting from a given node.
 """
-function _get_complete_chain(adj_matrix::SparseMatrixCSC, start_node::Int, reduced_indices::Set{Int}, irreducible_indices::Set{Int})
+function _get_complete_chain(
+    adj_matrix::SparseMatrixCSC,
+    start_node::Int,
+    reduced_indices::Set{Int},
+    irreducible_indices::Set{Int},
+)
     neighbors = _get_neighbors(adj_matrix, start_node)
     current_chain = [start_node]
     push!(reduced_indices, start_node)
-    _get_partial_chain_recursive!(current_chain, adj_matrix, neighbors[1], start_node, reduced_indices, irreducible_indices)
+    _get_partial_chain_recursive!(
+        current_chain,
+        adj_matrix,
+        neighbors[1],
+        start_node,
+        reduced_indices,
+        irreducible_indices,
+    )
     reverse!(current_chain)
-    _get_partial_chain_recursive!(current_chain, adj_matrix, neighbors[2], start_node, reduced_indices, irreducible_indices)
+    _get_partial_chain_recursive!(
+        current_chain,
+        adj_matrix,
+        neighbors[2],
+        start_node,
+        reduced_indices,
+        irreducible_indices,
+    )
     return current_chain
 end
 
@@ -124,12 +156,12 @@ end
 Recursively build a chain in one direction from current_node, avoiding prev_node.
 """
 function _get_partial_chain_recursive!(
-                              current_chain::Vector{Int},
-                              adj_matrix::SparseMatrixCSC,
-                              current_node::Int,
-                              prev_node::Int,
-                              reduced_indices::Set{Int},
-                              irreducible_indices::Set{Int})
+    current_chain::Vector{Int},
+    adj_matrix::SparseMatrixCSC,
+    current_node::Int,
+    prev_node::Int,
+    reduced_indices::Set{Int},
+    irreducible_indices::Set{Int})
     # If current node is reduced stop
     if current_node ∈ reduced_indices
         return Int[]
@@ -148,7 +180,14 @@ function _get_partial_chain_recursive!(
     # Determine the next node to visit. It must not be the `previous_node`.
     # This prevents the traversal from going back and forth between two nodes.
     next_node = (neighbors[1] == prev_node) ? neighbors[2] : neighbors[1]
-    _get_partial_chain_recursive!(current_chain, adj_matrix, next_node, current_node, reduced_indices, irreducible_indices)
+    _get_partial_chain_recursive!(
+        current_chain,
+        adj_matrix,
+        next_node,
+        current_node,
+        reduced_indices,
+        irreducible_indices,
+    )
     return
 end
 
@@ -187,7 +226,8 @@ function find_degree2_chains(adj_matrix::SparseMatrixCSC, irreducible_indices::S
         if node ∈ reduced_indices
             continue
         end
-        chain_path = _get_complete_chain(adj_matrix, node, reduced_indices, irreducible_indices)
+        chain_path =
+            _get_complete_chain(adj_matrix, node, reduced_indices, irreducible_indices)
         if adj_matrix[chain_path[1], chain_path[end]] != 0
             @warn "Nodes $(chain_path[1]) and $(chain_path[end]) already have a parallel path, skipping chain creation."
         else

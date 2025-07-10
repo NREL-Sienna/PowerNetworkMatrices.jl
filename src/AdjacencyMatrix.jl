@@ -44,11 +44,17 @@ function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwarg
         check_connectivity = check_connectivity,
         kwargs...,
     )
+    empty!(ybus.data)
+    adj_matrix = deepcopy(ybus.adjacency_data)
+    for i in 1:size(adj_matrix, 1)
+        adj_matrix[i, i] = 0
+    end
+    dropzeros!(adj_matrix)
     return AdjacencyMatrix(
-       deepcopy(ybus.adjacency_data),
-       deepcopy(ybus.axes),
-       deepcopy(ybus.lookup),
-       deepcopy(ybus.ref_bus_positions)
+        adj_matrix,
+        deepcopy(ybus.axes),
+        deepcopy(ybus.lookup),
+        deepcopy(ybus.ref_bus_positions),
     )
 end
 
