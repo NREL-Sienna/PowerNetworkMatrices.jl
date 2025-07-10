@@ -740,8 +740,7 @@ Builds a Ybus from the system. The return is a Ybus Array indexed with the bus n
 - `check_connectivity::Bool`: Checks connectivity of the network
 """
 function Ybus(
-    sys::PSY.System,
-    floating_point_type::DataType = Float32;
+    sys::PSY.System;
     check_connectivity::Bool = true,
     make_branch_admittance_matrices::Bool = false,
     network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
