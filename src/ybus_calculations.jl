@@ -51,7 +51,7 @@ function add_to_branch_maps!(
     primary_star_arc::PSY.Arc,
     secondary_star_arc::PSY.Arc,
     tertiary_star_arc::PSY.Arc,
-    br::Union{PSY.Transformer3W, PSY.PhaseShiftingTransformer3W},
+    br::PSY.ThreeWindingTransformer,
 )
     transformer3W_map = get_transformer3W_map(nr)
     reverse_transformer3W_map = get_reverse_transformer3W_map(nr)
@@ -590,7 +590,7 @@ function _buildybus!(
     network_reduction::NetworkReduction,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
     branches,
-    transformer_3w::Vector{Union{PSY.PhaseShiftingTransformer3W, PSY.Transformer3W}},
+    transformer_3w::Vector{PSY.ThreeWindingTransformer},
     num_bus::Dict{Int, Int},
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
@@ -828,7 +828,7 @@ function Ybus(
         collect(
             PSY.get_components(
                 x -> PSY.get_available(x),
-                Union{PSY.Transformer3W, PSY.PhaseShiftingTransformer3W},
+                PSY.ThreeWindingTransformer,
                 sys,
             ),
         )
