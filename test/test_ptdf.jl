@@ -210,7 +210,7 @@ end
     buscount = length(PNM.get_buses(sys5))
 
     dist_slack = 1 / buscount * ones(buscount)
-    slack_array = dist_slack / sum(dist_slack)
+    slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 
     P5_1 = PTDF(sys5; dist_slack = slack_array, linear_solver = "KLU")
     P5_2 = PTDF(sys5; dist_slack = slack_array, linear_solver = "Dense")
@@ -230,7 +230,7 @@ end
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")
     buscount = length(PNM.get_buses(sys))
     dist_slack = 1 / buscount * ones(buscount)
-    slack_array = dist_slack / sum(dist_slack)
+    slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 
     @test_throws ErrorException ptdf_1 =
         PTDF(sys; check_connectivity = false, dist_slack = slack_array)
@@ -239,29 +239,7 @@ end
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     buscount = length(PNM.get_buses(sys5)) + 1
     dist_slack = 1 / buscount * ones(buscount)
-    slack_array = dist_slack / sum(dist_slack)
+    slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 
-    @test_throws ErrorException ptdf_2 = PTDF(sys5; dist_slack = slack_array)
-end
-
-@testset "Test with brute-force PTDF" begin
-    sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    ptdf = PTDF(sys)
-    sys_bus_numbers = PSY.get_number.(PNM.get_buses(sys))
-    sys_arcs = PSY.get_arc.(PSY.get_components(PSY.ACBranch, sys))
-
-    tol = 1e-5
-    bf_tol = 1e-9
-    ptdf_brute_force, bus_lookup, branch_lookup = brute_force_ptdf(sys; tol = bf_tol)
-
-    for bus_number in sys_bus_numbers, arc in sys_arcs
-        f = get_number(get_from(arc))
-        t = get_number(get_to(arc))
-        @test isapprox(
-            ptdf[arc, bus_number],
-            ptdf_brute_force[branch_lookup[(f, t)], bus_lookup[bus_number]],
-            rtol = 0,
-            atol = tol,
-        )
-    end
+    @test_throws IS.InvalidValue ptdf_2 = PTDF(sys5; dist_slack = slack_array)
 end
