@@ -46,7 +46,11 @@
         end
     end
 
-    @test isapprox(Ybus5[buses_5[1], buses_5[2]], (-3.5234840209999647 + 35.234840209999646im), atol = 1e-4)
+    @test isapprox(
+        Ybus5[buses_5[1], buses_5[2]],
+        (-3.5234840209999647 + 35.234840209999646im),
+        atol = 1e-4,
+    )
 
     t_sys5_re = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     # Make 2 islands. Island 1: 1 - 5. Island 2: 2, 3 ,4
