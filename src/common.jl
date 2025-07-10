@@ -7,8 +7,8 @@ function _add_to_collection!(
 end
 
 function _add_to_collection!(
-    collection_tr3w::Vector{PSY.Transformer3W},
-    transformer_tr3w::PSY.Transformer3W,
+    collection_tr3w::Vector{PSY.ThreeWindingTransformer},
+    transformer_tr3w::PSY.ThreeWindingTransformer,
 )
     push!(collection_tr3w, transformer_tr3w)
     return
@@ -113,7 +113,7 @@ function get_ac_branches(
     )
 end
 
-#TODO - this needs to take into account network reduction
+#= #TODO - this needs to take into account network reduction
 function get_transformers_3w(
     sys::PSY.System,
 )::Vector{PSY.Transformer3W}
@@ -132,7 +132,7 @@ function get_transformers_3w(
             PSY.get_number(PSY.get_primary_tertiary_arc(x).to),
         ),
     )
-end
+end =#
 
 function get_switched_admittances(sys::PSY.System, reverse_bus_search_map)
     collection = Vector{PSY.SwitchedAdmittance}()
@@ -156,7 +156,7 @@ function get_fixed_admittances(sys::PSY.System, reverse_bus_search_map)
     return collection
 end
 
-"""
+#= """
 Because we need to differentiate between Transformer3W that has 3 arcs and ACTransmission that has 2 arcs, we need this function to know the increment for the branch number
 """
 function _next_branch_number(::PSY.ACTransmission, branch_number::Int)
@@ -169,7 +169,7 @@ Because Transformer3w have 3 arcs, we need to increment the branch number by 3
 function _next_branch_number(::PSY.Transformer3W, branch_number::Int)
     return branch_number + 3
 end
-
+ =#
 function _add_branch_to_lookup!(
     branch_lookup::Dict{String, Int},
     ::Dict{String, Vector{String}},
@@ -186,7 +186,7 @@ function _add_branch_to_lookup!(
     branch_lookup::Dict{String, Int},
     transformer_3w_lookup::Dict{String, Vector{String}},
     branch_type::Vector{DataType},
-    branch::PSY.Transformer3W,
+    branch::PSY.ThreeWindingTransformer,
     branch_number::Int,
 )
     tr3w_name = PSY.get_name(branch)
@@ -199,7 +199,7 @@ function _add_branch_to_lookup!(
     end
     return
 end
-
+#= 
 function get_branch_lookups(branches)
     branch_lookup = Dict{String, Int}()
     transformer_3w_lookup = Dict{String, Vector{String}}()
@@ -217,7 +217,7 @@ function get_branch_lookups(branches)
     end
     return branch_lookup, transformer_3w_lookup, branch_type
 end
-
+ =#
 """
 Gets the non-isolated buses from a given System
 """
@@ -305,7 +305,7 @@ function _add_branch_to_A_matrix!(
 end
 
 function _add_branch_to_A_matrix!(
-    b::PSY.Transformer3W,
+    b::PSY.ThreeWindingTransformer,
     ix::Int,
     bus_lookup::Dict{Int, Int},
     A_I::Vector{Int},
@@ -465,7 +465,7 @@ function _add_branch_to_BA_matrix!(
 end
 
 function _add_branch_to_BA_matrix!(
-    b::PSY.Transformer3W,
+    b::PSY.ThreeWindingTransformer,
     ix::Int,
     bus_lookup::Dict{Int, Int},
     BA_I::Vector{Int},
