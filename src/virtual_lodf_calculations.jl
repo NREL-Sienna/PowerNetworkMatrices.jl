@@ -72,7 +72,7 @@ end
 function _get_PTDF_A_diag(
     K::KLU.KLUFactorization{Float64, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     ref_bus_positions::Set{Int},
 )
     # get inverse of ABA
