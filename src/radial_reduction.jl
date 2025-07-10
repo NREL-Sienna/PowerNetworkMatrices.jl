@@ -7,14 +7,14 @@ function get_reduction(
 end
 
 """
-Builds a NetworkReduction by removing radially connected buses. 
+Builds a NetworkReduction by removing radially connected buses.
 
 # Arguments
 - `sys::System`
 """
 function get_radial_reduction(
     sys::PSY.System;
-    exempt_buses::Vector{Int64} = Int64[],
+    exempt_buses::Vector{Int} = Int[],
 )
     return get_radial_reduction(
         IncidenceMatrix(sys);
@@ -23,14 +23,14 @@ function get_radial_reduction(
 end
 
 """
-Builds a NetworkReduction by removing radially connected buses. 
+Builds a NetworkReduction by removing radially connected buses.
 
 # Arguments
 - `A::IncidenceMatrix`: IncidenceMatrix
 """
 function get_radial_reduction(
     A::IncidenceMatrix;
-    exempt_buses::Vector{Int64} = Int64[],
+    exempt_buses::Vector{Int} = Int[],
 )
     exempt_bus_positions = Set([A.lookup[2][x] for x in exempt_buses])
     return calculate_radial_arcs(
@@ -42,9 +42,9 @@ function get_radial_reduction(
 end
 
 function _find_upstream_bus(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     j::Int,
-    reverse_arc_map::Dict{Int64, Tuple{Int, Int}},
+    reverse_arc_map::Dict{Int, Tuple{Int, Int}},
     radial_arcs::Set{Tuple{Int, Int}},
     reduced_buses::Set{Int},
     reverse_bus_map::Dict{Int, Int},
@@ -60,10 +60,10 @@ function _find_upstream_bus(
 end
 
 function _new_parent(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     parent::Int,
     bus_reduction_map_index::Dict{Int, Set{Int}},
-    reverse_arc_map::Dict{Int64, Tuple{Int, Int}},
+    reverse_arc_map::Dict{Int, Tuple{Int, Int}},
     radial_arcs::Set{Tuple{Int, Int}},
     reverse_bus_map::Dict{Int, Int},
 )
@@ -100,10 +100,10 @@ function _new_parent(
 end
 
 function _reverse_search(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     j::Int,
     bus_reduction_map_index::Dict{Int, Set{Int}},
-    reverse_arc_map::Dict{Int64, Tuple{Int, Int}},
+    reverse_arc_map::Dict{Int, Tuple{Int, Int}},
     radial_arcs::Set{Tuple{Int, Int}},
     reverse_bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},
@@ -154,7 +154,7 @@ used to calculate the branches in the system that are radial and can be
 ignored in the models by exploring the structure of the incidence matrix
 
 # Arguments
-- `A::SparseArrays.SparseMatrixCSC{Int8, Int64}`: Data from the IncidenceMatrix
+- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`: Data from the IncidenceMatrix
 - `line_map::Dict{String, Int}`: Map of Line Name to Matrix Index
 - `bus_map::Dict{Int, Int}`: Map of Bus Name to Matrix Index
 - `ref_bus_positions::Set{Int}`:
@@ -162,7 +162,7 @@ ignored in the models by exploring the structure of the incidence matrix
         to the reference buses
 """
 function calculate_radial_arcs(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     arc_map::Dict{Tuple{Int, Int}, Int},
     bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},

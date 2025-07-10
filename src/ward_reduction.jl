@@ -14,7 +14,7 @@ function get_ward_reduction(
     _validate_study_buses(sys, study_buses, prior_reduction)
     y_bus = Ybus(sys; network_reduction = prior_reduction, check_connectivity = false)
     Z_full = KLU.solve!(klu(y_bus.data), Matrix(one(y_bus.data)))       #TODO: change implementation for large systems (row by row)
-    boundary_buses = Vector{Int64}()
+    boundary_buses = Vector{Int}()
     for branch in get_ac_branches(sys, prior_reduction.removed_branches)
         (from_bus, to_bus) = get_arc_tuple(branch)
         if (from_bus ∈ study_buses) && (to_bus ∉ study_buses)
