@@ -132,6 +132,10 @@ function VirtualLODF(
     )
     ref_bus_positions = Set([Ymatrix.lookup[1][x] for x in Ymatrix.ref_bus_numbers])
     A = IncidenceMatrix(Ymatrix)
+    line_ax = A.axes[1]
+    axes = (line_ax, line_ax)
+    line_ax_ref = make_ax_ref(line_ax)
+    look_up = (line_ax_ref, line_ax_ref)
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
     K = klu(ABA)
@@ -171,8 +175,8 @@ function VirtualLODF(
         1.0 ./ (1.0 .- PTDF_diag),
         ref_bus_positions,
         dist_slack,
-        A.axes,
-        A.lookup,
+        axes,
+        look_up,
         valid_ix,
         temp_data,
         empty_cache,
