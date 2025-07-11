@@ -97,8 +97,9 @@ end
 @testset "Test Virtual PTDF with distributed slack" begin
     # get 5 bus system
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
-    bus_number = length(PNM.get_buses(sys))
-    dist_slack = 1 / bus_number * ones(bus_number)
+    buscount = length(PNM.get_buses(sys))
+    dist_slack_factor = 1 / buscount
+    dist_slack = Dict(i => dist_slack_factor for i in 1:buscount)
     # compute full PTDF
     ptdf = PTDF(sys; dist_slack = dist_slack)
     # compute each row of the virtual PTDF and compare values
@@ -112,24 +113,23 @@ end
 
 @testset "Test Virtual PTDF matrix with distributed bus and with 2 reference buses" begin
     # check if an error is correctly thrown
-
     # 2 reference bus system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")
     buscount = length(PNM.get_buses(sys))
-    dist_slack = 1 / buscount * ones(buscount)
-    slack_array = dist_slack / sum(dist_slack)
-
-    ptdf_1 = VirtualPTDF(sys; dist_slack = slack_array)
+    dist_slack_factor = 1 / buscount
+    dist_slack = Dict(i => dist_slack_factor for i in 1:buscount)
+    ptdf_1 = VirtualPTDF(sys; dist_slack = dist_slack)
     @test_throws ErrorException ptdf_1[1, 1]
 
-    # incorrect dist_slack array length
+    # entry in dist_slack dict not belonging to system/matrix
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     buscount = length(PNM.get_buses(sys5)) + 1
-    dist_slack = 1 / buscount * ones(buscount)
-    slack_array = dist_slack / sum(dist_slack)
-    test_val2 = false
-    ptdf_2 = VirtualPTDF(sys5; dist_slack = slack_array)
-    @test_throws ErrorException ptdf_2[1, 1]
+    dist_slack_factor = 1 / buscount
+    dist_slack = Dict(i => dist_slack_factor for i in 1:buscount)
+    @test_throws InfrastructureSystems.InvalidValue VirtualPTDF(
+        sys5;
+        dist_slack = dist_slack,
+    )
 end
 
 @testset "Test Virtual PTDF auxiliary functions" begin
