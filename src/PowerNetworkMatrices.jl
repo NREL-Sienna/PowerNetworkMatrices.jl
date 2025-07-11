@@ -10,15 +10,18 @@ export get_lodf_data
 export get_bus_reduction_map
 export get_radial_reduction
 export get_ward_reduction
-export get_reduction_type
-export get_network_reduction
+export get_reductions
+export get_network_reduction_data
 export IncidenceMatrix
 export AdjacencyMatrix
 export is_factorized
 export LODF
 export PTDF
 export NetworkReduction
-export NetworkReductionTypes
+export NetworkReductionData
+export RadialReduction
+export DegreeTwoReduction
+export WardReduction
 
 export to_hdf5
 export validate_connectivity

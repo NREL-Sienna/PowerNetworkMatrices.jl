@@ -20,7 +20,7 @@ struct IncidenceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 # functions to get stored data
@@ -30,7 +30,7 @@ get_slack_positions(A::IncidenceMatrix) = A.ref_bus_positions
 
 function IncidenceMatrix(sys::PSY.System;
     check_connectivity::Bool = true,
-    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     return IncidenceMatrix(
@@ -44,7 +44,7 @@ function IncidenceMatrix(sys::PSY.System;
 end
 
 function IncidenceMatrix(ybus::Ybus)
-    nr = ybus.network_reduction
+    nr = ybus.network_reduction_data
     direct_arcs = [x for x in keys(nr.direct_branch_map)]
     parallel_arcs = [x for x in keys(nr.parallel_branch_map)]
     series_arcs = [x for x in keys(nr.series_branch_map)]
@@ -68,5 +68,11 @@ function IncidenceMatrix(ybus::Ybus)
     axes = (arc_ax, bus_ax)
     lookup = (make_ax_ref(arc_ax), make_ax_ref(bus_ax))
     ref_bus_positions = Set([lookup[2][x] for x in ybus.ref_bus_numbers])
-    return IncidenceMatrix(data, axes, lookup, ref_bus_positions, ybus.network_reduction)
+    return IncidenceMatrix(
+        data,
+        axes,
+        lookup,
+        ref_bus_positions,
+        ybus.network_reduction_data,
+    )
 end

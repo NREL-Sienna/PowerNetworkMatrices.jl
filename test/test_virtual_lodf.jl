@@ -1,5 +1,9 @@
 @testset "Test Virtual LODF matrices" begin
-    sys = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys")
+    sys =
+        @test_logs (:error, r"no active generators found at bus") match_mode = :any PSB.build_system(
+            PSB.PSYTestSystems,
+            "tamu_ACTIVSg2000_sys",
+        )
     vlodf = VirtualLODF(sys)
     LODF_ref = LODF(sys)
 

@@ -58,7 +58,7 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
@@ -118,7 +118,7 @@ function VirtualLODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
-    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     if length(dist_slack) != 0
@@ -182,14 +182,8 @@ function VirtualLODF(
         empty_cache,
         Ymatrix.subnetworks,
         Ref(tol),
-        Ymatrix.network_reduction,
+        Ymatrix.network_reduction_data,
     )
-    # previously the code was:
-    #=
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    return VirtualLODF(branches, buses; network_reduction = network_reduction, kwargs...)
-    =#
 end
 
 # Overload Base functions

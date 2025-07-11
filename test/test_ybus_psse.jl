@@ -62,7 +62,7 @@ end
     ]
     skip_indices = indexin(ref_bus_numbers, Ybus_pnm.axes[1])
     n_ref_bus_elements = nnz(Ybus_pnm.data[skip_indices, :])
-    nr = Ybus_pnm.network_reduction
+    nr = Ybus_pnm.network_reduction_data
 
     #Test adjacency and Ybus have same non-zero elements
     findnz(Ybus_pnm.data)[1] == findnz(Ybus_pnm.adjacency_data)[1]
@@ -95,7 +95,7 @@ end
         runchecks = false,
     )
     Ybus_pnm = Ybus(sys_240)
-    nr = Ybus_pnm.network_reduction
+    nr = Ybus_pnm.network_reduction_data
     ref_bus_numbers = [
         get_number(x) for
         x in get_components(x -> get_bustype(x) == PSY.ACBusTypes.REF, ACBus, sys_240)
@@ -133,7 +133,7 @@ end
         )
 
     Ybus_pnm = Ybus(sys)
-    nr = Ybus_pnm.network_reduction
+    nr = Ybus_pnm.network_reduction_data
     ref_bus_numbers = [
         get_number(x) for
         x in get_components(x -> get_bustype(x) == PSY.ACBusTypes.REF, ACBus, sys)
@@ -181,7 +181,7 @@ end
     ]
     skip_indices = indexin(ref_bus_numbers, Ybus_pnm.axes[1])
     n_ref_bus_elements = nnz(Ybus_pnm.data[skip_indices, :])
-    nr = Ybus_pnm.network_reduction
+    nr = Ybus_pnm.network_reduction_data
 
     #Test adjacency and Ybus have same non-zero elements
     findnz(Ybus_pnm.data)[1] == findnz(Ybus_pnm.adjacency_data)[1]

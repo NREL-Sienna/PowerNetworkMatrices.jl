@@ -1,3 +1,16 @@
+struct WardReduction <: NetworkReduction
+    study_buses::Vector{Int}
+end
+get_study_buses(nr::WardReduction) = nr.study_buses
+
+function get_reduction(
+    ybus::Ybus,
+    sys::PSY.System,
+    nr::WardReduction,
+)
+    return get_ward_reduction(ybus, nr)
+end
+
 """
 Builds a NetworkReduction corresponding to Ward reduction
 
@@ -6,43 +19,32 @@ Builds a NetworkReduction corresponding to Ward reduction
 - `study_buses::Vector{Int}`: Bus numbers corresponding to the area of study (the retained area)
 """
 function get_ward_reduction(
-    sys::PSY.System,
-    study_buses::Vector{Int};
-    prior_reduction::NetworkReduction = NetworkReduction(),
+    y_bus::Ybus,
+    reduction::WardReduction,
 )
-    validate_reduction_type(NetworkReductionTypes.WARD, get_reduction_type(prior_reduction))
-    _validate_study_buses(sys, study_buses, prior_reduction)
-    y_bus = Ybus(sys; network_reduction = prior_reduction, check_connectivity = false)
-    Z_full = KLU.solve!(klu(y_bus.data), Matrix(one(y_bus.data)))       #TODO: change implementation for large systems (row by row)
-    boundary_buses = Vector{Int}()
-    for branch in get_ac_branches(sys, prior_reduction.removed_branches)
-        (from_bus, to_bus) = get_arc_tuple(branch)
-        if (from_bus ∈ study_buses) && (to_bus ∉ study_buses)
-            push!(boundary_buses, from_bus)
+    study_buses = get_study_buses(reduction)
+    #_validate_study_buses(ybus, study_buses)    #TODO- add data validation of study buses 
+    Z_full = KLU.solve!(klu(y_bus.data), Matrix{ComplexF64}(one(y_bus.data)))       #TODO: change implementation for large systems (row by row)
+    A = IncidenceMatrix(y_bus)
+    boundary_buses = Set{Int}()
+    removed_arcs = Set{Tuple{Int, Int}}()
+    for arc in A.axes[1]
+        #Deterimine boundary buses: 
+        if (arc[1] ∈ study_buses) && (arc[2] ∉ study_buses)
+            push!(boundary_buses, arc[1])
+        elseif (arc[1] ∉ study_buses) && (arc[2] ∈ study_buses)
+            push!(boundary_buses, arc[2])
         end
-        if (to_bus ∈ study_buses) && (from_bus ∉ study_buses)
-            push!(boundary_buses, to_bus)
+        #Determine arcs outside of study area 
+        if !(arc[1] ∈ study_buses && arc[2] ∈ study_buses)
+            push!(removed_arcs, arc)
         end
     end
-    all_buses =
-        [PSY.get_number(b) for b in get_buses(sys, prior_reduction.bus_reduction_map)]
+    all_buses = y_bus.axes[1]
     external_buses = setdiff(all_buses, study_buses)
     boundary_buses = unique(boundary_buses)
     n_external = length(external_buses)
     n_boundary = length(boundary_buses)
-
-    retained_branches = Set{String}()
-    removed_branches = Set{String}()
-    for branch in get_ac_branches(sys, prior_reduction.removed_branches)
-        (from_bus, to_bus) = get_arc_tuple(branch)
-        if (from_bus ∈ external_buses) && (to_bus ∈ external_buses) ||
-           (from_bus ∈ boundary_buses) && (to_bus ∈ external_buses) ||
-           (from_bus ∈ external_buses) && (to_bus ∈ boundary_buses)
-            push!(removed_branches, PSY.get_name(branch))
-        else
-            push!(retained_branches, PSY.get_name(branch))
-        end
-    end
 
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
     bus_lookup = y_bus.lookup[1]    #y_bus and Z have same lookup
@@ -58,19 +60,19 @@ function get_ward_reduction(
         _make_reverse_bus_search_map(bus_reduction_map_index, length(all_buses))
 
     #Populate matrices for computing external equivalent
-    y_ee = SparseArrays.spzeros(ComplexF64, n_external, n_external)
+    y_ee = SparseArrays.spzeros(ComplexF32, n_external, n_external)
     for (ix, i) in enumerate(external_buses)
         for (jx, j) in enumerate(external_buses)
             y_ee[ix, jx] = y_bus[i, j]
         end
     end
-    y_be = SparseArrays.spzeros(ComplexF64, n_boundary, n_external)
+    y_be = SparseArrays.spzeros(ComplexF32, n_boundary, n_external)
     for (ix, i) in enumerate(boundary_buses)
         for (jx, j) in enumerate(external_buses)
             y_be[ix, jx] = y_bus[i, j]
         end
     end
-    y_eb = SparseArrays.spzeros(ComplexF64, n_external, n_boundary)
+    y_eb = SparseArrays.spzeros(ComplexF32, n_external, n_boundary)
     for (ix, i) in enumerate(external_buses)
         for (jx, j) in enumerate(boundary_buses)
             y_eb[ix, jx] = y_bus[i, j]
@@ -78,53 +80,41 @@ function get_ward_reduction(
     end
 
     # Eq. (2.16) from  https://core.ac.uk/download/pdf/79564835.pdf
-    y_eq = y_be * KLU.solve!(klu(y_ee), Matrix(y_eb))
+    y_eq = y_be * KLU.solve!(klu(y_ee), Matrix{Complex{Float64}}(y_eb))
 
-    added_branches = Vector{PSY.ACTransmission}()
-    added_admittances = Vector{PSY.FixedAdmittance}()
+    added_branch_map = Dict{Tuple{Int, Int}, PSY.Line}()
+    added_admittance_map = Dict{Int, PSY.FixedAdmittance}()
     virtual_admittance_name_index = 1
     virtual_branch_name_index = 1
     #Loop upper diagonal of Yeq
+    ix_to_bus_map = Dict(v => k for (k, v) in y_bus.lookup[1])
     for ix in 1:length(boundary_buses)
         for jx in ix:length(boundary_buses)
+            bx = ix_to_bus_map[ix]
+            bx2 = ix_to_bus_map[jx]
             if y_eq[ix, jx] != 0.0
                 if ix == jx
-                    bus = collect(
-                        PSY.get_components(
-                            x -> PSY.get_number(x) == boundary_buses[ix],
-                            PSY.ACBus,
-                            sys,
-                        ),
-                    )[1]
                     virtual_admittance = PSY.FixedAdmittance(;
                         name = "virtual_admittance_$(virtual_admittance_name_index)",
                         available = true,
-                        bus = bus,
+                        bus = PSY.ACBus(nothing),
                         Y = y_eq[ix, jx],
                     )
-                    push!(added_admittances, virtual_admittance)
+                    added_admittance_map[ix] = virtual_admittance
                     virtual_admittance_name_index += 1
                 else
-                    to_bus = collect(
-                        PSY.get_components(
-                            x -> PSY.get_number(x) == boundary_buses[ix],
-                            PSY.ACBus,
-                            sys,
-                        ),
-                    )[1]
-                    from_bus = collect(
-                        PSY.get_components(
-                            x -> PSY.get_number(x) == boundary_buses[jx],
-                            PSY.ACBus,
-                            sys,
-                        ),
-                    )[1]
+                    #check if the arc of virtual line is already existing so we don't add an additional arc
+                    if (bx2, bx) ∈ A.axes[1]
+                        arc_key = (bx2, bx)
+                    else
+                        arc_key = (bx, bx2)
+                    end
                     virtual_branch = PSY.Line(;
                         name = "virtual_branch_$(virtual_branch_name_index)",
                         available = true,
                         active_power_flow = 0.0,
                         reactive_power_flow = 0.0,
-                        arc = PSY.Arc(; from = from_bus, to = to_bus),
+                        arc = PSY.Arc(; from = PSY.ACBus(nothing), to = PSY.ACBus(nothing)),
                         r = -1 * real(y_eq[ix, jx]),
                         x = -1 * imag(y_eq[ix, jx]),
                         b = (from = 0.0, to = 0.0),
@@ -132,32 +122,27 @@ function get_ward_reduction(
                         angle_limits = (min = (-pi / 3), max = (pi / 3)),
                         g = (from = 0.0, to = 0.0),
                     )
-                    push!(added_branches, virtual_branch)
+                    added_branch_map[arc_key] = virtual_branch
                     virtual_branch_name_index += 1
                 end
             end
         end
     end
-    new_reduction = NetworkReduction(;
+    return NetworkReductionData(;
         bus_reduction_map = bus_reduction_map_index,
         reverse_bus_search_map = reverse_bus_search_map,
-        removed_branches = removed_branches,
-        retained_branches = retained_branches,
-        added_branches = added_branches,
-        added_admittances = added_admittances,
-        reduction_type = [NetworkReductionTypes.WARD],
+        removed_arcs = removed_arcs,
+        added_branch_map = added_branch_map,
+        added_admittance_map = added_admittance_map,
+        reductions = NetworkReduction[reduction],
     )
-    if isempty(prior_reduction)
-        return new_reduction
-    else
-        return compose_reductions(prior_reduction, new_reduction, length(all_buses))
-    end
 end
 
+# TODO - add checks of valid study buses 
 function _validate_study_buses(
     sys::PSY.System,
     study_buses::Vector{Int},
-    network_reduction::NetworkReduction,
+    network_reduction::NetworkReductionData,
 )
     buses = get_buses(sys, network_reduction.bus_reduction_map)
     branches = get_ac_branches(sys, network_reduction.removed_branches)

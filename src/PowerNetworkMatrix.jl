@@ -311,7 +311,7 @@ get_data(mat::PowerNetworkMatrix) = mat.data
 get_lookup(mat::PowerNetworkMatrix) = mat.lookup
 
 function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetworkMatrix}
-    nr = A.network_reduction
+    nr = A.network_reduction_data
     for (k, v) in nr.reverse_direct_branch_map
         if branch_name == PSY.get_name(k)
             return 1.0, v

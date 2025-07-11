@@ -24,12 +24,12 @@ struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 function BA_Matrix(sys::PSY.System;
     check_connectivity::Bool = true,
-    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
+    network_reductions::Vector{NetworkReduction} = Vector{NetworkReduction}(),
     kwargs...,
 )
     return BA_Matrix(
@@ -43,7 +43,7 @@ function BA_Matrix(sys::PSY.System;
 end
 
 function BA_Matrix(ybus::Ybus)
-    nr = ybus.network_reduction
+    nr = ybus.network_reduction_data
     direct_arcs = [x for x in keys(nr.direct_branch_map)]
     parallel_arcs = [x for x in keys(nr.parallel_branch_map)]
     series_arcs = [x for x in keys(nr.series_branch_map)]
@@ -73,7 +73,7 @@ function BA_Matrix(ybus::Ybus)
     axes = (bus_ax, arc_ax)
     lookup = (make_ax_ref(bus_ax), make_ax_ref(arc_ax))
     ref_bus_positions = Set([lookup[1][x] for x in ybus.ref_bus_numbers])
-    return BA_Matrix(data, axes, lookup, ref_bus_positions, ybus.network_reduction)
+    return BA_Matrix(data, axes, lookup, ref_bus_positions, ybus.network_reduction_data)
 end
 
 """
@@ -109,13 +109,13 @@ struct ABA_Matrix{
     ref_bus_positions::Set{Int}
     ref_bus_numbers::Set{Int}
     K::F
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 function ABA_Matrix(sys::PSY.System;
     factorize::Bool = false,
     check_connectivity::Bool = true,
-    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     ymatrix = Ybus(
@@ -147,7 +147,7 @@ function ABA_Matrix(sys::PSY.System;
         ref_bus_positions,
         ref_bus_numbers,
         K,
-        ymatrix.network_reduction,
+        ymatrix.network_reduction_data,
     )
 end
 
@@ -166,7 +166,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.ref_bus_positions),
         deepcopy(ABA.ref_bus_numbers),
         klu(ABA.data),
-        deepcopy(ABA.network_reduction),
+        deepcopy(ABA.network_reduction_data),
     )
     return ABA_lu
 end

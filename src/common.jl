@@ -14,7 +14,7 @@ function _add_to_collection!(
     return
 end
 
-function get_bus_index(bus_no::Int, bus_lookup::Dict{Int, Int}, nr::NetworkReduction)
+function get_bus_index(bus_no::Int, bus_lookup::Dict{Int, Int}, nr::NetworkReductionData)
     if haskey(nr.reverse_bus_search_map, bus_no)
         return bus_lookup[nr.reverse_bus_search_map[bus_no]]
     else
@@ -25,7 +25,7 @@ end
 function get_bus_index(
     dev::PSY.Component,
     bus_lookup::Dict{Int, Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
 )
     bus_number = PSY.get_number(PSY.get_bus(dev))
     return get_bus_index(bus_number, bus_lookup, nr)
@@ -34,7 +34,7 @@ end
 function get_bus_indices(
     arc::PSY.Arc,
     bus_lookup::Dict{Int, Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
 )
     check_arc_validity(arc, IS.get_name(arc))
     reverse_bus_search_map = get_reverse_bus_search_map(nr)
@@ -290,15 +290,15 @@ NOTE:
 function calculate_A_matrix(
     branches::Vector{<:PSY.ACTransmission},
     buses::Vector{PSY.ACBus},
-    network_reduction::NetworkReduction,
+    network_reduction_data::NetworkReductionData,
 )
     ref_bus_positions = find_slack_positions(buses)
     bus_lookup = make_ax_ref(buses)
-    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
+    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction_data)
     A_I = Int[]
     A_J = Int[]
     A_V = Int8[]
-    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
+    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction_data)
     # build incidence matrix A (lines x buses)
     for (ix, b) in enumerate(branches)
         # we offload the logic to separate functions because we need to treat Transformer3W differently
@@ -307,7 +307,6 @@ function calculate_A_matrix(
 
     return SparseArrays.sparse(A_I, A_J, A_V), ref_bus_positions
 end
-
 
 function _add_branch_to_BA_matrix!(
     b::PSY.ACTransmission,
@@ -369,12 +368,12 @@ Evaluates the transposed BA matrix given the System's banches, reference bus pos
 function calculate_BA_matrix(
     branches,
     bus_lookup::Dict{Int, Int},
-    network_reduction::NetworkReduction,
+    network_reduction_data::NetworkReductionData,
 )
     BA_I = Int[]
     BA_J = Int[]
     BA_V = Float64[]
-    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
+    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction_data)
     for (ix, b) in enumerate(branches)
         # we offload the logic to separate functions because we need to treat Transformer3W differently
         _add_branch_to_BA_matrix!(

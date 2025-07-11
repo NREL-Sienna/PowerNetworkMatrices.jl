@@ -2,8 +2,8 @@
     for name in ["c_sys14", "test_RTS_GMLC_sys"]
         sys = PSB.build_system(PSB.PSITestSystems, name)
         BA = BA_Matrix(sys)
-        BA_rad = BA_Matrix(sys; network_reductions = [NetworkReductionTypes.RADIAL])
-        nr = BA_rad.network_reduction
+        BA_rad = BA_Matrix(sys; network_reductions = NetworkReduction[RadialReduction()])
+        nr = BA_rad.network_reduction_data
         bus_numbers = []
         for i in keys(nr.bus_reduction_map)
             append!(bus_numbers, collect(nr.bus_reduction_map[i]))
@@ -24,17 +24,18 @@ end
 
         # get the original and reduced IncidenceMatrix, BA and ABA
         A = IncidenceMatrix(sys)
-        A_rad = IncidenceMatrix(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+        A_rad =
+            IncidenceMatrix(sys; network_reductions = NetworkReduction[RadialReduction()])
         BA = BA_Matrix(sys)
-        BA_rad = BA_Matrix(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+        BA_rad = BA_Matrix(sys; network_reductions = NetworkReduction[RadialReduction()])
         ABA = ABA_Matrix(sys; factorize = true)
         ABA_rad = ABA_Matrix(
             sys;
             factorize = true,
-            network_reductions = [NetworkReductionTypes.RADIAL],
+            network_reductions = NetworkReduction[RadialReduction()],
         )
 
-        nr = A_rad.network_reduction
+        nr = A_rad.network_reduction_data
         # check if the same angles and flows are computed with the matrices of the reduced systems
         # get the indices for the reduced system
         bus_numbers = []

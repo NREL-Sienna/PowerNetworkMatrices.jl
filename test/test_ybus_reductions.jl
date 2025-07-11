@@ -3,25 +3,25 @@ sys = System(joinpath(TEST_DATA_DIR, "case14_reductions.raw"))
 # Full Matrix 
 ybus = Ybus(sys)
 A = IncidenceMatrix(ybus)
-nr = ybus.network_reduction;
+nr = ybus.network_reduction_data;
 
 # Radial Reduction
-ybus_radial = Ybus(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+ybus_radial = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
 A_radial = IncidenceMatrix(ybus_radial)
-nr_radial = ybus_radial.network_reduction;
+nr_radial = ybus_radial.network_reduction_data;
 
 # Degree Two Reduction 
-ybus_degree_two = Ybus(sys; network_reductions = [NetworkReductionTypes.DEGREE_TWO])
+ybus_degree_two = Ybus(sys; network_reductions = NetworkReduction[DegreeTwoReduction()])
 A_degree_two = IncidenceMatrix(ybus_degree_two)
-nr_degree_two = ybus_degree_two.network_reduction;
+nr_degree_two = ybus_degree_two.network_reduction_data;
 
 # Radial + Degree Two Reduction 
 ybus_radial_degree_two = Ybus(
     sys;
-    network_reductions = [NetworkReductionTypes.RADIAL, NetworkReductionTypes.DEGREE_TWO],
+    network_reductions = [RadialReduction(), DegreeTwoReduction()],
 )
 A_radial_degree_two = IncidenceMatrix(ybus_radial_degree_two)
-nr_radial_degree_two = ybus_radial_degree_two.network_reduction;
+nr_radial_degree_two = ybus_radial_degree_two.network_reduction_data;
 
 @test length(nr_radial_degree_two.series_branch_map) == 1 #One set of series lines 
 @test length(nr_radial_degree_two.reverse_bus_search_map) == 4 #Two breaker/switches and a two radial arcs 

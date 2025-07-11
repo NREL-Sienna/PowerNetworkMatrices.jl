@@ -4,15 +4,16 @@
         sys = PSB.build_system(PSB.PSITestSystems, name)
 
         # get the A and BA matrices without radial lines
-        A_rad = IncidenceMatrix(sys; network_reductions = [NetworkReductionTypes.RADIAL])
-        BA_rad = BA_Matrix(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+        A_rad =
+            IncidenceMatrix(sys; network_reductions = NetworkReduction[RadialReduction()])
+        BA_rad = BA_Matrix(sys; network_reductions = NetworkReduction[RadialReduction()])
 
         # get the NetworkReduction struct
-        rb = A_rad.network_reduction
+        rb = A_rad.network_reduction_data
 
         # get the original and reduced PTDF matrices (consider different methods)
         ptdf = PTDF(sys)
-        ptdf_rad = PTDF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+        ptdf_rad = PTDF(sys; network_reductions = NetworkReduction[RadialReduction()])
         ptdf_rad_A_BA = PTDF(A_rad, BA_rad)
 
         # check if the same angles and flows are computed with the matrices of the reduced systems
@@ -87,8 +88,8 @@ end
             sys = PSB.build_system(PSB.PSITestSystems, name)
             # get the radial branches
             A = IncidenceMatrix(sys)
-            rb = get_network_reduction(
-                Ybus(sys; network_reductions = [NetworkReductionTypes.RADIAL]),
+            rb = get_network_reduction_data(
+                Ybus(sys; network_reductions = NetworkReduction[RadialReduction()]),
             )
             # get number of buses
             buscount = length(PNM.get_buses(sys))
@@ -119,7 +120,7 @@ end
             ptdf = PTDF(sys; dist_slack = slack_dict)
             ptdf_rad = PTDF(
                 sys;
-                network_reductions = [NetworkReductionTypes.RADIAL],
+                network_reductions = NetworkReduction[RadialReduction()],
                 dist_slack = slack_dict,
             )
 
@@ -180,7 +181,7 @@ end
     # get the A and BA matrices without radial lines
     A = IncidenceMatrix(sys)
     BA = BA_Matrix(sys)
-    BA_rad = BA_Matrix(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+    BA_rad = BA_Matrix(sys; network_reductions = NetworkReduction[RadialReduction()])
 
     test_value = false
     try

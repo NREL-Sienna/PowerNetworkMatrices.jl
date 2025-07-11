@@ -57,7 +57,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
@@ -98,7 +98,7 @@ function VirtualPTDF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
-    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     Ymatrix = Ybus(
@@ -110,13 +110,13 @@ function VirtualPTDF(
     ref_bus_positions = Set([Ymatrix.lookup[1][x] for x in Ymatrix.ref_bus_numbers])
     A = IncidenceMatrix(Ymatrix)
     if !(isempty(dist_slack))
-        dist_slack_vector = redistribute_dist_slack(dist_slack, A, A.network_reduction)
+        dist_slack_vector = redistribute_dist_slack(dist_slack, A, A.network_reduction_data)
     else
         dist_slack_vector = Float64[]
     end
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
-    bus_ax = A.axes[2] 
+    bus_ax = A.axes[2]
     axes = A.axes
     look_up = A.lookup
     subnetworks = Ymatrix.subnetworks
@@ -150,7 +150,7 @@ function VirtualPTDF(
         empty_cache,
         subnetworks,
         Ref(tol),
-        Ymatrix.network_reduction,
+        Ymatrix.network_reduction_data,
     )
 end
 

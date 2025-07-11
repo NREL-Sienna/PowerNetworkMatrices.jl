@@ -14,16 +14,16 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
     axes::Ax
     lookup::L
     subnetworks::Dict{Int, Set{Int}}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
     yft::Union{SparseArrays.SparseMatrixCSC{ComplexF32, Int}, Nothing}
     ytf::Union{SparseArrays.SparseMatrixCSC{ComplexF32, Int}, Nothing}
     fb::Union{Vector{Int}, Nothing}
     tb::Union{Vector{Int}, Nothing}
 end
 
-get_network_reduction(y::Ybus) = y.network_reduction
+get_network_reduction_data(y::Ybus) = y.network_reduction_data
 
-function add_to_branch_maps!(nr::NetworkReduction, arc::PSY.Arc, br::PSY.Branch)
+function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.Branch)
     direct_branch_map = get_direct_branch_map(nr)
     reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
     parallel_branch_map = get_parallel_branch_map(nr)
@@ -47,7 +47,7 @@ function add_to_branch_maps!(nr::NetworkReduction, arc::PSY.Arc, br::PSY.Branch)
 end
 
 function add_to_branch_maps!(
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
     primary_star_arc::PSY.Arc,
     secondary_star_arc::PSY.Arc,
     tertiary_star_arc::PSY.Arc,
@@ -83,7 +83,7 @@ function _ybus!(
     branch_ix::Int,
     fb::Vector{Int},
     tb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     arc = PSY.get_arc(br)
@@ -120,7 +120,7 @@ function _ybus!(
     branch_ix::Int,
     fb::Vector{Int},
     tb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     arc = PSY.get_arc(br)
@@ -158,7 +158,7 @@ function _ybus!(
     branch_ix::Int,
     fb::Vector{Int},
     tb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     _ybus!(
@@ -188,7 +188,7 @@ function _ybus!(
     branch_ix::Int,
     fb::Vector{Int},
     tb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     arc = PSY.get_arc(br)
@@ -229,7 +229,7 @@ function _ybus!(
     fb::Vector{Int},
     tb::Vector{Int},
     ix::Int,
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     primary_star_arc = PSY.get_primary_star_arc(br)
@@ -333,7 +333,7 @@ function _ybus!(
     fb::Vector{Int},
     tb::Vector{Int},
     ix::Int,
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     primary_star_arc = PSY.get_primary_star_arc(br)
@@ -434,7 +434,7 @@ function _ybus!(
     branch_ix::Int,
     fb::Vector{Int},
     tb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     arc = PSY.get_arc(br)
@@ -476,7 +476,7 @@ function _ybus!(
     branch_ix::Int,
     fb::Vector{Int},
     tb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     arc = PSY.get_arc(br)
@@ -513,7 +513,7 @@ function _ybus!(
     num_bus::Dict{Int, Int},
     fa_ix::Int,
     sb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
 )
     bus_no = get_bus_index(fa, num_bus, nr)
     Y = PSY.get_Y(fa)
@@ -534,7 +534,7 @@ function _ybus!(
     num_bus::Dict{Int, Int},
     fa_ix::Int,
     sb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
 )
     bus_no = get_bus_index(fa, num_bus, nr)
     sb[fa_ix] = bus_no
@@ -548,7 +548,7 @@ function _ybus!(
     num_bus::Dict{Int, Int},
     fa_ix::Int,
     sb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
 )
     bus_no = get_bus_index(fa, num_bus, nr)
     Y = PSY.get_impedance_active_power(fa) + im * PSY.get_impedance_reactive_power(fa)
@@ -572,7 +572,7 @@ function _ybus!(
     branch_ix::Int,
     fb::Vector{Int},
     tb::Vector{Int},
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
 )
     arc = PSY.get_arc(br)
     bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
@@ -597,7 +597,7 @@ function _ybus!(
 end
 
 function _buildybus!(
-    network_reduction::NetworkReduction,
+    network_reduction_data::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
     branches,
     transformer_3w::Vector{PSY.ThreeWindingTransformer},
@@ -633,7 +633,7 @@ function _buildybus!(
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb, network_reduction, adj)
+        _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb, network_reduction_data, adj)
     end
 
     ix = 1
@@ -652,13 +652,13 @@ function _buildybus!(
             fb,
             tb,
             ix,
-            network_reduction,
+            network_reduction_data,
             adj,
         )
         ix += n_entries
     end
     for (ix, fa) in enumerate([fixed_admittances; switched_admittances; standard_loads])
-        _ybus!(ysh, fa, num_bus, ix, sb, network_reduction)
+        _ybus!(ysh, fa, num_bus, ix, sb, network_reduction_data)
     end
     return (
         y11,
@@ -682,11 +682,11 @@ function Ybus(
     sys::PSY.System;
     check_connectivity::Bool = true,
     make_branch_admittance_matrices::Bool = false,
-    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     ref_bus_numbers = Set{Int}()
-    nr = NetworkReduction()
+    nr = NetworkReductionData()
     bus_reduction_map = get_bus_reduction_map(nr)
     reverse_bus_search_map = get_reverse_bus_search_map(nr)
 
@@ -850,7 +850,7 @@ function Ybus(
             ybus.axes,
             ybus.lookup,
             subnetworks,
-            ybus.network_reduction,
+            ybus.network_reduction_data,
             ybus.yft,
             ybus.ytf,
             ybus.fb,
@@ -861,12 +861,17 @@ function Ybus(
     end
 end
 
-function build_reduced_ybus(ybus::Ybus, sys::PSY.System, reduction::NetworkReductionTypes)
-    nr = get_reduction(ybus, sys, Val(reduction))
-    return _apply_reduction(ybus, nr)
+function build_reduced_ybus(
+    ybus::Ybus,
+    sys::PSY.System,
+    network_reduction::NetworkReduction,
+)
+    network_reduction_data = get_reduction(ybus, sys, network_reduction)
+    return _apply_reduction(ybus, network_reduction_data)
 end
 
-function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
+#NOTE: this is the key function that composes sequential reductions; this function needs cleanup, review, and more testing. 
+function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     remake_reverse_direct_branch_map = false
     remake_reverse_parallel_branch_map = false
     remake_reverse_series_branch_map = false
@@ -875,7 +880,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
     adjacency_data = ybus.adjacency_data    #TODO add getters
     lookup = get_lookup(ybus)
     bus_lookup = lookup[1]
-    nr = ybus.network_reduction
+    nr = ybus.network_reduction_data
     bus_numbers_to_remove = Vector{Int}()
     for (k, v) in nr_new.reverse_bus_search_map
         nr.reverse_bus_search_map[k] = v
@@ -888,6 +893,9 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
     for (k, v) in nr_new.bus_reduction_map
         if haskey(nr.bus_reduction_map, k)
             union!(nr.bus_reduction_map[k], nr_new.bus_reduction_map[k])
+            for x in v
+                delete!(nr.bus_reduction_map, x)
+            end
         else
             error("Bus $k was previously reduced")
         end
@@ -938,8 +946,12 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
     remake_reverse_parallel_branch_map && _remake_reverse_parallel_branch_map!(nr)
     remake_reverse_series_branch_map && _remake_reverse_series_branch_map!(nr)
     remake_reverse_transformer3W_map && _remake_reverse_transformer3W_map!(nr)
+    #Assumes only the last reduction (Ward) can add branches and admittances
+    nr.added_branch_map = nr_new.added_branch_map
+    nr.added_admittance_map = nr_new.added_admittance_map
 
-    push!(nr.reduction_type, nr_new.reduction_type[1])
+    #TODO - loop through added branches and admittances and modify the Ybus for Ward reduction
+    push!(nr.reductions, nr_new.reductions[1])
     bus_ax = setdiff(ybus.axes[1], bus_numbers_to_remove)
     bus_lookup = make_ax_ref(bus_ax)
     bus_ix = [ybus.lookup[1][x] for x in bus_ax]
@@ -961,14 +973,14 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReduction)
     )
 end
 
-function _remake_reverse_direct_branch_map!(nr::NetworkReduction)
+function _remake_reverse_direct_branch_map!(nr::NetworkReductionData)
     reverse_direct_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
     for (k, v) in nr.direct_branch_map
         reverse_direct_branch_map[v] = k
     end
     nr.reverse_direct_branch_map = reverse_direct_branch_map
 end
-function _remake_reverse_parallel_branch_map!(nr::NetworkReduction)
+function _remake_reverse_parallel_branch_map!(nr::NetworkReductionData)
     reverse_parallel_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
     for (k, v) in nr.parallel_branch_map
         for x in v
@@ -977,7 +989,7 @@ function _remake_reverse_parallel_branch_map!(nr::NetworkReduction)
     end
     nr.reverse_parallel_branch_map = reverse_parallel_branch_map
 end
-function _remake_reverse_series_branch_map!(nr::NetworkReduction)
+function _remake_reverse_series_branch_map!(nr::NetworkReductionData)
     reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
     for (k, v) in nr.series_branch_map
         for x in v
@@ -986,7 +998,7 @@ function _remake_reverse_series_branch_map!(nr::NetworkReduction)
     end
     nr.reverse_series_branch_map = reverse_series_branch_map
 end
-function _remake_reverse_transformer3W_map!(nr::NetworkReduction)
+function _remake_reverse_transformer3W_map!(nr::NetworkReductionData)
     reverse_transformer3W_map =
         Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
     for (k, v) in nr.transformer3W_map

@@ -2,8 +2,8 @@
     # get the system
     sys = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys")
     # get the LODF matrix for reference
-    lodf_rad = LODF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
-    vlodf_rad = VirtualLODF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+    lodf_rad = LODF(sys; network_reductions = NetworkReduction[RadialReduction()])
+    vlodf_rad = VirtualLODF(sys; network_reductions = NetworkReduction[RadialReduction()])
 
     for i in axes(lodf_rad, 2)
         virtual = vlodf_rad[i, :]
