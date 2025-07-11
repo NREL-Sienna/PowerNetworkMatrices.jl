@@ -113,27 +113,6 @@ function get_ac_branches(
     )
 end
 
-#= #TODO - this needs to take into account network reduction
-function get_transformers_3w(
-    sys::PSY.System,
-)::Vector{PSY.Transformer3W}
-    collection = Vector{PSY.Transformer3W}()
-    for br in PSY.get_components(x -> PSY.get_available(x), PSY.Transformer3W, sys)
-        ps_arc = PSY.get_primary_secondary_arc(br)
-        st_arc = PSY.get_secondary_tertiary_arc(br)
-        check_arc_validity(ps_arc, PSY.get_name(ps_arc))
-        check_arc_validity(st_arc, PSY.get_name(st_arc))
-        _add_to_collection!(collection, br)
-    end
-    return sort!(collection;
-        by = x -> (
-            PSY.get_number(PSY.get_primary_secondary_arc(x).from),
-            PSY.get_number(PSY.get_primary_secondary_arc(x).to),
-            PSY.get_number(PSY.get_primary_tertiary_arc(x).to),
-        ),
-    )
-end =#
-
 function get_switched_admittances(sys::PSY.System, reverse_bus_search_map)
     collection = Vector{PSY.SwitchedAdmittance}()
     for sa in
@@ -156,20 +135,6 @@ function get_fixed_admittances(sys::PSY.System, reverse_bus_search_map)
     return collection
 end
 
-#= """
-Because we need to differentiate between Transformer3W that has 3 arcs and ACTransmission that has 2 arcs, we need this function to know the increment for the branch number
-"""
-function _next_branch_number(::PSY.ACTransmission, branch_number::Int)
-    return branch_number + 1
-end
-
-"""
-Because Transformer3w have 3 arcs, we need to increment the branch number by 3
-"""
-function _next_branch_number(::PSY.Transformer3W, branch_number::Int)
-    return branch_number + 3
-end
- =#
 function _add_branch_to_lookup!(
     branch_lookup::Dict{String, Int},
     ::Dict{String, Vector{String}},
@@ -199,25 +164,7 @@ function _add_branch_to_lookup!(
     end
     return
 end
-#=
-function get_branch_lookups(branches)
-    branch_lookup = Dict{String, Int}()
-    transformer_3w_lookup = Dict{String, Vector{String}}()
-    branch_type = Vector{DataType}()
-    branch_number = 0
-    for b in branches
-        branch_number = _next_branch_number(b, branch_number)
-        _add_branch_to_lookup!(
-            branch_lookup,
-            transformer_3w_lookup,
-            branch_type,
-            b,
-            branch_number,
-        )
-    end
-    return branch_lookup, transformer_3w_lookup, branch_type
-end
- =#
+
 """
 Gets the non-isolated buses from a given System
 """
@@ -361,87 +308,6 @@ function calculate_A_matrix(
     return SparseArrays.sparse(A_I, A_J, A_V), ref_bus_positions
 end
 
-#= """
-Evaluates the Adjacency matrix given the branches and buses of a given System.
-
-# Arguments
-- `branches`:
-        vector containing the branches of the considered system (should be AC branches).
-- `buses::Vector{PSY.ACBus}`:
-        vector containing the buses of the considered system.
-"""
-function calculate_adjacency(
-    branches,
-    buses::Vector{PSY.ACBus},
-    network_reduction::NetworkReduction,
-)
-    bus_ax = PSY.get_number.(buses)
-    return calculate_adjacency(
-        branches,
-        buses,
-        make_ax_ref(bus_ax),
-        network_reduction,
-    )
-end =#
-
-#= function _add_branch_to_adjacency!(
-    b::PSY.ACTransmission,
-    bus_lookup::Dict{Int, Int},
-    a::SparseArrays.SparseMatrixCSC{Int8, Int},
-    reverse_bus_search_map::Dict{Int, Int},
-)
-    fr_b, to_b = get_bus_indices(b, bus_lookup, reverse_bus_search_map)
-    a[fr_b, to_b] = 1
-    a[to_b, fr_b] = -1
-    return
-end =#
-
-#= function _add_branch_to_adjacency!(
-    b::PSY.Transformer3W,
-    bus_lookup::Dict{Int, Int},
-    a::SparseArrays.SparseMatrixCSC{Int8, Int},
-    reverse_bus_search_map::Dict{Int, Int},
-)
-    for (fr_b, to_b) in get_bus_indices(b, bus_lookup, reverse_bus_search_map)
-        a[fr_b, to_b] = 1
-        a[to_b, fr_b] = -1
-    end
-    return
-end =#
-
-#= """
-Evaluates the Adjacency matrix given the System's banches, buses and bus_lookup.
-
-NOTE:
-- bus_lookup is a dictionary mapping the bus numbers (as shown in the Systems)
-  with their enumerated indxes.
-"""
-function calculate_adjacency(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    network_reduction::NetworkReduction,
-)
-    buscount = length(buses)
-    a = SparseArrays.spzeros(Int8, buscount, buscount)
-    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction)
-
-    for b in branches
-        # we offload the logic to separate functions because we need to treat Transformer3W differently
-        _add_branch_to_adjacency!(b, bus_lookup, a, reverse_bus_search_map)
-    end
-
-    # If a line is disconnected needs to check for the buses correctly
-    for i in 1:buscount
-        if PSY.get_bustype(buses[i]) == ACBusTypes.ISOLATED
-            continue
-        end
-        a[i, i] = 1
-    end
-
-    # Return both for type stability
-    return a, bus_lookup
-end =#
 
 function _add_branch_to_BA_matrix!(
     b::PSY.ACTransmission,

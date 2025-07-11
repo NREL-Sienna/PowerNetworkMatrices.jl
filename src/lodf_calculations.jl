@@ -256,67 +256,6 @@ function _calculate_LODF_matrix_MKLPardiso(
     return lodf_t
 end
 
-#= """
-Builds the LODF matrix given the data of branches and buses of the system.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-
-# Keyword Arguments
-- `linear_solver`::String
-        linear solver to use for matrix evaluation.
-        Available options: "KLU", "Dense" (OpenBLAS) or "MKLPardiso".
-        Default solver: "KLU".
-- `tol::Float64`:
-        Tolerance to eliminate entries in the LODF matrix (default eps())
-- `network_reduction::NetworkReduction`:
-        Structure containing the details of the network reduction applied when computing the matrix
-"""
-function LODF(
-    branches,
-    buses::Vector{PSY.ACBus};
-    linear_solver::String = "KLU",
-    tol::Float64 = eps(),
-    network_reduction::NetworkReduction = NetworkReduction(),
-)
-    # get axis names
-    line_ax = [branch.name for branch in branches]
-    axes = (line_ax, line_ax)
-    line_map = make_ax_ref(line_ax)
-    look_up = (line_map, line_map)
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    bus_lookup = make_ax_ref(bus_ax)
-    # get network matrices
-    ptdf_t, a = calculate_PTDF_matrix_KLU(
-        branches,
-        buses,
-        bus_lookup,
-        network_reduction,
-        Float64[],
-    )
-
-    if tol > eps()
-        lodf_t = _buildlodf(a, ptdf_t, linear_solver)
-        return LODF(
-            sparsify(lodf_t, tol),
-            axes,
-            look_up,
-            Ref(tol),
-            network_reduction,
-        )
-    else
-        return LODF(
-            _buildlodf(a, ptdf_t, linear_solver),
-            axes,
-            look_up,
-            Ref(tol),
-            network_reduction,
-        )
-    end
-end =#
 
 """
 Builds the LODF matrix from a system.

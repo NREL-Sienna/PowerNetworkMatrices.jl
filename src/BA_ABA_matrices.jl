@@ -75,35 +75,6 @@ function BA_Matrix(ybus::Ybus)
     ref_bus_positions = Set([lookup[1][x] for x in ybus.ref_bus_numbers])
     return BA_Matrix(data, axes, lookup, ref_bus_positions, ybus.network_reduction)
 end
-#= 
-"""
-Build the BA matrix from a given System
-
-# Arguments
-- `sys::PSY.System`:
-        PSY system for which the matrix is constructed
-- `network_reduction::NetworkReduction`:
-        Structure containing the details of the network reduction applied when computing the matrix
-"""
-function BA_Matrix(
-    sys::PSY.System;
-    network_reduction::NetworkReduction = NetworkReduction(),
-)
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    if !isempty(network_reduction.added_branches)
-        branches = vcat(branches, network_reduction.added_branches)
-    end
-    ref_bus_positions = find_slack_positions(buses)
-    bus_lookup = make_ax_ref(buses)
-    line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in setdiff(buses, ref_bus_positions)]
-    axes = (bus_ax, line_ax)
-    lookup = (make_ax_ref(bus_ax), make_ax_ref(line_ax))
-    data =
-        calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    return BA_Matrix(data, axes, lookup, ref_bus_positions, network_reduction)
-end =#
 
 """
 Structure containing the ABA matrix and other relevant data.
@@ -180,96 +151,6 @@ function ABA_Matrix(sys::PSY.System;
     )
 end
 
-#=     branches = get_ac_branches(sys, network_reduction.removed_branches)
-    if !isempty(network_reduction.added_branches)
-        branches = vcat(branches, network_reduction.added_branches)
-    end
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    bus_lookup = make_ax_ref(buses)
-    ref_bus_numbers = ymatrix.ref_bus_numbers
-
-    A, ref_bus_positions =
-        calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    ref_bus_numbers = Set([
-        PSY.get_number(bus) for bus in buses
-        if PSY.get_bustype(bus) == PSY.ACBusTypes.REF
-    ])
-    bus_ax_ = setdiff(bus_ax, ref_bus_numbers)
-    axes = (bus_ax_, bus_ax_)
-    bus_ax_ref = make_ax_ref(bus_ax_)
-    lookup = (bus_ax_ref, bus_ax_ref)
-    if factorize
-        K = klu(ABA)
-    else
-        K = nothing
-    end
-    return ABA_Matrix(
-        ABA,
-        axes,
-        lookup,
-        ref_bus_positions,
-        ref_bus_numbers,
-        K,
-        network_reduction,
-    )
-
-end  =#
-#= """
-Builds the ABA matrix from a System
-
-# Arguments
-- `sys::PSY.System`:
-        system to consider
-
-# Keyword arguments
-- `factorize`: if true populates ABA_Matrix.K with KLU factorization matrices
-"""
-function ABA_Matrix(
-    sys::PSY.System;
-    factorize = false,
-    network_reduction::NetworkReduction = NetworkReduction(),
-)
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    if !isempty(network_reduction.added_branches)
-        branches = vcat(branches, network_reduction.added_branches)
-    end
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    bus_lookup = make_ax_ref(buses)
-
-    A, ref_bus_positions =
-        calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    ref_bus_numbers = Set([
-        PSY.get_number(bus) for bus in buses
-        if PSY.get_bustype(bus) == PSY.ACBusTypes.REF
-    ])
-    bus_ax_ = setdiff(bus_ax, ref_bus_numbers)
-    axes = (bus_ax_, bus_ax_)
-    bus_ax_ref = make_ax_ref(bus_ax_)
-    lookup = (bus_ax_ref, bus_ax_ref)
-    if factorize
-        K = klu(ABA)
-    else
-        K = nothing
-    end
-    return ABA_Matrix(
-        ABA,
-        axes,
-        lookup,
-        ref_bus_positions,
-        ref_bus_numbers,
-        K,
-        network_reduction,
-    )
-end
- =#
 """
 Evaluates the LU factorization matrices of the ABA matrix, using KLU.
 
