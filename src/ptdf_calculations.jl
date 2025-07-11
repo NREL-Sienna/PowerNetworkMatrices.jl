@@ -32,7 +32,7 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     subnetworks::Dict{Int, Set{Int}}
     ref_bus_positions::Set{Int}
     tol::Base.RefValue{Float64}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 """
@@ -46,7 +46,7 @@ PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
 function _buildptdf(
     branches,
     buses::Vector{PSY.ACBus},
-    network_reduction::NetworkReduction,
+    network_reduction_data::NetworkReductionData,
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
     linear_solver::String)
@@ -55,7 +55,7 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
-            network_reduction,
+            network_reduction_data,
             dist_slack,
         )
     elseif linear_solver == "Dense"
@@ -63,7 +63,7 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
-            network_reduction,
+            network_reduction_data,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
@@ -76,7 +76,7 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
-            network_reduction,
+            network_reduction_data,
             dist_slack,
         )
     end
@@ -301,7 +301,7 @@ function PTDF(sys::PSY.System;
     linear_solver = "KLU",
     tol::Float64 = eps(),
     check_connectivity::Bool = true,
-    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     Ymatrix = Ybus(
@@ -349,13 +349,13 @@ function PTDF(
     tol::Float64 = eps(),
 )
     if !(isempty(dist_slack))
-        dist_slack = redistribute_dist_slack(dist_slack, A, A.network_reduction)
+        dist_slack = redistribute_dist_slack(dist_slack, A, A.network_reduction_data)
     else
         dist_slack = Float64[]
     end
     validate_linear_solver(linear_solver)
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
-    if !isequal(A.network_reduction, BA.network_reduction)
+    if !isequal(A.network_reduction_data, BA.network_reduction_data)
         error("A and BA matrices have non-equivalent network reductions.")
     end
     axes = BA.axes
@@ -377,7 +377,7 @@ function PTDF(
             subnetworks,
             BA.ref_bus_positions,
             Ref(tol),
-            BA.network_reduction,
+            BA.network_reduction_data,
         )
     else
         return PTDF(
@@ -387,7 +387,7 @@ function PTDF(
             subnetworks,
             BA.ref_bus_positions,
             Ref(tol),
-            BA.network_reduction,
+            BA.network_reduction_data,
         )
     end
 end
@@ -435,7 +435,7 @@ end
 function redistribute_dist_slack(
     dist_slack::Dict{Int, Float64},
     A::IncidenceMatrix,
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
 )
     dist_slack_vector = zeros(length(A.axes[2]))
     for (bus_no, dist_slack_factor) in dist_slack

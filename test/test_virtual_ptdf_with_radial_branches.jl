@@ -2,8 +2,8 @@
     # get the system
     sys = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys")
     # get the PTDF matrix for reference
-    ptdf_rad = PTDF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
-    vptdf_rad = VirtualPTDF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+    ptdf_rad = PTDF(sys; network_reductions = NetworkReduction[RadialReduction()])
+    vptdf_rad = VirtualPTDF(sys; network_reductions = NetworkReduction[RadialReduction()])
 
     for i in axes(ptdf_rad, 2)
         virtual = vptdf_rad[i, :]
@@ -29,12 +29,12 @@ end
     end
     ptdf_rad = PTDF(
         sys;
-        network_reductions = [NetworkReductionTypes.RADIAL],
+        network_reductions = NetworkReduction[RadialReduction()],
         dist_slack = dist_slack,
     )
     vptdf_rad = VirtualPTDF(
         sys;
-        network_reductions = [NetworkReductionTypes.RADIAL],
+        network_reductions = NetworkReduction[RadialReduction()],
         dist_slack = dist_slack,
     )
     for i in axes(ptdf_rad, 2)

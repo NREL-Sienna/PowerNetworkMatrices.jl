@@ -5,5 +5,5 @@
             "matpower_ACTIVSg10k_sys",
         )
     ybus = Ybus(sys; check_connectivity = false)
-    reduction = PNM.get_reduction(ybus, sys, Val(NetworkReductionTypes.DEGREE_TWO))
+    reduction = PNM.get_reduction(ybus, sys, DegreeTwoReduction())
 end

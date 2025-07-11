@@ -1,8 +1,12 @@
-#NOTE: hardcoded for testing system
+@kwdef struct DegreeTwoReduction <: NetworkReduction
+    irreducible_buses::Vector{Int} = Vector{Int}()
+    reduce_reactive_power_injectors::Bool = true
+end
+
 function get_reduction(
     ybus::Ybus,
     sys::PSY.System,
-    ::Val{NetworkReductionTypes.DEGREE_TWO},
+    nr::DegreeTwoReduction,
 )
     A = ybus_to_adjacency(ybus)
     irreducible_buses = Set{Int}()
@@ -13,16 +17,16 @@ function get_reduction(
 
     arc_maps = find_degree2_chains(A.data, irreducible_indices)
 
-    # TODO - translate the arc_maps from the 2d algorithm to the mappings of the NetworkReduction object.
+    # TODO - translate the arc_maps from the 2d algorithm to the mappings of the NetworkReductionData object.
     # Should modify series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs
 
-    return NetworkReduction(;
+    return NetworkReductionData(;
         irreducible_buses = irreducible_buses,
         #series_branch_map =  Dict{Tuple{Int, Int}, Set{PSY.Branch}}((101, 102) => Set([br1, br2])),         
         #reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}(br1 => (101, 102), br2 => (101, 102)),
         #removed_buses = Set{Int}([115]),
         #removed_arcs = Set{Tuple{Int, Int}}([(101, 115), (115, 102)]),                               
-        reduction_type = Vector{NetworkReductionTypes}([NetworkReductionTypes.DEGREE_TWO]),
+        reductions = Vector{NetworkReduction}([nr]),
     )
 end
 

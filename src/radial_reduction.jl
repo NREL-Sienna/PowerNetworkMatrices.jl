@@ -1,7 +1,11 @@
+@kwdef struct RadialReduction <: NetworkReduction
+    irreducible_buses::Vector{Int} = Vector{Int}()
+end
+
 function get_reduction(
     Y::Ybus,
     ::PSY.System,
-    ::Val{NetworkReductionTypes.RADIAL},
+    ::RadialReduction,  #TODO - include irreducible buses 
 )
     A = IncidenceMatrix(Y)
     return get_radial_reduction(A)
@@ -191,21 +195,12 @@ function calculate_radial_arcs(
     end
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map_index, buscount)
 
-    return NetworkReduction(
-        Set{Int}(),         # TODO - inherit irreducible_buses 
-        bus_reduction_map_index,
-        reverse_bus_search_map,
-        Dict{Tuple{Int, Int}, PSY.Branch}(),
-        Dict{PSY.Branch, Tuple{Int, Int}}(),
-        Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
-        Dict{PSY.Branch, Tuple{Int, Int}}(),
-        Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
-        Dict{PSY.Branch, Tuple{Int, Int}}(),
-        Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}}(),
-        Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}(),
-        Set{Int}(),
-        radial_arcs,
-        [NetworkReductionTypes.RADIAL],
+    return NetworkReductionData(;
+        irreducible_buses = Set{Int}(),         # TODO - inherit irreducible_buses 
+        bus_reduction_map = bus_reduction_map_index,
+        reverse_bus_search_map = reverse_bus_search_map,
+        removed_arcs = radial_arcs,
+        reductions = NetworkReduction[RadialReduction()],
     )
 end
 
@@ -216,7 +211,7 @@ Interface to obtain the parent bus number of a reduced bus when radial branches 
 - `rb::NetworkReduction`: NetworkReduction object
 - `bus_number::Int`: Bus number of the reduced bus
 """
-function get_mapped_bus_number(rb::NetworkReduction, bus_number::Int)
+function get_mapped_bus_number(rb::NetworkReductionData, bus_number::Int)
     if isempty(rb)
         return bus_number
     end
@@ -230,6 +225,6 @@ Interface to obtain the parent bus number of a reduced bus when radial branches 
 - `rb::NetworkReduction`: NetworkReduction object
 - `bus::ACBus`: Reduced bus
 """
-function get_mapped_bus_number(rb::NetworkReduction, bus::PSY.ACBus)
+function get_mapped_bus_number(rb::NetworkReductionData, bus::PSY.ACBus)
     return get_mapped_bus_number(rb, PSY.get_number(bus))
 end

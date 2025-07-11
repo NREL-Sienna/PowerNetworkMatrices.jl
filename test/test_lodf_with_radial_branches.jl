@@ -1,3 +1,4 @@
+
 @testset "Test LODF with radial branches" begin
     # check if the flows obtained with original LODF and reduced one are the same
     for name in ["c_sys14", "test_RTS_GMLC_sys"]
@@ -5,23 +6,24 @@
         sys = PSB.build_system(PSB.PSITestSystems, name)
 
         # get A, BA and ABA matrix with radial branches
-        A_rad = IncidenceMatrix(sys; network_reductions = [NetworkReductionTypes.RADIAL])
-        BA_rad = BA_Matrix(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+        A_rad =
+            IncidenceMatrix(sys; network_reductions = NetworkReduction[RadialReduction()])
+        BA_rad = BA_Matrix(sys; network_reductions = NetworkReduction[RadialReduction()])
         ABA_rad = ABA_Matrix(
             sys;
-            network_reductions = [NetworkReductionTypes.RADIAL],
+            network_reductions = NetworkReduction[RadialReduction()],
             factorize = true,
         )
         ptdf = PTDF(sys)
-        ptdf_rad = PTDF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+        ptdf_rad = PTDF(sys; network_reductions = NetworkReduction[RadialReduction()])
 
         # get the original and reduced PTDF matrices (consider different methods)
         lodf = LODF(sys)
-        lodf_rad = LODF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+        lodf_rad = LODF(sys; network_reductions = NetworkReduction[RadialReduction()])
         lodf_rad_A_BA_ABA = LODF(A_rad, ABA_rad, BA_rad)
         lodf_rad_A_PTDF = LODF(A_rad, ptdf_rad)
 
-        rb = A_rad.network_reduction
+        rb = A_rad.network_reduction_data
 
         # at first check if all the matrices are the same
         @test isapprox(lodf_rad.data, lodf_rad_A_BA_ABA.data, atol = 1e-10)
@@ -95,10 +97,10 @@ end
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     # get A, BA and ABA matrix with radial branches
     A = IncidenceMatrix(sys)
-    BA_rad = BA_Matrix(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+    BA_rad = BA_Matrix(sys; network_reductions = NetworkReduction[RadialReduction()])
     ABA = ABA_Matrix(sys; factorize = true)
     ptdf = PTDF(sys)
-    ptdf_rad = PTDF(sys; network_reductions = [NetworkReductionTypes.RADIAL])
+    ptdf_rad = PTDF(sys; network_reductions = NetworkReduction[RadialReduction()])
     # test LODF from A, ABA and BA
     test_value = false
     try

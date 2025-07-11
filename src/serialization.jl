@@ -90,7 +90,7 @@ function from_hdf5(::Type{PTDF}, filename::AbstractString)
             subnetworks,
             ref_bus_positions,
             tol,
-            NetworkReduction(),
+            NetworkReductionData(), #TODO - support serialization of NetworkReductionData
         )
     end
 end

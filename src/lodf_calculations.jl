@@ -23,7 +23,7 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     axes::Ax
     lookup::L
     tol::Base.RefValue{Float64}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 function _buildlodf(
@@ -256,7 +256,6 @@ function _calculate_LODF_matrix_MKLPardiso(
     return lodf_t
 end
 
-
 """
 Builds the LODF matrix from a system.
 Note that `network_reduction` kwargs is explicitly mentioned because needed inside of the function.
@@ -274,7 +273,7 @@ function LODF(
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
     check_connectivity = false,
-    network_reductions::Vector{NetworkReductionTypes} = NetworkReductionTypes[],
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     Ymatrix = Ybus(
@@ -327,7 +326,7 @@ function LODF(
         PTDFm_data = PTDFm.data
     end
 
-    if !isequal(A.network_reduction, PTDFm.network_reduction)
+    if !isequal(A.network_reduction_data, PTDFm.network_reduction_data)
         error("A and PTDF matrices have non-equivalent network reductions.")
     end
     ax_ref = make_ax_ref(A.axes[1])
@@ -339,7 +338,7 @@ function LODF(
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
             Ref(tol),
-            A.network_reduction,
+            A.network_reduction_data,
         )
     end
     return LODF(
@@ -347,7 +346,7 @@ function LODF(
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
-        A.network_reduction,
+        A.network_reduction_data,
     )
 end
 
@@ -378,8 +377,8 @@ function LODF(
     tol::Float64 = eps(),
 )
     if !(
-        isequal(A.network_reduction, BA.network_reduction) &&
-        isequal(BA.network_reduction, ABA.network_reduction)
+        isequal(A.network_reduction_data, BA.network_reduction_data) &&
+        isequal(BA.network_reduction_data, ABA.network_reduction_data)
     )
         error(
             "Mismatch in `NetworkReduction`, A, BA, and ABA matrices must be computed with the same network reduction.",
@@ -395,7 +394,7 @@ function LODF(
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
             Ref(tol),
-            A.network_reduction,
+            A.network_reduction_data,
         )
     end
     return LODF(
@@ -403,7 +402,7 @@ function LODF(
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
-        A.network_reduction,
+        A.network_reduction_data,
     )
 end
 

@@ -48,7 +48,7 @@ function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwarg
 end
 
 function ybus_to_adjacency(ybus::Ybus)
-    empty!(ybus.data)
+    #empty!(ybus.data)          #TODO empty!(ybus.data) fails; find alternative
     adj_matrix = deepcopy(ybus.adjacency_data)
     for i in 1:size(adj_matrix, 1)
         adj_matrix[i, i] = 0

@@ -24,8 +24,8 @@
             (0.0, 0.0),
         ),
     )
-    Y = Ybus(sys; network_reductions = [NetworkReductionTypes.RADIAL])
-    rb = get_network_reduction(Y)
+    Y = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
+    rb = get_network_reduction_data(Y)
     @test rb.bus_reduction_map[7] == Set([61, 8])
     @test rb.reverse_bus_search_map[61] == rb.reverse_bus_search_map[8] == 7
     @test length(rb.direct_branch_map) == 19
@@ -38,7 +38,7 @@
     @test length(rb.reverse_transformer3W_map) == 0
     @test length(rb.removed_buses) == 0
     @test rb.removed_arcs == Set([(7, 8), (8, 61)])
-    @test get_reduction_type(rb) == [NetworkReductionTypes.RADIAL]
+    @test get_reductions(rb) == NetworkReduction[RadialReduction()]
 end
 
 @testset "Radial Branches Large" begin
@@ -47,8 +47,8 @@ end
             MatpowerTestSystems,
             "matpower_ACTIVSg10k_sys",
         )
-    Y = Ybus(sys; network_reductions = [NetworkReductionTypes.RADIAL])
-    rb = get_network_reduction(Y)
+    Y = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
+    rb = get_network_reduction_data(Y)
     for (k, v) in get_bus_reduction_map(rb)
         @test k ∉ v
     end
@@ -62,8 +62,8 @@ end
                 name,
             )
         a_mat = IncidenceMatrix(sys)
-        Y = Ybus(sys; network_reductions = [NetworkReductionTypes.RADIAL])
-        rb = get_network_reduction(Y)
+        Y = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
+        rb = get_network_reduction_data(Y)
         leaf_buses = Int[]
         for i in keys(rb.bus_reduction_map)
             append!(leaf_buses, collect(rb.bus_reduction_map[i]))
