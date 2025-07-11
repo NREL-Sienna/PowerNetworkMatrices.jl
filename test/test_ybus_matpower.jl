@@ -61,26 +61,29 @@ end
     for (col, row, val_re, val_im) in
         zip(matpower_cols, matpower_rows, matpower_vals_re, matpower_vals_im)
         if col == 1 && row == 1
-            @test isapprox(imag(ybus_pnm.data[row, col]) - val_im, Float32((3.126 / 2) / 1.3^2))
+            @test isapprox(
+                imag(ybus_pnm.data[row, col]) - val_im,
+                Float32((3.126 / 2) / 1.3^2),
+            )
             continue
         end
         if col == 2 && row == 2
-            @test isapprox(imag(ybus_pnm.data[row, col]) - val_im,  Float32(1.852 / 2))
+            @test isapprox(imag(ybus_pnm.data[row, col]) - val_im, Float32(1.852 / 2))
             continue
         end
         if col == 3 && row == 3
             @test isapprox(
                 imag(ybus_pnm.data[row, col]) - val_im,
-                 Float32((0.674 / 2) / 1.5^2 - 1.852 / 2),
+                Float32((0.674 / 2) / 1.5^2 - 1.852 / 2),
             )
             continue
         end
         if col == 4 && row == 4
-            @test isapprox(imag(ybus_pnm.data[row, col]) - val_im,  Float32(-0.674 / 2))
+            @test isapprox(imag(ybus_pnm.data[row, col]) - val_im, Float32(-0.674 / 2))
             continue
         end
         if col == 5 && row == 5
-            @test isapprox(imag(ybus_pnm.data[row, col]) - val_im,  Float32(-3.126 / 2))
+            @test isapprox(imag(ybus_pnm.data[row, col]) - val_im, Float32(-3.126 / 2))
             continue
         end
         @test isapprox(ybus_pnm.data[row, col], Complex(val_re, val_im); atol = 1e-5)

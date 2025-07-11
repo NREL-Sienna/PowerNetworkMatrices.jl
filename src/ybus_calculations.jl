@@ -862,8 +862,7 @@ function Ybus(
 end
 
 function build_reduced_ybus(ybus::Ybus, sys::PSY.System, reduction::NetworkReductionTypes)
-    A = IncidenceMatrix(ybus)
-    nr = get_reduction(A, sys, Val(reduction))
+    nr = get_reduction(ybus, sys, Val(reduction))
     return _apply_reduction(ybus, nr)
 end
 

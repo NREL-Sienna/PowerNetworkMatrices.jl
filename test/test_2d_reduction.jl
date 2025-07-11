@@ -4,7 +4,6 @@
             MatpowerTestSystems,
             "matpower_ACTIVSg10k_sys",
         )
-
-    A = AdjacencyMatrix(sys; check_connectivity = false)
-    reduction = get_reduction(A, sys, Val(NetworkReductionTypes.TWO_D))
+    ybus = Ybus(sys; check_connectivity = false)
+    reduction = PNM.get_reduction(ybus, sys, Val(NetworkReductionTypes.DEGREE_TWO))
 end

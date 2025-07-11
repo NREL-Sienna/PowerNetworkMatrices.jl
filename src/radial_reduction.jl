@@ -1,8 +1,9 @@
 function get_reduction(
-    A::IncidenceMatrix,
+    Y::Ybus,
     ::PSY.System,
     ::Val{NetworkReductionTypes.RADIAL},
 )
+    A = IncidenceMatrix(Y)
     return get_radial_reduction(A)
 end
 
@@ -191,6 +192,7 @@ function calculate_radial_arcs(
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map_index, buscount)
 
     return NetworkReduction(
+        Set{Int}(),         # TODO - inherit irreducible_buses 
         bus_reduction_map_index,
         reverse_bus_search_map,
         Dict{Tuple{Int, Int}, PSY.Branch}(),
