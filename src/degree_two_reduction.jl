@@ -1,35 +1,28 @@
 #NOTE: hardcoded for testing system
 function get_reduction(
-    A::AdjacencyMatrix,
+    ybus::Ybus,
     sys::PSY.System,
     ::Val{NetworkReductionTypes.DEGREE_TWO},
 )
+    A = ybus_to_adjacency(ybus)
     irreducible_buses = Set{Int}()
-    for c in get_components(StaticInjection, sys_DA)
+    for c in PSY.get_components(PSY.StaticInjection, sys)
         push!(irreducible_buses, PSY.get_number(PSY.get_bus(c)))
     end
-    irreducible_indices = Set([yb.lookup[2][i] for i in irreducible_buses])
+    irreducible_indices = Set([ybus.lookup[2][i] for i in irreducible_buses])
 
     arc_maps = find_degree2_chains(A.data, irreducible_indices)
 
-    @error "DEGREE TWO HARDCODED REDUCTION FOR 14 BUS SYSTEM"
-    br1 = PSY.get_component(PSY.Line, sys, "BUS 101-BUS 115-i_1")
-    br2 = PSY.get_component(PSY.Line, sys, "BUS 115-BUS 102-i_1")
-    return NetworkReduction(
-        irreducible_buses,
-        Dict{Int, Set{Int}}(),
-        Dict{Int, Int}(),
-        Dict{Tuple{Int, Int}, PSY.Branch}(),
-        Dict{PSY.Branch, Tuple{Int, Int}}(),
-        Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
-        Dict{PSY.Branch, Tuple{Int, Int}}(),
-        Dict{Tuple{Int, Int}, Set{PSY.Branch}}((101, 102) => Set([br1, br2])),          # Map from NEW arc to the series branches that comprise it.
-        Dict{PSY.Branch, Tuple{Int, Int}}(br1 => (101, 102), br2 => (101, 102)),
-        Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}}(),
-        Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}(),
-        Set{Int}([115]),
-        Set{Tuple{Int, Int}}([(101, 115), (115, 102)]),                                 # Set of OLD arcs to be removed
-        Vector{NetworkReductionTypes}([NetworkReductionTypes.DEGREE_TWO]),
+    # TODO - translate the arc_maps from the 2d algorithm to the mappings of the NetworkReduction object.
+    # Should modify series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs
+
+    return NetworkReduction(;
+        irreducible_buses = irreducible_buses,
+        #series_branch_map =  Dict{Tuple{Int, Int}, Set{PSY.Branch}}((101, 102) => Set([br1, br2])),         
+        #reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}(br1 => (101, 102), br2 => (101, 102)),
+        #removed_buses = Set{Int}([115]),
+        #removed_arcs = Set{Tuple{Int, Int}}([(101, 115), (115, 102)]),                               
+        reduction_type = Vector{NetworkReductionTypes}([NetworkReductionTypes.DEGREE_TWO]),
     )
 end
 
@@ -73,7 +66,11 @@ Determines if a node is a final node in a path traversal.
 # Returns
 - `Bool`: `true` if the node is a final node, `false` otherwise.
 """
-function _is_final_node(node::Int, adj_matrix::SparseArrays.SparseMatrixCSC, reduced_indices::Set{Int})
+function _is_final_node(
+    node::Int,
+    adj_matrix::SparseArrays.SparseMatrixCSC,
+    reduced_indices::Set{Int},
+)
     if !_is_2degree_node(adj_matrix, node)
         return true
     end
@@ -196,7 +193,10 @@ end
 
 Return all degree-2 nodes in the adjacency matrix, excluding irreducible indices.
 """
-function _get_degree2_nodes(adj_matrix::SparseArrays.SparseMatrixCSC, irreducible_indices::Set{Int})
+function _get_degree2_nodes(
+    adj_matrix::SparseArrays.SparseMatrixCSC,
+    irreducible_indices::Set{Int},
+)
     node_count = size(adj_matrix, 1)
     nodes = sizehint!(Vector{Int}(), node_count)
     for i in 1:node_count
@@ -218,7 +218,10 @@ A chain is a sequence of connected degree-2 nodes.
 
 Returns a dictionary mapping each starting node to its chain of node indices.
 """
-function find_degree2_chains(adj_matrix::SparseArrays.SparseMatrixCSC, irreducible_indices::Set{Int})
+function find_degree2_chains(
+    adj_matrix::SparseArrays.SparseMatrixCSC,
+    irreducible_indices::Set{Int},
+)
     arc_map = Dict()
     reduced_indices = Set{Int}()
     degree2_nodes = _get_degree2_nodes(adj_matrix, irreducible_indices)

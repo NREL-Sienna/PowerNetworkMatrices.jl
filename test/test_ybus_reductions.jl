@@ -1,4 +1,3 @@
-# TODO - problem with radial reduction algorithm and three winding transformers. 
 sys = System(joinpath(TEST_DATA_DIR, "case14_reductions.raw"))
 
 # Full Matrix 

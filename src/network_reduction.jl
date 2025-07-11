@@ -2,12 +2,18 @@
     irreducible_buses::Set{Int} = Set{Int}() # Buses that are not reduced in the network reduction
     bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}() # Maps reduced bus to the set of buses it was reduced to
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}()
-    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch} = Dict{Tuple{Int, Int}, PSY.Branch}()
-    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{PSY.Branch, Tuple{Int, Int}}()
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
-    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{PSY.Branch, Tuple{Int, Int}}()
-    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} = Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
-    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} = Dict{PSY.Branch, Tuple{Int, Int}}()
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch} =
+        Dict{Tuple{Int, Int}, PSY.Branch}()
+    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} =
+        Dict{PSY.Branch, Tuple{Int, Int}}()
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} =
+        Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
+    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} =
+        Dict{PSY.Branch, Tuple{Int, Int}}()
+    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} =
+        Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
+    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} =
+        Dict{PSY.Branch, Tuple{Int, Int}}()
     transformer3W_map::Dict{
         Tuple{Int, Int},
         Tuple{PSY.ThreeWindingTransformer, Int},
