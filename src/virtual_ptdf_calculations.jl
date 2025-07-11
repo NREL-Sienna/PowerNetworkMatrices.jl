@@ -116,26 +116,13 @@ function VirtualPTDF(
     end
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
-    #Get axis names
-    line_ax = A.axes[1]#[PSY.get_name(branch) for branch in branches]
-    bus_ax = A.axes[2] #[PSY.get_number(bus) for bus in buses]
+    bus_ax = A.axes[2] 
     axes = A.axes
     look_up = A.lookup
     subnetworks = Ymatrix.subnetworks
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
     end
-    #M, bus_ax_ref = calculate_adjacency(branches, buses, network_reduction)
-    #line_ax_ref = make_ax_ref(line_ax)
-    #look_up = (line_ax_ref, bus_ax_ref)
-    #A, ref_bus_positions =
-    #    calculate_A_matrix(branches, buses, network_reduction)
-    #BA = calculate_BA_matrix(branches, bus_ax_ref, network_reduction)
-    #ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-    #ref_bus_positions = find_slack_positions(buses)
-    #subnetworks =
-    #    assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
-
     temp_data = zeros(length(axes[2]))
 
     if isempty(persistent_arcs)

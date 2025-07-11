@@ -159,31 +159,6 @@ function _calculate_PTDF_matrix_KLU(
     return
 end
 
-#= """
-Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function calculate_PTDF_matrix_KLU(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    network_reduction::NetworkReduction,
-    dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
-    return PTDFm, A
-end
- =#
 function _binfo_check(binfo::Int)
     if binfo != 0
         if binfo < 0
@@ -248,31 +223,6 @@ function _calculate_PTDF_matrix_DENSE(
 
     return
 end
-
-#= """
-Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function calculate_PTDF_matrix_DENSE(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    network_reduction::NetworkReduction,
-    dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    PTDFm = _calculate_PTDF_matrix_DENSE(A, BA, ref_bus_positions, dist_slack)
-    return PTDFm, A
-end =#
 
 """
 Function for internal use only.
@@ -346,104 +296,6 @@ function _calculate_PTDF_matrix_MKLPardiso(
     return
 end
 
-#= """
-Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function calculate_PTDF_matrix_MKLPardiso(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    network_reduction::NetworkReduction,
-    dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
-    return PTDFm, A
-end
- =#
-
-#= """
-Builds the PTDF matrix from a group of branches and buses. The return is a PTDF array indexed with the bus numbers.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-
-# Keyword Arguments
-- `dist_slack::Vector{Float64}`:
-        vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses
-- `linear_solver::String`:
-        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
-- `tol::Float64`:
-        Tolerance to eliminate entries in the PTDF matrix (default eps())
-- `network_reduction::NetworkReduction`:
-        Structure containing the details of the network reduction applied when computing the matrix
-"""
-function PTDF(
-    branches,
-    buses::Vector{PSY.ACBus};
-    dist_slack::Vector{Float64} = Float64[],
-    linear_solver::String = "KLU",
-    tol::Float64 = eps(),
-    network_reduction::NetworkReduction = NetworkReduction(),
-)
-    validate_linear_solver(linear_solver)
-
-    #Get axis names
-    line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    axes = (bus_ax, line_ax)
-    M, bus_ax_ref = calculate_adjacency(branches, buses, network_reduction)
-    ref_bus_positions = find_slack_positions(buses, bus_ax_ref)
-    subnetworks =
-        assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
-    if length(subnetworks) > 1
-        @info "Network is not connected, using subnetworks"
-    end
-    look_up = (bus_ax_ref, make_ax_ref(line_ax))
-    S, _ = _buildptdf(
-        branches,
-        buses,
-        network_reduction,
-        look_up[1],
-        dist_slack,
-        linear_solver,
-    )
-    if tol > eps()
-        return PTDF(
-            sparsify(S, tol),
-            axes,
-            look_up,
-            subnetworks,
-            ref_bus_positions,
-            Ref(tol),
-            network_reduction,
-        )
-    end
-    return PTDF(
-        S,
-        axes,
-        look_up,
-        subnetworks,
-        ref_bus_positions,
-        Ref(tol),
-        network_reduction,
-    )
-end
- =#
 function PTDF(sys::PSY.System;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     linear_solver = "KLU",
@@ -470,45 +322,6 @@ function PTDF(sys::PSY.System;
     )
 end
 
-#= """
-Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
-Note that `dist_slack` and `network_reduction` kwargs are explicitly mentioned because needed inside of the function.
-
-# Arguments
-- `sys::PSY.System`:
-        PSY system for which the matrix is constructed
-
-# Keyword Arguments
-- `dist_slack::Vector{Float64}=Float64[]`:
-        vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses
-- `network_reduction::NetworkReduction=NetworkReduction()`:
-        Structure containing the details of the network reduction applied when computing the matrix
-"""
-function PTDF(
-    sys::PSY.System;
-    dist_slack::Vector{Float64} = Float64[],
-    network_reduction::NetworkReduction = NetworkReduction(),
-    kwargs...,
-)
-    if !isempty(network_reduction)
-        A = IncidenceMatrix(sys)
-        dist_slack = redistribute_dist_slack(dist_slack, A, network_reduction)
-    end
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    if !isempty(network_reduction.added_branches)
-        branches = vcat(branches, network_reduction.added_branches)
-    end
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    return PTDF(
-        branches,
-        buses;
-        dist_slack = dist_slack,
-        network_reduction = network_reduction,
-        kwargs...,
-    )
-end
- =#
 """
 Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
 
