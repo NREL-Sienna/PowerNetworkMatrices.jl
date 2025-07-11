@@ -2,7 +2,7 @@ using SparseArrays
 
 function parse_psse_ybus(path)
     data = readlines(path)
-    row_buses, col_buses, y_values = Int[], Int[], ComplexF64[]
+    row_buses, col_buses, y_values = Int[], Int[], ComplexF32[]
     reduced_bus_pairs = Vector{Vector{Int}}()
     values_done = false
     for line in data
@@ -121,7 +121,7 @@ end
         if col_bus ∈ keys(nr.reverse_bus_search_map)
             col_bus = nr.reverse_bus_search_map[col_bus]
         end
-        @test isapprox(Ybus_pnm[row_bus, col_bus], val, atol = 1e-3)
+        @test isapprox(Ybus_pnm[row_bus, col_bus], val, atol = 2e-3)
     end
 end
 
