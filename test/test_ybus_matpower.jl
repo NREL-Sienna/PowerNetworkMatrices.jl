@@ -20,7 +20,7 @@
 end
 
 @testset "Ybus - CATS" begin
-    sys = System(joinpath(TEST_DATA_DIR, "CaliforniaTestSystem.m"))
+    sys = build_system(MatpowerTestSystems, "matpower_cats")
     matpower_cols =
         readdlm(joinpath(TEST_DATA_DIR, "ybus_cats_cols.csv"), Int)
     matpower_rows =
