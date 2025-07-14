@@ -819,46 +819,36 @@ function Ybus(
         fb = nothing
         tb = nothing
     end
+
+    if check_connectivity && length(bus_lookup) > 1
+        subnetworks = assign_reference_buses!(
+            find_subnetworks(ybus, axes[1]),
+            ref_bus_numbers,
+        )
+        if length(subnetworks) > 1
+            @warn "More than one island found; Network is not connected"
+        end
+    else
+        subnetworks = Dict{Int, Set{Int}}()
+    end
     ybus = Ybus(
         ybus,
         adj,
         ref_bus_numbers,
         axes,
         lookup,
-        Dict{Int, Set{Int}}(),
+        subnetworks,
         nr,
         yft,
         ytf,
         fb,
         tb,
     )
+
     for nr in network_reductions
         ybus = build_reduced_ybus(ybus, sys, nr)
     end
-    if check_connectivity && length(bus_lookup) > 1
-        subnetworks = assign_reference_buses!(
-            find_subnetworks(ybus.data, ybus.axes[1]),
-            ybus.ref_bus_numbers,
-        )
-        if length(subnetworks) > 1
-            @warn "More than one island found; Network is not connected"
-        end
-        return Ybus(
-            ybus.data,
-            ybus.adjacency_data,
-            ybus.ref_bus_numbers,
-            ybus.axes,
-            ybus.lookup,
-            subnetworks,
-            ybus.network_reduction_data,
-            ybus.yft,
-            ybus.ytf,
-            ybus.fb,
-            ybus.tb,
-        )
-    else
-        return ybus
-    end
+    return ybus
 end
 
 function build_reduced_ybus(
@@ -957,6 +947,19 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     bus_ix = [ybus.lookup[1][x] for x in bus_ax]
     adjacency_data = adjacency_data[bus_ix, bus_ix]
     data = data[bus_ix, bus_ix]
+
+    subnetworks = deepcopy(ybus.subnetworks)
+    for (k, values) in subnetworks
+        if k in bus_numbers_to_remove
+            pop!(subnetworks, k)
+        else
+            for x in values
+                if x in bus_numbers_to_remove
+                    pop!(subnetworks[k], x)
+                end
+            end
+        end
+    end
     #TODO - doesn't yet account for reduction in yft, ytf, fb, tb
     return Ybus(
         data,
@@ -964,7 +967,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         setdiff(ybus.ref_bus_numbers, bus_numbers_to_remove),
         (bus_ax, bus_ax),
         (bus_lookup, bus_lookup),
-        Dict{Int, Set{Int}}(),
+        subnetworks,
         nr,
         ybus.yft,
         ybus.ytf,
