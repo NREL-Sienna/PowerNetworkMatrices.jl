@@ -23,7 +23,7 @@ function get_ward_reduction(
     reduction::WardReduction,
 )
     study_buses = get_study_buses(reduction)
-    #_validate_study_buses(ybus, study_buses)    #TODO- add data validation of study buses 
+    _validate_study_buses(y_bus, study_buses)
     Z_full = KLU.solve!(klu(y_bus.data), Matrix{ComplexF64}(one(y_bus.data)))       #TODO: change implementation for large systems (row by row)
     A = IncidenceMatrix(y_bus)
     boundary_buses = Set{Int}()
@@ -87,11 +87,10 @@ function get_ward_reduction(
     virtual_admittance_name_index = 1
     virtual_branch_name_index = 1
     #Loop upper diagonal of Yeq
-    ix_to_bus_map = Dict(v => k for (k, v) in y_bus.lookup[1])
     for ix in 1:length(boundary_buses)
         for jx in ix:length(boundary_buses)
-            bx = ix_to_bus_map[ix]
-            bx2 = ix_to_bus_map[jx]
+            bus_ix = boundary_buses[ix]
+            bus_jx = boundary_buses[jx]
             if y_eq[ix, jx] != 0.0
                 if ix == jx
                     virtual_admittance = PSY.FixedAdmittance(;
@@ -104,10 +103,10 @@ function get_ward_reduction(
                     virtual_admittance_name_index += 1
                 else
                     #check if the arc of virtual line is already existing so we don't add an additional arc
-                    if (bx2, bx) ∈ A.axes[1]
-                        arc_key = (bx2, bx)
+                    if (bus_ix, bus_jx) ∈ A.axes[1]
+                        arc_key = (bus_ix, bus_jx)
                     else
-                        arc_key = (bx, bx2)
+                        arc_key = (bus_jx, bus_ix)
                     end
                     virtual_branch = PSY.Line(;
                         name = "virtual_branch_$(virtual_branch_name_index)",
@@ -138,48 +137,46 @@ function get_ward_reduction(
     )
 end
 
-# TODO - add checks of valid study buses 
 function _validate_study_buses(
-    sys::PSY.System,
+    ybus::Ybus,
     study_buses::Vector{Int},
-    network_reduction::NetworkReductionData,
 )
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-
-    bus_numbers = PSY.get_number.(buses)
+    #TODO - improve building the vector/set of valid bus numbers
+    valid_bus_numbers = Set{Int}()
+    for (k, v) in get_network_reduction_data(ybus).bus_reduction_map
+        push!(valid_bus_numbers, k)
+        union!(valid_bus_numbers, v)
+    end
     for b in study_buses
-        b ∉ bus_numbers && throw(IS.DataFormatError("Study bus $b not found in system"))
+        b ∉ valid_bus_numbers &&
+            throw(IS.DataFormatError("Study bus $b not found in system"))
     end
-    M, _ = calculate_adjacency(branches, buses, network_reduction)
-    bus_ax = PSY.get_number.(buses)
-    sub_nets = find_subnetworks(M, bus_ax)
-    if length(sub_nets) > 1
-        @warn "System contains multiple islands"
-    end
-
-    slack_bus_numbers =
-        [PSY.get_number(n) for n in buses if PSY.get_bustype(n) == ACBusTypes.REF]
-    for (_, v) in sub_nets
-        all_in = all(x -> x in Set(v), study_buses)
-        none_in = all(x -> !(x in Set(v)), study_buses)
-        if all_in
-            @warn "The study buses comprise an entire island; ward reduction will not modify this island and other islands will be eliminated"
-        end
-        if !(all_in || none_in)
-            throw(
-                IS.DataFormatError(
-                    "All study_buses must occur in a single synchronously connected system.",
-                ),
-            )
-        end
-        for sb in slack_bus_numbers
-            if sb in v && sb ∉ study_buses && !(none_in)
+    slack_bus_numbers = ybus.ref_bus_numbers
+    if isempty(ybus.subnetworks)
+        @warn "Skipping additional data checks because subnetworks are not computed."
+    else
+        sub_networks = ybus.subnetworks
+        for (_, v) in sub_networks
+            all_in = all(x -> x in Set(v), study_buses)
+            none_in = all(x -> !(x in Set(v)), study_buses)
+            if all_in
+                @warn "The study buses comprise an entire island; ward reduction will not modify this island and other islands will be eliminated"
+            end
+            if !(all_in || none_in)
                 throw(
                     IS.DataFormatError(
-                        "Slack bus $sb must be included in the study buses for an area that is partially reduced",
+                        "All study_buses must occur in a single synchronously connected system.",
                     ),
                 )
+            end
+            for sb in slack_bus_numbers
+                if sb in v && sb ∉ study_buses && !(none_in)
+                    throw(
+                        IS.DataFormatError(
+                            "Slack bus $sb must be included in the study buses for an area that is partially reduced",
+                        ),
+                    )
+                end
             end
         end
     end

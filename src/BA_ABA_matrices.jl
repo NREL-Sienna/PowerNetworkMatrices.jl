@@ -48,9 +48,12 @@ function BA_Matrix(ybus::Ybus)
     parallel_arcs = [x for x in keys(nr.parallel_branch_map)]
     series_arcs = [x for x in keys(nr.series_branch_map)]
     transformer_arcs = [x for x in keys(nr.transformer3W_map)]
+    additional_arcs = [x for x in keys(nr.added_branch_map)]
     bus_ax = ybus.axes[1]
     bus_lookup = ybus.lookup[1]
-    arc_ax = vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs)
+    arc_ax = unique(
+        vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
+    )
     n_entries = length(arc_ax) * 2
     BA_I = Vector{Int}(undef, n_entries)
     BA_J = Vector{Int}(undef, n_entries)

@@ -18,11 +18,13 @@ function _test_matrices_ward_reduction(sys, study_buses)
     wr = get_network_reduction_data(ybus)
     added_branch_arcs = [x for x in keys(wr.added_branch_map)]
     direct_arcs = [x for x in keys(wr.direct_branch_map)]
+    parallel_arcs = [x for x in keys(wr.parallel_branch_map)]
     A = IncidenceMatrix(
         sys;
         network_reductions = NetworkReduction[WardReduction(study_buses)],
     )
-    @test Set(A.axes[1]) == union(Set(added_branch_arcs), Set(direct_arcs))
+    @test Set(A.axes[1]) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
     @test Set(A.axes[2]) == Set(study_buses)
 
     Adj = AdjacencyMatrix(
@@ -33,7 +35,8 @@ function _test_matrices_ward_reduction(sys, study_buses)
     @test Set(Adj.axes[2]) == Set(study_buses)
 
     BA = BA_Matrix(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
-    @test Set(BA.axes[2]) == union(Set(added_branch_arcs), Set(direct_arcs))
+    @test Set(BA.axes[2]) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
     @test Set(BA.axes[1]) == Set(study_buses)
 
     Y = Ybus(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
@@ -42,11 +45,14 @@ function _test_matrices_ward_reduction(sys, study_buses)
 
     PTDF_ = PTDF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
     @test Set(PTDF_.axes[1]) == Set(study_buses)
-    @test Set(PTDF_.axes[2]) == union(Set(added_branch_arcs), Set(direct_arcs))
+    @test Set(PTDF_.axes[2]) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
 
     LODF_ = LODF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
-    @test Set(LODF_.axes[1]) == union(Set(added_branch_arcs), Set(direct_arcs))
-    @test Set(LODF_.axes[2]) == union(Set(added_branch_arcs), Set(direct_arcs))
+    @test Set(LODF_.axes[1]) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
+    @test Set(LODF_.axes[2]) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
 
     #TODO - add virtual PTDF/ virtual LODF
 end
@@ -103,7 +109,6 @@ end
     #@test length(wr.added_branches) == 0
     #@test length(wr.added_admittances) == 0
 
-    #TODO - throw the correct error type 
     @test_throws IS.DataFormatError get_network_reduction_data(
         Ybus(
             sys;
