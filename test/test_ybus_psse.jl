@@ -90,15 +90,12 @@ end
 end
 
 @testset "WECC 240 bus" begin
-    sys_240 = System(
-        joinpath(TEST_DATA_DIR, "240busWECC_2018_PSS33.raw");
-        runchecks = false,
-    )
-    Ybus_pnm = Ybus(sys_240)
+    sys = PSB.build_system(PSYTestSystems, "psse_240_parsing_sys"; runchecks = false)
+    Ybus_pnm = Ybus(sys)
     nr = Ybus_pnm.network_reduction_data
     ref_bus_numbers = [
         get_number(x) for
-        x in get_components(x -> get_bustype(x) == PSY.ACBusTypes.REF, ACBus, sys_240)
+        x in get_components(x -> get_bustype(x) == PSY.ACBusTypes.REF, ACBus, sys)
     ]
     skip_indices = indexin(ref_bus_numbers, Ybus_pnm.axes[1])
     n_ref_bus_elements = nnz(Ybus_pnm.data[skip_indices, :])

@@ -1,6 +1,5 @@
 #TODO - add testing for new capabilities (i.e. degree two reduction)
-sys = System(joinpath(TEST_DATA_DIR, "case14_reductions.raw"))
-
+sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
 # Full Matrix 
 ybus = Ybus(sys)
 A = IncidenceMatrix(ybus)
