@@ -1,30 +1,16 @@
 @kwdef struct RadialReduction <: NetworkReduction
     irreducible_buses::Vector{Int} = Vector{Int}()
 end
+get_irreducible_buses(nr::RadialReduction) = nr.irreducible_buses
 
 function get_reduction(
-    Y::Ybus,
+    ybus::Ybus,
     ::PSY.System,
-    ::RadialReduction,  #TODO - include irreducible buses 
+    reduction::RadialReduction,
 )
-    A = IncidenceMatrix(Y)
-    return get_radial_reduction(A)
-end
-
-"""
-Builds a NetworkReduction by removing radially connected buses.
-
-# Arguments
-- `sys::System`
-"""
-function get_radial_reduction(
-    sys::PSY.System;
-    exempt_buses::Vector{Int} = Int[],
-)
-    return get_radial_reduction(
-        IncidenceMatrix(sys);
-        exempt_buses = exempt_buses,
-    )
+    A = IncidenceMatrix(ybus)
+    irreducible_buses = get_irreducible_buses(reduction)
+    return get_radial_reduction(A, irreducible_buses, reduction)
 end
 
 """
@@ -34,15 +20,17 @@ Builds a NetworkReduction by removing radially connected buses.
 - `A::IncidenceMatrix`: IncidenceMatrix
 """
 function get_radial_reduction(
-    A::IncidenceMatrix;
-    exempt_buses::Vector{Int} = Int[],
+    A::IncidenceMatrix,
+    irreducible_buses::Vector{Int},
+    reduction::RadialReduction,
 )
-    exempt_bus_positions = Set([A.lookup[2][x] for x in exempt_buses])
+    exempt_bus_positions = Set([A.lookup[2][x] for x in irreducible_buses])
     return calculate_radial_arcs(
         A.data,
         A.lookup[1],
         A.lookup[2],
         union(A.ref_bus_positions, exempt_bus_positions),
+        reduction,
     )
 end
 
@@ -171,6 +159,7 @@ function calculate_radial_arcs(
     arc_map::Dict{Tuple{Int, Int}, Int},
     bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},
+    reduction::RadialReduction,
 )
     lk = ReentrantLock()
     buscount = length(bus_map)
@@ -196,11 +185,11 @@ function calculate_radial_arcs(
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map_index, buscount)
 
     return NetworkReductionData(;
-        irreducible_buses = Set{Int}(),         # TODO - inherit irreducible_buses 
+        irreducible_buses = Set(get_irreducible_buses(reduction)),
         bus_reduction_map = bus_reduction_map_index,
         reverse_bus_search_map = reverse_bus_search_map,
         removed_arcs = radial_arcs,
-        reductions = NetworkReduction[RadialReduction()],
+        reductions = NetworkReduction[reduction],
     )
 end
 

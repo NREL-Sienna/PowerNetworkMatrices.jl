@@ -75,11 +75,22 @@ end
 
 @testset "Small island exception for radial reduction" begin
     sys = build_hvdc_with_small_island()
-    a_mat = IncidenceMatrix(sys; check_connectivity = false)
-    rr = get_radial_reduction(a_mat)
+    ybus = Ybus(
+        sys;
+        check_connectivity = false,
+        network_reductions = NetworkReduction[RadialReduction()],
+    )
+    rr = get_network_reduction_data(ybus)
     @test haskey(rr.reverse_bus_search_map, 16)
     @test haskey(rr.reverse_bus_search_map, 17)
-    rr = get_radial_reduction(a_mat; exempt_buses = [16, 17])
+    ybus = Ybus(
+        sys;
+        check_connectivity = false,
+        network_reductions = NetworkReduction[RadialReduction(;
+            irreducible_buses = [16, 17],
+        )],
+    )
+    rr = get_network_reduction_data(ybus)
     @test !haskey(rr.reverse_bus_search_map, 16)
     @test !haskey(rr.reverse_bus_search_map, 17)
     #@test isa(PTDF(sys; network_reduction = rr), PTDF)     #TODO - look at this test once PTDF works; I think I have captured the functionality with other added tests

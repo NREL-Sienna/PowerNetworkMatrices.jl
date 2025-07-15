@@ -5,10 +5,11 @@ get_study_buses(nr::WardReduction) = nr.study_buses
 
 function get_reduction(
     ybus::Ybus,
-    sys::PSY.System,
-    nr::WardReduction,
+    ::PSY.System,
+    reduction::WardReduction,
 )
-    return get_ward_reduction(ybus, nr)
+    study_buses = get_study_buses(reduction)
+    return get_ward_reduction(ybus, study_buses, reduction)
 end
 
 """
@@ -20,9 +21,9 @@ Builds a NetworkReduction corresponding to Ward reduction
 """
 function get_ward_reduction(
     y_bus::Ybus,
+    study_buses::Vector{Int},
     reduction::WardReduction,
 )
-    study_buses = get_study_buses(reduction)
     _validate_study_buses(y_bus, study_buses)
     Z_full = KLU.solve!(klu(y_bus.data), Matrix{ComplexF64}(one(y_bus.data)))       #TODO: change implementation for large systems (row by row)
     A = IncidenceMatrix(y_bus)
