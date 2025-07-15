@@ -103,11 +103,13 @@ end
     @test length(wr.added_branch_map) == 0
     @test length(wr.added_admittance_map) == 1
 
-    #TODO - fails because no boundary buses are found 
-    #wr = get_ward_reduction(sys, [15, 16, 17])
-    #@test isa(wr, NetworkReduction)
-    #@test length(wr.added_branches) == 0
-    #@test length(wr.added_admittances) == 0
+    wr =
+        @test_logs (:error, r"no boundary buses found") match_mode = :any get_network_reduction_data(
+            Ybus(sys; network_reductions = NetworkReduction[WardReduction([15, 16, 17])]),
+        )
+    @test isa(wr, NetworkReductionData)
+    @test length(wr.added_branch_map) == 0
+    @test length(wr.added_admittance_map) == 0
 
     @test_throws IS.DataFormatError get_network_reduction_data(
         Ybus(
