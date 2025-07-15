@@ -2,18 +2,30 @@
     irreducible_buses::Vector{Int} = Vector{Int}()
     reduce_reactive_power_injectors::Bool = true
 end
+get_irreducible_buses(nr::DegreeTwoReduction) = nr.irreducible_buses
+get_reduce_reactive_power_injectors(nr::DegreeTwoReduction) =
+    nr.reduce_reactive_power_injectors
 
 function get_reduction(
     ybus::Ybus,
     sys::PSY.System,
-    nr::DegreeTwoReduction,
+    reduction::DegreeTwoReduction,
 )
-    A = ybus_to_adjacency(ybus)
-    irreducible_buses = Set{Int}()
+    A = AdjacencyMatrix(ybus)
+    irreducible_buses = Set(get_irreducible_buses(reduction))
+    return get_degree2_reduction(A, sys, irreducible_buses, reduction)
+end
+
+function get_degree2_reduction(
+    A::AdjacencyMatrix,
+    sys::PSY.System,
+    irreducible_buses::Set{Int},
+    reduction::DegreeTwoReduction,
+)
     for c in PSY.get_components(PSY.StaticInjection, sys)
         push!(irreducible_buses, PSY.get_number(PSY.get_bus(c)))
     end
-    irreducible_indices = Set([ybus.lookup[2][i] for i in irreducible_buses])
+    irreducible_indices = Set([A.lookup[2][i] for i in irreducible_buses])
 
     arc_maps = find_degree2_chains(A.data, irreducible_indices)
 
@@ -26,7 +38,7 @@ function get_reduction(
         #reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}(br1 => (101, 102), br2 => (101, 102)),
         #removed_buses = Set{Int}([115]),
         #removed_arcs = Set{Tuple{Int, Int}}([(101, 115), (115, 102)]),                               
-        reductions = Vector{NetworkReduction}([nr]),
+        reductions = NetworkReduction[reduction],
     )
 end
 

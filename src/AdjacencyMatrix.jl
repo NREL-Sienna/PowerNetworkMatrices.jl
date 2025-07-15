@@ -44,10 +44,10 @@ function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwarg
         check_connectivity = check_connectivity,
         kwargs...,
     )
-    return ybus_to_adjacency(ybus)
+    return AdjacencyMatrix(ybus)
 end
 
-function ybus_to_adjacency(ybus::Ybus)
+function AdjacencyMatrix(ybus::Ybus)
     SparseArrays.droptol!(ybus.data, 1e6)
     adj_matrix = deepcopy(ybus.adjacency_data)
     for i in 1:size(adj_matrix, 1)
