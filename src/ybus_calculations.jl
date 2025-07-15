@@ -862,6 +862,10 @@ end
 
 #NOTE: this is the key function that composes sequential reductions; this function needs cleanup, review, and more testing. 
 function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
+    validate_reduction_type(
+        get_reductions(nr_new)[1],
+        get_reductions(get_network_reduction_data(ybus)),
+    )
     remake_reverse_direct_branch_map = false
     remake_reverse_parallel_branch_map = false
     remake_reverse_series_branch_map = false

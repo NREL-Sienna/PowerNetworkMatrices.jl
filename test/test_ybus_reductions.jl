@@ -1,3 +1,23 @@
+@testset "Invalid reduction combinations" begin
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    @test_throws IS.DataFormatError("RadialReduction is applied twice to the same system") Ybus(
+        sys;
+        network_reductions = NetworkReduction[RadialReduction(), RadialReduction()],
+    )
+    @test_throws IS.DataFormatError(
+        "When applying both RadialReduction and DegreeTwoReduction, RadialReduction must be applied first",
+    ) Ybus(
+        sys;
+        network_reductions = NetworkReduction[DegreeTwoReduction(), RadialReduction()],
+    )
+    @test_throws IS.DataFormatError(
+        "RadialReduction reduction is applied after Ward reduction. Ward reduction must be applied last.",
+    ) Ybus(
+        sys;
+        network_reductions = NetworkReduction[WardReduction([1, 2, 4]), RadialReduction()],
+    )
+end
+
 #TODO - add testing for new capabilities (i.e. degree two reduction)
 sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
 # Full Matrix 

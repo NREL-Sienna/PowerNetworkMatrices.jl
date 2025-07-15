@@ -57,36 +57,35 @@ function Base.isempty(rb::NetworkReductionData)
     return true
 end
 
-#TODO - refactor and use this function to validate that the order to reductions passed is a valid combination. 
-#= function validate_reduction_type(
-    reduction_type::NetworkReductionTypes,
-    prior_reduction_types::Vector{NetworkReductionTypes},
-)
-    if length(prior_reduction_types) == 0
+function validate_reduction_type(
+    reduction::T,
+    prior_reductions::Vector{NetworkReduction},
+) where {T <: NetworkReduction}
+    prior_reduction_types = [typeof(x) for x in prior_reductions]
+    if length(prior_reductions) == 0
         return
     else
-        if reduction_type ∈ prior_reduction_types
-            throw(IS.DataFormatError("$reduction_type is applied twice to the same system"))
+        if T ∈ prior_reduction_types
+            throw(IS.DataFormatError("$T is applied twice to the same system"))
         end
-        if reduction_type == NetworkReductionTypes.BREAKER_SWITCH
-            if NetworkReductionTypes.WARD ∈ prior_reduction_types
+        if WardReduction ∈ prior_reduction_types
+            throw(
+                IS.DataFormatError(
+                    "$T reduction is applied after Ward reduction. Ward reduction must be applied last.",
+                ),
+            )
+        end
+        if T == RadialReduction
+            if DegreeTwoReduction ∈ prior_reduction_types
                 throw(
-                    IS.DataFormatError("Cannot apply $reduction_type after Ward Reduction"),
+                    IS.DataFormatError(
+                        "When applying both RadialReduction and DegreeTwoReduction, RadialReduction must be applied first",
+                    ),
                 )
             end
-        elseif reduction_type == NetworkReductionTypes.RADIAL
-            if NetworkReductionTypes.WARD ∈ prior_reduction_types
-                throw(
-                    IS.DataFormatError("Cannot apply $reduction_type after Ward Reduction"),
-                )
-            end
-        elseif reduction_type == NetworkReductionTypes.WARD
-        else
-            error("Define validation for $reduction_type reduction")
         end
     end
 end
- =#
 
 ##############################################################################
 ########################### Auxiliary functions ##############################
