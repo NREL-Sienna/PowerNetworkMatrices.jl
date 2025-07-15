@@ -49,13 +49,23 @@ function get_ward_reduction(
 
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
     bus_lookup = y_bus.lookup[1]    #y_bus and Z have same lookup
-    for b in external_buses
-        boundary_bus_indices = [bus_lookup[x] for x in boundary_buses]
-        boundary_bus_numbers = [x for x in boundary_buses]
-        row_index = bus_lookup[b]
-        Z_row_boundary = abs.(Z_full[row_index, boundary_bus_indices])
-        closest_boundary_bus = boundary_bus_numbers[argmin(Z_row_boundary)]
-        push!(bus_reduction_map_index[closest_boundary_bus], b)
+
+
+    added_branch_map = Dict{Tuple{Int, Int}, PSY.Line}()
+    added_admittance_map = Dict{Int, PSY.FixedAdmittance}()
+    if isempty(boundary_buses)
+        first_ref_study_bus = findfirst(x -> x ∈ y_bus.ref_bus_numbers, study_buses)
+        @error "no boundary buses found; cannot make bus_reduction_map based on impedance based criteria. mapping all external buses to the first reference bus ($first_ref_study_bus)"
+        bus_reduction_map_index[first_ref_study_bus] = Set(external_buses)
+    else
+        for b in external_buses
+            boundary_bus_indices = [bus_lookup[x] for x in boundary_buses]
+            boundary_bus_numbers = [x for x in boundary_buses]
+            row_index = bus_lookup[b]
+            Z_row_boundary = abs.(Z_full[row_index, boundary_bus_indices])
+            closest_boundary_bus = boundary_bus_numbers[argmin(Z_row_boundary)]
+            push!(bus_reduction_map_index[closest_boundary_bus], b)
+        end
     end
     reverse_bus_search_map =
         _make_reverse_bus_search_map(bus_reduction_map_index, length(all_buses))
@@ -83,8 +93,6 @@ function get_ward_reduction(
     # Eq. (2.16) from  https://core.ac.uk/download/pdf/79564835.pdf
     y_eq = y_be * KLU.solve!(klu(y_ee), Matrix{Complex{Float64}}(y_eb))
 
-    added_branch_map = Dict{Tuple{Int, Int}, PSY.Line}()
-    added_admittance_map = Dict{Int, PSY.FixedAdmittance}()
     virtual_admittance_name_index = 1
     virtual_branch_name_index = 1
     #Loop upper diagonal of Yeq

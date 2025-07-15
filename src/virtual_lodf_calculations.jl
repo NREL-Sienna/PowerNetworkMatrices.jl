@@ -145,8 +145,6 @@ function VirtualLODF(
 
     temp_data = zeros(length(bus_ax))
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
-    # TODO: I'm assuming the indexing set up such that rows/cols get matched
-    # up correctly between BA.data and A.data
     PTDF_diag = _get_PTDF_A_diag(
         K,
         BA.data,
