@@ -50,7 +50,6 @@ function get_ward_reduction(
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
     bus_lookup = y_bus.lookup[1]    #y_bus and Z have same lookup
 
-
     added_branch_map = Dict{Tuple{Int, Int}, PSY.Line}()
     added_admittance_map = Dict{Int, PSY.FixedAdmittance}()
     if isempty(boundary_buses)
