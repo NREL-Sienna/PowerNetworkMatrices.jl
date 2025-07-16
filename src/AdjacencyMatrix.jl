@@ -24,12 +24,14 @@ struct AdjacencyMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
+    network_reduction_data::NetworkReductionData
 end
 
 # functions to get stored data
 get_axes(A::AdjacencyMatrix) = A.axes
 get_lookup(A::AdjacencyMatrix) = A.lookup
 get_slack_position(A::AdjacencyMatrix) = A.ref_bus_positions
+get_network_reduction_data(A::AdjacencyMatrix) = A.ref_bunetwork_reduction_datas_positions
 
 """
 Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix Array indexed with the bus numbers.
@@ -59,6 +61,7 @@ function AdjacencyMatrix(ybus::Ybus)
         deepcopy(ybus.axes),
         deepcopy(ybus.lookup),
         Set([ybus.lookup[1][x] for x in ybus.ref_bus_numbers]),
+        ybus.network_reduction_data,
     )
 end
 
