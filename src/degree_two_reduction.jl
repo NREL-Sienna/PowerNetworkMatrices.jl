@@ -22,24 +22,77 @@ function get_degree2_reduction(
     irreducible_buses::Set{Int},
     reduction::DegreeTwoReduction,
 )
+    network_reduction_data = A.network_reduction_data
+    reverse_bus_search_map = network_reduction_data.reverse_bus_search_map
     for c in PSY.get_components(PSY.StaticInjection, sys)
         push!(irreducible_buses, PSY.get_number(PSY.get_bus(c)))
     end
-    irreducible_indices = Set([A.lookup[2][i] for i in irreducible_buses])
-
+    irreducible_non_reduced_buses =
+        unique([get(reverse_bus_search_map, k, k) for k in irreducible_buses])
+    irreducible_indices = Set([A.lookup[2][i] for i in irreducible_non_reduced_buses])
+    reverse_bus_lookup = Dict(v => k for (k, v) in A.lookup[2])
     arc_maps = find_degree2_chains(A.data, irreducible_indices)
+    series_branch_map = Dict{Tuple{Int, Int}, Vector{Any}}()
+    reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    removed_buses = Set{Int}()
+    removed_arcs = Set{Tuple{Int, Int}}()
+    for (composite_arc_ix, segment_ix) in arc_maps
+        composite_arc = (
+            reverse_bus_lookup[composite_arc_ix[1]],
+            reverse_bus_lookup[composite_arc_ix[2]],
+        )
+        segment_numbers = [reverse_bus_lookup[x] for x in segment_ix]
+        @assert composite_arc[1] == segment_numbers[1]
+        @assert composite_arc[2] == segment_numbers[end]
+        segments = Vector{Any}()
+        for ix in 1:(length(segment_numbers) - 1)
+            segment_arc = (segment_numbers[ix], segment_numbers[ix + 1])
+            segment_arc, entry = _get_branch_map_entry(network_reduction_data, segment_arc)
+            push!(segments, entry)
+            push!(removed_arcs, segment_arc)
+            ix != 1 && push!(removed_buses, segment_numbers[ix])
+        end
+        series_branch_map[composite_arc] = segments
+    end
 
-    # TODO - translate the arc_maps from the 2d algorithm to the mappings of the NetworkReductionData object.
-    # Should modify series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs
+    #TODO - add the reverse_series_branch_map
 
     return NetworkReductionData(;
         irreducible_buses = irreducible_buses,
-        #series_branch_map =  Dict{Tuple{Int, Int}, Set{PSY.Branch}}((101, 102) => Set([br1, br2])),         
-        #reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}(br1 => (101, 102), br2 => (101, 102)),
-        #removed_buses = Set{Int}([115]),
-        #removed_arcs = Set{Tuple{Int, Int}}([(101, 115), (115, 102)]),                               
+        series_branch_map = series_branch_map,
+        reverse_series_branch_map = reverse_series_branch_map,
+        removed_buses = removed_buses,
+        removed_arcs = removed_arcs,
         reductions = NetworkReduction[reduction],
     )
+end
+
+function _get_branch_map_entry(nr::NetworkReductionData, arc::Tuple{Int, Int})
+    reverse_arc = (arc[2], arc[1])
+    direct_branch_map = nr.direct_branch_map
+    parallel_branch_map = nr.parallel_branch_map
+    series_branch_map = nr.series_branch_map
+    transformer3W_map = nr.transformer3W_map
+
+    if haskey(direct_branch_map, arc)
+        return arc, direct_branch_map[arc]
+    elseif haskey(direct_branch_map, reverse_arc)
+        return reverse_arc, direct_branch_map[reverse_arc]
+    elseif haskey(parallel_branch_map, arc)
+        return arc, parallel_branch_map[arc]
+    elseif haskey(parallel_branch_map, reverse_arc)
+        return reverse_arc, parallel_branch_map[reverse_arc]
+    elseif haskey(series_branch_map, arc)
+        return arc, series_branch_map[arc]
+    elseif haskey(series_branch_map, reverse_arc)
+        return reverse_arc, series_branch_map[reverse_arc]
+    elseif haskey(transformer3W_map, arc)
+        return arc, transformer3W_map[arc]
+    elseif haskey(transformer3W_map, reverse_arc)
+        return reverse_arc, transformer3W_map[reverse_arc]
+    else
+        error("Arc $segment_arc not found in the existing network reduction mappings.")
+    end
 end
 
 """

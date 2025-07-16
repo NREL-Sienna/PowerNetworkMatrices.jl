@@ -12,8 +12,8 @@ abstract type NetworkReduction end
         Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
     reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} =
         Dict{PSY.Branch, Tuple{Int, Int}}()
-    series_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} =
-        Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
+    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}} =
+        Dict{Tuple{Int, Int}, Vector{Any}}()
     reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} =
         Dict{PSY.Branch, Tuple{Int, Int}}()
     transformer3W_map::Dict{

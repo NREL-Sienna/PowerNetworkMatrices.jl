@@ -18,6 +18,14 @@
     )
 end
 
+@testset "Basic degree two NetworkReductionData" begin
+    sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
+    ybus = Ybus(sys; check_connectivity = false)
+    network_reduction_data = PNM.get_reduction(ybus, sys, DegreeTwoReduction())
+    @test !isempty(PNM.get_series_branch_map(network_reduction_data))
+    #@test !isempty(PNM.get_reverse_series_branch_map(network_reduction_data))  # FAILS - need to implement building reverse map
+end
+
 #TODO - add testing for new capabilities (i.e. degree two reduction)
 sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
 # Full Matrix 
