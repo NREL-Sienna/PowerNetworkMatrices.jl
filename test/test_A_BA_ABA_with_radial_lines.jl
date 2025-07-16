@@ -1,22 +1,16 @@
 @testset "Test BA matrix with radial lines" begin
     for name in ["c_sys14", "test_RTS_GMLC_sys"]
-        # load the system
         sys = PSB.build_system(PSB.PSITestSystems, name)
-        # get the incidence matrix
         BA = BA_Matrix(sys)
-        # ... and with radial lines
-        network_reduction = get_radial_reduction(sys)
-        BA_rad = BA_Matrix(sys; network_reduction = network_reduction)
-        # get indices for the leaf nodes
-        nr = BA_rad.network_reduction
+        BA_rad = BA_Matrix(sys; network_reductions = NetworkReduction[RadialReduction()])
+        nr = BA_rad.network_reduction_data
         bus_numbers = []
         for i in keys(nr.bus_reduction_map)
             append!(bus_numbers, collect(nr.bus_reduction_map[i]))
         end
         bus_idx = setdiff(1:size(BA.data, 1), [BA.lookup[1][i] for i in bus_numbers])
-        # ... and radial branches
-        br_idx = setdiff(1:size(BA.data, 2), [BA.lookup[2][i] for i in nr.removed_branches])
-        # now extract A matrix and compare
+        br_idx = setdiff(1:size(BA.data, 2), [BA.lookup[2][i] for i in nr.removed_arcs])
+        # now extract A matrix manually and compare
         @test all(isapprox.(BA.data[bus_idx, br_idx], BA_rad.data))
     end
 end
@@ -28,17 +22,20 @@ end
         # load the system
         sys = PSB.build_system(PSB.PSITestSystems, name)
 
-        # get the NetworkReduction struct
-        nr = get_radial_reduction(sys)
-
         # get the original and reduced IncidenceMatrix, BA and ABA
         A = IncidenceMatrix(sys)
-        A_rad = IncidenceMatrix(sys; network_reduction = nr)
+        A_rad =
+            IncidenceMatrix(sys; network_reductions = NetworkReduction[RadialReduction()])
         BA = BA_Matrix(sys)
-        BA_rad = BA_Matrix(sys; network_reduction = nr)
+        BA_rad = BA_Matrix(sys; network_reductions = NetworkReduction[RadialReduction()])
         ABA = ABA_Matrix(sys; factorize = true)
-        ABA_rad = ABA_Matrix(sys; factorize = true, network_reduction = nr)
+        ABA_rad = ABA_Matrix(
+            sys;
+            factorize = true,
+            network_reductions = NetworkReduction[RadialReduction()],
+        )
 
+        nr = A_rad.network_reduction_data
         # check if the same angles and flows are computed with the matrices of the reduced systems
         # get the indices for the reduced system
         bus_numbers = []
@@ -49,9 +46,9 @@ end
             1:size(A.data, 2),
             append!([A.lookup[2][i] for i in bus_numbers], A.ref_bus_positions),
         )
-        br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in nr.removed_branches])
+        br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in nr.removed_arcs])
 
-        # now get the injunctions from the system
+        # now get the injenctions from the system
         n_buses = length(axes(BA, 1))
         bus_lookup = BA.lookup[1]
         branch_lookup = BA.lookup[2]
@@ -72,7 +69,11 @@ end
         end
         bus_activepower_injection = zeros(Float64, n_buses)
         sources =
-            PSY.get_components(d -> !isa(d, PSY.ElectricLoad), PSY.StaticInjection, sys)
+            PSY.get_components(
+                d -> !isa(d, Union{PSY.ElectricLoad, PSY.SynchronousCondenser}),
+                PSY.StaticInjection,
+                sys,
+            )
         for source in sources
             !PSY.get_available(source) && continue
             bus = PSY.get_bus(source)

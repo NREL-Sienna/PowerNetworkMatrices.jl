@@ -23,7 +23,7 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     axes::Ax
     lookup::L
     tol::Base.RefValue{Float64}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 function _buildlodf(
@@ -47,9 +47,9 @@ function _buildlodf(
 end
 
 function _buildlodf(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int64},
-    k::KLU.KLUFactorization{Float64, Int64},
-    ba::SparseArrays.SparseMatrixCSC{Float64, Int64},
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    k::KLU.KLUFactorization{Float64, Int},
+    ba::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int},
     linear_solver::String,
 )
@@ -62,10 +62,10 @@ function _buildlodf(
 end
 
 function _calculate_LODF_matrix_KLU(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int64},
-    k::KLU.KLUFactorization{Float64, Int64},
-    ba::SparseArrays.SparseMatrixCSC{Float64, Int64},
-    ref_bus_positions::Set{Int64},
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    k::KLU.KLUFactorization{Float64, Int},
+    ba::SparseArrays.SparseMatrixCSC{Float64, Int},
+    ref_bus_positions::Set{Int},
 )
     linecount = size(ba, 2)
     # get inverse of aba
@@ -257,68 +257,6 @@ function _calculate_LODF_matrix_MKLPardiso(
 end
 
 """
-Builds the LODF matrix given the data of branches and buses of the system.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-
-# Keyword Arguments
-- `linear_solver`::String
-        linear solver to use for matrix evaluation.
-        Available options: "KLU", "Dense" (OpenBLAS) or "MKLPardiso".
-        Default solver: "KLU".
-- `tol::Float64`:
-        Tolerance to eliminate entries in the LODF matrix (default eps())
-- `network_reduction::NetworkReduction`:
-        Structure containing the details of the network reduction applied when computing the matrix
-"""
-function LODF(
-    branches,
-    buses::Vector{PSY.ACBus};
-    linear_solver::String = "KLU",
-    tol::Float64 = eps(),
-    network_reduction::NetworkReduction = NetworkReduction(),
-)
-    # get axis names
-    line_ax = [branch.name for branch in branches]
-    axes = (line_ax, line_ax)
-    line_map = make_ax_ref(line_ax)
-    look_up = (line_map, line_map)
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    bus_lookup = make_ax_ref(bus_ax)
-    # get network matrices
-    ptdf_t, a = calculate_PTDF_matrix_KLU(
-        branches,
-        buses,
-        bus_lookup,
-        network_reduction,
-        Float64[],
-    )
-
-    if tol > eps()
-        lodf_t = _buildlodf(a, ptdf_t, linear_solver)
-        return LODF(
-            sparsify(lodf_t, tol),
-            axes,
-            look_up,
-            Ref(tol),
-            network_reduction,
-        )
-    else
-        return LODF(
-            _buildlodf(a, ptdf_t, linear_solver),
-            axes,
-            look_up,
-            Ref(tol),
-            network_reduction,
-        )
-    end
-end
-
-"""
 Builds the LODF matrix from a system.
 Note that `network_reduction` kwargs is explicitly mentioned because needed inside of the function.
 
@@ -332,15 +270,22 @@ Note that `network_reduction` kwargs is explicitly mentioned because needed insi
 """
 function LODF(
     sys::PSY.System;
-    network_reduction::NetworkReduction = NetworkReduction(),
+    linear_solver::String = "KLU",
+    tol::Float64 = eps(),
+    check_connectivity = false,
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    if !isempty(network_reduction.added_branches)
-        branches = vcat(branches, network_reduction.added_branches)
-    end
-    return LODF(branches, buses; network_reduction = network_reduction, kwargs...)
+    Ymatrix = Ybus(
+        sys;
+        check_connectivity = check_connectivity,
+        network_reductions = network_reductions,
+        kwargs...,
+    )
+    A = IncidenceMatrix(Ymatrix)
+    BA = BA_Matrix(Ymatrix)
+    ptdf = PTDF(A, BA)
+    return LODF(A, ptdf; linear_solver = linear_solver, tol = tol, kwargs...)
 end
 
 """
@@ -367,7 +312,6 @@ function LODF(
     PTDFm::PTDF;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    network_reduction::NetworkReduction = NetworkReduction(),
 )
     validate_linear_solver(linear_solver)
 
@@ -382,7 +326,7 @@ function LODF(
         PTDFm_data = PTDFm.data
     end
 
-    if !isequal(A.network_reduction, PTDFm.network_reduction)
+    if !isequal(A.network_reduction_data, PTDFm.network_reduction_data)
         error("A and PTDF matrices have non-equivalent network reductions.")
     end
     ax_ref = make_ax_ref(A.axes[1])
@@ -394,7 +338,7 @@ function LODF(
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
             Ref(tol),
-            network_reduction,
+            A.network_reduction_data,
         )
     end
     return LODF(
@@ -402,7 +346,7 @@ function LODF(
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
-        network_reduction,
+        A.network_reduction_data,
     )
 end
 
@@ -431,11 +375,10 @@ function LODF(
     BA::BA_Matrix;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    network_reduction::NetworkReduction = NetworkReduction(), #TODO The public API should not have a way to pass in network_reduction to this function which uses existing matrices to compute the LODF. 
 )
     if !(
-        isequal(A.network_reduction, BA.network_reduction) &&
-        isequal(BA.network_reduction, ABA.network_reduction)
+        isequal(A.network_reduction_data, BA.network_reduction_data) &&
+        isequal(BA.network_reduction_data, ABA.network_reduction_data)
     )
         error(
             "Mismatch in `NetworkReduction`, A, BA, and ABA matrices must be computed with the same network reduction.",
@@ -451,7 +394,7 @@ function LODF(
             (A.axes[1], A.axes[1]),
             (ax_ref, ax_ref),
             Ref(tol),
-            network_reduction,
+            A.network_reduction_data,
         )
     end
     return LODF(
@@ -459,7 +402,7 @@ function LODF(
         (A.axes[1], A.axes[1]),
         (ax_ref, ax_ref),
         Ref(tol),
-        network_reduction,
+        A.network_reduction_data,
     )
 end
 
@@ -469,8 +412,15 @@ end
 
 # NOTE: the LODF matrix is saved as transposed!
 
-function Base.getindex(A::LODF, selected_line, outage_line)
-    i, j = to_index(A, outage_line, selected_line)
+function Base.getindex(A::LODF, selected_branch_name::String, outage_branch_name::String)
+    multiplier_selected, arc_selected = get_branch_multiplier(A, selected_branch_name)
+    multiplier_outage, arc_outage = get_branch_multiplier(A, outage_branch_name)
+    i, j = to_index(A, arc_outage, arc_selected)
+    return A.data[i, j] * multiplier_selected * multiplier_outage
+end
+
+function Base.getindex(A::LODF, selected_arc, outage_arc)
+    i, j = to_index(A, outage_arc, selected_arc)
     return A.data[i, j]
 end
 

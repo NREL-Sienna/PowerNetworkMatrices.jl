@@ -24,36 +24,59 @@ struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     axes::Ax
     lookup::L
     ref_bus_positions::Set{Int}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
-"""
-Build the BA matrix from a given System
-
-# Arguments
-- `sys::PSY.System`:
-        PSY system for which the matrix is constructed
-- `network_reduction::NetworkReduction`:
-        Structure containing the details of the network reduction applied when computing the matrix
-"""
-function BA_Matrix(
-    sys::PSY.System;
-    network_reduction::NetworkReduction = NetworkReduction(),
+function BA_Matrix(sys::PSY.System;
+    check_connectivity::Bool = true,
+    network_reductions::Vector{NetworkReduction} = Vector{NetworkReduction}(),
+    kwargs...,
 )
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    if !isempty(network_reduction.added_branches)
-        branches = vcat(branches, network_reduction.added_branches)
+    return BA_Matrix(
+        Ybus(
+            sys;
+            check_connectivity = check_connectivity,
+            network_reductions = network_reductions,
+            kwargs...,
+        ),
+    )
+end
+
+function BA_Matrix(ybus::Ybus)
+    nr = ybus.network_reduction_data
+    direct_arcs = [x for x in keys(nr.direct_branch_map)]
+    parallel_arcs = [x for x in keys(nr.parallel_branch_map)]
+    series_arcs = [x for x in keys(nr.series_branch_map)]
+    transformer_arcs = [x for x in keys(nr.transformer3W_map)]
+    additional_arcs = [x for x in keys(nr.added_branch_map)]
+    bus_ax = ybus.axes[1]
+    bus_lookup = ybus.lookup[1]
+    arc_ax = unique(
+        vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
+    )
+    n_entries = length(arc_ax) * 2
+    BA_I = Vector{Int}(undef, n_entries)
+    BA_J = Vector{Int}(undef, n_entries)
+    BA_V = Vector{Float64}(undef, n_entries)
+    for (ix_arc, arc) in enumerate(arc_ax)
+        ix_from_bus = get_bus_index(arc[1], bus_lookup, nr)
+        ix_to_bus = get_bus_index(arc[2], bus_lookup, nr)
+        Yt = -1 * ybus.data[ix_from_bus, ix_to_bus]
+        Zt = 1 / Yt
+        # TODO - should we consider phase shift?
+        b = 1 / imag(Zt)
+        BA_I[2 * ix_arc - 1] = ix_from_bus
+        BA_J[2 * ix_arc - 1] = ix_arc
+        BA_V[2 * ix_arc - 1] = b
+        BA_I[2 * ix_arc] = ix_to_bus
+        BA_J[2 * ix_arc] = ix_arc
+        BA_V[2 * ix_arc] = -1 * b
     end
-    ref_bus_positions = find_slack_positions(buses)
-    bus_lookup = make_ax_ref(buses)
-    line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in setdiff(buses, ref_bus_positions)]
-    axes = (bus_ax, line_ax)
-    lookup = (make_ax_ref(bus_ax), make_ax_ref(line_ax))
-    data =
-        calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    return BA_Matrix(data, axes, lookup, ref_bus_positions, network_reduction)
+    data = SparseArrays.sparse(BA_I, BA_J, BA_V)
+    axes = (bus_ax, arc_ax)
+    lookup = (make_ax_ref(bus_ax), make_ax_ref(arc_ax))
+    ref_bus_positions = Set([lookup[1][x] for x in ybus.ref_bus_numbers])
+    return BA_Matrix(data, axes, lookup, ref_bus_positions, ybus.network_reduction_data)
 end
 
 """
@@ -89,45 +112,32 @@ struct ABA_Matrix{
     ref_bus_positions::Set{Int}
     ref_bus_numbers::Set{Int}
     K::F
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
-"""
-Builds the ABA matrix from a System
-
-# Arguments
-- `sys::PSY.System`:
-        system to consider
-
-# Keyword arguments
-- `factorize`: if true populates ABA_Matrix.K with KLU factorization matrices
-"""
-function ABA_Matrix(
-    sys::PSY.System;
-    factorize = false,
-    network_reduction::NetworkReduction = NetworkReduction(),
+function ABA_Matrix(sys::PSY.System;
+    factorize::Bool = false,
+    check_connectivity::Bool = true,
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
+    kwargs...,
 )
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    if !isempty(network_reduction.added_branches)
-        branches = vcat(branches, network_reduction.added_branches)
-    end
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    bus_lookup = make_ax_ref(buses)
-
-    A, ref_bus_positions =
-        calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    ref_bus_numbers = Set([
-        PSY.get_number(bus) for bus in buses
-        if PSY.get_bustype(bus) == PSY.ACBusTypes.REF
-    ])
+    ymatrix = Ybus(
+        sys;
+        check_connectivity = check_connectivity,
+        network_reductions = network_reductions,
+        kwargs...,
+    )
+    ref_bus_positions = Set([ymatrix.lookup[1][x] for x in ymatrix.ref_bus_numbers])
+    A = IncidenceMatrix(ymatrix)
+    BA = BA_Matrix(ymatrix)
+    ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
+    bus_ax = ymatrix.axes[1]
+    ref_bus_numbers = ymatrix.ref_bus_numbers
     bus_ax_ = setdiff(bus_ax, ref_bus_numbers)
     axes = (bus_ax_, bus_ax_)
     bus_ax_ref = make_ax_ref(bus_ax_)
     lookup = (bus_ax_ref, bus_ax_ref)
+
     if factorize
         K = klu(ABA)
     else
@@ -140,7 +150,7 @@ function ABA_Matrix(
         ref_bus_positions,
         ref_bus_numbers,
         K,
-        network_reduction,
+        ymatrix.network_reduction_data,
     )
 end
 
@@ -159,7 +169,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.ref_bus_positions),
         deepcopy(ABA.ref_bus_numbers),
         klu(ABA.data),
-        deepcopy(ABA.network_reduction),
+        deepcopy(ABA.network_reduction_data),
     )
     return ABA_lu
 end

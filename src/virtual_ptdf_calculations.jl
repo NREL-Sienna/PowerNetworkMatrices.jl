@@ -57,7 +57,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     cache::RowCache
     subnetworks::Dict{Int, Set{Int}}
     tol::Base.RefValue{Float64}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
@@ -69,14 +69,12 @@ function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
 end
 
 """
-Builds the PTDF matrix from a group of branches and buses. The return is a
-VirtualPTDF struct with an empty cache.
+Builds the Virtual PTDF matrix from a system. The return is a VirtualPTDF
+struct with an empty cache.
 
 # Arguments
-- `branches`:
-        Vector of the system's AC branches.
-- `buses::Vector{PSY.ACBus}`:
-        Vector of the system's buses.
+- `sys::PSY.System`:
+        PSY system for which the matrix is constructed
 
 # Keyword Arguments
 - `dist_slack::Vector{Float64} = Float64[]`:
@@ -90,44 +88,48 @@ VirtualPTDF struct with an empty cache.
         line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
+- `kwargs...`:
+        other keyword arguments used by VirtualPTDF
 """
 function VirtualPTDF(
-    branches,
-    buses::Vector{PSY.ACBus};
-    dist_slack::Vector{Float64} = Float64[],
+    sys::PSY.System;
+    check_connectivity::Bool = true,
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
-    persistent_lines::Vector{String} = String[],
-    network_reduction::NetworkReduction = NetworkReduction(),
+    persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
+    kwargs...,
 )
-    if length(dist_slack) != 0
-        @info "Distributed bus"
+    Ymatrix = Ybus(
+        sys;
+        check_connectivity = check_connectivity,
+        network_reductions = network_reductions,
+        kwargs...,
+    )
+    ref_bus_positions = Set([Ymatrix.lookup[1][x] for x in Ymatrix.ref_bus_numbers])
+    A = IncidenceMatrix(Ymatrix)
+    if !(isempty(dist_slack))
+        dist_slack_vector = redistribute_dist_slack(dist_slack, A, A.network_reduction_data)
+    else
+        dist_slack_vector = Float64[]
     end
-
-    #Get axis names
-    line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    axes = (line_ax, bus_ax)
-    M, bus_ax_ref = calculate_adjacency(branches, buses, network_reduction)
-    line_ax_ref = make_ax_ref(line_ax)
-    look_up = (line_ax_ref, bus_ax_ref)
-    A, ref_bus_positions =
-        calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_ax_ref, network_reduction)
-    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-    ref_bus_positions = find_slack_positions(buses)
-    subnetworks =
-        assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
+    BA = BA_Matrix(Ymatrix)
+    ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
+    bus_ax = A.axes[2]
+    axes = A.axes
+    look_up = A.lookup
+    subnetworks = Ymatrix.subnetworks
     if length(subnetworks) > 1
         @info "Network is not connected, using subnetworks"
     end
-    temp_data = zeros(length(bus_ax))
+    temp_data = zeros(length(axes[2]))
 
-    if isempty(persistent_lines)
+    if isempty(persistent_arcs)
         empty_cache =
             RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
     else
-        init_persistent_dict = Set{Int}(line_ax_ref[k] for k in persistent_lines)
+        init_persistent_dict = Set{Int}(look_up[1][k] for k in persistent_arcs)
         empty_cache =
             RowCache(
                 max_cache_size * MiB,
@@ -138,9 +140,9 @@ function VirtualPTDF(
 
     return VirtualPTDF(
         klu(ABA),
-        BA,
+        BA.data,
         ref_bus_positions,
-        dist_slack,
+        dist_slack_vector,
         axes,
         look_up,
         temp_data,
@@ -148,45 +150,7 @@ function VirtualPTDF(
         empty_cache,
         subnetworks,
         Ref(tol),
-        network_reduction,
-    )
-end
-
-"""
-Builds the Virtual PTDF matrix from a system. The return is a VirtualPTDF
-struct with an empty cache.
-
-# Arguments
-- `sys::PSY.System`:
-        PSY system for which the matrix is constructed
-
-# Keyword Arguments
-- `dist_slack::Vector{Float64}=Float64[]`:
-        vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses
-- `network_reduction::NetworkReduction`:
-        Structure containing the details of the network reduction applied when computing the matrix
-- `kwargs...`:
-        other keyword arguments used by VirtualPTDF
-"""
-function VirtualPTDF(
-    sys::PSY.System;
-    dist_slack::Vector{Float64} = Float64[],
-    network_reduction::NetworkReduction = NetworkReduction(),
-    kwargs...,
-)
-    if !isempty(network_reduction)
-        A = IncidenceMatrix(sys)
-        dist_slack = redistribute_dist_slack(dist_slack, A, network_reduction)
-    end
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    return VirtualPTDF(
-        branches,
-        buses;
-        dist_slack = dist_slack,
-        network_reduction = network_reduction,
-        kwargs...,
+        Ymatrix.network_reduction_data,
     )
 end
 
