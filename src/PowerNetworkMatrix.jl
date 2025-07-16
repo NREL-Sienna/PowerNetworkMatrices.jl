@@ -11,107 +11,6 @@ License, v. 2.0.
 abstract type PowerNetworkMatrix{T} <: AbstractArray{T, 2} end
 
 """
-Evaluates the bus indices for the given branch.
-
-# Arguments
-- `branch::PSY.ACTransmission`:
-        system's branch
-- `bus_lookup::Dict{Int, Int}`: A dictionary mapping bus numbers to their indices.
-- `reverse_bus_search_map::Dict{Int, Int}`: map for reduced buses.
-
-# Returns
-- `fr_b::Int`:
-        from bus index
-- `to_b::Int`:
-        to bus index
-"""
-function get_bus_indices(
-    branch::PSY.ACTransmission,
-    bus_lookup::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
-)
-    fr_bus_number = PSY.get_number(PSY.get_from(PSY.get_arc(branch)))
-    to_bus_number = PSY.get_number(PSY.get_to(PSY.get_arc(branch)))
-    if haskey(reverse_bus_search_map, fr_bus_number)
-        fr_bus_ix = bus_lookup[reverse_bus_search_map[fr_bus_number]]
-    else
-        fr_bus_ix = bus_lookup[fr_bus_number]
-    end
-    if haskey(reverse_bus_search_map, to_bus_number)
-        to_bus_ix = bus_lookup[reverse_bus_search_map[to_bus_number]]
-    else
-        to_bus_ix = bus_lookup[to_bus_number]
-    end
-    return fr_bus_ix, to_bus_ix
-end
-
-"""
-    get_bus_indices(branch::PSY.Transformer3W, bus_lookup::Dict{Int, Int})
-
-Retrieve the bus indices for the primary-secondary, secondary-tertiary, and primary-tertiary arcs of a 3-winding transformer.
-
-# Arguments
-- `branch::PSY.Transformer3W`: The 3-winding transformer branch.
-- `bus_lookup::Dict{Int, Int}`: A dictionary mapping bus numbers to their indices.
-- `reverse_bus_search_map::Dict{Int, Int}`: map for reduced buses.
-
-# Returns
-- A tuple containing three tuples:
-  - `(ps_from, ps_to)`: from and to buses for the primary-secondary arc.
-  - `(st_from, st_to)`: from and to buses for the secondary-tertiary arc.
-  - `(pt_from, pt_to)`: from and to buses for the primary-tertiary arc.
-"""
-function get_bus_indices(
-    branch::PSY.Transformer3W,
-    bus_lookup::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
-)
-    ps_from_bus_number = PSY.get_number(PSY.get_from(PSY.get_primary_secondary_arc(branch)))
-    if haskey(reverse_bus_search_map, ps_from_bus_number)
-        ps_from = bus_lookup[reverse_bus_search_map[ps_from_bus_number]]
-    else
-        ps_from = bus_lookup[ps_from_bus_number]
-    end
-
-    ps_to_bus_number = PSY.get_number(PSY.get_to(PSY.get_primary_secondary_arc(branch)))
-    if haskey(reverse_bus_search_map, ps_to_bus_number)
-        ps_to = bus_lookup[reverse_bus_search_map[ps_to_bus_number]]
-    else
-        ps_to = bus_lookup[ps_to_bus_number]
-    end
-
-    st_from_bus_number =
-        PSY.get_number(PSY.get_from(PSY.get_secondary_tertiary_arc(branch)))
-    if haskey(reverse_bus_search_map, st_from_bus_number)
-        st_from = bus_lookup[reverse_bus_search_map[st_from_bus_number]]
-    else
-        st_from = bus_lookup[st_from_bus_number]
-    end
-
-    st_to_bus_number = PSY.get_number(PSY.get_to(PSY.get_secondary_tertiary_arc(branch)))
-    if haskey(reverse_bus_search_map, st_to_bus_number)
-        st_to = bus_lookup[reverse_bus_search_map[st_to_bus_number]]
-    else
-        st_to = bus_lookup[st_to_bus_number]
-    end
-
-    pt_from_bus_number = PSY.get_number(PSY.get_from(PSY.get_primary_tertiary_arc(branch)))
-    if haskey(reverse_bus_search_map, pt_from_bus_number)
-        pt_from = bus_lookup[reverse_bus_search_map[pt_from_bus_number]]
-    else
-        pt_from = bus_lookup[pt_from_bus_number]
-    end
-
-    pt_to_bus_number = PSY.get_number(PSY.get_to(PSY.get_primary_tertiary_arc(branch)))
-    if haskey(reverse_bus_search_map, pt_to_bus_number)
-        pt_to = bus_lookup[reverse_bus_search_map[pt_to_bus_number]]
-    else
-        pt_to = bus_lookup[pt_to_bus_number]
-    end
-    return (ps_from, ps_to), (st_from, st_to), (pt_from, pt_to)
-end
-
-"""
 Evaluates the map linking the system's buses and branches.
 
 # Arguments
@@ -169,7 +68,7 @@ Gets bus indices to a certain branch name
 - `lookup::Dict`:
         Dictionary mapping branch and buses
 """
-function lookup_index(i::PSY.ACBranch, lookup::Dict)
+function lookup_index(i::PSY.Arc, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
 
@@ -398,8 +297,8 @@ function Base.show(io::IO, array::PowerNetworkMatrix)
 end
 
 Base.to_index(b::PSY.ACBus) = PSY.get_number(b)
-Base.to_index(b::T) where {T <: PSY.ACBranch} = PSY.get_name(b)
-
+Base.to_index(b::T) where {T <: PSY.ACBranch} = get_arc_tuple(b)
+Base.to_index(b::PSY.Arc) = get_arc_tuple(b)
 """returns the raw array data of the `PowerNetworkMatrix`"""
 get_data(mat::PowerNetworkMatrix) = mat.data
 
@@ -410,3 +309,34 @@ get_data(mat::PowerNetworkMatrix) = mat.data
     PTDF the first dimension is branches and the second dimension is buses
 """
 get_lookup(mat::PowerNetworkMatrix) = mat.lookup
+
+function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetworkMatrix}
+    nr = A.network_reduction_data
+    for (k, v) in nr.reverse_direct_branch_map
+        if branch_name == PSY.get_name(k)
+            return 1.0, v
+        end
+    end
+    for (k, v) in nr.reverse_parallel_branch_map
+        if branch_name == PSY.get_name(k)
+            parallel_branch_set = nr.parallel_branch_map[v]
+            multiplier = _compute_parallel_multiplier(parallel_branch_set, branch_name)
+            return multiplier, v
+        end
+    end
+end
+
+function _compute_parallel_multiplier(
+    parallel_branch_set::Set{PSY.Branch},
+    branch_name::String,
+)
+    b_total = 0.0
+    b_branch = 0.0
+    for br in parallel_branch_set
+        if PSY.get_name(br) == branch_name
+            b_branch += PSY.get_series_susceptance(br)
+        end
+        b_total += PSY.get_series_susceptance(br)
+    end
+    return b_branch / b_total
+end

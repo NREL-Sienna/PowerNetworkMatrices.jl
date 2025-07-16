@@ -32,7 +32,7 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     subnetworks::Dict{Int, Set{Int}}
     ref_bus_positions::Set{Int}
     tol::Base.RefValue{Float64}
-    network_reduction::NetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 """
@@ -46,7 +46,7 @@ PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
 function _buildptdf(
     branches,
     buses::Vector{PSY.ACBus},
-    network_reduction::NetworkReduction,
+    network_reduction_data::NetworkReductionData,
     bus_lookup::Dict{Int, Int},
     dist_slack::Vector{Float64},
     linear_solver::String)
@@ -55,7 +55,7 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
-            network_reduction,
+            network_reduction_data,
             dist_slack,
         )
     elseif linear_solver == "Dense"
@@ -63,7 +63,7 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
-            network_reduction,
+            network_reduction_data,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
@@ -76,7 +76,7 @@ function _buildptdf(
             branches,
             buses,
             bus_lookup,
-            network_reduction,
+            network_reduction_data,
             dist_slack,
         )
     end
@@ -95,9 +95,9 @@ function _buildptdf_from_matrices(
     elseif linear_solver == "Dense"
         # Convert SparseMatrices to Dense
         PTDFm = _calculate_PTDF_matrix_DENSE(
-            Matrix(A),
-            Matrix(BA),
-            A.ref_bus_positions,
+            A,
+            BA,
+            ref_bus_positions,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
@@ -157,31 +157,6 @@ function _calculate_PTDF_matrix_KLU(
     end
 
     return
-end
-
-"""
-Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function calculate_PTDF_matrix_KLU(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    network_reduction::NetworkReduction,
-    dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
-    return PTDFm, A
 end
 
 function _binfo_check(binfo::Int)
@@ -247,31 +222,6 @@ function _calculate_PTDF_matrix_DENSE(
     end
 
     return
-end
-
-"""
-Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function calculate_PTDF_matrix_DENSE(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    network_reduction::NetworkReduction,
-    dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    PTDFm = _calculate_PTDF_matrix_DENSE(A, BA, ref_bus_positions, dist_slack)
-    return PTDFm, A
 end
 
 """
@@ -346,139 +296,29 @@ function _calculate_PTDF_matrix_MKLPardiso(
     return
 end
 
-"""
-Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function calculate_PTDF_matrix_MKLPardiso(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    network_reduction::NetworkReduction,
-    dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses, network_reduction)
-    BA = calculate_BA_matrix(branches, bus_lookup, network_reduction)
-    PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
-    return PTDFm, A
-end
-
-"""
-Builds the PTDF matrix from a group of branches and buses. The return is a PTDF array indexed with the bus numbers.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-
-# Keyword Arguments
-- `dist_slack::Vector{Float64}`:
-        vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses
-- `linear_solver::String`:
-        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
-- `tol::Float64`:
-        Tolerance to eliminate entries in the PTDF matrix (default eps())
-- `network_reduction::NetworkReduction`:
-        Structure containing the details of the network reduction applied when computing the matrix
-"""
-function PTDF(
-    branches,
-    buses::Vector{PSY.ACBus};
-    dist_slack::Vector{Float64} = Float64[],
-    linear_solver::String = "KLU",
+function PTDF(sys::PSY.System;
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
+    linear_solver = "KLU",
     tol::Float64 = eps(),
-    network_reduction::NetworkReduction = NetworkReduction(),
-)
-    validate_linear_solver(linear_solver)
-
-    #Get axis names
-    line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    axes = (bus_ax, line_ax)
-    M, bus_ax_ref = calculate_adjacency(branches, buses, network_reduction)
-    ref_bus_positions = find_slack_positions(buses, bus_ax_ref)
-    subnetworks =
-        assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
-    if length(subnetworks) > 1
-        @info "Network is not connected, using subnetworks"
-    end
-    look_up = (bus_ax_ref, make_ax_ref(line_ax))
-    S, _ = _buildptdf(
-        branches,
-        buses,
-        network_reduction,
-        look_up[1],
-        dist_slack,
-        linear_solver,
-    )
-    if tol > eps()
-        return PTDF(
-            sparsify(S, tol),
-            axes,
-            look_up,
-            subnetworks,
-            ref_bus_positions,
-            Ref(tol),
-            network_reduction,
-        )
-    end
-    return PTDF(
-        S,
-        axes,
-        look_up,
-        subnetworks,
-        ref_bus_positions,
-        Ref(tol),
-        network_reduction,
-    )
-end
-
-"""
-Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
-Note that `dist_slack` and `network_reduction` kwargs are explicitly mentioned because needed inside of the function.
-
-# Arguments
-- `sys::PSY.System`:
-        PSY system for which the matrix is constructed
-
-# Keyword Arguments
-- `dist_slack::Vector{Float64}=Float64[]`:
-        vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses
-- `network_reduction::NetworkReduction=NetworkReduction()`:
-        Structure containing the details of the network reduction applied when computing the matrix
-"""
-function PTDF(
-    sys::PSY.System;
-    dist_slack::Vector{Float64} = Float64[],
-    network_reduction::NetworkReduction = NetworkReduction(),
+    check_connectivity::Bool = true,
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
-    if !isempty(network_reduction)
-        A = IncidenceMatrix(sys)
-        dist_slack = redistribute_dist_slack(dist_slack, A, network_reduction)
-    end
-    branches = get_ac_branches(sys, network_reduction.removed_branches)
-    if !isempty(network_reduction.added_branches)
-        branches = vcat(branches, network_reduction.added_branches)
-    end
-    buses = get_buses(sys, network_reduction.bus_reduction_map)
-    return PTDF(
-        branches,
-        buses;
-        dist_slack = dist_slack,
-        network_reduction = network_reduction,
+    Ymatrix = Ybus(
+        sys;
+        check_connectivity = check_connectivity,
+        network_reductions = network_reductions,
         kwargs...,
+    )
+    A = IncidenceMatrix(Ymatrix)
+    BA = BA_Matrix(Ymatrix)
+    return PTDF(
+        A,
+        BA;
+        subnetworks = Ymatrix.subnetworks,
+        dist_slack = dist_slack,
+        linear_solver = linear_solver,
+        tol = tol,
     )
 end
 
@@ -503,13 +343,19 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
-    dist_slack::Vector{Float64} = Float64[],
+    subnetworks::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     linear_solver = "KLU",
     tol::Float64 = eps(),
 )
+    if !(isempty(dist_slack))
+        dist_slack = redistribute_dist_slack(dist_slack, A, A.network_reduction_data)
+    else
+        dist_slack = Float64[]
+    end
     validate_linear_solver(linear_solver)
     @warn "PTDF creates via other matrices doesn't compute the subnetworks"
-    if !isequal(A.network_reduction, BA.network_reduction)
+    if !isequal(A.network_reduction_data, BA.network_reduction_data)
         error("A and BA matrices have non-equivalent network reductions.")
     end
     axes = BA.axes
@@ -528,20 +374,20 @@ function PTDF(
             sparsify(S, tol),
             axes,
             lookup,
-            Dict{Int, Set{Int}}(),
+            subnetworks,
             BA.ref_bus_positions,
             Ref(tol),
-            BA.network_reduction,
+            BA.network_reduction_data,
         )
     else
         return PTDF(
             S,
             axes,
             lookup,
-            Dict{Int, Set{Int}}(),
+            subnetworks,
             BA.ref_bus_positions,
             Ref(tol),
-            BA.network_reduction,
+            BA.network_reduction_data,
         )
     end
 end
@@ -550,9 +396,15 @@ end
 ########################### Auxiliary functions ##############################
 ##############################################################################
 
+function Base.getindex(A::PTDF, branch_name::String, bus)
+    multiplier, arc = get_branch_multiplier(A, branch_name)
+    i, j = to_index(A, bus, arc)
+    return A.data[i, j] * multiplier
+end
+
 # PTDF stores the transposed matrix. Overload indexing and how data is exported.
-function Base.getindex(A::PTDF, line, bus)
-    i, j = to_index(A, bus, line)
+function Base.getindex(A::PTDF, arc, bus)
+    i, j = to_index(A, bus, arc)
     return A.data[i, j]
 end
 
@@ -581,24 +433,22 @@ function get_tol(ptdf::PTDF)
 end
 
 function redistribute_dist_slack(
-    dist_slack::Vector{Float64},
+    dist_slack::Dict{Int, Float64},
     A::IncidenceMatrix,
-    nr::NetworkReduction,
+    nr::NetworkReductionData,
 )
-    dist_slack1 = deepcopy(dist_slack)
-    # if original length of dist_slack is correct
-    if length(dist_slack) == size(A.data, 2)
-        for i in keys(nr.bus_reduction_map)
-            for j in nr.bus_reduction_map[i]
-                dist_slack1[A.lookup[2][i]] += dist_slack1[A.lookup[2][j]]
-                dist_slack1[A.lookup[2][j]] = -9999
-            end
+    dist_slack_vector = zeros(length(A.axes[2]))
+    for (bus_no, dist_slack_factor) in dist_slack
+        bus_no_ = get(nr.reverse_bus_search_map, bus_no, bus_no)
+        if !haskey(A.lookup[2], bus_no_)
+            throw(
+                IS.InvalidValue(
+                    "Bus number $bus_no_ not found in the incidence matrix. Correct your slack distribution specification.",
+                ),
+            )
         end
-        # redefine dist_slack
-        return dist_slack1[dist_slack1 .!= -9999]
-        # otherwise throw an error
-    elseif !isempty(dist_slack) && length(dist_slack) != size(A.data, 2)
-        error("Distributed bus specification doesn't match the number of the buses.")
+        ix = A.lookup[2][bus_no_]
+        dist_slack_vector[ix] += dist_slack_factor
     end
-    return dist_slack
+    return dist_slack_vector
 end

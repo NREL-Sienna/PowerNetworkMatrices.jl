@@ -1,7 +1,6 @@
 module PowerNetworkMatrices
 
 export ABA_Matrix
-export AdjacencyMatrix
 export BA_Matrix
 export factorize
 export find_subnetworks
@@ -11,22 +10,24 @@ export get_lodf_data
 export get_bus_reduction_map
 export get_radial_reduction
 export get_ward_reduction
-export get_breaker_switch_reduction
-export get_removed_branches
-export get_reduction_type
+export get_reductions
+export get_network_reduction_data
 export IncidenceMatrix
+export AdjacencyMatrix
 export is_factorized
 export LODF
 export PTDF
 export NetworkReduction
-export NetworkReductionTypes
+export NetworkReductionData
+export RadialReduction
+export DegreeTwoReduction
+export WardReduction
 
 export to_hdf5
 export validate_connectivity
 export VirtualLODF
 export VirtualPTDF
 export Ybus
-export get_branch_lookups
 
 using DocStringExtensions
 import InfrastructureSystems
@@ -70,15 +71,17 @@ import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 include("PowerNetworkMatrix.jl")
 include("definitions.jl")
 include("network_reduction.jl")
-include("incedence_matrix.jl")
-include("adjacency_matrix.jl")
-include("breaker_switch_reduction.jl")
+include("ybus_calculations.jl")
+include("IncidenceMatrix.jl")
+include("AdjacencyMatrix.jl")
 include("radial_reduction.jl")
+include("degree_two_reduction.jl")
+include("connectivity_checks.jl")
+include("subnetworks.jl")
 include("ward_reduction.jl")
 include("common.jl")
 include("BA_ABA_matrices.jl")
 include("ptdf_calculations.jl")
-include("ybus_calculations.jl")
 include("row_cache.jl")
 include("virtual_ptdf_calculations.jl")
 include("lodf_calculations.jl")

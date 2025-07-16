@@ -1,5 +1,9 @@
 @testset "Test Virtual LODF matrices" begin
-    sys = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys")
+    sys =
+        @test_logs (:error, r"no active generators found at bus") match_mode = :any PSB.build_system(
+            PSB.PSYTestSystems,
+            "tamu_ACTIVSg2000_sys",
+        )
     vlodf = VirtualLODF(sys)
     LODF_ref = LODF(sys)
 
@@ -19,10 +23,18 @@
     # check the getindex function works properly
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     vlodf5 = VirtualLODF(sys5)
-    for i in axes(Lodf_5, 1)
-        for j in axes(Lodf_5, 2)
+    ix_to_arc_map = Dict(
+        ix => PNM.get_arc_tuple(get_component(ACBranch, sys5, br_name)) for
+        (ix, br_name) in enumerate(Lodf_5_branch_axis)
+    )
+    for i in 1:size(vlodf5, 1)
+        for j in 1:size(vlodf5, 2)
             # get the data
-            @test isapprox(vlodf5[i, j], Lodf_5[i, j], atol = 1e-3)
+            @test isapprox(
+                vlodf5[ix_to_arc_map[i], ix_to_arc_map[j]],
+                Lodf_5[i, j],
+                atol = 1e-3,
+            )
         end
     end
 end
@@ -41,21 +53,26 @@ end
 @testset "Test Virtual LODF matrices with tolerance" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     lodf_reference = deepcopy(Lodf_14)
+    ix_to_arc_map = Dict()
+    for (ix, l) in enumerate(Lodf_14_branch_axis)
+        ix_to_arc_map[ix] = PNM.get_arc_tuple(get_component(ACBranch, sys, l))
+    end
     lodf_reference[abs.(lodf_reference) .<= 1e-2] .= 0
     lodf_virtual_with_tol = VirtualLODF(sys; tol = 1e-2)
-    for (n, i) in enumerate(axes(lodf_virtual_with_tol, 1))
-        # get the row
-        @test isapprox(
-            lodf_virtual_with_tol[i, :], lodf_reference[n, :], atol = 1e-3)
+    for ix in 1:size(lodf_reference)[1]
+        row_map = [ix_to_arc_map[x] for x in 1:size(lodf_reference)[2]]
+        row_pnm = [lodf_virtual_with_tol[ix_to_arc_map[ix], x] for x in row_map]
+        row_ref = lodf_reference[ix, :]
+        @test isapprox(row_pnm, row_ref, atol = 1e-3)
     end
 
     @test isapprox(
-        sum(abs.(lodf_reference[lodf_virtual_with_tol.lookup[1]["Line12"], :])),
-        sum(abs.(lodf_virtual_with_tol["Line12", :])),
+        sum(abs.(lodf_reference[1, :])),
+        sum(abs.(lodf_virtual_with_tol[ix_to_arc_map[1], :])),
         atol = 1e-5)
 end
 
-@testset failfast = true "Test Virtual LODF matrices for 10 bus system with 2 reference buses" begin
+@testset "Test Virtual LODF matrices for 10 bus system with 2 reference buses" begin
     # get system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")   # get the system composed by 2 5-bus ones connected by a DC line
     # get PTDF matrix with KLU as reference
@@ -70,32 +87,37 @@ end
     end
 
     # check submatrices: since connected by a single bus, areas must have the same numbers
-    branch_number = length(lodf_complete.axes[2])
-    bus_number = length(lodf_complete.axes[1])
-    ptdf_first_area = zeros(Int(branch_number / 2), Int(bus_number / 2))
-    ptdf_second_area = zeros(Int(branch_number / 2), Int(bus_number / 2))
-
-    for i in 1:Int(branch_number / 2)
-        aa = lodf_virtual.cache[i]
-        bb = lodf_virtual.cache[i + Int(branch_number / 2)]
-        ptdf_first_area[i, :] .= aa[1:Int(bus_number / 2)]
-        ptdf_second_area[i, :] .= bb[(Int(bus_number / 2) + 1):end]
+    corresponding_arcs = [
+        ((1, 2), (6, 7)),
+        ((4, 5), (9, 10)),
+        ((1, 5), (6, 10)),
+        ((1, 4), (6, 9)),
+        ((3, 4), (8, 9)),
+        ((2, 3), (7, 8)),
+    ]
+    for arc_pair_a in corresponding_arcs, arc_pair_b in corresponding_arcs
+        @test isapprox(
+            lodf_virtual[arc_pair_a[1], arc_pair_b[1]],
+            lodf_virtual[arc_pair_a[2], arc_pair_b[2]],
+            atol = 1e-6,
+        )
     end
-    @test isapprox(ptdf_first_area, ptdf_second_area, atol = 1e-6)
 end
 
 @testset "Test virtual LODF cache" begin
     RTS = build_system(PSITestSystems, "test_RTS_GMLC_sys")
-    line_names = get_name.(PNM.get_ac_branches(RTS))
-    persist_lines = line_names[1:10]
+    #Get Arcs from ACTransmission components (arc for HVDC is not included in matrices)
+    arc_tuples =
+        unique([PNM.get_arc_tuple(br) for br in get_components(ACTransmission, RTS)])
+    persist_arcs = arc_tuples[1:10]
 
-    vlodf = VirtualLODF(RTS; max_cache_size = 1, persistent_lines = persist_lines)
+    vlodf = VirtualLODF(RTS; max_cache_size = 1, persistent_arcs = persist_arcs)
 
-    for l in line_names
-        @test size(vlodf[l, :]) == (120,)
+    for l in arc_tuples
+        @test size(vlodf[l, :]) == (108,)
     end
 
-    for l in persist_lines
+    for l in persist_arcs
         @test vlodf.lookup[1][l] ∈ keys(vlodf.cache.temp_cache)
     end
 end

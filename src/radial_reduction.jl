@@ -1,55 +1,44 @@
-"""
-Builds a NetworkReduction by removing radially connected buses. 
+@kwdef struct RadialReduction <: NetworkReduction
+    irreducible_buses::Vector{Int} = Vector{Int}()
+end
+get_irreducible_buses(nr::RadialReduction) = nr.irreducible_buses
 
-# Arguments
-- `sys::System`
-"""
-function get_radial_reduction(
-    sys::PSY.System;
-    prior_reduction::NetworkReduction = NetworkReduction(),
-    exempt_buses::Vector{Int64} = Int64[],
+function get_reduction(
+    ybus::Ybus,
+    ::PSY.System,
+    reduction::RadialReduction,
 )
-    validate_reduction_type(
-        NetworkReductionTypes.RADIAL,
-        get_reduction_type(prior_reduction),
-    )
-    return get_radial_reduction(
-        IncidenceMatrix(sys);
-        prior_reduction = prior_reduction,
-        exempt_buses = exempt_buses,
-    )
+    A = IncidenceMatrix(ybus)
+    irreducible_buses = get_irreducible_buses(reduction)
+    return get_radial_reduction(A, irreducible_buses, reduction)
 end
 
 """
-Builds a NetworkReduction by removing radially connected buses. 
+Builds a NetworkReduction by removing radially connected buses.
 
 # Arguments
 - `A::IncidenceMatrix`: IncidenceMatrix
 """
 function get_radial_reduction(
-    A::IncidenceMatrix;
-    prior_reduction::NetworkReduction = NetworkReduction(),
-    exempt_buses::Vector{Int64} = Int64[],
+    A::IncidenceMatrix,
+    irreducible_buses::Vector{Int},
+    reduction::RadialReduction,
 )
-    exempt_bus_positions = [A.lookup[2][x] for x in exempt_buses]
-    new_reduction = calculate_radial_branches(
+    exempt_bus_positions = Set([A.lookup[2][x] for x in irreducible_buses])
+    return calculate_radial_arcs(
         A.data,
         A.lookup[1],
         A.lookup[2],
-        union(A.ref_bus_positions, Set(exempt_bus_positions)),
+        union(A.ref_bus_positions, exempt_bus_positions),
+        reduction,
     )
-    if isempty(prior_reduction)
-        return new_reduction
-    else
-        return compose_reductions(prior_reduction, new_reduction, length(A.lookup[2]))
-    end
 end
 
 function _find_upstream_bus(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     j::Int,
-    reverse_line_map::Dict{Int64, String},
-    radial_branches::Set{String},
+    reverse_arc_map::Dict{Int, Tuple{Int, Int}},
+    radial_arcs::Set{Tuple{Int, Int}},
     reduced_buses::Set{Int},
     reverse_bus_map::Dict{Int, Int},
 )
@@ -59,16 +48,16 @@ function _find_upstream_bus(
         row_ix = A.rowval[A.colptr[j] + 1]
         parent = setdiff!(A[row_ix, :].nzind, j)[1]
     end
-    push!(radial_branches, reverse_line_map[row_ix])
+    push!(radial_arcs, reverse_arc_map[row_ix])
     return parent
 end
 
 function _new_parent(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     parent::Int,
     bus_reduction_map_index::Dict{Int, Set{Int}},
-    reverse_line_map::Dict{Int64, String},
-    radial_branches::Set{String},
+    reverse_arc_map::Dict{Int, Tuple{Int, Int}},
+    radial_arcs::Set{Tuple{Int, Int}},
     reverse_bus_map::Dict{Int, Int},
 )
     if length(SparseArrays.nzrange(A, parent)) == 2
@@ -76,8 +65,8 @@ function _new_parent(
         new_parent_val = _find_upstream_bus(
             A,
             parent,
-            reverse_line_map,
-            radial_branches,
+            reverse_arc_map,
+            radial_arcs,
             bus_reduction_map_index[parent_bus_number],
             reverse_bus_map,
         )
@@ -95,8 +84,8 @@ function _new_parent(
             A,
             new_parent_val,
             bus_reduction_map_index,
-            reverse_line_map,
-            radial_branches,
+            reverse_arc_map,
+            radial_arcs,
             reverse_bus_map,
         )
     end
@@ -104,11 +93,11 @@ function _new_parent(
 end
 
 function _reverse_search(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     j::Int,
     bus_reduction_map_index::Dict{Int, Set{Int}},
-    reverse_line_map::Dict{Int64, String},
-    radial_branches::Set{String},
+    reverse_arc_map::Dict{Int, Tuple{Int, Int}},
+    radial_arcs::Set{Tuple{Int, Int}},
     reverse_bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},
 )
@@ -121,8 +110,8 @@ function _reverse_search(
     parent = _find_upstream_bus(
         A,
         j,
-        reverse_line_map,
-        radial_branches,
+        reverse_arc_map,
+        radial_arcs,
         reduction_set,
         reverse_bus_map,
     )
@@ -135,8 +124,8 @@ function _reverse_search(
         A,
         parent,
         bus_reduction_map_index,
-        reverse_line_map,
-        radial_branches,
+        reverse_arc_map,
+        radial_arcs,
         reverse_bus_map,
     )
     return
@@ -158,23 +147,24 @@ used to calculate the branches in the system that are radial and can be
 ignored in the models by exploring the structure of the incidence matrix
 
 # Arguments
-- `A::SparseArrays.SparseMatrixCSC{Int8, Int64}`: Data from the IncidenceMatrix
+- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`: Data from the IncidenceMatrix
 - `line_map::Dict{String, Int}`: Map of Line Name to Matrix Index
 - `bus_map::Dict{Int, Int}`: Map of Bus Name to Matrix Index
 - `ref_bus_positions::Set{Int}`:
         Set containing the indexes of the columns of the BA matrix corresponding
         to the reference buses
 """
-function calculate_radial_branches(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
-    line_map::Dict{String, Int},
+function calculate_radial_arcs(
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
+    arc_map::Dict{Tuple{Int, Int}, Int},
     bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},
+    reduction::RadialReduction,
 )
     lk = ReentrantLock()
     buscount = length(bus_map)
-    radial_branches = Set{String}()
-    reverse_line_map = Dict(reverse(kv) for kv in line_map)
+    radial_arcs = Set{Tuple{Int, Int}}()
+    reverse_arc_map = Dict(reverse(kv) for kv in arc_map)
     reverse_bus_map = Dict(reverse(kv) for kv in bus_map)
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in keys(bus_map))
     Threads.@threads for j in 1:buscount
@@ -184,8 +174,8 @@ function calculate_radial_branches(
                     A,
                     j,
                     bus_reduction_map_index,
-                    reverse_line_map,
-                    radial_branches,
+                    reverse_arc_map,
+                    radial_arcs,
                     reverse_bus_map,
                     ref_bus_positions,
                 )
@@ -193,21 +183,13 @@ function calculate_radial_branches(
         end
     end
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map_index, buscount)
-    meshed_branches = Set{String}()
-    for k in keys(line_map)
-        if k in radial_branches
-            continue
-        end
-        push!(meshed_branches, k)
-    end
-    return NetworkReduction(
-        bus_reduction_map_index,
-        reverse_bus_search_map,
-        radial_branches,
-        meshed_branches,
-        Vector{PSY.ACBranch}(),
-        Vector{PSY.FixedAdmittance}(),
-        [NetworkReductionTypes.RADIAL],
+
+    return NetworkReductionData(;
+        irreducible_buses = Set(get_irreducible_buses(reduction)),
+        bus_reduction_map = bus_reduction_map_index,
+        reverse_bus_search_map = reverse_bus_search_map,
+        removed_arcs = radial_arcs,
+        reductions = NetworkReduction[reduction],
     )
 end
 
@@ -218,7 +200,7 @@ Interface to obtain the parent bus number of a reduced bus when radial branches 
 - `rb::NetworkReduction`: NetworkReduction object
 - `bus_number::Int`: Bus number of the reduced bus
 """
-function get_mapped_bus_number(rb::NetworkReduction, bus_number::Int)
+function get_mapped_bus_number(rb::NetworkReductionData, bus_number::Int)
     if isempty(rb)
         return bus_number
     end
@@ -232,6 +214,6 @@ Interface to obtain the parent bus number of a reduced bus when radial branches 
 - `rb::NetworkReduction`: NetworkReduction object
 - `bus::ACBus`: Reduced bus
 """
-function get_mapped_bus_number(rb::NetworkReduction, bus::PSY.ACBus)
+function get_mapped_bus_number(rb::NetworkReductionData, bus::PSY.ACBus)
     return get_mapped_bus_number(rb, PSY.get_number(bus))
 end
