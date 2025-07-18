@@ -28,7 +28,7 @@ function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.Bra
     reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
     parallel_branch_map = get_parallel_branch_map(nr)
     reverse_parallel_branch_map = get_reverse_parallel_branch_map(nr)
-    arc_tuple = get_arc_tuple(arc)
+    arc_tuple = get_arc_tuple(arc, nr)
     if haskey(parallel_branch_map, arc_tuple)
         push!(parallel_branch_map[arc_tuple], br)
         reverse_parallel_branch_map[br] = arc_tuple
@@ -56,17 +56,17 @@ function add_to_branch_maps!(
     transformer3W_map = get_transformer3W_map(nr)
     reverse_transformer3W_map = get_reverse_transformer3W_map(nr)
     if PSY.get_available_primary(br)
-        primary_star_arc_tuple = get_arc_tuple(primary_star_arc)
+        primary_star_arc_tuple = get_arc_tuple(primary_star_arc, nr)
         transformer3W_map[primary_star_arc_tuple] = (br, 1)
         reverse_transformer3W_map[(br, 1)] = primary_star_arc_tuple
     end
     if PSY.get_available_secondary(br)
-        secondary_star_arc_tuple = get_arc_tuple(secondary_star_arc)
+        secondary_star_arc_tuple = get_arc_tuple(secondary_star_arc, nr)
         transformer3W_map[secondary_star_arc_tuple] = (br, 2)
         reverse_transformer3W_map[(br, 2)] = secondary_star_arc_tuple
     end
     if PSY.get_available_tertiary(br)
-        tertiary_star_arc_tuple = get_arc_tuple(tertiary_star_arc)
+        tertiary_star_arc_tuple = get_arc_tuple(tertiary_star_arc, nr)
         transformer3W_map[tertiary_star_arc_tuple] = (br, 3)
         reverse_transformer3W_map[(br, 3)] = tertiary_star_arc_tuple
     end
@@ -871,7 +871,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     remake_reverse_series_branch_map = false
     remake_reverse_transformer3W_map = false
     data = get_data(ybus)
-    adjacency_data = ybus.adjacency_data    #TODO add getters
+    adjacency_data = ybus.adjacency_data   
     lookup = get_lookup(ybus)
     bus_lookup = lookup[1]
     nr = ybus.network_reduction_data
@@ -923,6 +923,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     nr.added_admittance_map = nr_new.added_admittance_map
     if isempty(nr.series_branch_map)
         nr.series_branch_map = nr_new.series_branch_map
+        nr.reverse_series_branch_map = nr_new.reverse_series_branch_map
     elseif !isempty(nr_new.series_branch_map) && !!isempty(nr.series_branch_map)
         error(
             "Cannot compose series branch maps; should not apply multiple reductions that generate series branch maps",
@@ -970,6 +971,7 @@ function _add_series_branches_to_ybus!(
 )
     bus_lookup = ybus.lookup[1]
     data = ybus.data
+    nrd = get_network_reduction_data(ybus)
     for (equivalent_arc, series_map_entry) in series_branch_map
         series_impedance_from_to = 0.0
         series_impedance_to_from = 0.0
@@ -978,7 +980,7 @@ function _add_series_branches_to_ybus!(
             segment_series_impedance_from_to,
             segment_series_impedance_to_from,
             segment_shunt_admittance =
-                _get_equivalent_line_parameters(ybus, equivalent_arc, series_segment)
+                _get_equivalent_line_parameters(ybus, equivalent_arc, series_segment, nrd)
             series_impedance_from_to += segment_series_impedance_from_to
             series_impedance_to_from += segment_series_impedance_to_from
             shunt_admittance += segment_shunt_admittance
@@ -998,8 +1000,9 @@ function _get_equivalent_line_parameters(
     ybus::Ybus,
     equivalent_arc::Tuple{Int, Int},
     branch::PSY.Branch,
+    network_reduction_data::NetworkReductionData,
 )
-    fr_bus_no, to_bus_no = get_arc_tuple(branch)
+    fr_bus_no, to_bus_no = get_arc_tuple(branch, network_reduction_data)
     data = ybus.data
     bus_lookup = ybus.lookup[1]
     series_impedance_from_to = 1 / data[bus_lookup[fr_bus_no], bus_lookup[to_bus_no]]
@@ -1018,6 +1021,7 @@ function _get_equivalent_line_parameters(
     ybus::Ybus,
     equivalent_arc::Tuple{Int, Int},
     branches::Set{PSY.Branch},
+    network_reduction_data::NetworkReductionData,
 )
     error("Implement getting equivalent line parameters for set of parallel branches")
 end
@@ -1026,8 +1030,9 @@ function _get_equivalent_line_parameters(
     ybus::Ybus,
     equivalent_arc::Tuple{Int, Int},
     transformer_tuple::Tuple{PSY.ThreeWindingTransformer, Int},
+    network_reduction_data::NetworkReductionData,
 )
-    fr_bus_no, to_bus_no = get_arc_tuple(transformer_tuple)
+    fr_bus_no, to_bus_no = get_arc_tuple(transformer_tuple, network_reduction_data)
     data = ybus.data
     bus_lookup = ybus.lookup[1]
     series_impedance_from_to = 1 / data[bus_lookup[fr_bus_no], bus_lookup[to_bus_no]]

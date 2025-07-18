@@ -76,11 +76,20 @@ function check_arc_validity(arc::PSY.Arc, name::String)
     return
 end
 
-function get_arc_tuple(br::PSY.ACTransmission)
+function get_arc_tuple(arc::PSY.Arc, nr::NetworkReductionData)
+    reverse_bus_search_map = get_reverse_bus_search_map(nr)
+    arc_tuple_original = get_arc_tuple(arc)
     return (
-        PSY.get_number(PSY.get_from(PSY.get_arc(br))),
-        PSY.get_number(PSY.get_to(PSY.get_arc(br))),
+        get(reverse_bus_search_map, arc_tuple_original[1], arc_tuple_original[1]),
+        get(reverse_bus_search_map, arc_tuple_original[2], arc_tuple_original[2]),
     )
+end
+function get_arc_tuple(br::PSY.ACTransmission, nr::NetworkReductionData)
+    get_arc_tuple(PSY.get_arc(br), nr)
+end
+
+function get_arc_tuple(br::PSY.ACTransmission)
+    return get_arc_tuple(PSY.get_arc(br))
 end
 
 get_arc_tuple(arc::PSY.Arc) =
@@ -104,6 +113,18 @@ function get_arc_tuple(tr3W_tuple::Tuple{T, Int}) where {T <: PSY.ThreeWindingTr
             PSY.get_number(PSY.get_to(PSY.get_tertiary_star_arc(t3W))),
         )
     end
+end
+
+function get_arc_tuple(
+    tr3W_tuple::Tuple{T, Int},
+    nr::NetworkReductionData,
+) where {T <: PSY.ThreeWindingTransformer}
+    reverse_bus_search_map = get_reverse_bus_search_map(nr)
+    arc_tuple_original = get_arc_tuple(tr3W_tuple)
+    return (
+        get(reverse_bus_search_map, arc_tuple_original[1], arc_tuple_original[1]),
+        get(reverse_bus_search_map, arc_tuple_original[2], arc_tuple_original[2]),
+    )
 end
 
 """
