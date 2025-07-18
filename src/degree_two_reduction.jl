@@ -25,7 +25,10 @@ function get_degree2_reduction(
     network_reduction_data = A.network_reduction_data
     reverse_bus_search_map = network_reduction_data.reverse_bus_search_map
     for c in PSY.get_components(PSY.StaticInjection, sys)
-        push!(irreducible_buses, PSY.get_number(PSY.get_bus(c)))
+        bus = PSY.get_bus(c)
+        if PSY.get_available(bus)
+            push!(irreducible_buses, PSY.get_number(bus))
+        end 
     end
     irreducible_non_reduced_buses =
         unique([get(reverse_bus_search_map, k, k) for k in irreducible_buses])
