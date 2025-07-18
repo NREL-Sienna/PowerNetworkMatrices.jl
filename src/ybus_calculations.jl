@@ -883,6 +883,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     for x in nr_new.removed_buses
         push!(nr.removed_buses, x)
         push!(bus_numbers_to_remove, x)
+        delete!(nr.bus_reduction_map, x)
     end
     for (k, v) in nr_new.bus_reduction_map
         if haskey(nr.bus_reduction_map, k)
@@ -910,31 +911,8 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
             pop!(nr.transformer3W_map, x)
         end
     end
-    # TODO - order matters; can we depend on ordered branches from the degree_two_reduction algorithm or need to compute here from arbitrary set of branches
-    for (k, v) in nr_new.series_branch_map
-        nr.series_branch_map[k] = v
-        total_series_impedance_from_to = 0.0
-        total_series_impedance_to_from = 0.0
-        total_shunt_admittance = 0.0
-        for x in v
-            fr_bus_no = x.arc.from.number
-            to_bus_no = x.arc.to.number
-            total_series_impedance_from_to +=
-                1 / data[bus_lookup[fr_bus_no], bus_lookup[to_bus_no]]
-            total_series_impedance_to_from +=
-                1 / data[bus_lookup[to_bus_no], bus_lookup[fr_bus_no]]
-            if fr_bus_no ∉ k
-                total_shunt_admittance += data[bus_lookup[fr_bus_no], bus_lookup[fr_bus_no]]
-            end
-            if to_bus_no ∉ k
-                total_shunt_admittance += data[bus_lookup[to_bus_no], bus_lookup[to_bus_no]]
-            end
-        end
-        data[bus_lookup[k[1]], bus_lookup[k[2]]] += 1 / total_series_impedance_from_to
-        data[bus_lookup[k[2]], bus_lookup[k[1]]] += 1 / total_series_impedance_to_from
-        data[bus_lookup[k[1]], bus_lookup[k[1]]] += total_shunt_admittance / 2
-        data[bus_lookup[k[2]], bus_lookup[k[2]]] += total_shunt_admittance / 2
-    end
+    # Add additional entries to the ybus corresponding to the equivalent series arcs
+    _add_series_branches_to_ybus!(ybus, nr_new.series_branch_map)
 
     remake_reverse_direct_branch_map && _remake_reverse_direct_branch_map!(nr)
     remake_reverse_parallel_branch_map && _remake_reverse_parallel_branch_map!(nr)
@@ -943,7 +921,13 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     #Assumes only the last reduction (Ward) can add branches and admittances
     nr.added_branch_map = nr_new.added_branch_map
     nr.added_admittance_map = nr_new.added_admittance_map
-
+    if isempty(nr.series_branch_map)
+        nr.series_branch_map = nr_new.series_branch_map
+    elseif !isempty(nr_new.series_branch_map) && !!isempty(nr.series_branch_map)
+        error(
+            "Cannot compose series branch maps; should not apply multiple reductions that generate series branch maps",
+        )
+    end
     #TODO - loop through added branches and admittances and modify the Ybus for Ward reduction
     push!(nr.reductions, nr_new.reductions[1])
     bus_ax = setdiff(ybus.axes[1], bus_numbers_to_remove)
@@ -978,6 +962,84 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         ybus.fb,
         ybus.tb,
     )
+end
+
+function _add_series_branches_to_ybus!(
+    ybus::Ybus,
+    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
+)
+    bus_lookup = ybus.lookup[1]
+    data = ybus.data
+    for (equivalent_arc, series_map_entry) in series_branch_map
+        series_impedance_from_to = 0.0
+        series_impedance_to_from = 0.0
+        shunt_admittance = 0.0
+        for series_segment in series_map_entry
+            segment_series_impedance_from_to,
+            segment_series_impedance_to_from,
+            segment_shunt_admittance =
+                _get_equivalent_line_parameters(ybus, equivalent_arc, series_segment)
+            series_impedance_from_to += segment_series_impedance_from_to
+            series_impedance_to_from += segment_series_impedance_to_from
+            shunt_admittance += segment_shunt_admittance
+        end
+        data[bus_lookup[equivalent_arc[1]], bus_lookup[equivalent_arc[2]]] +=
+            1 / series_impedance_from_to
+        data[bus_lookup[equivalent_arc[2]], bus_lookup[equivalent_arc[1]]] +=
+            1 / series_impedance_to_from
+        data[bus_lookup[equivalent_arc[1]], bus_lookup[equivalent_arc[1]]] +=
+            shunt_admittance / 2
+        data[bus_lookup[equivalent_arc[2]], bus_lookup[equivalent_arc[2]]] +=
+            shunt_admittance / 2
+    end
+end
+
+function _get_equivalent_line_parameters(
+    ybus::Ybus,
+    equivalent_arc::Tuple{Int, Int},
+    branch::PSY.Branch,
+)
+    fr_bus_no, to_bus_no = get_arc_tuple(branch)
+    data = ybus.data
+    bus_lookup = ybus.lookup[1]
+    series_impedance_from_to = 1 / data[bus_lookup[fr_bus_no], bus_lookup[to_bus_no]]
+    series_impedance_to_from = 1 / data[bus_lookup[to_bus_no], bus_lookup[fr_bus_no]]
+    shunt_admittance = 0.0
+    if fr_bus_no ∉ equivalent_arc
+        shunt_admittance += data[bus_lookup[fr_bus_no], bus_lookup[fr_bus_no]]
+    end
+    if to_bus_no ∉ equivalent_arc
+        shunt_admittance += data[bus_lookup[to_bus_no], bus_lookup[to_bus_no]]
+    end
+    return series_impedance_from_to, series_impedance_to_from, shunt_admittance
+end
+
+function _get_equivalent_line_parameters(
+    ybus::Ybus,
+    equivalent_arc::Tuple{Int, Int},
+    branches::Set{PSY.Branch},
+)
+    error("Implement getting equivalent line parameters for set of parallel branches")
+end
+
+function _get_equivalent_line_parameters(
+    ybus::Ybus,
+    equivalent_arc::Tuple{Int, Int},
+    transformer_tuple::Tuple{PSY.ThreeWindingTransformer, Int},
+)
+    fr_bus_no, to_bus_no = get_arc_tuple(transformer_tuple)
+    data = ybus.data
+    bus_lookup = ybus.lookup[1]
+    series_impedance_from_to = 1 / data[bus_lookup[fr_bus_no], bus_lookup[to_bus_no]]
+    series_impedance_to_from = 1 / data[bus_lookup[to_bus_no], bus_lookup[fr_bus_no]]
+    shunt_admittance = 0.0
+    if fr_bus_no ∉ equivalent_arc
+        shunt_admittance += data[bus_lookup[fr_bus_no], bus_lookup[fr_bus_no]]
+    end
+    if to_bus_no ∉ equivalent_arc
+        shunt_admittance += data[bus_lookup[to_bus_no], bus_lookup[to_bus_no]]
+    end
+    return series_impedance_from_to, series_impedance_to_from, shunt_admittance
 end
 
 function _remake_reverse_direct_branch_map!(nr::NetworkReductionData)

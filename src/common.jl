@@ -86,6 +86,26 @@ end
 get_arc_tuple(arc::PSY.Arc) =
     (PSY.get_number(PSY.get_from(arc)), PSY.get_number(PSY.get_to(arc)))
 
+function get_arc_tuple(tr3W_tuple::Tuple{T, Int}) where {T <: PSY.ThreeWindingTransformer}
+    t3W, arc_number = tr3W_tuple
+    if arc_number == 1
+        return (
+            PSY.get_number(PSY.get_from(PSY.get_primary_star_arc(t3W))),
+            PSY.get_number(PSY.get_to(PSY.get_primary_star_arc(t3W))),
+        )
+    elseif arc_number == 2
+        return (
+            PSY.get_number(PSY.get_from(PSY.get_secondary_star_arc(t3W))),
+            PSY.get_number(PSY.get_to(PSY.get_secondary_star_arc(t3W))),
+        )
+    elseif arc_number == 3
+        return (
+            PSY.get_number(PSY.get_from(PSY.get_tertiary_star_arc(t3W))),
+            PSY.get_number(PSY.get_to(PSY.get_tertiary_star_arc(t3W))),
+        )
+    end
+end
+
 """
 Gets the AC branches for a system
 """
