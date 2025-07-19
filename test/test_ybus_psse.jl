@@ -204,3 +204,39 @@ end
         @test isapprox(Ybus_pnm[row_bus, col_bus], val; atol = 1e-1)
     end
 end
+
+@testset "4 bus system with zero impedance correction for three winding transformer" begin
+    sys = build_system(PSSEParsingTestSystems, "psse_4_zero_impedance_3wt_test_system")
+    Ybus_pnm = Ybus(sys)
+    ref_bus_numbers = [
+        get_number(x) for
+        x in get_components(x -> get_bustype(x) == PSY.ACBusTypes.REF, ACBus, sys)
+    ]
+    skip_indices = indexin(ref_bus_numbers, Ybus_pnm.axes[1])
+    n_ref_bus_elements = nnz(Ybus_pnm.data[skip_indices, :])
+    nr = Ybus_pnm.network_reduction_data
+
+    #Test adjacency and Ybus have same non-zero elements
+    findnz(Ybus_pnm.data)[1] == findnz(Ybus_pnm.adjacency_data)[1]
+    findnz(Ybus_pnm.data)[2] == findnz(Ybus_pnm.adjacency_data)[2]
+
+    # Compare with PSSE
+    Ybus_psse, b_ix_psse, row_buses, col_buses, y_values, reduced_bus_pairs_psse =
+        parse_psse_ybus(joinpath(TEST_DATA_DIR, "case4_zero_impedance_3wt_Ymatrix.txt"))         #TODO - required manual remapping of star buses
+    # Compare breaker/switch reductions
+    for x in reduced_bus_pairs_psse
+        _test_psse_reduction_row(x, nr.reverse_bus_search_map)
+    end
+    #Test number of nonzero elements matches
+    @test nnz(Ybus_pnm.data) == length(filter(!iszero, y_values)) + n_ref_bus_elements
+    #Test values match 
+    for (row_bus, col_bus, val) in zip(row_buses, col_buses, y_values)
+        if row_bus ∈ keys(nr.reverse_bus_search_map)
+            row_bus = nr.reverse_bus_search_map[row_bus]
+        end
+        if col_bus ∈ keys(nr.reverse_bus_search_map)
+            col_bus = nr.reverse_bus_search_map[col_bus]
+        end
+        @test isapprox(Ybus_pnm[row_bus, col_bus], val; atol = 1e-5)
+    end
+end
