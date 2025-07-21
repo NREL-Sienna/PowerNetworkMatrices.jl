@@ -28,7 +28,7 @@ function get_degree2_reduction(
         bus = PSY.get_bus(c)
         if PSY.get_available(bus)
             push!(irreducible_buses, PSY.get_number(bus))
-        end 
+        end
     end
     irreducible_non_reduced_buses =
         unique([get(reverse_bus_search_map, k, k) for k in irreducible_buses])
@@ -68,23 +68,25 @@ function get_degree2_reduction(
     )
 end
 
-function _make_reverse_series_branch_map(series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}} )
+function _make_reverse_series_branch_map(
+    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
+)
     reverse_series_branch_map = Dict{Any, Tuple{Int, Int}}()
     for (composite_arc, vector_segments) in series_branch_map
         for segment in vector_segments
             # Segment composed of parallel branches:
             if isa(segment, Set)
                 for x in segment
-                    reverse_series_branch_map[x] = composite_arc 
-                end 
-            # Segment composed of single branch or part of a 3WT:
-            else 
-                reverse_series_branch_map[segment] = composite_arc 
-            end 
-        end 
-    end     
+                    reverse_series_branch_map[x] = composite_arc
+                end
+                # Segment composed of single branch or part of a 3WT:
+            else
+                reverse_series_branch_map[segment] = composite_arc
+            end
+        end
+    end
     return reverse_series_branch_map
-end 
+end
 
 function _get_branch_map_entry(nr::NetworkReductionData, arc::Tuple{Int, Int})
     reverse_arc = (arc[2], arc[1])
