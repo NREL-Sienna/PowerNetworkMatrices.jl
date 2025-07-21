@@ -871,7 +871,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     remake_reverse_series_branch_map = false
     remake_reverse_transformer3W_map = false
     data = get_data(ybus)
-    adjacency_data = ybus.adjacency_data   
+    adjacency_data = ybus.adjacency_data
     lookup = get_lookup(ybus)
     bus_lookup = lookup[1]
     nr = ybus.network_reduction_data
@@ -999,7 +999,7 @@ end
 function _get_equivalent_line_parameters(
     ybus::Ybus,
     equivalent_arc::Tuple{Int, Int},
-    branch::PSY.Branch,
+    branch::Union{PSY.Branch, Tuple{PSY.ThreeWindingTransformer, Int}},
     network_reduction_data::NetworkReductionData,
 )
     fr_bus_no, to_bus_no = get_arc_tuple(branch, network_reduction_data)
@@ -1023,26 +1023,21 @@ function _get_equivalent_line_parameters(
     branches::Set{PSY.Branch},
     network_reduction_data::NetworkReductionData,
 )
-    error("Implement getting equivalent line parameters for set of parallel branches")
-end
-
-function _get_equivalent_line_parameters(
-    ybus::Ybus,
-    equivalent_arc::Tuple{Int, Int},
-    transformer_tuple::Tuple{PSY.ThreeWindingTransformer, Int},
-    network_reduction_data::NetworkReductionData,
-)
-    fr_bus_no, to_bus_no = get_arc_tuple(transformer_tuple, network_reduction_data)
-    data = ybus.data
-    bus_lookup = ybus.lookup[1]
-    series_impedance_from_to = 1 / data[bus_lookup[fr_bus_no], bus_lookup[to_bus_no]]
-    series_impedance_to_from = 1 / data[bus_lookup[to_bus_no], bus_lookup[fr_bus_no]]
+    series_impedance_from_to = 0.0
+    series_impedance_to_from = 0.0
     shunt_admittance = 0.0
-    if fr_bus_no ∉ equivalent_arc
-        shunt_admittance += data[bus_lookup[fr_bus_no], bus_lookup[fr_bus_no]]
-    end
-    if to_bus_no ∉ equivalent_arc
-        shunt_admittance += data[bus_lookup[to_bus_no], bus_lookup[to_bus_no]]
+    for branch in branches
+        segment_series_impedance_from_to,
+        segment_series_impedance_to_from,
+        segment_shunt_admittance = _get_equivalent_line_parameters(
+            ybus,
+            equivalent_arc,
+            branch,
+            network_reduction_data,
+        )
+        series_impedance_from_to += segment_series_impedance_from_to
+        series_impedance_to_from += segment_series_impedance_to_from
+        shunt_admittance += segment_shunt_admittance
     end
     return series_impedance_from_to, series_impedance_to_from, shunt_admittance
 end
