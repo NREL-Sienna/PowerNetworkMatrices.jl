@@ -683,7 +683,7 @@ function Ybus(
     check_connectivity::Bool = true,
     make_branch_admittance_matrices::Bool = false,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
-    include_constant_impedance_loads = false,
+    include_constant_impedance_loads = true,
     kwargs...,
 )
     ref_bus_numbers = Set{Int}()
