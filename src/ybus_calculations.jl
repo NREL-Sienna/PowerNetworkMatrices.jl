@@ -683,6 +683,7 @@ function Ybus(
     check_connectivity::Bool = true,
     make_branch_admittance_matrices::Bool = false,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
+    include_constant_impedance_loads = false,
     kwargs...,
 )
     ref_bus_numbers = Set{Int}()
@@ -776,8 +777,11 @@ function Ybus(
         collect(PSY.get_components(x -> PSY.get_available(x), PSY.FixedAdmittance, sys))
     switched_admittances =
         collect(PSY.get_components(x -> PSY.get_available(x), PSY.SwitchedAdmittance, sys))
-    standard_loads =
+    standard_loads = if include_constant_impedance_loads
         collect(PSY.get_components(x -> PSY.get_available(x), PSY.StandardLoad, sys))
+    else
+        PSY.StandardLoad[]
+    end
     y11, y12, y21, y22, ysh, fb, tb, sb =
         _buildybus!(
             nr,
