@@ -91,7 +91,7 @@ end
 
 @testset "WECC 240 bus" begin
     sys = PSB.build_system(PSYTestSystems, "psse_240_parsing_sys"; runchecks = false)
-    Ybus_pnm = Ybus(sys)
+    Ybus_pnm = Ybus(sys; include_constant_impedance_loads = true)
     nr = Ybus_pnm.network_reduction_data
     ref_bus_numbers = [
         get_number(x) for
@@ -129,7 +129,7 @@ end
             joinpath(TEST_DATA_DIR, "Base_Eastern_Interconnect_515GW_Ymatrix.dat"),
         )
 
-    Ybus_pnm = Ybus(sys)
+    Ybus_pnm = Ybus(sys; include_constant_impedance_loads = true)
     nr = Ybus_pnm.network_reduction_data
     ref_bus_numbers = [
         get_number(x) for
