@@ -271,169 +271,40 @@ function validate_linear_solver(linear_solver::String)
     return
 end
 
-function _add_branch_to_A_matrix!(
-    b::PSY.ACTransmission,
-    ix::Int,
-    bus_lookup::Dict{Int, Int},
-    A_I::Vector{Int},
-    A_J::Vector{Int},
-    A_V::Vector{Int8},
-    reverse_bus_search_map::Dict{Int, Int},
-)
-    fr_b, to_b = get_bus_indices(b, bus_lookup, reverse_bus_search_map)
-    # change column number
-    push!(A_I, ix)
-    push!(A_J, fr_b)
-    push!(A_V, 1)
-
-    push!(A_I, ix)
-    push!(A_J, to_b)
-    push!(A_V, -1)
-    return
-end
-
-function _add_branch_to_A_matrix!(
-    b::PSY.ThreeWindingTransformer,
-    ix::Int,
-    bus_lookup::Dict{Int, Int},
-    A_I::Vector{Int},
-    A_J::Vector{Int},
-    A_V::Vector{Int8},
-    reverse_bus_search_map::Dict{Int, Int},
-)
-    for (iix, (fr_b, to_b)) in
-        enumerate(get_bus_indices(b, bus_lookup, reverse_bus_search_map))
-        # for a 2-terminal branch, the value of ix must be incremented by 0, for a Transformer3W by 0, 1, 2
-        push!(A_I, ix + iix - 1)
-        push!(A_J, fr_b)
-        push!(A_V, 1)
-
-        push!(A_I, ix + iix - 1)
-        push!(A_J, to_b)
-        push!(A_V, -1)
+"""
+Validates that the user bus input is consistent with the ybus axes and the prior reductions.
+Is used to check `irreducible_buses` for `Radial` and `DegreeTwo` reductions and `study_buses` for `WardReduction`.
+"""
+function validate_buses(ybus::Ybus, buses::Vector{Int})
+    reverse_bus_search_map = ybus.network_reduction_data.reverse_bus_search_map
+    for bus_no in buses
+        reduced_bus_no = get(reverse_bus_search_map, bus_no, bus_no)
+        if reduced_bus_no ∉ ybus.axes[1]
+            if bus_no == reduced_bus_no
+                error(
+                    "Invalid bus entry found: Bus $bus_no. Check your input data; this bus was not found in the admittance matrix.",
+                )
+            else
+                error(
+                    "Invalid bus entry found: Bus $bus_no. Check your input data; this bus was mapped to bus $reduced_bus_no in a prior reductions and not found in the admittance matrix.",
+                )
+            end
+        end
     end
     return
 end
 
 """
-Evaluates the Incidence matrix A given the branches and node of a System.
-
-# Arguments
-- `branches`:
-        vector containing the branches of the considered system (should be AC branches).
-- `buses::Vector{PSY.ACBus}`:
-        vector containing the buses of the considered system.
-
-NOTE:
-- the matrix features all the columns, including the ones related to the
-  reference buses (each column is related to a system's bus).
+Convert the user input for irreducible_buses to a set of indices based on the Ybus lookup and the prior reductions.
 """
-function calculate_A_matrix(
-    branches::Vector{<:PSY.ACTransmission},
-    buses::Vector{PSY.ACBus},
-    network_reduction_data::NetworkReductionData,
-)
-    ref_bus_positions = find_slack_positions(buses)
-    bus_lookup = make_ax_ref(buses)
-    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction_data)
-    A_I = Int[]
-    A_J = Int[]
-    A_V = Int8[]
-    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction_data)
-    # build incidence matrix A (lines x buses)
-    for (ix, b) in enumerate(branches)
-        # we offload the logic to separate functions because we need to treat Transformer3W differently
-        _add_branch_to_A_matrix!(b, ix, bus_lookup, A_I, A_J, A_V, reverse_bus_search_map)
+function get_irreducible_indices(ybus::Ybus, irreducible_buses::Vector{Int})
+    reverse_bus_search_map = ybus.network_reduction_data.reverse_bus_search_map
+    irreducible_indices = zeros(Int, length(irreducible_buses))
+    for (ix, bus_no) in enumerate(irreducible_buses)
+        reduced_bus_no = get(reverse_bus_search_map, bus_no, bus_no)
+        irreducible_indices[ix] = ybus.lookup[1][reduced_bus_no]
     end
-
-    return SparseArrays.sparse(A_I, A_J, A_V), ref_bus_positions
-end
-
-function _add_branch_to_BA_matrix!(
-    b::PSY.ACTransmission,
-    ix::Int,
-    bus_lookup::Dict{Int, Int},
-    BA_I::Vector{Int},
-    BA_J::Vector{Int},
-    BA_V::Vector{Float64},
-    reverse_bus_search_map::Dict{Int, Int},
-)
-    b_val = PSY.get_series_susceptance(b)
-    fr_b, to_b = get_bus_indices(b, bus_lookup, reverse_bus_search_map)
-    push!(BA_I, fr_b)
-    push!(BA_J, ix)
-    push!(BA_V, b_val)
-
-    push!(BA_I, to_b)
-    push!(BA_J, ix)
-    push!(BA_V, -b_val)
-    return
-end
-
-function _add_branch_to_BA_matrix!(
-    b::PSY.ThreeWindingTransformer,
-    ix::Int,
-    bus_lookup::Dict{Int, Int},
-    BA_I::Vector{Int},
-    BA_J::Vector{Int},
-    BA_V::Vector{Float64},
-    reverse_bus_search_map::Dict{Int, Int},
-)
-    b_vals = PSY.get_series_susceptance(b)
-    for (iix, (fr_b, to_b)) in
-        enumerate(get_bus_indices(b, bus_lookup, reverse_bus_search_map))
-        b_val = b_vals[iix]
-        push!(BA_I, fr_b)
-        push!(BA_J, ix + iix - 1)
-        push!(BA_V, b_val)
-
-        push!(BA_I, to_b)
-        push!(BA_J, ix + iix - 1)
-        push!(BA_V, -b_val)
-    end
-    return
-end
-
-"""
-Evaluates the transposed BA matrix given the System's banches, reference bus positions and bus_lookup.
-
-# Arguments
-- `branches`:
-        vector containing the branches of the considered system (should be AC branches).
-- `ref_bus_positions::Set{Int}`:
-        Vector containing the indexes of the columns of the BA matrix corresponding
-        to the reference buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-"""
-function calculate_BA_matrix(
-    branches,
-    bus_lookup::Dict{Int, Int},
-    network_reduction_data::NetworkReductionData,
-)
-    BA_I = Int[]
-    BA_J = Int[]
-    BA_V = Float64[]
-    reverse_bus_search_map = get_reverse_bus_search_map(network_reduction_data)
-    for (ix, b) in enumerate(branches)
-        # we offload the logic to separate functions because we need to treat Transformer3W differently
-        _add_branch_to_BA_matrix!(
-            b,
-            ix,
-            bus_lookup,
-            BA_I,
-            BA_J,
-            BA_V,
-            reverse_bus_search_map,
-        )
-    end
-
-    BA = SparseArrays.sparse(BA_I, BA_J, BA_V)
-
-    return BA
-end
-
-function calculate_BA_matrix(Ymatrix::Ybus)
+    return irreducible_indices
 end
 
 """
