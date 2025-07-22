@@ -8,9 +8,8 @@ function get_reduction(
     ::PSY.System,
     reduction::RadialReduction,
 )
-    A = IncidenceMatrix(ybus)
     irreducible_buses = get_irreducible_buses(reduction)
-    return get_radial_reduction(A, irreducible_buses, reduction)
+    return get_radial_reduction(ybus, irreducible_buses, reduction)
 end
 
 """
@@ -20,16 +19,18 @@ Builds a NetworkReduction by removing radially connected buses.
 - `A::IncidenceMatrix`: IncidenceMatrix
 """
 function get_radial_reduction(
-    A::IncidenceMatrix,
+    ybus::Ybus,
     irreducible_buses::Vector{Int},
     reduction::RadialReduction,
 )
-    exempt_bus_positions = Set([A.lookup[2][x] for x in irreducible_buses])
+    validate_buses(ybus, irreducible_buses)
+    exempt_bus_positions = get_irreducible_indices(ybus, irreducible_buses)
+    A = IncidenceMatrix(ybus)
     return calculate_radial_arcs(
         A.data,
         A.lookup[1],
         A.lookup[2],
-        union(A.ref_bus_positions, exempt_bus_positions),
+        union(A.ref_bus_positions, Set(exempt_bus_positions)),
         reduction,
     )
 end

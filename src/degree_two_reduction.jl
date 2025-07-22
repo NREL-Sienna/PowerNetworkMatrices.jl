@@ -11,30 +11,29 @@ function get_reduction(
     sys::PSY.System,
     reduction::DegreeTwoReduction,
 )
-    A = AdjacencyMatrix(ybus)
-    irreducible_buses = Set(get_irreducible_buses(reduction))
-    return get_degree2_reduction(A, sys, irreducible_buses, reduction)
+    irreducible_buses = get_irreducible_buses(reduction)
+    validate_buses(ybus, irreducible_buses)
+    return get_degree2_reduction(ybus, sys, irreducible_buses, reduction)
 end
 
 function get_degree2_reduction(
-    A::AdjacencyMatrix,
+    ybus::Ybus,
     sys::PSY.System,
-    irreducible_buses::Set{Int},
+    irreducible_buses::Vector{Int},
     reduction::DegreeTwoReduction,
 )
+    validate_buses(ybus, irreducible_buses)
+    A = AdjacencyMatrix(ybus)
     network_reduction_data = A.network_reduction_data
-    reverse_bus_search_map = network_reduction_data.reverse_bus_search_map
     for c in PSY.get_components(PSY.StaticInjection, sys)
         bus = PSY.get_bus(c)
         if PSY.get_available(bus)
             push!(irreducible_buses, PSY.get_number(bus))
         end
     end
-    irreducible_non_reduced_buses =
-        unique([get(reverse_bus_search_map, k, k) for k in irreducible_buses])
-    irreducible_indices = Set([A.lookup[2][i] for i in irreducible_non_reduced_buses])
+    exempt_bus_positions = Set(get_irreducible_indices(ybus, irreducible_buses))
     reverse_bus_lookup = Dict(v => k for (k, v) in A.lookup[2])
-    arc_maps = find_degree2_chains(A.data, irreducible_indices)
+    arc_maps = find_degree2_chains(A.data, exempt_bus_positions)
     series_branch_map = Dict{Tuple{Int, Int}, Vector{Any}}()
 
     removed_buses = Set{Int}()
@@ -59,7 +58,7 @@ function get_degree2_reduction(
     end
     reverse_series_branch_map = _make_reverse_series_branch_map(series_branch_map)
     return NetworkReductionData(;
-        irreducible_buses = irreducible_buses,
+        irreducible_buses = Set(irreducible_buses),
         series_branch_map = series_branch_map,
         reverse_series_branch_map = reverse_series_branch_map,
         removed_buses = removed_buses,
