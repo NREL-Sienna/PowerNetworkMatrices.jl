@@ -26,8 +26,9 @@ abstract type NetworkReduction end
     } = Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
     removed_buses::Set{Int} = Set{Int}()
     removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
-    added_admittance_map::Dict{Int, PSY.FixedAdmittance} = Dict{Int, PSY.FixedAdmittance}()
-    added_branch_map::Dict{Tuple{Int, Int}, PSY.Line} = Dict{Tuple{Int, Int}, PSY.Line}()
+    added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
+    added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
+        Dict{Tuple{Int, Int}, Complex{Float32}}()
     reductions::Vector{NetworkReduction} = Vector{NetworkReduction}() #store the reductions that were applied.
 end
 
