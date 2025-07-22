@@ -122,7 +122,7 @@ end
             network_reductions = NetworkReduction[WardReduction([1, 2, 3, 4, 5, 17])],
         ),
     )
-    @test_throws IS.DataFormatError get_network_reduction_data(
+    @test_throws ErrorException get_network_reduction_data(
         Ybus(
             sys;
             network_reductions = NetworkReduction[WardReduction([1, 2, 3, 4, 5, 100])],

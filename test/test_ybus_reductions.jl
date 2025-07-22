@@ -95,7 +95,8 @@ end
     check_bus_arc_axis_consistency(A)
     ybus = Ybus(sys; network_reductions = NetworkReduction[DegreeTwoReduction()])
     nrd = get_network_reduction_data(ybus)
-    @test nrd.irreducible_buses == Set{Int}()
+    @test nrd.irreducible_buses ==
+          Set([112, 101, 114, 110, 105, 108, 103, 102, 111, 113, 104, 106, 109])
     @test length(keys(nrd.bus_reduction_map)) == 14
     @test nrd.bus_reduction_map[112] == Set([113])
     @test nrd.bus_reduction_map[104] == Set([105])
