@@ -73,6 +73,11 @@ end
     study_buses = filter!(x -> digits(x)[end] == 1, bus_numbers)  #study buses are from area 1 
     _basic_test_ward_reduction(sys, study_buses)
     _test_matrices_ward_reduction(sys, study_buses)
+
+    sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
+    study_buses = [101, 114, 110, 111]
+    _basic_test_ward_reduction(sys, study_buses)
+    _test_matrices_ward_reduction(sys, study_buses)
 end
 
 #TODO - develop more robust testing for correctness of PTDF
