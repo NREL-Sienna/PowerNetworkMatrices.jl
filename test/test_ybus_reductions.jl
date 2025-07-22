@@ -40,8 +40,8 @@ end
     @test nrd.bus_reduction_map[112] == Set([113])
     @test nrd.bus_reduction_map[104] == Set([105])
     @test nrd.reverse_bus_search_map == Dict{Int, Int}(105 => 104, 113 => 112)
-    @test length(keys(nrd.direct_branch_map)) == 15
-    @test length(keys(nrd.parallel_branch_map)) == 2
+    @test length(keys(nrd.direct_branch_map)) == 14
+    @test length(keys(nrd.parallel_branch_map)) == 3
     @test length(keys(nrd.series_branch_map)) == 0
     @test length(keys(nrd.transformer3W_map)) == 6
     @test nrd.removed_buses == Set{Int}()
@@ -71,8 +71,8 @@ end
     @test nrd.bus_reduction_map[1001] == Set([107, 108])
     @test nrd.reverse_bus_search_map ==
           Dict(113 => 112, 105 => 104, 116 => 103, 108 => 1001, 107 => 1001)
-    @test length(keys(nrd.direct_branch_map)) == 13
-    @test length(keys(nrd.parallel_branch_map)) == 2
+    @test length(keys(nrd.direct_branch_map)) == 12
+    @test length(keys(nrd.parallel_branch_map)) == 3
     @test length(keys(nrd.series_branch_map)) == 0
     @test length(keys(nrd.transformer3W_map)) == 5
     @test nrd.removed_buses == Set{Int}()
@@ -89,7 +89,6 @@ end
     @test Set(A.axes[2]) == Set(keys(nrd.bus_reduction_map))
 end
 
-# TODO - add a parallel set that gets reduced into a series chain.
 @testset "14 bus; + degree two reduction" begin
     sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
     A = IncidenceMatrix(sys; network_reductions = NetworkReduction[DegreeTwoReduction()])
@@ -105,7 +104,7 @@ end
     @test length(keys(nrd.parallel_branch_map)) == 2
     @test length(keys(nrd.series_branch_map)) == 3
     @test length(keys(nrd.transformer3W_map)) == 5
-    @test length(keys(nrd.reverse_series_branch_map)) == 7
+    @test length(keys(nrd.reverse_series_branch_map)) == 8
     @test nrd.removed_buses == Set([117, 107, 115, 118])
     @test nrd.removed_arcs == Set([
         (107, 108),
@@ -129,4 +128,85 @@ end
     @test Set(A.axes[2]) == Set(keys(nrd.bus_reduction_map))
     ybus_full = Ybus(sys)
     @test isapprox(ybus[108, 1001]^-1, (ybus_full[108, 107])^-1 + ybus_full[107, 1001]^-1)
+end
+
+@testset "14 bus; radial + degree two reduction" begin
+    sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
+    A_both = IncidenceMatrix(
+        sys;
+        network_reductions = NetworkReduction[RadialReduction(), DegreeTwoReduction()],
+    )
+    check_bus_arc_axis_consistency(A_both)
+    ybus_both = Ybus(
+        sys;
+        network_reductions = NetworkReduction[RadialReduction(), DegreeTwoReduction()],
+    )
+    nrd_both = get_network_reduction_data(ybus_both)
+    A_radial =
+        IncidenceMatrix(sys; network_reductions = NetworkReduction[RadialReduction()])
+    ybus_radial = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
+    nrd_radial = get_network_reduction_data(ybus_radial)
+    A_d2 = IncidenceMatrix(sys; network_reductions = NetworkReduction[DegreeTwoReduction()])
+    ybus_d2 = Ybus(sys; network_reductions = NetworkReduction[DegreeTwoReduction()])
+    nrd_d2 = get_network_reduction_data(ybus_d2)
+
+    @test nrd_both.bus_reduction_map != nrd_radial.bus_reduction_map
+    @test nrd_both.reverse_bus_search_map == nrd_radial.reverse_bus_search_map
+
+    # TODO - add more testing for the composition of both reductions
+end
+
+@testset "14 bus; Ward reduction" begin
+    sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
+    study_buses = [101, 114, 110, 111]
+    boundary_buses = [101, 114, 110, 111]
+    A = IncidenceMatrix(
+        sys;
+        network_reductions = NetworkReduction[WardReduction(study_buses)],
+    )
+    check_bus_arc_axis_consistency(A)
+    ybus = Ybus(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    nrd = get_network_reduction_data(ybus)
+    @test Set(ybus.axes[1]) == Set(study_buses)
+    @test length(nrd.added_admittance_map) == length(boundary_buses)
+    @test length(nrd.added_branch_map) == factorial(length(boundary_buses) - 1)
+    ybus_full = Ybus(sys)
+    for i in study_buses, j in study_buses
+        if i ∈ boundary_buses && j ∈ boundary_buses
+            @test ybus_full[i, j] != ybus[i, j]
+        else
+            @test ybus_full[i, j] == ybus[i, j]
+        end
+    end
+    @test Set(A.axes[1]) == union(
+        Set(keys(nrd.direct_branch_map)),
+        Set(keys(nrd.parallel_branch_map)),
+        Set(keys(nrd.series_branch_map)),
+        Set(keys(nrd.transformer3W_map)),
+        Set(keys(nrd.added_branch_map)),
+    )
+    @test Set(A.axes[2]) == Set(keys(nrd.bus_reduction_map))
+end
+
+@testset "Test irreducible_buses" begin
+    sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
+    # Test irreducible bus input for radial reduction
+    ybus = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
+    @test haskey(ybus.network_reduction_data.reverse_bus_search_map, 116)
+    ybus = Ybus(sys; network_reductions = NetworkReduction[RadialReduction([116])])
+    @test !haskey(ybus.network_reduction_data.reverse_bus_search_map, 116)
+    @test ybus.network_reduction_data.irreducible_buses == Set{Int}(116)
+
+    # Test irreducible bus input for degree two reduction
+    ybus = Ybus(sys; network_reductions = NetworkReduction[DegreeTwoReduction()])
+    @test 117 ∈ ybus.network_reduction_data.removed_buses
+    ybus = Ybus(
+        sys;
+        network_reductions = NetworkReduction[DegreeTwoReduction(;
+            irreducible_buses = [117],
+        )],
+    )
+    @test 117 ∉ ybus.network_reduction_data.removed_buses
+    @test ybus.network_reduction_data.irreducible_buses ==
+          Set{Int}([112, 101, 114, 110, 105, 108, 103, 102, 111, 113, 117, 104, 106, 109])
 end
