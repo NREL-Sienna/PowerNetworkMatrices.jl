@@ -929,8 +929,16 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
             "Cannot compose series branch maps; should not apply multiple reductions that generate series branch maps",
         )
     end
-    #TODO - loop through added branches and admittances and modify the Ybus for Ward reduction
+    for (bus_no, admittance) in nr.added_admittance_map
+        data[bus_lookup[bus_no], bus_lookup[bus_no]] += admittance
+    end
+    for (bus_tuple, admittance) in nr.added_branch_map
+        bus_from, bus_to = bus_tuple
+        data[bus_lookup[bus_from], bus_lookup[bus_to]] += admittance
+        data[bus_lookup[bus_to], bus_lookup[bus_from]] += admittance
+    end
     push!(nr.reductions, nr_new.reductions[1])
+    union!(nr.irreducible_buses, nr_new.irreducible_buses)
     bus_ax = setdiff(ybus.axes[1], bus_numbers_to_remove)
     bus_lookup = make_ax_ref(bus_ax)
     bus_ix = [ybus.lookup[1][x] for x in bus_ax]
