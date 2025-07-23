@@ -87,6 +87,25 @@ function validate_reduction_type(
     end
 end
 
+
+"""
+   get_retained_branches_names(network_reduction_data::NetworkReductionData)
+
+Gets the branch names that are retained after network reduction. This method only returns the 
+branch names from non-three winding transformer branches that have a one-to-one correspondence with 
+arcs after the reduction. This does not include parallel branches or branches that have been reduced as 
+part of a series chain of degree two nodes.
+
+# Arguments
+- `network_reduction_data::NetworkReductionData`
+
+# Returns
+- `Vector{String}`: Vector of the retained branch names.
+"""
+function get_retained_branches_names(network_reduction_data::NetworkReductionData)
+    return [PSY.get_name(branch) for branch in keys(network_reduction_data.direct_branch_map)]
+end 
+
 ##############################################################################
 ########################### Auxiliary functions ##############################
 ##############################################################################
