@@ -87,7 +87,6 @@ function validate_reduction_type(
     end
 end
 
-
 """
    get_retained_branches_names(network_reduction_data::NetworkReductionData)
 
@@ -103,8 +102,11 @@ part of a series chain of degree two nodes.
 - `Vector{String}`: Vector of the retained branch names.
 """
 function get_retained_branches_names(network_reduction_data::NetworkReductionData)
-    return [PSY.get_name(branch) for branch in keys(network_reduction_data.direct_branch_map)]
-end 
+    return [
+        PSY.get_name(branch) for
+        branch in keys(network_reduction_data.reverse_direct_branch_map)
+    ]
+end
 
 ##############################################################################
 ########################### Auxiliary functions ##############################
