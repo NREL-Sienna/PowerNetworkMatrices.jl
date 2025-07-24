@@ -40,8 +40,8 @@ function get_ward_reduction(
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
     bus_lookup = y_bus.lookup[1]    #y_bus and Z have same lookup
 
-    added_branch_map = Dict{Tuple{Int, Int}, PSY.Line}()
-    added_admittance_map = Dict{Int, PSY.FixedAdmittance}()
+    added_branch_map = Dict{Tuple{Int, Int}, Complex{Float32}}()
+    added_admittance_map = Dict{Int, Complex{Float32}}()
     if isempty(boundary_buses)
         first_ref_study_bus = findfirst(x -> x ∈ y_bus.ref_bus_numbers, study_buses)
         @error "no boundary buses found; cannot make bus_reduction_map based on impedance based criteria. mapping all external buses to the first reference bus ($first_ref_study_bus)"
@@ -91,14 +91,7 @@ function get_ward_reduction(
             bus_jx = boundary_buses[jx]
             if y_eq[ix, jx] != 0.0
                 if ix == jx
-                    virtual_admittance = PSY.FixedAdmittance(;
-                        name = "virtual_admittance_$(virtual_admittance_name_index)",
-                        available = true,
-                        bus = PSY.ACBus(nothing),
-                        Y = y_eq[ix, jx],
-                    )
-                    added_admittance_map[ix] = virtual_admittance
-                    virtual_admittance_name_index += 1
+                    added_admittance_map[bus_ix] = y_eq[ix, jx]
                 else
                     #check if the arc of virtual line is already existing so we don't add an additional arc
                     if (bus_ix, bus_jx) ∈ A.axes[1]
@@ -106,21 +99,7 @@ function get_ward_reduction(
                     else
                         arc_key = (bus_jx, bus_ix)
                     end
-                    virtual_branch = PSY.Line(;
-                        name = "virtual_branch_$(virtual_branch_name_index)",
-                        available = true,
-                        active_power_flow = 0.0,
-                        reactive_power_flow = 0.0,
-                        arc = PSY.Arc(; from = PSY.ACBus(nothing), to = PSY.ACBus(nothing)),
-                        r = -1 * real(y_eq[ix, jx]),
-                        x = -1 * imag(y_eq[ix, jx]),
-                        b = (from = 0.0, to = 0.0),
-                        rating = 100.0,
-                        angle_limits = (min = (-pi / 3), max = (pi / 3)),
-                        g = (from = 0.0, to = 0.0),
-                    )
-                    added_branch_map[arc_key] = virtual_branch
-                    virtual_branch_name_index += 1
+                    added_branch_map[arc_key] = y_eq[ix, jx]
                 end
             end
         end
