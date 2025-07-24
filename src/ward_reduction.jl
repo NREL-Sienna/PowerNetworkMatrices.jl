@@ -3,15 +3,6 @@ struct WardReduction <: NetworkReduction
 end
 get_study_buses(nr::WardReduction) = nr.study_buses
 
-function get_reduction(
-    ybus::Ybus,
-    ::PSY.System,
-    reduction::WardReduction,
-)
-    study_buses = get_study_buses(reduction)
-    return get_ward_reduction(ybus, study_buses, reduction)
-end
-
 """
 Builds a NetworkReduction corresponding to Ward reduction
 
@@ -24,19 +15,18 @@ function get_ward_reduction(
     study_buses::Vector{Int},
     reduction::WardReduction,
 )
-    _validate_study_buses(y_bus, study_buses)
     Z_full = KLU.solve!(klu(y_bus.data), Matrix{ComplexF64}(one(y_bus.data)))       #TODO: change implementation for large systems (row by row)
     A = IncidenceMatrix(y_bus)
     boundary_buses = Set{Int}()
     removed_arcs = Set{Tuple{Int, Int}}()
     for arc in A.axes[1]
-        #Deterimine boundary buses: 
+        #Deterimine boundary buses:
         if (arc[1] ∈ study_buses) && (arc[2] ∉ study_buses)
             push!(boundary_buses, arc[1])
         elseif (arc[1] ∉ study_buses) && (arc[2] ∈ study_buses)
             push!(boundary_buses, arc[2])
         end
-        #Determine arcs outside of study area 
+        #Determine arcs outside of study area
         if !(arc[1] ∈ study_buses && arc[2] ∈ study_buses)
             push!(removed_arcs, arc)
         end
@@ -143,49 +133,4 @@ function get_ward_reduction(
         added_admittance_map = added_admittance_map,
         reductions = NetworkReduction[reduction],
     )
-end
-
-function _validate_study_buses(
-    ybus::Ybus,
-    study_buses::Vector{Int},
-)
-    #TODO - improve building the vector/set of valid bus numbers
-    valid_bus_numbers = Set{Int}()
-    for (k, v) in get_network_reduction_data(ybus).bus_reduction_map
-        push!(valid_bus_numbers, k)
-        union!(valid_bus_numbers, v)
-    end
-    for b in study_buses
-        b ∉ valid_bus_numbers &&
-            throw(IS.DataFormatError("Study bus $b not found in system"))
-    end
-    slack_bus_numbers = ybus.ref_bus_numbers
-    if isempty(ybus.subnetworks)
-        @warn "Skipping additional data checks because subnetworks are not computed."
-    else
-        sub_networks = ybus.subnetworks
-        for (_, v) in sub_networks
-            all_in = all(x -> x in Set(v), study_buses)
-            none_in = all(x -> !(x in Set(v)), study_buses)
-            if all_in
-                @warn "The study buses comprise an entire island; ward reduction will not modify this island and other islands will be eliminated"
-            end
-            if !(all_in || none_in)
-                throw(
-                    IS.DataFormatError(
-                        "All study_buses must occur in a single synchronously connected system.",
-                    ),
-                )
-            end
-            for sb in slack_bus_numbers
-                if sb in v && sb ∉ study_buses && !(none_in)
-                    throw(
-                        IS.DataFormatError(
-                            "Slack bus $sb must be included in the study buses for an area that is partially reduced",
-                        ),
-                    )
-                end
-            end
-        end
-    end
 end
