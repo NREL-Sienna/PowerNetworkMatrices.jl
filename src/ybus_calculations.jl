@@ -194,24 +194,27 @@ function _ybus!(
     arc = PSY.get_arc(br)
     add_to_branch_maps!(nr, arc, br)
     bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
-    Y11 = Y_t
-    y_shunt = PSY.get_primary_shunt(br)
-    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt)
-        error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
-        )
-    end
-
     adj[bus_from_no, bus_to_no] = 1
     adj[bus_to_no, bus_from_no] = -1
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
 
+    Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
+    tap = exp(PSY.get_phase_shift(br) * 1im)
+    c_tap = exp(-1 * PSY.get_phase_shift(br) * 1im)
+    y_shunt = PSY.get_primary_shunt(br)
+
+    Y11 = (Y_t / (tap * c_tap))
+    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
+        error(
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+        )
+    end
+    
     y11[branch_ix] = Y11 + y_shunt
-    Y12 = -Y_t
+    Y12 = -Y_t / c_tap
     y12[branch_ix] = Y12
-    Y21 = Y12
+    Y21 = -Y_t / tap
     y21[branch_ix] = Y21
     Y22 = Y_t
     y22[branch_ix] = Y22
@@ -446,20 +449,21 @@ function _ybus!(
     tb[branch_ix] = bus_to_no
 
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
-    c = 1 / PSY.get_tap(br)
+    tap = (PSY.get_tap(br) * exp(PSY.get_phase_shift(br) * 1im))
+    c_tap = (PSY.get_tap(br) * exp(-1 * PSY.get_phase_shift(br) * 1im))
     y_shunt = PSY.get_primary_shunt(br)
-
-    Y11 = (Y_t * c^2)
-    y11[branch_ix] = Y11 + y_shunt
-    Y12 = (-Y_t * c)
-    if !isfinite(Y11) || !isfinite(Y12) || !isfinite(y_shunt)
+    
+    Y11 = Y_t / (tap * c_tap)
+    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
 
+    y11[branch_ix] = Y11 + y_shunt
+    Y12 = -Y_t / c_tap
     y12[branch_ix] = Y12
-    Y21 = Y12
+    Y21 = -Y_t / tap
     y21[branch_ix] = Y21
     Y22 = Y_t
     y22[branch_ix] = Y22
