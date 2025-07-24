@@ -23,6 +23,16 @@ end
 
 get_network_reduction_data(y::Ybus) = y.network_reduction_data
 
+function get_reduction(
+    ybus::Ybus,
+    ::PSY.System,
+    reduction::RadialReduction,
+)
+    A = IncidenceMatrix(ybus)
+    irreducible_buses = get_irreducible_buses(reduction)
+    return get_radial_reduction(A, irreducible_buses, reduction)
+end
+
 function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.Branch)
     direct_branch_map = get_direct_branch_map(nr)
     reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
@@ -864,7 +874,7 @@ function build_reduced_ybus(
     return _apply_reduction(ybus, network_reduction_data)
 end
 
-#NOTE: this is the key function that composes sequential reductions; this function needs cleanup, review, and more testing. 
+#NOTE: this is the key function that composes sequential reductions; this function needs cleanup, review, and more testing.
 function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     validate_reduction_type(
         get_reductions(nr_new)[1],
@@ -1033,4 +1043,69 @@ but not connected with buses of other subsets.
 function find_subnetworks(M::Ybus)
     bus_numbers = M.axes[2]
     return find_subnetworks(M.adjacency_data, bus_numbers)
+end
+
+function get_reduction(
+    ybus::Ybus,
+    sys::PSY.System,
+    reduction::DegreeTwoReduction,
+)
+    A = AdjacencyMatrix(ybus)
+    irreducible_buses = Set(get_irreducible_buses(reduction))
+    return get_degree2_reduction(A, sys, irreducible_buses, reduction)
+end
+
+function _validate_study_buses(
+    ybus::Ybus,
+    study_buses::Vector{Int},
+)
+    #TODO - improve building the vector/set of valid bus numbers
+    valid_bus_numbers = Set{Int}()
+    for (k, v) in get_network_reduction_data(ybus).bus_reduction_map
+        push!(valid_bus_numbers, k)
+        union!(valid_bus_numbers, v)
+    end
+    for b in study_buses
+        b ∉ valid_bus_numbers &&
+            throw(IS.DataFormatError("Study bus $b not found in system"))
+    end
+    slack_bus_numbers = ybus.ref_bus_numbers
+    if isempty(ybus.subnetworks)
+        @warn "Skipping additional data checks because subnetworks are not computed."
+    else
+        sub_networks = ybus.subnetworks
+        for (_, v) in sub_networks
+            all_in = all(x -> x in Set(v), study_buses)
+            none_in = all(x -> !(x in Set(v)), study_buses)
+            if all_in
+                @warn "The study buses comprise an entire island; ward reduction will not modify this island and other islands will be eliminated"
+            end
+            if !(all_in || none_in)
+                throw(
+                    IS.DataFormatError(
+                        "All study_buses must occur in a single synchronously connected system.",
+                    ),
+                )
+            end
+            for sb in slack_bus_numbers
+                if sb in v && sb ∉ study_buses && !(none_in)
+                    throw(
+                        IS.DataFormatError(
+                            "Slack bus $sb must be included in the study buses for an area that is partially reduced",
+                        ),
+                    )
+                end
+            end
+        end
+    end
+end
+
+function get_reduction(
+    ybus::Ybus,
+    ::PSY.System,
+    reduction::WardReduction,
+)
+    study_buses = get_study_buses(reduction)
+    _validate_study_buses(ybus, study_buses)
+    return get_ward_reduction(ybus, study_buses, reduction)
 end

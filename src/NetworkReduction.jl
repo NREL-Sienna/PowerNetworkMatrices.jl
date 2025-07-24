@@ -1,0 +1,1 @@
+abstract type NetworkReduction end

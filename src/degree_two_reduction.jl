@@ -6,16 +6,6 @@ get_irreducible_buses(nr::DegreeTwoReduction) = nr.irreducible_buses
 get_reduce_reactive_power_injectors(nr::DegreeTwoReduction) =
     nr.reduce_reactive_power_injectors
 
-function get_reduction(
-    ybus::Ybus,
-    sys::PSY.System,
-    reduction::DegreeTwoReduction,
-)
-    A = AdjacencyMatrix(ybus)
-    irreducible_buses = Set(get_irreducible_buses(reduction))
-    return get_degree2_reduction(A, sys, irreducible_buses, reduction)
-end
-
 function get_degree2_reduction(
     A::AdjacencyMatrix,
     sys::PSY.System,

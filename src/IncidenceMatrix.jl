@@ -79,3 +79,33 @@ function IncidenceMatrix(ybus::Ybus)
         ybus.network_reduction_data,
     )
 end
+
+"""
+Builds a NetworkReduction by removing radially connected buses.
+
+# Arguments
+- `A::IncidenceMatrix`: IncidenceMatrix
+"""
+function get_radial_reduction(
+    A::IncidenceMatrix,
+    irreducible_buses::Vector{Int},
+    reduction::RadialReduction,
+)
+    exempt_bus_positions = Set([A.lookup[2][x] for x in irreducible_buses])
+    irreducible_buses, bus_reduction_map, reverse_bus_search_map, radial_arcs =
+        calculate_radial_arcs(
+            A.data,
+            A.lookup[1],
+            A.lookup[2],
+            union(A.ref_bus_positions, exempt_bus_positions),
+            reduction,
+        )
+
+    return NetworkReductionData(;
+        irreducible_buses = irreducible_buses,
+        bus_reduction_map = bus_reduction_map,
+        reverse_bus_search_map = reverse_bus_search_map,
+        removed_arcs = radial_arcs,
+        reductions = NetworkReduction[reduction],
+    )
+end
