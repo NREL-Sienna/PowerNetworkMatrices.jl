@@ -7,23 +7,15 @@ get_reduce_reactive_power_injectors(nr::DegreeTwoReduction) =
     nr.reduce_reactive_power_injectors
 
 function get_degree2_reduction(
-    ybus::Ybus,
-    sys::PSY.System,
-    irreducible_buses::Vector{Int},
-    reduction::DegreeTwoReduction,
+    data::SparseArrays.SparseMatrixCSC{Int8, Int},
+    bus_lookup::Dict{Int, Int},
+    exempt_bus_positions::Set{Int},
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch},
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}},
+    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
 )
-    validate_buses(ybus, irreducible_buses)
-    A = AdjacencyMatrix(ybus)
-    network_reduction_data = A.network_reduction_data
-    for c in PSY.get_components(PSY.StaticInjection, sys)
-        bus = PSY.get_bus(c)
-        if PSY.get_available(bus)
-            push!(irreducible_buses, PSY.get_number(bus))
-        end
-    end
-    exempt_bus_positions = Set(get_irreducible_indices(ybus, irreducible_buses))
-    reverse_bus_lookup = Dict(v => k for (k, v) in A.lookup[2])
-    arc_maps = find_degree2_chains(A.data, exempt_bus_positions)
+    reverse_bus_lookup = Dict(v => k for (k, v) in bus_lookup)
+    arc_maps = find_degree2_chains(data, exempt_bus_positions)
     series_branch_map = Dict{Tuple{Int, Int}, Vector{Any}}()
 
     removed_buses = Set{Int}()
@@ -39,7 +31,12 @@ function get_degree2_reduction(
         segments = Vector{Any}()
         for ix in 1:(length(segment_numbers) - 1)
             segment_arc = (segment_numbers[ix], segment_numbers[ix + 1])
-            segment_arc, entry = _get_branch_map_entry(network_reduction_data, segment_arc)
+            segment_arc, entry = _get_branch_map_entry(
+                direct_branch_map,
+                parallel_branch_map,
+                transformer3W_map,
+                segment_arc,
+            )
             push!(segments, entry)
             push!(removed_arcs, segment_arc)
             ix != 1 && push!(removed_buses, segment_numbers[ix])
@@ -47,14 +44,7 @@ function get_degree2_reduction(
         series_branch_map[composite_arc] = segments
     end
     reverse_series_branch_map = _make_reverse_series_branch_map(series_branch_map)
-    return NetworkReductionData(;
-        irreducible_buses = Set(irreducible_buses),
-        series_branch_map = series_branch_map,
-        reverse_series_branch_map = reverse_series_branch_map,
-        removed_buses = removed_buses,
-        removed_arcs = removed_arcs,
-        reductions = NetworkReduction[reduction],
-    )
+    return series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs
 end
 
 function _make_reverse_series_branch_map(
@@ -77,13 +67,13 @@ function _make_reverse_series_branch_map(
     return reverse_series_branch_map
 end
 
-function _get_branch_map_entry(nr::NetworkReductionData, arc::Tuple{Int, Int})
+function _get_branch_map_entry(
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch},
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}},
+    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
+    arc::Tuple{Int, Int},
+)
     reverse_arc = (arc[2], arc[1])
-    direct_branch_map = nr.direct_branch_map
-    parallel_branch_map = nr.parallel_branch_map
-    series_branch_map = nr.series_branch_map
-    transformer3W_map = nr.transformer3W_map
-
     if haskey(direct_branch_map, arc)
         return arc, direct_branch_map[arc]
     elseif haskey(direct_branch_map, reverse_arc)
@@ -92,10 +82,6 @@ function _get_branch_map_entry(nr::NetworkReductionData, arc::Tuple{Int, Int})
         return arc, parallel_branch_map[arc]
     elseif haskey(parallel_branch_map, reverse_arc)
         return reverse_arc, parallel_branch_map[reverse_arc]
-    elseif haskey(series_branch_map, arc)
-        return arc, series_branch_map[arc]
-    elseif haskey(series_branch_map, reverse_arc)
-        return reverse_arc, series_branch_map[reverse_arc]
     elseif haskey(transformer3W_map, arc)
         return arc, transformer3W_map[arc]
     elseif haskey(transformer3W_map, reverse_arc)
@@ -338,8 +324,7 @@ function _find_longest_valid_chain(
                 push!(subchains, chain_path[i:j])
             end
         end
-        sort!(subchains; by = length, rev = true)
-        filter!(x -> length(x) > 2, subchains)
+        subchains = sort([x for x in subchains if length(x) > 2]; by = length, rev = true)
         for subchain in subchains
             if adj_matrix[subchain[1], subchain[end]] == 0
                 @warn "found a valid subchain $subchain"

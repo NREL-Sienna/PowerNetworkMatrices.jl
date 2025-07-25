@@ -1,39 +1,53 @@
 @kwdef mutable struct ReductionContainer
-    radial::Union{Nothing, RadialReduction} = nothing
+    radial_reduction::Union{Nothing, RadialReduction} = nothing
     degree_two_reduction::Union{Nothing, DegreeTwoReduction} = nothing
     ward_reduction::Union{Nothing, WardReduction} = nothing
 end
 
-has_radial_reduction(rb::ReductionContainer) = !isnothing(rb.radial)
+has_radial_reduction(rb::ReductionContainer) = !isnothing(rb.radial_reduction)
 has_degree_two_reduction(rb::ReductionContainer) = !isnothing(rb.degree_two_reduction)
 has_ward_reduction(rb::ReductionContainer) = !isnothing(rb.ward_reduction)
 
 function validate_reduction_type(
-    reduction::T,
+    new_reduction::ReductionContainer,
     prior_reductions::ReductionContainer,
-) where {T <: NetworkReduction}
-    prior_reduction_types = [typeof(x) for x in prior_reductions]
-    if length(prior_reductions) == 0
-        return
-    else
-        if T ∈ prior_reduction_types
-            throw(IS.DataFormatError("$T is applied twice to the same system"))
-        end
-        if WardReduction ∈ prior_reduction_types
-            throw(
-                IS.DataFormatError(
-                    "$T reduction is applied after Ward reduction. Ward reduction must be applied last.",
-                ),
-            )
-        end
-        if T == RadialReduction
-            if DegreeTwoReduction ∈ prior_reduction_types
-                throw(
-                    IS.DataFormatError(
-                        "When applying both RadialReduction and DegreeTwoReduction, RadialReduction must be applied first",
-                    ),
-                )
-            end
+)
+    if has_radial_reduction(new_reduction) && has_radial_reduction(prior_reductions)
+        throw(IS.DataFormatError("Radial reduction is applied twice to the same system"))
+    end
+    if has_degree_two_reduction(new_reduction) && has_degree_two_reduction(prior_reductions)
+        throw(
+            IS.DataFormatError("Degree two reduction is applied twice to the same system"),
+        )
+    end
+    if has_ward_reduction(new_reduction) && has_ward_reduction(prior_reductions)
+        throw(IS.DataFormatError("Ward reduction is applied twice to the same system"))
+    end
+    if has_ward_reduction(prior_reductions)
+        throw(IS.DataFormatError("Ward reduction must be the last applied reduction"))
+    end
+    if has_radial_reduction(new_reduction) && has_degree_two_reduction(prior_reductions)
+        @warn "When applying both RadialReduction and DegreeTwoReduction, it is likely beneficial to apply RadialReduction first."
+    end
+end
+
+function add_reduction!(r1::ReductionContainer, r2::ReductionContainer)
+    if has_radial_reduction(r2)
+        r1.radial_reduction = r2.radial_reduction
+    end
+    if has_degree_two_reduction(r2)
+        r1.degree_two_reduction = r2.degree_two_reduction
+    end
+    if has_ward_reduction(r2)
+        r1.ward_reduction = r2.ward_reduction
+    end
+end
+
+function Base.:(==)(x::ReductionContainer, y::ReductionContainer)
+    for field in fieldnames(ReductionContainer)
+        if getfield(x, field) != getfield(y, field)
+            return false
         end
     end
+    return true
 end

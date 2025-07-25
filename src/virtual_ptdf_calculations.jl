@@ -116,7 +116,7 @@ function VirtualPTDF(
     end
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
-    bus_ax = A.axes[2]
+    bus_ax = get_bus_axis(A)
     axes = A.axes
     look_up = A.lookup
     subnetworks = Ymatrix.subnetworks
@@ -267,7 +267,7 @@ Base.setindex!(::VirtualPTDF, _, ::CartesianIndex) =
 
 get_ptdf_data(mat::VirtualPTDF) = mat.cache.temp_cache
 
-function get_branch_ax(ptdf::VirtualPTDF)
+function get_arc_axis(ptdf::VirtualPTDF)
     return ptdf.axes[1]
 end
 

@@ -74,7 +74,7 @@
     # check axes values
     P5 = PTDF(sys5)
     arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, sys5)]
-    @test setdiff(PNM.get_branch_ax(P5), arc_tuples) ==
+    @test setdiff(PNM.get_arc_axis(P5), arc_tuples) ==
           Tuple{Int, Int}[]
     @test setdiff(PNM.get_bus_ax(P5), PSY.get_number.(PNM.get_buses(sys5))) == String[]
 

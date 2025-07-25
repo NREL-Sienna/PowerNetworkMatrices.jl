@@ -49,8 +49,8 @@ function BA_Matrix(ybus::Ybus)
     series_arcs = [x for x in keys(nr.series_branch_map)]
     transformer_arcs = [x for x in keys(nr.transformer3W_map)]
     additional_arcs = [x for x in keys(nr.added_branch_map)]
-    bus_ax = ybus.axes[1]
-    bus_lookup = ybus.lookup[1]
+    bus_ax = get_bus_axis(ybus)
+    bus_lookup = get_bus_lookup(ybus)
     arc_ax = unique(
         vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
     )
@@ -131,7 +131,7 @@ function ABA_Matrix(sys::PSY.System;
     A = IncidenceMatrix(ymatrix)
     BA = BA_Matrix(ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
-    bus_ax = ymatrix.axes[1]
+    bus_ax = get_bus_axis(ymatrix)
     ref_bus_numbers = ymatrix.ref_bus_numbers
     bus_ax_ = setdiff(bus_ax, ref_bus_numbers)
     axes = (bus_ax_, bus_ax_)

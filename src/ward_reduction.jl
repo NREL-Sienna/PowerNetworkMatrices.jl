@@ -3,47 +3,27 @@ struct WardReduction <: NetworkReduction
 end
 get_study_buses(nr::WardReduction) = nr.study_buses
 
-"""
-Builds a NetworkReduction corresponding to Ward reduction
-
-# Arguments
-- `sys::System`
-- `study_buses::Vector{Int}`: Bus numbers corresponding to the area of study (the retained area)
-"""
 function get_ward_reduction(
-    y_bus::Ybus,
+    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int},
+    bus_lookup::Dict{Int, Int},
+    bus_axis::Vector{Int},
+    boundary_buses::Set{Int},
+    ref_bus_numbers::Set{Int},
     study_buses::Vector{Int},
-    reduction::WardReduction,
 )
-    Z_full = KLU.solve!(klu(y_bus.data), Matrix{ComplexF64}(one(y_bus.data)))       #TODO: change implementation for large systems (row by row)
-    A = IncidenceMatrix(y_bus)
-    boundary_buses = Set{Int}()
-    removed_arcs = Set{Tuple{Int, Int}}()
-    for arc in A.axes[1]
-        #Deterimine boundary buses:
-        if (arc[1] ∈ study_buses) && (arc[2] ∉ study_buses)
-            push!(boundary_buses, arc[1])
-        elseif (arc[1] ∉ study_buses) && (arc[2] ∈ study_buses)
-            push!(boundary_buses, arc[2])
-        end
-        #Determine arcs outside of study area
-        if !(arc[1] ∈ study_buses && arc[2] ∈ study_buses)
-            push!(removed_arcs, arc)
-        end
-    end
-    all_buses = y_bus.axes[1]
+    Z_full = KLU.solve!(klu(data), Matrix{ComplexF64}(one(data)))       #TODO: change implementation for large systems (row by row)
+    all_buses = bus_axis
     external_buses = setdiff(all_buses, study_buses)
     boundary_buses = unique(boundary_buses)
     n_external = length(external_buses)
     n_boundary = length(boundary_buses)
 
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
-    bus_lookup = y_bus.lookup[1]    #y_bus and Z have same lookup
 
     added_branch_map = Dict{Tuple{Int, Int}, Complex{Float32}}()
     added_admittance_map = Dict{Int, Complex{Float32}}()
     if isempty(boundary_buses)
-        first_ref_study_bus = findfirst(x -> x ∈ y_bus.ref_bus_numbers, study_buses)
+        first_ref_study_bus = findfirst(x -> x ∈ ref_bus_numbers, study_buses)
         @error "no boundary buses found; cannot make bus_reduction_map based on impedance based criteria. mapping all external buses to the first reference bus ($first_ref_study_bus)"
         bus_reduction_map_index[first_ref_study_bus] = Set(external_buses)
     else
@@ -59,31 +39,30 @@ function get_ward_reduction(
     reverse_bus_search_map =
         _make_reverse_bus_search_map(bus_reduction_map_index, length(all_buses))
 
+    # TODO . 
     #Populate matrices for computing external equivalent
     y_ee = SparseArrays.spzeros(ComplexF32, n_external, n_external)
     for (ix, i) in enumerate(external_buses)
         for (jx, j) in enumerate(external_buses)
-            y_ee[ix, jx] = y_bus[i, j]
+            y_ee[ix, jx] = data[bus_lookup[i], bus_lookup[j]]
         end
     end
     y_be = SparseArrays.spzeros(ComplexF32, n_boundary, n_external)
     for (ix, i) in enumerate(boundary_buses)
         for (jx, j) in enumerate(external_buses)
-            y_be[ix, jx] = y_bus[i, j]
+            y_be[ix, jx] = data[bus_lookup[i], bus_lookup[j]]
         end
     end
     y_eb = SparseArrays.spzeros(ComplexF32, n_external, n_boundary)
     for (ix, i) in enumerate(external_buses)
         for (jx, j) in enumerate(boundary_buses)
-            y_eb[ix, jx] = y_bus[i, j]
+            y_eb[ix, jx] = data[bus_lookup[i], bus_lookup[j]]
         end
     end
 
     # Eq. (2.16) from  https://core.ac.uk/download/pdf/79564835.pdf
     y_eq = y_be * KLU.solve!(klu(y_ee), Matrix{Complex{Float64}}(y_eb))
 
-    virtual_admittance_name_index = 1
-    virtual_branch_name_index = 1
     #Loop upper diagonal of Yeq
     for ix in 1:length(boundary_buses)
         for jx in ix:length(boundary_buses)
@@ -94,7 +73,7 @@ function get_ward_reduction(
                     added_admittance_map[bus_ix] = y_eq[ix, jx]
                 else
                     #check if the arc of virtual line is already existing so we don't add an additional arc
-                    if (bus_ix, bus_jx) ∈ A.axes[1]
+                    if (bus_ix, bus_jx) ∈ bus_axis
                         arc_key = (bus_ix, bus_jx)
                     else
                         arc_key = (bus_jx, bus_ix)
@@ -104,12 +83,8 @@ function get_ward_reduction(
             end
         end
     end
-    return NetworkReductionData(;
-        bus_reduction_map = bus_reduction_map_index,
-        reverse_bus_search_map = reverse_bus_search_map,
-        removed_arcs = removed_arcs,
-        added_branch_map = added_branch_map,
-        added_admittance_map = added_admittance_map,
-        reductions = NetworkReduction[reduction],
-    )
+    return bus_reduction_map_index,
+    reverse_bus_search_map,
+    added_branch_map,
+    added_admittance_map
 end

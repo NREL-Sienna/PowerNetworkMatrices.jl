@@ -1,26 +1,27 @@
 @testset "Invalid reduction combinations" begin
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    @test_throws IS.DataFormatError("RadialReduction is applied twice to the same system") Ybus(
+    @test_throws IS.DataFormatError("Radial reduction is applied twice to the same system") Ybus(
         sys;
         network_reductions = NetworkReduction[RadialReduction(), RadialReduction()],
     )
     @test_throws IS.DataFormatError(
-        "When applying both RadialReduction and DegreeTwoReduction, RadialReduction must be applied first",
-    ) Ybus(
-        sys;
-        network_reductions = NetworkReduction[DegreeTwoReduction(), RadialReduction()],
-    )
-    @test_throws IS.DataFormatError(
-        "RadialReduction reduction is applied after Ward reduction. Ward reduction must be applied last.",
+        "Ward reduction must be the last applied reduction",
     ) Ybus(
         sys;
         network_reductions = NetworkReduction[WardReduction([1, 2, 4]), RadialReduction()],
+    )
+    @test_logs (
+        :warn,
+        r"When applying both RadialReduction and DegreeTwoReduction, it is likely beneficial to apply RadialReduction first",
+    ) match_mode = :any Ybus(
+        sys;
+        network_reductions = NetworkReduction[DegreeTwoReduction(), RadialReduction()],
     )
 end
 
 function check_bus_arc_axis_consistency(A::IncidenceMatrix)
     arc_axis_numbers = Set()
-    for arc in A.axes[1]
+    for arc in PNM.get_arc_axis(A)
         push!(arc_axis_numbers, arc[1])
         push!(arc_axis_numbers, arc[2])
     end

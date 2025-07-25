@@ -22,15 +22,16 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
 end
 
 get_network_reduction_data(y::Ybus) = y.network_reduction_data
+get_bus_axis(y::Ybus) = y.axes[1]
+get_bus_lookup(y::Ybus) = y.lookup[1]
 
 function get_reduction(
     ybus::Ybus,
-    ::PSY.System,
+    sys::PSY.System,
     reduction::RadialReduction,
 )
     A = IncidenceMatrix(ybus)
-    irreducible_buses = get_irreducible_buses(reduction)
-    return get_radial_reduction(A, irreducible_buses, reduction)
+    return get_reduction(A, sys, reduction)
 end
 
 function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.Branch)
@@ -876,8 +877,9 @@ end
 
 #NOTE: this is the key function that composes sequential reductions; this function needs cleanup, review, and more testing.
 function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
+    #TODO - we should change this to do this validation before we compute the reduction
     validate_reduction_type(
-        get_reductions(nr_new)[1],
+        get_reductions(nr_new),
         get_reductions(get_network_reduction_data(ybus)),
     )
     remake_reverse_direct_branch_map = false
@@ -938,7 +940,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     if isempty(nr.series_branch_map)
         nr.series_branch_map = nr_new.series_branch_map
         nr.reverse_series_branch_map = nr_new.reverse_series_branch_map
-    elseif !isempty(nr_new.series_branch_map) && !!isempty(nr.series_branch_map)
+    elseif !isempty(nr_new.series_branch_map) && !isempty(nr.series_branch_map)
         error(
             "Cannot compose series branch maps; should not apply multiple reductions that generate series branch maps",
         )
@@ -951,9 +953,9 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         data[bus_lookup[bus_from], bus_lookup[bus_to]] += admittance
         data[bus_lookup[bus_to], bus_lookup[bus_from]] += admittance
     end
-    push!(nr.reductions, nr_new.reductions[1])
+    add_reduction!(nr.reductions, nr_new.reductions)
     union!(nr.irreducible_buses, nr_new.irreducible_buses)
-    bus_ax = setdiff(ybus.axes[1], bus_numbers_to_remove)
+    bus_ax = setdiff(get_bus_axis(ybus), bus_numbers_to_remove)
     bus_lookup = make_ax_ref(bus_ax)
     bus_ix = [ybus.lookup[1][x] for x in bus_ax]
     adjacency_data = adjacency_data[bus_ix, bus_ix]
@@ -1016,6 +1018,7 @@ function _add_series_branches_to_ybus!(
         data[bus_lookup[equivalent_arc[2]], bus_lookup[equivalent_arc[2]]] +=
             shunt_admittance / 2
     end
+    return
 end
 
 function _get_equivalent_line_parameters(
@@ -1121,8 +1124,7 @@ function get_reduction(
     reduction::DegreeTwoReduction,
 )
     A = AdjacencyMatrix(ybus)
-    irreducible_buses = Set(get_irreducible_buses(reduction))
-    return get_degree2_reduction(A, sys, irreducible_buses, reduction)
+    return get_reduction(A, sys, reduction)
 end
 
 function _validate_study_buses(
@@ -1144,7 +1146,7 @@ function _validate_study_buses(
         @warn "Skipping additional data checks because subnetworks are not computed."
     else
         sub_networks = ybus.subnetworks
-        for (_, v) in sub_networks
+        for v in values(sub_networks)
             all_in = all(x -> x in Set(v), study_buses)
             none_in = all(x -> !(x in Set(v)), study_buses)
             if all_in
@@ -1177,5 +1179,39 @@ function get_reduction(
 )
     study_buses = get_study_buses(reduction)
     _validate_study_buses(ybus, study_buses)
-    return get_ward_reduction(ybus, study_buses, reduction)
+    bus_lookup = get_bus_lookup(ybus)
+    bus_axis = get_bus_axis(ybus)
+    A = IncidenceMatrix(ybus)
+    boundary_buses = Set{Int}()
+    removed_arcs = Set{Tuple{Int, Int}}()
+    for arc in get_arc_axis(A)
+        #Deterimine boundary buses:
+        if (arc[1] ∈ study_buses) && (arc[2] ∉ study_buses)
+            push!(boundary_buses, arc[1])
+        elseif (arc[1] ∉ study_buses) && (arc[2] ∈ study_buses)
+            push!(boundary_buses, arc[2])
+        end
+        #Determine arcs outside of study area
+        if !(arc[1] ∈ study_buses && arc[2] ∈ study_buses)
+            push!(removed_arcs, arc)
+        end
+    end
+    bus_reduction_map, reverse_bus_search_map, added_branch_map, added_admittance_map =
+        get_ward_reduction(
+            ybus.data,
+            bus_lookup,
+            bus_axis,
+            boundary_buses,
+            ybus.ref_bus_numbers,
+            study_buses,
+        )
+
+    return NetworkReductionData(;
+        bus_reduction_map = bus_reduction_map,
+        reverse_bus_search_map = reverse_bus_search_map,
+        removed_arcs = removed_arcs,
+        added_branch_map = added_branch_map,
+        added_admittance_map = added_admittance_map,
+        reductions = ReductionContainer(; ward_reduction = reduction),
+    )
 end
