@@ -2,7 +2,8 @@ function _basic_test_ward_reduction(sys, study_buses)
     ybus = Ybus(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
     wr = get_network_reduction_data(ybus)
     @test isa(wr, NetworkReductionData)
-    @test get_reductions(wr) == [WardReduction(study_buses)]
+    @test get_reductions(wr) ==
+          PNM.ReductionContainer(; ward_reduction = WardReduction(study_buses))
     external_buses =
         setdiff([get_number(x) for x in get_components(ACBus, sys)], study_buses)
     @test !isempty(wr.added_admittance_map)
@@ -122,7 +123,7 @@ end
             network_reductions = NetworkReduction[WardReduction([1, 2, 3, 4, 5, 17])],
         ),
     )
-    @test_throws ErrorException get_network_reduction_data(
+    @test_throws IS.DataFormatError get_network_reduction_data(
         Ybus(
             sys;
             network_reductions = NetworkReduction[WardReduction([1, 2, 3, 4, 5, 100])],

@@ -153,8 +153,8 @@ end
     @test isapprox(lodf_t, get_lodf_data(lodf_))
 
     # test getindex
-    for name1 in PNM.get_branch_ax(lodf_)       # selected line
-        for name2 in PNM.get_branch_ax(lodf_)   # outage line
+    for name1 in PNM.get_arc_axis(lodf_)       # selected line
+        for name2 in PNM.get_arc_axis(lodf_)   # outage line
             i = lodf_.lookup[1][name1]
             j = lodf_.lookup[2][name2]
             element_1 = lodf_[name1, name2]

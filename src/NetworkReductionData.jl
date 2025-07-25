@@ -27,7 +27,7 @@
     added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
     added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
         Dict{Tuple{Int, Int}, Complex{Float32}}()
-    reductions::Vector{NetworkReduction} = Vector{NetworkReduction}() #store the reductions that were applied.
+    reductions::ReductionContainer = ReductionContainer() 
 end
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
@@ -70,15 +70,6 @@ function isequal(
 )
     for field in fieldnames(NetworkReductionData)
         if getfield(rb1, field) != getfield(rb2, field)
-            return false
-        end
-    end
-    return true
-end
-
-function Base.:(==)(x::T1, y::T1) where {T1 <: NetworkReduction}
-    for field in fieldnames(T1)
-        if getfield(x, field) != getfield(y, field)
             return false
         end
     end

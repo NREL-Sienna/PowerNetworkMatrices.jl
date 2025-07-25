@@ -128,7 +128,6 @@ function calculate_radial_arcs(
     arc_map::Dict{Tuple{Int, Int}, Int},
     bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},
-    ::RadialReduction,
 )
     lk = ReentrantLock()
     buscount = length(bus_map)
@@ -152,8 +151,7 @@ function calculate_radial_arcs(
         end
     end
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map_index, buscount)
-    return Set(get_irreducible_buses(reduction)),
-    bus_reduction_map_index,
+    return bus_reduction_map_index,
     reverse_bus_search_map,
     radial_arcs
 end

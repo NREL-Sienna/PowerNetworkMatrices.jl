@@ -275,11 +275,11 @@ end
 Validates that the user bus input is consistent with the ybus axes and the prior reductions.
 Is used to check `irreducible_buses` for `Radial` and `DegreeTwo` reductions and `study_buses` for `WardReduction`.
 """
-function validate_buses(ybus::Ybus, buses::Vector{Int})
-    reverse_bus_search_map = ybus.network_reduction_data.reverse_bus_search_map
+function validate_buses(A::AdjacencyMatrix, buses::Vector{Int})
+    reverse_bus_search_map = A.network_reduction_data.reverse_bus_search_map
     for bus_no in buses
         reduced_bus_no = get(reverse_bus_search_map, bus_no, bus_no)
-        if reduced_bus_no ∉ ybus.axes[1]
+        if reduced_bus_no ∉ get_bus_axis(A)
             if bus_no == reduced_bus_no
                 error(
                     "Invalid bus entry found: Bus $bus_no. Check your input data; this bus was not found in the admittance matrix.",
@@ -297,12 +297,12 @@ end
 """
 Convert the user input for irreducible_buses to a set of indices based on the Ybus lookup and the prior reductions.
 """
-function get_irreducible_indices(ybus::Ybus, irreducible_buses::Vector{Int})
-    reverse_bus_search_map = ybus.network_reduction_data.reverse_bus_search_map
+function get_irreducible_indices(A::AdjacencyMatrix, irreducible_buses::Vector{Int})
+    reverse_bus_search_map = A.network_reduction_data.reverse_bus_search_map
     irreducible_indices = zeros(Int, length(irreducible_buses))
     for (ix, bus_no) in enumerate(irreducible_buses)
         reduced_bus_no = get(reverse_bus_search_map, bus_no, bus_no)
-        irreducible_indices[ix] = ybus.lookup[1][reduced_bus_no]
+        irreducible_indices[ix] = A.lookup[1][reduced_bus_no]
     end
     return irreducible_indices
 end
