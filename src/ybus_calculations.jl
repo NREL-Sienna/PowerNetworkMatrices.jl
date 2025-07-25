@@ -210,7 +210,7 @@ function _ybus!(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
         )
     end
-    
+
     y11[branch_ix] = Y11 + y_shunt
     Y12 = -Y_t / c_tap
     y12[branch_ix] = Y12
@@ -452,7 +452,7 @@ function _ybus!(
     tap = (PSY.get_tap(br) * exp(PSY.get_phase_shift(br) * 1im))
     c_tap = (PSY.get_tap(br) * exp(-1 * PSY.get_phase_shift(br) * 1im))
     y_shunt = PSY.get_primary_shunt(br)
-    
+
     Y11 = Y_t / (tap * c_tap)
     if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
         error(
