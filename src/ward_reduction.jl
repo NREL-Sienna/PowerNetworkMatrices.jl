@@ -39,7 +39,6 @@ function get_ward_reduction(
     reverse_bus_search_map =
         _make_reverse_bus_search_map(bus_reduction_map_index, length(all_buses))
 
-    # TODO . 
     #Populate matrices for computing external equivalent
     y_ee = SparseArrays.spzeros(ComplexF32, n_external, n_external)
     for (ix, i) in enumerate(external_buses)
