@@ -420,7 +420,7 @@ function get_ptdf_data(ptdf::PTDF)
     return transpose(ptdf.data)
 end
 
-function get_branch_ax(ptdf::PTDF)
+function get_arc_axis(ptdf::PTDF)
     return ptdf.axes[2]
 end
 

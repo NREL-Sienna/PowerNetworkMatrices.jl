@@ -47,7 +47,7 @@ end
     vlodf = VirtualLODF(sys5)
     # properties
     @test size(vlodf) == (length(branches_5), length(branches_5))
-    @test length(PNM.get_branch_ax(vlodf)) == length(branches_5)
+    @test length(PNM.get_arc_axis(vlodf)) == length(branches_5)
 end
 
 @testset "Test Virtual LODF matrices with tolerance" begin

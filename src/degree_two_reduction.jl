@@ -6,34 +6,18 @@ get_irreducible_buses(nr::DegreeTwoReduction) = nr.irreducible_buses
 get_reduce_reactive_power_injectors(nr::DegreeTwoReduction) =
     nr.reduce_reactive_power_injectors
 
-function get_reduction(
-    ybus::Ybus,
-    sys::PSY.System,
-    reduction::DegreeTwoReduction,
-)
-    A = AdjacencyMatrix(ybus)
-    irreducible_buses = Set(get_irreducible_buses(reduction))
-    return get_degree2_reduction(A, sys, irreducible_buses, reduction)
-end
-
 function get_degree2_reduction(
-    A::AdjacencyMatrix,
-    sys::PSY.System,
-    irreducible_buses::Set{Int},
-    reduction::DegreeTwoReduction,
+    data::SparseArrays.SparseMatrixCSC{Int8, Int},
+    bus_lookup::Dict{Int, Int},
+    exempt_bus_positions::Set{Int},
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch},
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}},
+    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
 )
-    network_reduction_data = A.network_reduction_data
-    reverse_bus_search_map = network_reduction_data.reverse_bus_search_map
-    for c in PSY.get_components(PSY.StaticInjection, sys)
-        push!(irreducible_buses, PSY.get_number(PSY.get_bus(c)))
-    end
-    irreducible_non_reduced_buses =
-        unique([get(reverse_bus_search_map, k, k) for k in irreducible_buses])
-    irreducible_indices = Set([A.lookup[2][i] for i in irreducible_non_reduced_buses])
-    reverse_bus_lookup = Dict(v => k for (k, v) in A.lookup[2])
-    arc_maps = find_degree2_chains(A.data, irreducible_indices)
+    reverse_bus_lookup = Dict(v => k for (k, v) in bus_lookup)
+    arc_maps = find_degree2_chains(data, exempt_bus_positions)
     series_branch_map = Dict{Tuple{Int, Int}, Vector{Any}}()
-    reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+
     removed_buses = Set{Int}()
     removed_arcs = Set{Tuple{Int, Int}}()
     for (composite_arc_ix, segment_ix) in arc_maps
@@ -47,33 +31,49 @@ function get_degree2_reduction(
         segments = Vector{Any}()
         for ix in 1:(length(segment_numbers) - 1)
             segment_arc = (segment_numbers[ix], segment_numbers[ix + 1])
-            segment_arc, entry = _get_branch_map_entry(network_reduction_data, segment_arc)
+            segment_arc, entry = _get_branch_map_entry(
+                direct_branch_map,
+                parallel_branch_map,
+                transformer3W_map,
+                segment_arc,
+            )
             push!(segments, entry)
             push!(removed_arcs, segment_arc)
             ix != 1 && push!(removed_buses, segment_numbers[ix])
         end
         series_branch_map[composite_arc] = segments
     end
-
-    #TODO - add the reverse_series_branch_map
-
-    return NetworkReductionData(;
-        irreducible_buses = irreducible_buses,
-        series_branch_map = series_branch_map,
-        reverse_series_branch_map = reverse_series_branch_map,
-        removed_buses = removed_buses,
-        removed_arcs = removed_arcs,
-        reductions = NetworkReduction[reduction],
-    )
+    reverse_series_branch_map = _make_reverse_series_branch_map(series_branch_map)
+    return series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs
 end
 
-function _get_branch_map_entry(nr::NetworkReductionData, arc::Tuple{Int, Int})
-    reverse_arc = (arc[2], arc[1])
-    direct_branch_map = nr.direct_branch_map
-    parallel_branch_map = nr.parallel_branch_map
-    series_branch_map = nr.series_branch_map
-    transformer3W_map = nr.transformer3W_map
+function _make_reverse_series_branch_map(
+    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
+)
+    reverse_series_branch_map = Dict{Any, Tuple{Int, Int}}()
+    for (composite_arc, vector_segments) in series_branch_map
+        for segment in vector_segments
+            # Segment composed of parallel branches:
+            if isa(segment, Set)
+                for x in segment
+                    reverse_series_branch_map[x] = composite_arc
+                end
+                # Segment composed of single branch or part of a 3WT:
+            else
+                reverse_series_branch_map[segment] = composite_arc
+            end
+        end
+    end
+    return reverse_series_branch_map
+end
 
+function _get_branch_map_entry(
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch},
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}},
+    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
+    arc::Tuple{Int, Int},
+)
+    reverse_arc = (arc[2], arc[1])
     if haskey(direct_branch_map, arc)
         return arc, direct_branch_map[arc]
     elseif haskey(direct_branch_map, reverse_arc)
@@ -82,16 +82,12 @@ function _get_branch_map_entry(nr::NetworkReductionData, arc::Tuple{Int, Int})
         return arc, parallel_branch_map[arc]
     elseif haskey(parallel_branch_map, reverse_arc)
         return reverse_arc, parallel_branch_map[reverse_arc]
-    elseif haskey(series_branch_map, arc)
-        return arc, series_branch_map[arc]
-    elseif haskey(series_branch_map, reverse_arc)
-        return reverse_arc, series_branch_map[reverse_arc]
     elseif haskey(transformer3W_map, arc)
         return arc, transformer3W_map[arc]
     elseif haskey(transformer3W_map, reverse_arc)
         return reverse_arc, transformer3W_map[reverse_arc]
     else
-        error("Arc $segment_arc not found in the existing network reduction mappings.")
+        error("Arc $arc not found in the existing network reduction mappings.")
     end
 end
 
@@ -131,6 +127,7 @@ Determines if a node is a final node in a path traversal.
 - `node::Int`: The index of the node to check.
 - `adj_matrix::SparseArrays.SparseMatrixCSC`: The adjacency matrix of the network.
 - `reduced_indices::Set{Int}`: Set of indices that have already been reduced.
+- `irreducible_indices::Set{Int}`: Set of indices that should not be reduced.
 
 # Returns
 - `Bool`: `true` if the node is a final node, `false` otherwise.
@@ -139,11 +136,15 @@ function _is_final_node(
     node::Int,
     adj_matrix::SparseArrays.SparseMatrixCSC,
     reduced_indices::Set{Int},
+    irreducible_indices::Set{Int},
 )
     if !_is_2degree_node(adj_matrix, node)
         return true
     end
     if node ∈ reduced_indices
+        return true
+    end
+    if node ∈ irreducible_indices
         return true
     end
     return false
@@ -235,7 +236,7 @@ function _get_partial_chain_recursive!(
 
     push!(current_chain, current_node)
 
-    if _is_final_node(current_node, adj_matrix, reduced_indices)
+    if _is_final_node(current_node, adj_matrix, reduced_indices, irreducible_indices)
         return
     end
 
@@ -300,11 +301,37 @@ function find_degree2_chains(
         end
         chain_path =
             _get_complete_chain(adj_matrix, node, reduced_indices, irreducible_indices)
-        if adj_matrix[chain_path[1], chain_path[end]] != 0
-            @warn "Nodes $(chain_path[1]) and $(chain_path[end]) already have a parallel path, skipping chain creation."
-        else
-            arc_map[chain_path[1], chain_path[end]] = chain_path
+        valid_chain_path = _find_longest_valid_chain(adj_matrix, chain_path)
+        if !isempty(valid_chain_path)
+            arc_map[valid_chain_path[1], valid_chain_path[end]] = valid_chain_path
         end
     end
     return arc_map
+end
+
+function _find_longest_valid_chain(
+    adj_matrix::SparseArrays.SparseMatrixCSC,
+    chain_path::Vector{Int},
+)
+    if adj_matrix[chain_path[1], chain_path[end]] == 0
+        return chain_path
+    else
+        @warn "Nodes $(chain_path[1]) and $(chain_path[end]) already have a parallel path, searching for valid subchains."
+        subchains = Vector{Int}[]
+        n = length(chain_path)
+        for i in 1:n
+            for j in i:n
+                push!(subchains, chain_path[i:j])
+            end
+        end
+        subchains = sort([x for x in subchains if length(x) > 2]; by = length, rev = true)
+        for subchain in subchains
+            if adj_matrix[subchain[1], subchain[end]] == 0
+                @warn "found a valid subchain $subchain"
+                return subchain
+            end
+        end
+    end
+    @warn "No valid subchains found; skipping chain creation"
+    return Vector{Int}()
 end

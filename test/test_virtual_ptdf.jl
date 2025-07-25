@@ -148,20 +148,20 @@ end
 
     # get the rows and full PTDF matrix, test get_ptdf_data
     ptdf = PTDF(sys)
-    for i in PNM.get_branch_ax(vptdf)
+    for i in PNM.get_arc_axis(vptdf)
         for j in PNM.get_bus_ax(vptdf)
             vptdf[i, j]
         end
     end
     dict_ = Dict()
-    for (n, i) in enumerate(PNM.get_branch_ax(vptdf))
+    for (n, i) in enumerate(PNM.get_arc_axis(vptdf))
         dict_[n] = vptdf.cache[n]
     end
     @test get_ptdf_data(vptdf) == dict_
 
     # test get axes values
     arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, sys)]
-    @test setdiff(PNM.get_branch_ax(vptdf), arc_tuples) == []
+    @test setdiff(PNM.get_arc_axis(vptdf), arc_tuples) == []
     @test setdiff(PNM.get_bus_ax(vptdf), PSY.get_number.(PNM.get_buses(sys))) == String[]
 
     # test show

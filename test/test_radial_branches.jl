@@ -38,7 +38,8 @@
     @test length(rb.reverse_transformer3W_map) == 0
     @test length(rb.removed_buses) == 0
     @test rb.removed_arcs == Set([(7, 8), (8, 61)])
-    @test get_reductions(rb) == NetworkReduction[RadialReduction()]
+    @test get_reductions(rb) ==
+          PNM.ReductionContainer(; radial_reduction = RadialReduction())
 end
 
 @testset "Radial Branches Large" begin

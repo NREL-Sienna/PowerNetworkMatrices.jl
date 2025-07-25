@@ -329,13 +329,13 @@ function LODF(
     if !isequal(A.network_reduction_data, PTDFm.network_reduction_data)
         error("A and PTDF matrices have non-equivalent network reductions.")
     end
-    ax_ref = make_ax_ref(A.axes[1])
+    ax_ref = make_ax_ref(get_arc_axis(A))
 
     if tol > eps()
         lodf_t = _buildlodf(A.data, PTDFm_data, linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
-            (A.axes[1], A.axes[1]),
+            (get_arc_axis(A), get_arc_axis(A)),
             (ax_ref, ax_ref),
             Ref(tol),
             A.network_reduction_data,
@@ -343,7 +343,7 @@ function LODF(
     end
     return LODF(
         _buildlodf(A.data, PTDFm_data, linear_solver),
-        (A.axes[1], A.axes[1]),
+        (get_arc_axis(A), get_arc_axis(A)),
         (ax_ref, ax_ref),
         Ref(tol),
         A.network_reduction_data,
@@ -385,13 +385,13 @@ function LODF(
         )
     end
     validate_linear_solver(linear_solver)
-    ax_ref = make_ax_ref(A.axes[1])
+    ax_ref = make_ax_ref(get_arc_axis(A))
 
     if tol > eps()
         lodf_t = _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
-            (A.axes[1], A.axes[1]),
+            (get_arc_axis(A), get_arc_axis(A)),
             (ax_ref, ax_ref),
             Ref(tol),
             A.network_reduction_data,
@@ -399,7 +399,7 @@ function LODF(
     end
     return LODF(
         _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
-        (A.axes[1], A.axes[1]),
+        (get_arc_axis(A), get_arc_axis(A)),
         (ax_ref, ax_ref),
         Ref(tol),
         A.network_reduction_data,
@@ -436,7 +436,7 @@ function get_lodf_data(lodf::LODF)
     return transpose(lodf.data)
 end
 
-function get_branch_ax(lodf::LODF)
+function get_arc_axis(lodf::LODF)
     return lodf.axes[1]
 end
 

@@ -3,37 +3,6 @@
 end
 get_irreducible_buses(nr::RadialReduction) = nr.irreducible_buses
 
-function get_reduction(
-    ybus::Ybus,
-    ::PSY.System,
-    reduction::RadialReduction,
-)
-    A = IncidenceMatrix(ybus)
-    irreducible_buses = get_irreducible_buses(reduction)
-    return get_radial_reduction(A, irreducible_buses, reduction)
-end
-
-"""
-Builds a NetworkReduction by removing radially connected buses.
-
-# Arguments
-- `A::IncidenceMatrix`: IncidenceMatrix
-"""
-function get_radial_reduction(
-    A::IncidenceMatrix,
-    irreducible_buses::Vector{Int},
-    reduction::RadialReduction,
-)
-    exempt_bus_positions = Set([A.lookup[2][x] for x in irreducible_buses])
-    return calculate_radial_arcs(
-        A.data,
-        A.lookup[1],
-        A.lookup[2],
-        union(A.ref_bus_positions, exempt_bus_positions),
-        reduction,
-    )
-end
-
 function _find_upstream_bus(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     j::Int,
@@ -159,7 +128,6 @@ function calculate_radial_arcs(
     arc_map::Dict{Tuple{Int, Int}, Int},
     bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},
-    reduction::RadialReduction,
 )
     lk = ReentrantLock()
     buscount = length(bus_map)
@@ -183,37 +151,7 @@ function calculate_radial_arcs(
         end
     end
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map_index, buscount)
-
-    return NetworkReductionData(;
-        irreducible_buses = Set(get_irreducible_buses(reduction)),
-        bus_reduction_map = bus_reduction_map_index,
-        reverse_bus_search_map = reverse_bus_search_map,
-        removed_arcs = radial_arcs,
-        reductions = NetworkReduction[reduction],
-    )
-end
-
-"""
-Interface to obtain the parent bus number of a reduced bus when radial branches are eliminated
-
-# Arguments
-- `rb::NetworkReduction`: NetworkReduction object
-- `bus_number::Int`: Bus number of the reduced bus
-"""
-function get_mapped_bus_number(rb::NetworkReductionData, bus_number::Int)
-    if isempty(rb)
-        return bus_number
-    end
-    return get(rb.reverse_bus_search_map, bus_number, bus_number)
-end
-
-"""
-Interface to obtain the parent bus number of a reduced bus when radial branches are eliminated
-
-# Arguments
-- `rb::NetworkReduction`: NetworkReduction object
-- `bus::ACBus`: Reduced bus
-"""
-function get_mapped_bus_number(rb::NetworkReductionData, bus::PSY.ACBus)
-    return get_mapped_bus_number(rb, PSY.get_number(bus))
+    return bus_reduction_map_index,
+    reverse_bus_search_map,
+    radial_arcs
 end

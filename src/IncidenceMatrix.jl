@@ -28,6 +28,31 @@ get_axes(A::IncidenceMatrix) = A.axes
 get_lookup(A::IncidenceMatrix) = A.lookup
 get_slack_positions(A::IncidenceMatrix) = A.ref_bus_positions
 
+get_arc_axis(A::IncidenceMatrix) = A.axes[1]
+get_arc_lookup(A::IncidenceMatrix) = A.lookup[1]
+get_bus_axis(A::IncidenceMatrix) = A.axes[2]
+get_bus_lookup(A::IncidenceMatrix) = A.lookup[2]
+
+function get_reduction(
+    A::IncidenceMatrix,
+    ::PSY.System,
+    reduction::RadialReduction,
+)
+    irreducible_buses = get_irreducible_buses(reduction)
+    irreducible_positions = Set([A.lookup[2][x] for x in irreducible_buses])
+    exempt_positions = union(A.ref_bus_positions, irreducible_positions)
+    bus_reduction_map, reverse_bus_search_map, radial_arcs =
+        calculate_radial_arcs(A.data, A.lookup[1], A.lookup[2], exempt_positions)
+
+    return NetworkReductionData(;
+        irreducible_buses = Set(irreducible_buses),
+        bus_reduction_map = bus_reduction_map,
+        reverse_bus_search_map = reverse_bus_search_map,
+        removed_arcs = radial_arcs,
+        reductions = ReductionContainer(; radial_reduction = reduction),
+    )
+end
+
 function IncidenceMatrix(sys::PSY.System;
     check_connectivity::Bool = true,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
@@ -50,7 +75,7 @@ function IncidenceMatrix(ybus::Ybus)
     series_arcs = [x for x in keys(nr.series_branch_map)]
     transformer_arcs = [x for x in keys(nr.transformer3W_map)]
     additional_arcs = [x for x in keys(nr.added_branch_map)]
-    bus_ax = ybus.axes[1]
+    bus_ax = get_bus_axis(ybus)
     bus_lookup = ybus.lookup[1]
     arc_ax = unique(
         vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
@@ -77,5 +102,35 @@ function IncidenceMatrix(ybus::Ybus)
         lookup,
         ref_bus_positions,
         ybus.network_reduction_data,
+    )
+end
+
+"""
+Builds a NetworkReduction by removing radially connected buses.
+
+# Arguments
+- `A::IncidenceMatrix`: IncidenceMatrix
+"""
+function get_radial_reduction(
+    A::IncidenceMatrix,
+    irreducible_buses::Vector{Int},
+    reduction::RadialReduction,
+)
+    exempt_bus_positions = Set([A.lookup[2][x] for x in irreducible_buses])
+    irreducible_buses, bus_reduction_map, reverse_bus_search_map, radial_arcs =
+        calculate_radial_arcs(
+            A.data,
+            A.lookup[1],
+            A.lookup[2],
+            union(A.ref_bus_positions, exempt_bus_positions),
+            reduction,
+        )
+
+    return NetworkReductionData(;
+        irreducible_buses = irreducible_buses,
+        bus_reduction_map = bus_reduction_map,
+        reverse_bus_search_map = reverse_bus_search_map,
+        removed_arcs = radial_arcs,
+        reductions = NetworkReduction[reduction],
     )
 end
