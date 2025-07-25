@@ -31,7 +31,47 @@ end
 get_axes(A::AdjacencyMatrix) = A.axes
 get_lookup(A::AdjacencyMatrix) = A.lookup
 get_slack_position(A::AdjacencyMatrix) = A.ref_bus_positions
-get_network_reduction_data(A::AdjacencyMatrix) = A.ref_bunetwork_reduction_datas_positions
+get_network_reduction_data(A::AdjacencyMatrix) = A.network_reduction_data
+get_bus_axis(A::AdjacencyMatrix) = A.axes[1]
+get_bus_lookup(A::AdjacencyMatrix) = A.lookup[1]
+
+function get_reduction(
+    A::AdjacencyMatrix,
+    sys::PSY.System,
+    reduction::DegreeTwoReduction,
+)
+    irreducible_buses = get_irreducible_buses(reduction)
+    validate_buses(A, irreducible_buses)
+    network_reduction_data = get_network_reduction_data(A)
+    direct_branch_map = network_reduction_data.direct_branch_map
+    parallel_branch_map = network_reduction_data.parallel_branch_map
+    transformer3W_map = network_reduction_data.transformer3W_map
+
+    for c in PSY.get_components(PSY.StaticInjection, sys)
+        bus = PSY.get_bus(c)
+        if PSY.get_available(bus)
+            push!(irreducible_buses, PSY.get_number(bus))
+        end
+    end
+    exempt_bus_positions = Set(get_irreducible_indices(A, irreducible_buses))
+    series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs =
+        get_degree2_reduction(
+            A.data,
+            A.lookup[2],
+            exempt_bus_positions,
+            direct_branch_map,
+            parallel_branch_map,
+            transformer3W_map,
+        )
+    return NetworkReductionData(;
+        irreducible_buses = Set(irreducible_buses),
+        series_branch_map = series_branch_map,
+        reverse_series_branch_map = reverse_series_branch_map,
+        removed_buses = removed_buses,
+        removed_arcs = removed_arcs,
+        reductions = ReductionContainer(; degree_two_reduction = reduction),
+    )
+end
 
 """
 Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix Array indexed with the bus numbers.
@@ -50,7 +90,6 @@ function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwarg
 end
 
 function AdjacencyMatrix(ybus::Ybus)
-    SparseArrays.droptol!(ybus.data, 1e6)
     adj_matrix = deepcopy(ybus.adjacency_data)
     for i in 1:size(adj_matrix, 1)
         adj_matrix[i, i] = 0
@@ -78,6 +117,6 @@ Evaluates subnetworks by looking for the subsets of buses connected each other,
 but not connected with buses of other subsets.
 """
 function find_subnetworks(M::AdjacencyMatrix)
-    bus_numbers = M.axes[2]
+    bus_numbers = get_bus_axis(M)
     return find_subnetworks(M.data, bus_numbers)
 end

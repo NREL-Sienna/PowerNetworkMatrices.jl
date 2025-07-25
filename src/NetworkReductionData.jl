@@ -1,5 +1,3 @@
-abstract type NetworkReduction end
-
 @kwdef mutable struct NetworkReductionData
     irreducible_buses::Set{Int} = Set{Int}() # Buses that are not reduced in the network reduction
     bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}() # Maps reduced bus to the set of buses it was reduced to
@@ -14,8 +12,8 @@ abstract type NetworkReduction end
         Dict{PSY.Branch, Tuple{Int, Int}}()
     series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}} =
         Dict{Tuple{Int, Int}, Vector{Any}}()
-    reverse_series_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} =
-        Dict{PSY.Branch, Tuple{Int, Int}}()
+    reverse_series_branch_map::Dict{Any, Tuple{Int, Int}} =
+        Dict{Any, Tuple{Int, Int}}()
     transformer3W_map::Dict{
         Tuple{Int, Int},
         Tuple{PSY.ThreeWindingTransformer, Int},
@@ -26,9 +24,10 @@ abstract type NetworkReduction end
     } = Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
     removed_buses::Set{Int} = Set{Int}()
     removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
-    added_admittance_map::Dict{Int, PSY.FixedAdmittance} = Dict{Int, PSY.FixedAdmittance}()
-    added_branch_map::Dict{Tuple{Int, Int}, PSY.Line} = Dict{Tuple{Int, Int}, PSY.Line}()
-    reductions::Vector{NetworkReduction} = Vector{NetworkReduction}() #store the reductions that were applied.
+    added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
+    added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
+        Dict{Tuple{Int, Int}, Complex{Float32}}()
+    reductions::ReductionContainer = ReductionContainer() 
 end
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
@@ -48,6 +47,10 @@ get_added_admittance_map(rb::NetworkReductionData) = rb.added_admittance_map
 get_added_branch_map(rb::NetworkReductionData) = rb.added_branch_map
 get_reductions(rb::NetworkReductionData) = rb.reductions
 
+has_radial_reduction(rb::NetworkReductionData) = has_radial_reduction(rb.reductions)
+has_degree_two_reduction(rb::NetworkReductionData) = has_degree_two_reduction(rb.reductions)
+has_ward_reduction(rb::NetworkReductionData) = has_ward_reduction(rb.reductions)
+
 function Base.isempty(rb::NetworkReductionData)
     for field in fieldnames(NetworkReductionData)
         if !isempty(getfield(rb, field))
@@ -55,36 +58,6 @@ function Base.isempty(rb::NetworkReductionData)
         end
     end
     return true
-end
-
-function validate_reduction_type(
-    reduction::T,
-    prior_reductions::Vector{NetworkReduction},
-) where {T <: NetworkReduction}
-    prior_reduction_types = [typeof(x) for x in prior_reductions]
-    if length(prior_reductions) == 0
-        return
-    else
-        if T ∈ prior_reduction_types
-            throw(IS.DataFormatError("$T is applied twice to the same system"))
-        end
-        if WardReduction ∈ prior_reduction_types
-            throw(
-                IS.DataFormatError(
-                    "$T reduction is applied after Ward reduction. Ward reduction must be applied last.",
-                ),
-            )
-        end
-        if T == RadialReduction
-            if DegreeTwoReduction ∈ prior_reduction_types
-                throw(
-                    IS.DataFormatError(
-                        "When applying both RadialReduction and DegreeTwoReduction, RadialReduction must be applied first",
-                    ),
-                )
-            end
-        end
-    end
 end
 
 ##############################################################################
@@ -103,11 +76,27 @@ function isequal(
     return true
 end
 
-function Base.:(==)(x::T1, y::T1) where {T1 <: NetworkReduction}
-    for field in fieldnames(T1)
-        if getfield(x, field) != getfield(y, field)
-            return false
-        end
+"""
+Interface to obtain the parent bus number of a reduced bus when radial branches are eliminated
+
+# Arguments
+- `rb::NetworkReduction`: NetworkReduction object
+- `bus_number::Int`: Bus number of the reduced bus
+"""
+function get_mapped_bus_number(rb::NetworkReductionData, bus_number::Int)
+    if isempty(rb)
+        return bus_number
     end
-    return true
+    return get(rb.reverse_bus_search_map, bus_number, bus_number)
+end
+
+"""
+Interface to obtain the parent bus number of a reduced bus when radial branches are eliminated
+
+# Arguments
+- `rb::NetworkReduction`: NetworkReduction object
+- `bus::ACBus`: Reduced bus
+"""
+function get_mapped_bus_number(rb::NetworkReductionData, bus::PSY.ACBus)
+    return get_mapped_bus_number(rb, PSY.get_number(bus))
 end

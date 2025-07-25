@@ -132,16 +132,14 @@ function VirtualLODF(
     )
     ref_bus_positions = Set([Ymatrix.lookup[1][x] for x in Ymatrix.ref_bus_numbers])
     A = IncidenceMatrix(Ymatrix)
-    line_ax = A.axes[1]
-    axes = (line_ax, line_ax)
-    line_ax_ref = make_ax_ref(line_ax)
-    look_up = (line_ax_ref, line_ax_ref)
+    arc_ax = get_arc_axis(A)
+    axes = (arc_ax, arc_ax)
+    arc_ax_ref = make_ax_ref(arc_ax)
+    look_up = (arc_ax_ref, arc_ax_ref)
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
     K = klu(ABA)
-    #Get axis names
-    line_ax = A.axes[1]
-    bus_ax = A.axes[2]
+    bus_ax = get_bus_axis(A)
 
     temp_data = zeros(length(bus_ax))
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
@@ -283,7 +281,7 @@ Base.setindex!(::VirtualLODF, _, ::CartesianIndex) =
 
 get_lodf_data(mat::VirtualLODF) = mat.cache.temp_cache
 
-function get_branch_ax(mat::VirtualLODF)
+function get_arc_axis(mat::VirtualLODF)
     return mat.axes[1]
 end
 

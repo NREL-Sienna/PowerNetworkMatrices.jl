@@ -2,7 +2,8 @@ function _basic_test_ward_reduction(sys, study_buses)
     ybus = Ybus(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
     wr = get_network_reduction_data(ybus)
     @test isa(wr, NetworkReductionData)
-    @test get_reductions(wr) == [WardReduction(study_buses)]
+    @test get_reductions(wr) ==
+          PNM.ReductionContainer(; ward_reduction = WardReduction(study_buses))
     external_buses =
         setdiff([get_number(x) for x in get_components(ACBus, sys)], study_buses)
     @test !isempty(wr.added_admittance_map)
@@ -71,6 +72,11 @@ end
     sys = PSB.build_system(PSB.PSISystems, "RTS_GMLC_DA_sys")
     bus_numbers = [get_number(x) for x in get_components(ACBus, sys)]
     study_buses = filter!(x -> digits(x)[end] == 1, bus_numbers)  #study buses are from area 1 
+    _basic_test_ward_reduction(sys, study_buses)
+    _test_matrices_ward_reduction(sys, study_buses)
+
+    sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
+    study_buses = [101, 114, 110, 111]
     _basic_test_ward_reduction(sys, study_buses)
     _test_matrices_ward_reduction(sys, study_buses)
 end
