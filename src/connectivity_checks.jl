@@ -149,10 +149,15 @@ function find_subnetworks(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{I
         uf[i] = get_representative(uf, i)
     end
     # now we have the representatives, so assemble the subnetworks.
+    num_subnetworks = length(unique(uf))
+    avg_size = div(size(bus_numbers, 1), num_subnetworks)
     subnetworks = Dict{Int, Set{Int}}()
     for (representative, bus_num) in zip(uf, bus_numbers)
-        subnetwork = get!(subnetworks, bus_numbers[representative], Set{Int}())
-        push!(subnetwork, bus_num)
+        if !haskey(subnetworks, bus_numbers[representative])
+            subnetworks[bus_numbers[representative]] = Set{Int}()
+            sizehint!(subnetworks[bus_numbers[representative]], avg_size)
+        end
+        push!(subnetworks[bus_numbers[representative]], bus_num)
     end
     return subnetworks
 end
