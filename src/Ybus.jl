@@ -1077,6 +1077,7 @@ function _remake_reverse_direct_branch_map!(nr::NetworkReductionData)
         reverse_direct_branch_map[v] = k
     end
     nr.reverse_direct_branch_map = reverse_direct_branch_map
+    return
 end
 function _remake_reverse_parallel_branch_map!(nr::NetworkReductionData)
     reverse_parallel_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
@@ -1086,6 +1087,7 @@ function _remake_reverse_parallel_branch_map!(nr::NetworkReductionData)
         end
     end
     nr.reverse_parallel_branch_map = reverse_parallel_branch_map
+    return
 end
 function _remake_reverse_series_branch_map!(nr::NetworkReductionData)
     reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
@@ -1095,7 +1097,9 @@ function _remake_reverse_series_branch_map!(nr::NetworkReductionData)
         end
     end
     nr.reverse_series_branch_map = reverse_series_branch_map
+    return
 end
+
 function _remake_reverse_transformer3W_map!(nr::NetworkReductionData)
     reverse_transformer3W_map =
         Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
@@ -1103,6 +1107,7 @@ function _remake_reverse_transformer3W_map!(nr::NetworkReductionData)
         reverse_transformer3W_map[v] = k
     end
     nr.reverse_transformer3W_map = reverse_transformer3W_map
+    return
 end
 
 """
@@ -1174,6 +1179,7 @@ function _validate_study_buses(
             end
         end
     end
+    return
 end
 
 function get_reduction(
