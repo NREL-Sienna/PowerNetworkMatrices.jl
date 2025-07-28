@@ -43,46 +43,6 @@ Deserialize a PTDF from an HDF5 file.
 """
 PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
 
-function _buildptdf(
-    branches,
-    buses::Vector{PSY.ACBus},
-    network_reduction_data::NetworkReductionData,
-    bus_lookup::Dict{Int, Int},
-    dist_slack::Vector{Float64},
-    linear_solver::String)
-    if linear_solver == "KLU"
-        PTDFm, A = calculate_PTDF_matrix_KLU(
-            branches,
-            buses,
-            bus_lookup,
-            network_reduction_data,
-            dist_slack,
-        )
-    elseif linear_solver == "Dense"
-        PTDFm, A = calculate_PTDF_matrix_DENSE(
-            branches,
-            buses,
-            bus_lookup,
-            network_reduction_data,
-            dist_slack,
-        )
-    elseif linear_solver == "MKLPardiso"
-        if !USE_MKL
-            error(
-                "The MKL library is not available. Check that your hardware and operating system support MKL.",
-            )
-        end
-        PTDFm, A = calculate_PTDF_matrix_MKLPardiso(
-            branches,
-            buses,
-            bus_lookup,
-            network_reduction_data,
-            dist_slack,
-        )
-    end
-
-    return PTDFm, A
-end
 
 function _buildptdf_from_matrices(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -361,6 +321,7 @@ function PTDF(
     axes = BA.axes
     lookup = BA.lookup
     A_matrix = A.data
+    @error BA.ref_bus_positions
 
     S = _buildptdf_from_matrices(
         A_matrix,
