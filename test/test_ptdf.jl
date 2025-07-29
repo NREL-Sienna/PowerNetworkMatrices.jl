@@ -76,7 +76,7 @@
     arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, sys5)]
     @test setdiff(PNM.get_arc_axis(P5), arc_tuples) ==
           Tuple{Int, Int}[]
-    @test setdiff(PNM.get_bus_ax(P5), PSY.get_number.(PNM.get_buses(sys5))) == String[]
+    @test setdiff(PNM.get_bus_axis(P5), PSY.get_number.(PNM.get_buses(sys5))) == String[]
 
     # auxiliary function
     PRTS_sparse = PTDF(RTS; tol = 1e-3)
@@ -85,9 +85,9 @@ end
 
 @testset "Test PTDF matrices for 10 bus system with 2 reference buses" begin
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")   # get the system composed by 2 5-bus ones connected by a DC line
-    ptdf_complete_klu = PTDF(sys; check_connectivity = false, linear_solver = "KLU")
-    ptdf_complete_dense = PTDF(sys; check_connectivity = false, linear_solver = "Dense")
-    IncidenceMatrix(sys; check_connectivity = false)
+    ptdf_complete_klu = PTDF(sys; linear_solver = "KLU")
+    ptdf_complete_dense = PTDF(sys; linear_solver = "Dense")
+    IncidenceMatrix(sys)
     @test sum(ptdf_complete_klu.data - ptdf_complete_dense.data) < 1e-9
     @test isapprox(ptdf_complete_klu.data, ptdf_complete_dense.data, atol = 1e-6)
 
@@ -112,8 +112,8 @@ end
 
 @testset failfast = true "Test serialization of PTDF matrices to HDF5" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    P5 = PTDF(sys5; check_connectivity = true, linear_solver = "KLU")
-    P5_sparse = PTDF(sys5; check_connectivity = true, linear_solver = "KLU", tol = 1e-3)
+    P5 = PTDF(sys5; linear_solver = "KLU")
+    P5_sparse = PTDF(sys5; linear_solver = "KLU", tol = 1e-3)
     for ptdf in (P5, P5_sparse)
         for compress in (true, false)
             path = mktempdir()
@@ -233,7 +233,7 @@ end
     slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 
     @test_throws ErrorException ptdf_1 =
-        PTDF(sys; check_connectivity = false, dist_slack = slack_array)
+        PTDF(sys; dist_slack = slack_array)
 
     # incorrect dist_slack array length
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")

@@ -10,10 +10,10 @@ Using yft, ytf, and the voltage vector, the branch currents and power flows can 
 struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
     data::SparseArrays.SparseMatrixCSC{ComplexF32, Int}
     adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int}
-    ref_bus_numbers::Set{Int}
     axes::Ax
     lookup::L
-    subnetworks::Dict{Int, Set{Int}}
+    subnetwork_axes::Dict{Int, Ax}
+    arc_subnetwork_axis::Dict{Int, Vector{Tuple{Int, Int}}}
     network_reduction_data::NetworkReductionData
     yft::Union{SparseArrays.SparseMatrixCSC{ComplexF32, Int}, Nothing}
     ytf::Union{SparseArrays.SparseMatrixCSC{ComplexF32, Int}, Nothing}
@@ -21,9 +21,18 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
     tb::Union{Vector{Int}, Nothing}
 end
 
-get_network_reduction_data(y::Ybus) = y.network_reduction_data
-get_bus_axis(y::Ybus) = y.axes[1]
-get_bus_lookup(y::Ybus) = y.lookup[1]
+get_axes(M::Ybus) = M.axes
+get_lookup(M::Ybus) = M.lookup
+get_ref_bus(M::Ybus) = collect(keys(M.subnetwork_axes))
+get_ref_bus_position(M::Ybus) = [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::Ybus) = M.network_reduction_data
+get_bus_axis(M::Ybus) = M.axes[1]
+get_bus_lookup(M::Ybus) = M.lookup[1]
+
+function get_isolated_buses(M::Ybus)
+    collect(keys(M.subnetwork_axes))
+    [x for x in keys(M.subnetwork_axes) if length(M.subnetwork_axes[x][1]) == 1]
+end
 
 function get_reduction(
     ybus::Ybus,
@@ -688,14 +697,10 @@ function _buildybus!(
 end
 
 """
-Builds a Ybus from the system. The return is a Ybus Array indexed with the bus numbers and the branch names.
-
-# Arguments
-- `check_connectivity::Bool`: Checks connectivity of the network
+Builds a Ybus from the system. The return is a Ybus Array indexed with the bus numbers and the arc tuples.
 """
 function Ybus(
     sys::PSY.System;
-    check_connectivity::Bool = true,
     make_branch_admittance_matrices::Bool = false,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     include_constant_impedance_loads = true,
@@ -839,24 +844,26 @@ function Ybus(
         tb = nothing
     end
 
-    if check_connectivity && length(bus_lookup) > 1
+    if length(bus_lookup) > 1
         subnetworks = assign_reference_buses!(
-            find_subnetworks(ybus, axes[1]),
+            find_subnetworks(ybus, bus_ax),
             ref_bus_numbers,
         )
         if length(subnetworks) > 1
             @warn "More than one island found; Network is not connected"
         end
     else
-        subnetworks = Dict{Int, Set{Int}}()
+        subnetworks = Dict{Int, Set{Int}}(bus_lookup[1] => Set(bus_lookup))
     end
+    subnetwork_axes = _make_bus_subnetwork_axes(subnetworks)
+    arc_subnetwork_axis = _make_arc_subnetwork_axis(subnetworks, nr)
     ybus = Ybus(
         ybus,
         adj,
-        ref_bus_numbers,
         axes,
         lookup,
-        subnetworks,
+        subnetwork_axes,
+        arc_subnetwork_axis,
         nr,
         yft,
         ytf,
@@ -868,6 +875,64 @@ function Ybus(
         ybus = build_reduced_ybus(ybus, sys, nr)
     end
     return ybus
+end
+
+"""
+Make subnetwork axes for BA_Matrix
+"""
+function make_bus_arc_subnetwork_axes(ybus::Ybus)
+    subnetwork_axes = Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}()
+    for key in keys(ybus.subnetwork_axes)
+        subnetwork_axes[key] = (ybus.subnetwork_axes[key][1], ybus.arc_subnetwork_axis[key])
+    end
+    return subnetwork_axes
+end
+
+"""
+Make subnetwork axes for IncidenceMatrix
+"""
+function make_arc_bus_subnetwork_axes(ybus::Ybus)
+    subnetwork_axes = Dict{Int, Tuple{Vector{Tuple{Int, Int}}, Vector{Int}}}()
+    for key in keys(ybus.subnetwork_axes)
+        subnetwork_axes[key] = (ybus.arc_subnetwork_axis[key], ybus.subnetwork_axes[key][1])
+    end
+    return subnetwork_axes
+end
+
+function _make_bus_subnetwork_axes(subnetworks::Dict{Int, Set{Int}})
+    subnetwork_axes = Dict{Int, Tuple{Vector{Int}, Vector{Int}}}()
+    for (k, v) in subnetworks
+        subnetwork_axes[k] = (collect(v), collect(v))
+    end
+    return subnetwork_axes
+end
+
+function _make_arc_subnetwork_axis(
+    subnetworks::Dict{Int, Set{Int}},
+    nr::NetworkReductionData,
+)
+    direct_arcs = [x for x in keys(nr.direct_branch_map)]
+    parallel_arcs = [x for x in keys(nr.parallel_branch_map)]
+    series_arcs = [x for x in keys(nr.series_branch_map)]
+    transformer_arcs = [x for x in keys(nr.transformer3W_map)]
+    additional_arcs = [x for x in keys(nr.added_branch_map)]
+    arc_ax = unique(
+        vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
+    )
+    arc_subnetwork_axis = Dict{Int, Vector{Tuple{Int, Int}}}()
+    for k in keys(subnetworks)
+        arc_subnetwork_axis[k] = Vector{Tuple{Int, Int}}()
+    end
+    for arc in arc_ax
+        for (k, v) in subnetworks
+            if arc[1] ∈ v || arc[2] in v
+                subnetwork = get!(arc_subnetwork_axis, k, Vector{Tuple{Int, Int}}())
+                push!(subnetwork, arc)
+                break
+            end
+        end
+    end
+    return arc_subnetwork_axis
 end
 
 function build_reduced_ybus(
@@ -965,15 +1030,31 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     adjacency_data = adjacency_data[bus_ix, bus_ix]
     data = data[bus_ix, bus_ix]
 
-    subnetworks = deepcopy(ybus.subnetworks)
-    for (k, values) in subnetworks
+    subnetwork_axes = deepcopy(ybus.subnetwork_axes)
+    arc_subnetwork_axis = deepcopy(ybus.arc_subnetwork_axis)
+    for (k, values) in subnetwork_axes
         if k in bus_numbers_to_remove
-            pop!(subnetworks, k)
+            @warn "Reference bus removed during reduction; assigning arbitrary reference bus."
+            axis_1, axis_2 = pop!(subnetwork_axes, k)
+            new_ref_bus = pop!(axis_1)
+            pop!(axis_2)
+            subnetwork_axes[new_ref_bus] = (axis_1, axis_2)
+            arc_subnetwork_axis[new_ref_bus] = pop!(arc_subnetwork_axis, k)
         else
-            for x in values
+            for x in values[1]
                 if x in bus_numbers_to_remove
-                    pop!(subnetworks[k], x)
+                    subnetwork_axes[k] = (
+                        setdiff(subnetwork_axes[k][1], [x]),
+                        setdiff(subnetwork_axes[k][2], [x]),
+                    )
                 end
+            end
+        end
+    end
+    for (k, values) in arc_subnetwork_axis
+        for x in values
+            if x in nr_new.removed_arcs
+                arc_subnetwork_axis[k] = setdiff(arc_subnetwork_axis[k], [x])
             end
         end
     end
@@ -981,10 +1062,10 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     return Ybus(
         data,
         adjacency_data,
-        setdiff(ybus.ref_bus_numbers, bus_numbers_to_remove),
         (bus_ax, bus_ax),
         (bus_lookup, bus_lookup),
-        subnetworks,
+        subnetwork_axes,
+        arc_subnetwork_axis,
         nr,
         ybus.yft,
         ybus.ytf,
@@ -1150,35 +1231,33 @@ function _validate_study_buses(
         b ∉ valid_bus_numbers &&
             throw(IS.DataFormatError("Study bus $b not found in system"))
     end
-    slack_bus_numbers = ybus.ref_bus_numbers
-    if isempty(ybus.subnetworks)
-        @warn "Skipping additional data checks because subnetworks are not computed."
-    else
-        sub_networks = ybus.subnetworks
-        for v in values(sub_networks)
-            all_in = all(x -> x in Set(v), study_buses)
-            none_in = all(x -> !(x in Set(v)), study_buses)
-            if all_in
-                @warn "The study buses comprise an entire island; ward reduction will not modify this island and other islands will be eliminated"
-            end
-            if !(all_in || none_in)
+    slack_bus_numbers = get_ref_bus(ybus)
+    subnetwork_axes = ybus.subnetwork_axes
+    for axes in values(subnetwork_axes)
+        subnetwork_bus_ax = axes[1]
+        all_in = all(x -> x in Set(subnetwork_bus_ax), study_buses)
+        none_in = all(x -> !(x in Set(subnetwork_bus_ax)), study_buses)
+        if Set(subnetwork_bus_ax) == Set(study_buses)
+            @warn "The study buses comprise an entire island; ward reduction will not modify this island and other islands will be eliminated"
+        end
+        if !(all_in || none_in)
+            throw(
+                IS.DataFormatError(
+                    "All study_buses must occur in a single synchronously connected system.",
+                ),
+            )
+        end
+        for sb in slack_bus_numbers
+            if sb in subnetwork_bus_ax && sb ∉ study_buses && !(none_in)
                 throw(
                     IS.DataFormatError(
-                        "All study_buses must occur in a single synchronously connected system.",
+                        "Slack bus $sb must be included in the study buses for an area that is partially reduced",
                     ),
                 )
             end
-            for sb in slack_bus_numbers
-                if sb in v && sb ∉ study_buses && !(none_in)
-                    throw(
-                        IS.DataFormatError(
-                            "Slack bus $sb must be included in the study buses for an area that is partially reduced",
-                        ),
-                    )
-                end
-            end
         end
     end
+
     return
 end
 

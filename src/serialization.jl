@@ -23,19 +23,7 @@ function to_hdf5(
     lookup2_keys = sort!(collect(keys(ptdf.lookup[2])))
     lookup1_values = [ptdf.lookup[1][x] for x in lookup1_keys]
     lookup2_values = [ptdf.lookup[2][x] for x in lookup2_keys]
-    ref_bus_positions = collect(ptdf.ref_bus_positions)
-    num_rows = length(first(values(ptdf.subnetworks)))
-    subnetworks_keys = sort!(collect(keys(ptdf.subnetworks)))
-    subnetworks = Matrix{Int}(undef, num_rows, length(subnetworks_keys))
-
-    for (col, key) in enumerate(subnetworks_keys)
-        vals = collect(ptdf.subnetworks[key])
-        if length(vals) != num_rows
-            error("Mismatch in number of rows: num_rows=$num_rows key=$key $vals")
-        end
-        subnetworks[:, col] = vals
-    end
-
+    subnetworks_keys = sort!(collect(keys(ptdf.subnetwork_axes)))
     HDF5.h5open(filename, "w") do file
         _to_hdf5_dataset(file, ptdf.data, compress, compression_level)
         HDF5.attributes(file)["data_type"] = _data_type_as_string(ptdf.data)
@@ -46,9 +34,11 @@ function to_hdf5(
         file["lookup1_values"] = lookup1_values
         file["lookup2_keys"] = lookup2_keys
         file["lookup2_values"] = lookup2_values
-        file["ref_bus_positions"] = ref_bus_positions
         file["subnetworks_keys"] = subnetworks_keys
-        file["subnetworks"] = subnetworks
+        for (ix, axes) in enumerate(values(ptdf.subnetwork_axes))
+            file["subnetwork_bus_axis_$ix"] = axes[1]
+            file["subnetwork_arc_axis_$ix"] = axes[2]
+        end
     end
 
     return
@@ -75,20 +65,18 @@ function from_hdf5(::Type{PTDF}, filename::AbstractString)
         lookup1 = Dict(k => v for (k, v) in zip(lookup1_keys, lookup1_values))
         lookup2 = Dict(Tuple(k) => v for (k, v) in zip(lookup2_keys, lookup2_values))
         lookup = (lookup1, lookup2)
-        ref_bus_positions = Set(read(file["ref_bus_positions"]))
         subnetworks_keys = read(file["subnetworks_keys"])
-        subnetworks_matrix = read(file["subnetworks"])
-        subnetworks = Dict{Int, Set{Int}}()
-        for (col, key) in enumerate(subnetworks_keys)
-            subnetworks[key] = Set(subnetworks_matrix[:, col])
+        subnetwork_axes = Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}()
+        for (ix, key) in enumerate(subnetworks_keys)
+            bus_axis = read(file["subnetwork_bus_axis_$ix"])
+            arc_axis = read(file["subnetwork_arc_axis_$ix"])
+            subnetwork_axes[ix] = (bus_axis, Tuple.(arc_axis))
         end
-
         PTDF(
             data,
             axes,
             lookup,
-            subnetworks,
-            ref_bus_positions,
+            subnetwork_axes,
             tol,
             NetworkReductionData(), #TODO - support serialization of NetworkReductionData
         )

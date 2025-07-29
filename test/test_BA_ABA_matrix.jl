@@ -24,7 +24,10 @@
         ABA_2 = transpose(A.data) * BA.data'
         @test isapprox(
             ABA_lu.data,
-            ABA_2[setdiff(1:end, A.ref_bus_positions), setdiff(1:end, A.ref_bus_positions)],
+            ABA_2[
+                setdiff(1:end, PNM.get_ref_bus_position(A)),
+                setdiff(1:end, PNM.get_ref_bus_position(A)),
+            ],
             atol = 1e-8,
         )
 
@@ -32,9 +35,9 @@
         ptdf_1 = PTDF(sys)
         Ix = Matrix(1.0I, size(ABA_lu.data, 1), size(ABA_lu.data, 1))
         ABA_inv = ABA_lu.K \ Ix
-        ptdf_2 = BA.data[setdiff(1:end, A.ref_bus_positions), :]' * ABA_inv
+        ptdf_2 = BA.data[setdiff(1:end, PNM.get_ref_bus_position(A)), :]' * ABA_inv
         @test isapprox(
-            ptdf_1.data[setdiff(1:end, A.ref_bus_positions), :],
+            ptdf_1.data[setdiff(1:end, PNM.get_ref_bus_position(A)), :],
             ptdf_2',
             atol = 1e-8,
         )

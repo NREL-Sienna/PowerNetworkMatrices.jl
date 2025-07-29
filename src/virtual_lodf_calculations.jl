@@ -49,14 +49,13 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     A::SparseArrays.SparseMatrixCSC{Int8, Int}
     inv_PTDF_A_diag::Vector{Float64}
-    ref_bus_positions::Set{Int}
     dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
     valid_ix::Vector{Int}
     temp_data::Vector{Float64}
     cache::RowCache
-    subnetworks::Dict{Int, Set{Int}}
+    subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
 end
@@ -113,7 +112,6 @@ struct with an empty cache.
 """
 function VirtualLODF(
     sys::PSY.System;
-    check_connectivity::Bool = true,
     dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
@@ -126,18 +124,18 @@ function VirtualLODF(
     end
     Ymatrix = Ybus(
         sys;
-        check_connectivity = check_connectivity,
         network_reductions = network_reductions,
         kwargs...,
     )
-    ref_bus_positions = Set([Ymatrix.lookup[1][x] for x in Ymatrix.ref_bus_numbers])
+    ref_bus_positions = get_ref_bus_position(Ymatrix)
     A = IncidenceMatrix(Ymatrix)
     arc_ax = get_arc_axis(A)
     axes = (arc_ax, arc_ax)
     arc_ax_ref = make_ax_ref(arc_ax)
     look_up = (arc_ax_ref, arc_ax_ref)
+    subnetwork_axes = make_arc_arc_subnetwork_axes(A)
     BA = BA_Matrix(Ymatrix)
-    ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
+    ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
     K = klu(ABA)
     bus_ax = get_bus_axis(A)
 
@@ -147,7 +145,7 @@ function VirtualLODF(
         K,
         BA.data,
         A.data,
-        ref_bus_positions,
+        Set(ref_bus_positions),
     )
     PTDF_diag[PTDF_diag .> 1 - 1e-6] .= 0.0 # TODO: magic number.
 
@@ -169,14 +167,13 @@ function VirtualLODF(
         BA.data,
         A.data,
         1.0 ./ (1.0 .- PTDF_diag),
-        ref_bus_positions,
         dist_slack,
         axes,
         look_up,
         valid_ix,
         temp_data,
         empty_cache,
-        Ymatrix.subnetworks,
+        subnetwork_axes,
         Ref(tol),
         Ymatrix.network_reduction_data,
     )
