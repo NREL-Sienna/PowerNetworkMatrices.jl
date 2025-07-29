@@ -133,15 +133,15 @@ end
     )
 
     for i in ptdf_1.axes[1], j in ptdf_1.axes[2]
-        @test ptdf_1[j,i] == ptdf_2[j,i] == ptdf_3[j,i]
-    end 
+        @test ptdf_1[j, i] == ptdf_2[j, i] == ptdf_3[j, i]
+    end
     for i in lodf_1.axes[1], j in lodf_1.axes[2]
-        @test lodf_1[i, j] == lodf_2[i,j] == lodf_3[i,j]
-    end 
+        @test lodf_1[i, j] == lodf_2[i, j] == lodf_3[i, j]
+    end
     for i in vptdf_1.axes[1], j in vptdf_1.axes[2]
-        @test vptdf_1[i,j] == vptdf_2[i,j] == vptdf_3[i,j]
-    end 
+        @test vptdf_1[i, j] == vptdf_2[i, j] == vptdf_3[i, j]
+    end
     for i in vlodf_1.axes[1], j in vlodf_1.axes[2]
-        @test vlodf_1[i, j] == vlodf_2[i,j] == vlodf_3[i,j]
-    end 
+        @test vlodf_1[i, j] == vlodf_2[i, j] == vlodf_3[i, j]
+    end
 end

@@ -1030,34 +1030,9 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     adjacency_data = adjacency_data[bus_ix, bus_ix]
     data = data[bus_ix, bus_ix]
 
-    subnetwork_axes = deepcopy(ybus.subnetwork_axes)
-    arc_subnetwork_axis = deepcopy(ybus.arc_subnetwork_axis)
-    for (k, values) in subnetwork_axes
-        if k in bus_numbers_to_remove
-            @warn "Reference bus removed during reduction; assigning arbitrary reference bus."
-            axis_1, axis_2 = pop!(subnetwork_axes, k)
-            new_ref_bus = pop!(axis_1)
-            pop!(axis_2)
-            subnetwork_axes[new_ref_bus] = (axis_1, axis_2)
-            arc_subnetwork_axis[new_ref_bus] = pop!(arc_subnetwork_axis, k)
-        else
-            for x in values[1]
-                if x in bus_numbers_to_remove
-                    subnetwork_axes[k] = (
-                        setdiff(subnetwork_axes[k][1], [x]),
-                        setdiff(subnetwork_axes[k][2], [x]),
-                    )
-                end
-            end
-        end
-    end
-    for (k, values) in arc_subnetwork_axis
-        for x in values
-            if x in nr_new.removed_arcs
-                arc_subnetwork_axis[k] = setdiff(arc_subnetwork_axis[k], [x])
-            end
-        end
-    end
+    subnetwork_axes, arc_subnetwork_axis =
+        _make_subnetwork_axes(ybus, bus_numbers_to_remove, nr_new.removed_arcs)
+
     #TODO - doesn't yet account for reduction in yft, ytf, fb, tb
     return Ybus(
         data,
@@ -1072,6 +1047,37 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         ybus.fb,
         ybus.tb,
     )
+end
+
+function _make_subnetwork_axes(ybus, bus_numbers_to_remove, arcs_to_remove)
+    subnetwork_axes = deepcopy(ybus.subnetwork_axes)
+    arc_subnetwork_axis = deepcopy(ybus.arc_subnetwork_axis)
+    for (k, values) in subnetwork_axes
+        if k in bus_numbers_to_remove
+            @warn "Reference bus removed during reduction; assigning arbitrary reference bus."
+            axis_1, axis_2 = pop!(subnetwork_axes, k)
+            new_ref_bus = pop!(axis_1)
+            pop!(axis_2)
+            subnetwork_axes[new_ref_bus] = (axis_1, axis_2)
+            # If a reference bus key is reduced, change the arc subnetwork axis key as well: 
+            arc_subnetwork_axis[new_ref_bus] = pop!(arc_subnetwork_axis, k)
+        else
+            for x in values[1]
+                if x in bus_numbers_to_remove
+                    new_axis = setdiff(subnetwork_axes[k][1], [x])
+                    subnetwork_axes[k] = (new_axis, new_axis)
+                end
+            end
+        end
+    end
+    for (k, values) in arc_subnetwork_axis
+        for x in values
+            if x in arcs_to_remove
+                arc_subnetwork_axis[k] = setdiff(arc_subnetwork_axis[k], [x])
+            end
+        end
+    end
+    return subnetwork_axes, arc_subnetwork_axis
 end
 
 function _add_series_branches_to_ybus!(
