@@ -64,7 +64,7 @@ Finds the set of bus numbers that belong to each connected component in the Syst
 """
 # this function extends the PowerModels.jl implementation to accept a System
 function find_connected_components(sys::PSY.System)
-    a = Adjacency(sys; check_connectivity = false)
+    a = Adjacency(sys)
     return find_connected_components(a.data, a.lookup[1])
 end
 

@@ -27,7 +27,7 @@
     added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
     added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
         Dict{Tuple{Int, Int}, Complex{Float32}}()
-    reductions::ReductionContainer = ReductionContainer() 
+    reductions::ReductionContainer = ReductionContainer()
 end
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses

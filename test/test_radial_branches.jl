@@ -70,7 +70,7 @@ end
             append!(leaf_buses, collect(rb.bus_reduction_map[i]))
         end
         leaf_positions = [a_mat.lookup[2][x] for x in leaf_buses]
-        @test all(a_mat.ref_bus_positions .∉ leaf_positions)
+        @test all(PNM.get_ref_bus_position(a_mat) .∉ leaf_positions)
     end
 end
 
@@ -78,7 +78,6 @@ end
     sys = build_hvdc_with_small_island()
     ybus = Ybus(
         sys;
-        check_connectivity = false,
         network_reductions = NetworkReduction[RadialReduction()],
     )
     rr = get_network_reduction_data(ybus)
@@ -86,7 +85,6 @@ end
     @test haskey(rr.reverse_bus_search_map, 17)
     ybus = Ybus(
         sys;
-        check_connectivity = false,
         network_reductions = NetworkReduction[RadialReduction(;
             irreducible_buses = [16, 17],
         )],
