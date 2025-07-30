@@ -146,13 +146,26 @@ end
     end
 end
 
-@testset "Subnetwork algorithms" begin 
+@testset "Subnetwork algorithms" begin
     sys = build_hvdc_with_small_island()
-    ybus = @test_logs (:info, r"Finding subnetworks via iterative union find") match_mode = :any  Ybus(sys)
-    ybus = @test_logs (:info, r"Finding subnetworks via depth first search") match_mode = :any  Ybus(sys; subnetwork_algorithm = depth_first_search)
+    ybus = @test_logs (:info, r"Finding subnetworks via iterative union find") match_mode =
+        :any Ybus(sys)
+    ybus =
+        @test_logs (:info, r"Finding subnetworks via depth first search") match_mode = :any Ybus(
+            sys;
+            subnetwork_algorithm = depth_first_search,
+        )
 
-    sub_1 = PNM.find_subnetworks(ybus.data, ybus.axes[1]; subnetwork_algorithm = depth_first_search)
-    sub_2 = PNM.find_subnetworks(ybus.data, ybus.axes[1]; subnetwork_algorithm = iterative_union_find)
+    sub_1 = PNM.find_subnetworks(
+        ybus.data,
+        ybus.axes[1];
+        subnetwork_algorithm = depth_first_search,
+    )
+    sub_2 = PNM.find_subnetworks(
+        ybus.data,
+        ybus.axes[1];
+        subnetwork_algorithm = iterative_union_find,
+    )
     @test sub_1 == sub_2
-end 
+end
 
