@@ -36,7 +36,7 @@ get_bus_axis(M::BA_Matrix) = M.axes[1]
 get_bus_lookup(M::BA_Matrix) = M.lookup[1]
 get_arc_axis(M::BA_Matrix) = M.axes[2]
 get_arc_lookup(M::BA_Matrix) = M.lookup[2]
-stores_transpose(::BA_Matrix) = true 
+stores_transpose(::BA_Matrix) = true
 
 function BA_Matrix(sys::PSY.System;
     network_reductions::Vector{NetworkReduction} = Vector{NetworkReduction}(),

@@ -38,7 +38,7 @@ function make_ax_ref(ax::AbstractVector)
     end
     return ref
 end
-stores_transpose(::PowerNetworkMatrix) = false 
+stores_transpose(::PowerNetworkMatrix) = false
 
 # AbstractArray interface: overloading methods
 Base.isempty(A::PowerNetworkMatrix) = isempty(A.data)
@@ -207,15 +207,16 @@ function Base.summary(io::IO, A::PowerNetworkMatrix)
     _summary(io, A)
     if stores_transpose(A)
         axes = (A.axes[2], A.axes[1])
-    else 
+    else
         axes = A.axes
-    end 
+    end
     for (k, ax) in enumerate(axes)
         print(io, "    Dimension $k, ")
         show(IOContext(io, :limit => true), ax)
         println(io)
     end
-    stores_transpose(A) && println(io, "Note!! The data shown below corresponds to the transposed matrix.")
+    stores_transpose(A) &&
+        println(io, "Note!! The data shown below corresponds to the transposed matrix.")
     print(io, "And data with size ", size(A))
     return
 end
