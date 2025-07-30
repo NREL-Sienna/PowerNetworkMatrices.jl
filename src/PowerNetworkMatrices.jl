@@ -22,6 +22,8 @@ export RadialReduction
 export DegreeTwoReduction
 export WardReduction
 
+export depth_first_search
+export iterative_union_find
 export to_hdf5
 export validate_connectivity
 export VirtualLODF

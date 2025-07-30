@@ -704,6 +704,7 @@ function Ybus(
     make_branch_admittance_matrices::Bool = false,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     include_constant_impedance_loads = true,
+    subnetwork_algorithm = iterative_union_find,
     kwargs...,
 )
     ref_bus_numbers = Set{Int}()
@@ -846,7 +847,7 @@ function Ybus(
 
     if length(bus_lookup) > 1
         subnetworks = assign_reference_buses!(
-            find_subnetworks(ybus, bus_ax),
+            find_subnetworks(ybus, bus_ax; subnetwork_algorithm = subnetwork_algorithm),
             ref_bus_numbers,
         )
         if length(subnetworks) > 1
@@ -1297,7 +1298,7 @@ function get_reduction(
             bus_lookup,
             bus_axis,
             boundary_buses,
-            ybus.ref_bus_numbers,
+            Set(get_ref_bus(ybus)),
             study_buses,
         )
 
