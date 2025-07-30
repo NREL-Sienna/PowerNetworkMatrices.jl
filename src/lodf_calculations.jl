@@ -26,6 +26,7 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
 end
+stores_transpose(::LODF) = true 
 
 function _buildlodf(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
