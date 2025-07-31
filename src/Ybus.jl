@@ -1062,21 +1062,14 @@ function _make_subnetwork_axes(ybus, bus_numbers_to_remove, arcs_to_remove)
             subnetwork_axes[new_ref_bus] = (axis_1, axis_2)
             # If a reference bus key is reduced, change the arc subnetwork axis key as well: 
             arc_subnetwork_axis[new_ref_bus] = pop!(arc_subnetwork_axis, k)
-        else
-            for x in values[1]
-                if x in bus_numbers_to_remove
-                    new_axis = setdiff(subnetwork_axes[k][1], [x])
-                    subnetwork_axes[k] = (new_axis, new_axis)
-                end
-            end
         end
     end
+    for (k, values) in subnetwork_axes
+        new_values = setdiff(values[1], bus_numbers_to_remove)
+        subnetwork_axes[k] = (new_values, new_values)
+    end
     for (k, values) in arc_subnetwork_axis
-        for x in values
-            if x in arcs_to_remove
-                arc_subnetwork_axis[k] = setdiff(arc_subnetwork_axis[k], [x])
-            end
-        end
+        arc_subnetwork_axis[k] = setdiff(values, arcs_to_remove)
     end
     return subnetwork_axes, arc_subnetwork_axis
 end
