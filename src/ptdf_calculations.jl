@@ -44,6 +44,8 @@ get_bus_lookup(M::PTDF) = M.lookup[1]
 get_arc_axis(M::PTDF) = M.axes[2]
 get_arc_lookup(M::PTDF) = M.lookup[2]
 
+stores_transpose(::PTDF) = true
+
 """
 Deserialize a PTDF from an HDF5 file.
 
