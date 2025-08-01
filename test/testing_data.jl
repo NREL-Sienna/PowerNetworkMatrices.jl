@@ -474,6 +474,64 @@ Ybus3_matpower[1, 3] = -0.689655172413793 + 8.275862068965518im
 Ybus3_matpower[2, 3] = -0.689655172413793 + 8.275862068965518im
 Ybus3_matpower[3, 3] = 1.379310344827586 - 16.351724137931036im
 
+function build_hvdc_with_single_bus_island()
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    bus15 = ACBus(;
+        number = 15,
+        name = "Bus 15",
+        available = true,
+        bustype = ACBusTypes.REF,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.9, max = 1.05),
+        base_voltage = 69.0,
+    )
+    add_component!(sys, bus15)
+    load15 = PowerLoad(;
+        name = "Load_15",
+        available = true,
+        bus = bus15,
+        active_power = 0.0, # Per-unitized by device base_power
+        reactive_power = 0.0, # Per-unitized by device base_power
+        base_power = 10.0, # MVA
+        max_active_power = 1.0, # 10 MW per-unitized by device base_power
+        max_reactive_power = 0.0,
+    )
+    add_component!(sys, load15)
+    gen15 = ThermalStandard(;
+        name = "Gen_15",
+        available = true,
+        status = true,
+        bus = bus15,
+        active_power = 0.0, # Per-unitized by device base_power
+        reactive_power = 0.0, # Per-unitized by device base_power
+        rating = 1.0, # 30 MW per-unitized by device base_power
+        active_power_limits = (min = 0.2, max = 1.0), # 6 MW to 30 MW per-unitized by device base_power
+        reactive_power_limits = nothing, # Per-unitized by device base_power
+        ramp_limits = (up = 0.2, down = 0.2), # 6 MW/min up or down, per-unitized by device base_power
+        operation_cost = ThermalGenerationCost(nothing),
+        base_power = 30.0, # MVA
+        time_limits = (up = 8.0, down = 8.0), # Hours
+        must_run = false,
+        prime_mover_type = PrimeMovers.CC,
+        fuel = ThermalFuels.NATURAL_GAS,
+    )
+    add_component!(sys, gen15)
+    bus14 = get_component(ACBus, sys, "Bus 14")
+    hvdc1 = TwoTerminalHVDCLine(;
+        name = "Line18",
+        available = true,
+        active_power_flow = 0.0,
+        arc = Arc(; from = bus14, to = bus15),
+        active_power_limits_from = (min = -100.0, max = 100.0),
+        active_power_limits_to = (min = -100.0, max = 100.0),
+        reactive_power_limits_from = (min = -100.0, max = 100.0),
+        reactive_power_limits_to = (min = -100.0, max = 100.0),
+    )
+    add_component!(sys, hvdc1)
+    return sys
+end
+
 function build_hvdc_with_small_island()
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     bus15 = ACBus(;

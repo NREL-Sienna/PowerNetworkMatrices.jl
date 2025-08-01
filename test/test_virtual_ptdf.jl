@@ -149,7 +149,7 @@ end
     # get the rows and full PTDF matrix, test get_ptdf_data
     ptdf = PTDF(sys)
     for i in PNM.get_arc_axis(vptdf)
-        for j in PNM.get_bus_ax(vptdf)
+        for j in PNM.get_bus_axis(vptdf)
             vptdf[i, j]
         end
     end
@@ -162,7 +162,7 @@ end
     # test get axes values
     arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, sys)]
     @test setdiff(PNM.get_arc_axis(vptdf), arc_tuples) == []
-    @test setdiff(PNM.get_bus_ax(vptdf), PSY.get_number.(PNM.get_buses(sys))) == String[]
+    @test setdiff(PNM.get_bus_axis(vptdf), PSY.get_number.(PNM.get_buses(sys))) == String[]
 
     # test show
     test_value = false

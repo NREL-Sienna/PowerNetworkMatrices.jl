@@ -4,6 +4,6 @@
             MatpowerTestSystems,
             "matpower_ACTIVSg10k_sys",
         )
-    ybus = Ybus(sys; check_connectivity = false)
+    ybus = Ybus(sys)
     reduction = PNM.get_reduction(ybus, sys, DegreeTwoReduction())
 end

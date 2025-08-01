@@ -57,13 +57,13 @@
     remove_component!(Line, t_sys5_re, "1")
     remove_component!(Line, t_sys5_re, "2")
     remove_component!(Line, t_sys5_re, "6")
-    @test length(Ybus(t_sys5_re).subnetworks) == 2
+    @test length(Ybus(t_sys5_re).subnetwork_axes) == 2
 
     t2_sys5_re = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     # Remove lines. Don't cause islands
     remove_component!(Line, t2_sys5_re, "3")
     remove_component!(Line, t2_sys5_re, "5")
-    @test length(Ybus(t2_sys5_re).subnetworks) == 1
+    @test length(Ybus(t2_sys5_re).subnetwork_axes) == 1
 
     sys_3bus = PSB.build_system(PSB.PSYTestSystems, "psse_3bus_gen_cls_sys")
     bus_103 = PSY.get_component(PSY.ACBus, sys_3bus, "BUS 3")

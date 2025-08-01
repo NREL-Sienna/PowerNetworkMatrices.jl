@@ -29,11 +29,22 @@ struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     data::M
     axes::Ax
     lookup::L
-    subnetworks::Dict{Int, Set{Int}}
-    ref_bus_positions::Set{Int}
+    subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
 end
+
+get_axes(M::PTDF) = M.axes
+get_lookup(M::PTDF) = M.lookup
+get_ref_bus(M::PTDF) = Vector(keys(M.subnetwork_axes))
+get_ref_bus_position(M::PTDF) = [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::PTDF) = M.network_reduction_data
+get_bus_axis(M::PTDF) = M.axes[1]
+get_bus_lookup(M::PTDF) = M.lookup[1]
+get_arc_axis(M::PTDF) = M.axes[2]
+get_arc_lookup(M::PTDF) = M.lookup[2]
+
+stores_transpose(::PTDF) = true
 
 """
 Deserialize a PTDF from an HDF5 file.
@@ -42,47 +53,6 @@ Deserialize a PTDF from an HDF5 file.
 - `filename::AbstractString`: File containing a serialized PTDF.
 """
 PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
-
-function _buildptdf(
-    branches,
-    buses::Vector{PSY.ACBus},
-    network_reduction_data::NetworkReductionData,
-    bus_lookup::Dict{Int, Int},
-    dist_slack::Vector{Float64},
-    linear_solver::String)
-    if linear_solver == "KLU"
-        PTDFm, A = calculate_PTDF_matrix_KLU(
-            branches,
-            buses,
-            bus_lookup,
-            network_reduction_data,
-            dist_slack,
-        )
-    elseif linear_solver == "Dense"
-        PTDFm, A = calculate_PTDF_matrix_DENSE(
-            branches,
-            buses,
-            bus_lookup,
-            network_reduction_data,
-            dist_slack,
-        )
-    elseif linear_solver == "MKLPardiso"
-        if !USE_MKL
-            error(
-                "The MKL library is not available. Check that your hardware and operating system support MKL.",
-            )
-        end
-        PTDFm, A = calculate_PTDF_matrix_MKLPardiso(
-            branches,
-            buses,
-            bus_lookup,
-            network_reduction_data,
-            dist_slack,
-        )
-    end
-
-    return PTDFm, A
-end
 
 function _buildptdf_from_matrices(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -300,13 +270,11 @@ function PTDF(sys::PSY.System;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     linear_solver = "KLU",
     tol::Float64 = eps(),
-    check_connectivity::Bool = true,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     Ymatrix = Ybus(
         sys;
-        check_connectivity = check_connectivity,
         network_reductions = network_reductions,
         kwargs...,
     )
@@ -315,7 +283,6 @@ function PTDF(sys::PSY.System;
     return PTDF(
         A,
         BA;
-        subnetworks = Ymatrix.subnetworks,
         dist_slack = dist_slack,
         linear_solver = linear_solver,
         tol = tol,
@@ -343,7 +310,6 @@ Builds the PTDF matrix from a system. The return is a PTDF array indexed with th
 function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
-    subnetworks::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     linear_solver = "KLU",
     tol::Float64 = eps(),
@@ -354,18 +320,18 @@ function PTDF(
         dist_slack = Float64[]
     end
     validate_linear_solver(linear_solver)
-    @warn "PTDF creates via other matrices doesn't compute the subnetworks"
     if !isequal(A.network_reduction_data, BA.network_reduction_data)
         error("A and BA matrices have non-equivalent network reductions.")
     end
     axes = BA.axes
     lookup = BA.lookup
     A_matrix = A.data
-
+    subnetwork_axes = BA.subnetwork_axes
+    ref_bus_positions = get_ref_bus_position(BA)
     S = _buildptdf_from_matrices(
         A_matrix,
         BA.data,
-        BA.ref_bus_positions,
+        Set(ref_bus_positions),
         dist_slack,
         linear_solver,
     )
@@ -374,8 +340,7 @@ function PTDF(
             sparsify(S, tol),
             axes,
             lookup,
-            subnetworks,
-            BA.ref_bus_positions,
+            subnetwork_axes,
             Ref(tol),
             BA.network_reduction_data,
         )
@@ -384,8 +349,7 @@ function PTDF(
             S,
             axes,
             lookup,
-            subnetworks,
-            BA.ref_bus_positions,
+            subnetwork_axes,
             Ref(tol),
             BA.network_reduction_data,
         )
@@ -418,14 +382,6 @@ end
 
 function get_ptdf_data(ptdf::PTDF)
     return transpose(ptdf.data)
-end
-
-function get_arc_axis(ptdf::PTDF)
-    return ptdf.axes[2]
-end
-
-function get_bus_ax(ptdf::PTDF)
-    return ptdf.axes[1]
 end
 
 function get_tol(ptdf::PTDF)
