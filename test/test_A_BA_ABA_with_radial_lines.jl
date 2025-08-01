@@ -44,7 +44,7 @@ end
         end
         bus_idx = setdiff(
             1:size(A.data, 2),
-            append!([A.lookup[2][i] for i in bus_numbers], A.ref_bus_positions),
+            append!([A.lookup[2][i] for i in bus_numbers], PNM.get_ref_bus_position(A)),
         )
         br_idx = setdiff(1:size(A.data, 1), [A.lookup[1][i] for i in nr.removed_arcs])
 
@@ -90,7 +90,7 @@ end
         end
         power_injection =
             deepcopy(bus_activepower_injection - bus_activepower_withdrawals)
-        valid_ix = setdiff(1:length(power_injection), BA.ref_bus_positions)
+        valid_ix = setdiff(1:length(power_injection), PNM.get_ref_bus_position(BA))
         ref_bus_angles = deepcopy(bus_angles)
         ref_flow_values = deepcopy(branch_flow_values)
 
@@ -99,7 +99,7 @@ end
         ref_flow_values = transpose(BA.data) * ref_bus_angles
 
         # evaluate according to the matrices with no radial branches
-        reduced_bus_angles = zeros((length(bus_idx) + length(A.ref_bus_positions),))
+        reduced_bus_angles = zeros((length(bus_idx) + length(PNM.get_ref_bus_position(A)),))
         reduce_flow_values = zeros((length(br_idx),))
         # change power injection for affected leaf buses
         power_injection2 = deepcopy(power_injection)
@@ -108,7 +108,7 @@ end
                 power_injection2[BA.lookup[1][i]] += power_injection[BA.lookup[1][j]]
             end
         end
-        valid_ix2 = setdiff(1:size(BA_rad.data, 1), BA_rad.ref_bus_positions)
+        valid_ix2 = setdiff(1:size(BA_rad.data, 1), PNM.get_ref_bus_position(BA_rad))
         reduced_bus_angles[valid_ix2] = ABA_rad.K \ power_injection2[bus_idx]
         reduced_flow_values = transpose(BA_rad.data) * reduced_bus_angles
 

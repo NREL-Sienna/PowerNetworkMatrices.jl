@@ -22,9 +22,11 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     data::M
     axes::Ax
     lookup::L
+    subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
 end
+stores_transpose(::LODF) = true
 
 function _buildlodf(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -272,13 +274,11 @@ function LODF(
     sys::PSY.System;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    check_connectivity = false,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     Ymatrix = Ybus(
         sys;
-        check_connectivity = check_connectivity,
         network_reductions = network_reductions,
         kwargs...,
     )
@@ -314,6 +314,7 @@ function LODF(
     tol::Float64 = eps(),
 )
     validate_linear_solver(linear_solver)
+    subnetwork_axes = make_arc_arc_subnetwork_axes(A)
 
     if PTDFm.tol.x > 1e-15
         warn_msg = string(
@@ -337,6 +338,7 @@ function LODF(
             sparsify(lodf_t, tol),
             (get_arc_axis(A), get_arc_axis(A)),
             (ax_ref, ax_ref),
+            subnetwork_axes,
             Ref(tol),
             A.network_reduction_data,
         )
@@ -345,6 +347,7 @@ function LODF(
         _buildlodf(A.data, PTDFm_data, linear_solver),
         (get_arc_axis(A), get_arc_axis(A)),
         (ax_ref, ax_ref),
+        subnetwork_axes,
         Ref(tol),
         A.network_reduction_data,
     )
@@ -385,22 +388,25 @@ function LODF(
         )
     end
     validate_linear_solver(linear_solver)
+    subnetwork_axes = make_arc_arc_subnetwork_axes(A)
     ax_ref = make_ax_ref(get_arc_axis(A))
-
     if tol > eps()
-        lodf_t = _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver)
+        lodf_t =
+            _buildlodf(A.data, ABA.K, BA.data, Set(get_ref_bus_position(A)), linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
             (get_arc_axis(A), get_arc_axis(A)),
             (ax_ref, ax_ref),
+            subnetwork_axes,
             Ref(tol),
             A.network_reduction_data,
         )
     end
     return LODF(
-        _buildlodf(A.data, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
+        _buildlodf(A.data, ABA.K, BA.data, Set(get_ref_bus_position(A)), linear_solver),
         (get_arc_axis(A), get_arc_axis(A)),
         (ax_ref, ax_ref),
+        subnetwork_axes,
         Ref(tol),
         A.network_reduction_data,
     )

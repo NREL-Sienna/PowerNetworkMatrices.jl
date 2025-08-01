@@ -23,19 +23,28 @@ struct BA_Matrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
     lookup::L
-    ref_bus_positions::Set{Int}
+    subnetwork_axes::Dict{Int, Ax}
     network_reduction_data::NetworkReductionData
 end
 
+get_axes(M::BA_Matrix) = M.axes
+get_lookup(M::BA_Matrix) = M.lookup
+get_ref_bus(M::BA_Matrix) = collect(keys(M.subnetwork_axes))
+get_ref_bus_position(M::BA_Matrix) = [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::BA_Matrix) = M.network_reduction_data
+get_bus_axis(M::BA_Matrix) = M.axes[1]
+get_bus_lookup(M::BA_Matrix) = M.lookup[1]
+get_arc_axis(M::BA_Matrix) = M.axes[2]
+get_arc_lookup(M::BA_Matrix) = M.lookup[2]
+stores_transpose(::BA_Matrix) = true
+
 function BA_Matrix(sys::PSY.System;
-    check_connectivity::Bool = true,
     network_reductions::Vector{NetworkReduction} = Vector{NetworkReduction}(),
     kwargs...,
 )
     return BA_Matrix(
         Ybus(
             sys;
-            check_connectivity = check_connectivity,
             network_reductions = network_reductions,
             kwargs...,
         ),
@@ -54,7 +63,8 @@ function BA_Matrix(ybus::Ybus)
     arc_ax = unique(
         vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
     )
-    n_entries = length(arc_ax) * 2
+    n_isolated_buses = length(get_isolated_buses(ybus))
+    n_entries = length(arc_ax) * 2 + n_isolated_buses
     BA_I = Vector{Int}(undef, n_entries)
     BA_J = Vector{Int}(undef, n_entries)
     BA_V = Vector{Float64}(undef, n_entries)
@@ -72,11 +82,16 @@ function BA_Matrix(ybus::Ybus)
         BA_J[2 * ix_arc] = ix_arc
         BA_V[2 * ix_arc] = -1 * b
     end
+    BA_I[(end - n_isolated_buses + 1):end] =
+        [get_bus_index(x, bus_lookup, nr) for x in get_isolated_buses(ybus)]
+    BA_J[(end - n_isolated_buses + 1):end] = ones(n_isolated_buses)
+    BA_V[(end - n_isolated_buses + 1):end] = zeros(n_isolated_buses)
     data = SparseArrays.sparse(BA_I, BA_J, BA_V)
+    SparseArrays.dropzeros!(data)
     axes = (bus_ax, arc_ax)
     lookup = (make_ax_ref(bus_ax), make_ax_ref(arc_ax))
-    ref_bus_positions = Set([lookup[1][x] for x in ybus.ref_bus_numbers])
-    return BA_Matrix(data, axes, lookup, ref_bus_positions, ybus.network_reduction_data)
+    subnetwork_axes = make_bus_arc_subnetwork_axes(ybus)
+    return BA_Matrix(data, axes, lookup, subnetwork_axes, ybus.network_reduction_data)
 end
 
 """
@@ -109,35 +124,37 @@ struct ABA_Matrix{
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
     lookup::L
-    ref_bus_positions::Set{Int}
-    ref_bus_numbers::Set{Int}
+    subnetwork_axes::Dict{Int, Ax}
     K::F
     network_reduction_data::NetworkReductionData
 end
 
+get_axes(M::ABA_Matrix) = M.axes
+get_lookup(M::ABA_Matrix) = M.lookup
+get_ref_bus(M::ABA_Matrix) = collect(keys(M.subnetwork_axes))
+get_ref_bus_position(M::ABA_Matrix) =
+    [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::ABA_Matrix) = M.network_reduction_data
+get_bus_axis(M::ABA_Matrix) = M.axes[1]
+get_bus_lookup(M::ABA_Matrix) = M.lookup[1]
+
 function ABA_Matrix(sys::PSY.System;
     factorize::Bool = false,
-    check_connectivity::Bool = true,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     ymatrix = Ybus(
         sys;
-        check_connectivity = check_connectivity,
         network_reductions = network_reductions,
         kwargs...,
     )
-    ref_bus_positions = Set([ymatrix.lookup[1][x] for x in ymatrix.ref_bus_numbers])
+    ref_bus_positions = Set(get_ref_bus_position(ymatrix))
     A = IncidenceMatrix(ymatrix)
     BA = BA_Matrix(ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
-    bus_ax = get_bus_axis(ymatrix)
-    ref_bus_numbers = ymatrix.ref_bus_numbers
-    bus_ax_ = setdiff(bus_ax, ref_bus_numbers)
-    axes = (bus_ax_, bus_ax_)
-    bus_ax_ref = make_ax_ref(bus_ax_)
+    axes, subnetwork_axes = _remake_axes_without_ref(ymatrix.axes, ymatrix.subnetwork_axes)
+    bus_ax_ref = make_ax_ref(axes[1])
     lookup = (bus_ax_ref, bus_ax_ref)
-
     if factorize
         K = klu(ABA)
     else
@@ -147,11 +164,25 @@ function ABA_Matrix(sys::PSY.System;
         ABA,
         axes,
         lookup,
-        ref_bus_positions,
-        ref_bus_numbers,
+        subnetwork_axes,
         K,
         ymatrix.network_reduction_data,
     )
+end
+
+function _remake_axes_without_ref(
+    axes::Tuple{Vector{Int}, Vector{Int}},
+    subnetwork_axes::Dict{Int, Tuple{Vector{Int}, Vector{Int}}},
+)
+    ref_bus_numbers = collect(keys(subnetwork_axes))
+    bus_ax_ = setdiff(axes[1], Set(ref_bus_numbers))
+    axes_ref = (bus_ax_, bus_ax_)
+    subnetwork_axes_ref = deepcopy(subnetwork_axes)
+    for (k, v) in subnetwork_axes_ref
+        setdiff!(v[1], [k])
+        setdiff!(v[2], [k])
+    end
+    return axes_ref, subnetwork_axes_ref
 end
 
 """
@@ -166,8 +197,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.data),
         deepcopy(ABA.axes),
         deepcopy(ABA.lookup),
-        deepcopy(ABA.ref_bus_positions),
-        deepcopy(ABA.ref_bus_numbers),
+        deepcopy(ABA.subnetwork_axes),
         klu(ABA.data),
         deepcopy(ABA.network_reduction_data),
     )
@@ -203,12 +233,13 @@ _is_ref_bus(::Colon, ::Set{Int}) = false
 # and column is equal to the number of the system's buses minus the slack ones,
 # NOTE: bus_1, bus_2 are bus numbers (or PSY.ACBus objects) not row and column indices!
 function Base.getindex(A::ABA_Matrix, bus_1, bus_2)
-    if _is_ref_bus(bus_1, A.ref_bus_numbers) || _is_ref_bus(bus_2, A.ref_bus_numbers)
+    ref_bus_numbers = Set(get_ref_bus(A))
+    if _is_ref_bus(bus_1, ref_bus_numbers) || _is_ref_bus(bus_2, ref_bus_numbers)
         err_msg = string(
             " Rows and columns related to slack buses are not defined for the ABA matrix. \n",
             "Indices must be referred to any bus number that is not a slack one. \n",
             "For the current Systems the reference slack buses are: ",
-            collect(A.ref_bus_numbers), ". \n")
+            collect(ref_bus_numbers), ". \n")
         error(err_msg)
     else
         i, j = to_index(A, bus_1, bus_2)

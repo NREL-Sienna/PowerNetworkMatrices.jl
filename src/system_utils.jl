@@ -7,10 +7,10 @@ function validate_connectivity(sys::PSY.System)
 end
 
 function _find_subnetworks(sys::PSY.System)
-    Ymatrix = Ybus(sys; check_connectivity = false)
+    Ymatrix = Ybus(sys)
     @info "Validating connectivity with depth first search (network traversal)"
     subnetworks = find_subnetworks(Ymatrix)
-    return subnetworks, Ymatrix.ref_bus_numbers
+    return subnetworks, get_ref_bus(Ymatrix)
 end
 
 """
@@ -19,5 +19,5 @@ by the reference bus of the subnetworks if they exist
 """
 function find_subnetworks(sys::PSY.System)
     sbn, ref_buses = _find_subnetworks(sys)
-    return assign_reference_buses!(sbn, ref_buses)
+    return assign_reference_buses!(sbn, Set(ref_buses))
 end

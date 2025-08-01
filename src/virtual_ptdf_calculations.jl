@@ -48,17 +48,25 @@ matrix.
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
-    ref_bus_positions::Set{Int}
     dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
     temp_data::Vector{Float64}
     valid_ix::Vector{Int}
     cache::RowCache
-    subnetworks::Dict{Int, Set{Int}}
+    subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
 end
+
+get_axes(M::VirtualPTDF) = M.axes
+get_lookup(M::VirtualPTDF) = M.lookup
+get_ref_bus(M::VirtualPTDF) = Vector(keys(M.subnetwork_axes))
+get_ref_bus_position(M::VirtualPTDF) =
+    [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::VirtualPTDF) = M.network_reduction_data
+get_bus_lookup(M::VirtualPTDF) = M.lookup[2]
+get_arc_lookup(M::VirtualPTDF) = M.lookup[1]
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
     summary(io, array)
@@ -93,7 +101,6 @@ struct with an empty cache.
 """
 function VirtualPTDF(
     sys::PSY.System;
-    check_connectivity::Bool = true,
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
@@ -103,11 +110,10 @@ function VirtualPTDF(
 )
     Ymatrix = Ybus(
         sys;
-        check_connectivity = check_connectivity,
         network_reductions = network_reductions,
         kwargs...,
     )
-    ref_bus_positions = Set([Ymatrix.lookup[1][x] for x in Ymatrix.ref_bus_numbers])
+    ref_bus_positions = get_ref_bus_position(Ymatrix)
     A = IncidenceMatrix(Ymatrix)
     if !(isempty(dist_slack))
         dist_slack_vector = redistribute_dist_slack(dist_slack, A, A.network_reduction_data)
@@ -115,12 +121,12 @@ function VirtualPTDF(
         dist_slack_vector = Float64[]
     end
     BA = BA_Matrix(Ymatrix)
-    ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
+    ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
     bus_ax = get_bus_axis(A)
     axes = A.axes
     look_up = A.lookup
-    subnetworks = Ymatrix.subnetworks
-    if length(subnetworks) > 1
+    subnetwork_axes = A.subnetwork_axes
+    if length(subnetwork_axes) > 1
         @info "Network is not connected, using subnetworks"
     end
     temp_data = zeros(length(axes[2]))
@@ -141,14 +147,13 @@ function VirtualPTDF(
     return VirtualPTDF(
         klu(ABA),
         BA.data,
-        ref_bus_positions,
         dist_slack_vector,
         axes,
         look_up,
         temp_data,
         setdiff(1:length(temp_data), ref_bus_positions),
         empty_cache,
-        subnetworks,
+        subnetwork_axes,
         Ref(tol),
         Ymatrix.network_reduction_data,
     )
@@ -201,12 +206,12 @@ function _getindex(
         valid_ix = vptdf.valid_ix
         lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[valid_ix, row]))
         buscount = size(vptdf, 1)
-
-        if !isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) != 1
+        ref_bus_positions = get_ref_bus_position(vptdf)
+        if !isempty(vptdf.dist_slack) && length(ref_bus_positions) != 1
             error(
                 "Distributed slack is not supported for systems with multiple reference buses.",
             )
-        elseif isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) < buscount
+        elseif isempty(vptdf.dist_slack) && length(ref_bus_positions) < buscount
             for i in eachindex(valid_ix)
                 vptdf.temp_data[valid_ix[i]] = lin_solve[i]
             end
@@ -271,7 +276,7 @@ function get_arc_axis(ptdf::VirtualPTDF)
     return ptdf.axes[1]
 end
 
-function get_bus_ax(ptdf::VirtualPTDF)
+function get_bus_axis(ptdf::VirtualPTDF)
     return ptdf.axes[2]
 end
 

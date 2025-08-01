@@ -23,17 +23,19 @@ struct AdjacencyMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
-    ref_bus_positions::Set{Int}
+    subnetwork_axes::Dict{Int, Ax}
     network_reduction_data::NetworkReductionData
 end
 
 # functions to get stored data
-get_axes(A::AdjacencyMatrix) = A.axes
-get_lookup(A::AdjacencyMatrix) = A.lookup
-get_slack_position(A::AdjacencyMatrix) = A.ref_bus_positions
-get_network_reduction_data(A::AdjacencyMatrix) = A.network_reduction_data
-get_bus_axis(A::AdjacencyMatrix) = A.axes[1]
-get_bus_lookup(A::AdjacencyMatrix) = A.lookup[1]
+get_axes(M::AdjacencyMatrix) = M.axes
+get_lookup(M::AdjacencyMatrix) = M.lookup
+get_ref_bus(M::AdjacencyMatrix) = collect(keys(M.subnetwork_axes))
+get_ref_bus_position(M::AdjacencyMatrix) =
+    [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::AdjacencyMatrix) = M.network_reduction_data
+get_bus_axis(M::AdjacencyMatrix) = M.axes[1]
+get_bus_lookup(M::AdjacencyMatrix) = M.lookup[1]
 
 function get_reduction(
     A::AdjacencyMatrix,
@@ -76,16 +78,9 @@ end
 """
 Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix Array indexed with the bus numbers.
 
-# Arguments
-- `check_connectivity::Bool`:
-        Checks connectivity of the network using Depth First Search (DFS) algorithm
 """
-function AdjacencyMatrix(sys::PSY.System; check_connectivity::Bool = true, kwargs...)
-    ybus = Ybus(
-        sys;
-        check_connectivity = check_connectivity,
-        kwargs...,
-    )
+function AdjacencyMatrix(sys::PSY.System; kwargs...)
+    ybus = Ybus(sys; kwargs...)
     return AdjacencyMatrix(ybus)
 end
 
@@ -99,7 +94,7 @@ function AdjacencyMatrix(ybus::Ybus)
         adj_matrix,
         deepcopy(ybus.axes),
         deepcopy(ybus.lookup),
-        Set([ybus.lookup[1][x] for x in ybus.ref_bus_numbers]),
+        deepcopy(ybus.subnetwork_axes),
         ybus.network_reduction_data,
     )
 end
