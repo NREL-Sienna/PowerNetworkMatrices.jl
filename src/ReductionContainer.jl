@@ -51,3 +51,17 @@ function Base.:(==)(x::ReductionContainer, y::ReductionContainer)
     end
     return true
 end
+
+function Base.isempty(rb::ReductionContainer)
+    # Verbose on purpose
+    if !isnothing(rb.radial_reduction)
+        return false
+    end
+    if !isnothing(rb.degree_two_reduction)
+        return false
+    end
+    if !isnothing(rb.ward_reduction)
+        return false
+    end
+    return true
+end
