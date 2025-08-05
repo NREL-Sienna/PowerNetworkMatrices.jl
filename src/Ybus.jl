@@ -272,7 +272,7 @@ function _ybus!(
         if !isfinite(Y11) || !isfinite(y_shunt)
             error(
                 "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
             )
         end
 
@@ -298,7 +298,7 @@ function _ybus!(
         if !isfinite(Y11) || !isfinite(y_shunt)
             error(
                 "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+                r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
             )
         end
 
@@ -324,7 +324,7 @@ function _ybus!(
         if !isfinite(Y11) || !isfinite(y_shunt)
             error(
                 "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+                r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
             )
         end
 
@@ -381,7 +381,7 @@ function _ybus!(
         if !isfinite(Y11) || !isfinite(y_shunt)
             error(
                 "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
             )
         end
         y11[offset_ix + ix + n_entries] = Y11 + y_shunt
@@ -407,7 +407,7 @@ function _ybus!(
         if !isfinite(Y11) || !isfinite(y_shunt)
             error(
                 "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+                r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
             )
         end
         y11[offset_ix + ix + n_entries] = Y11
@@ -432,7 +432,7 @@ function _ybus!(
         if !isfinite(Y11) || !isfinite(y_shunt)
             error(
                 "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br))",
+                r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
             )
         end
         y11[offset_ix + ix + n_entries] = Y11
@@ -476,7 +476,7 @@ function _ybus!(
     Y11 = Y_t / (tap * c_tap)
     if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
         error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br)), tap = $(PSY.get_tap(br))",
         )
     end
 
@@ -517,7 +517,7 @@ function _ybus!(
     Y11 = (Y_t / abs(tap)^2)
     if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
         error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br)), tap = $(PSY.get_tap(br))",
         )
     end
 
