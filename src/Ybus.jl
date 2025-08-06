@@ -37,8 +37,7 @@ end
 function get_default_reduction(sys::PSY.System)
     ybus = Ybus(sys)
     return ybus.network_reduction_data
-end 
-
+end
 
 function get_reduction(
     ybus::Ybus,
