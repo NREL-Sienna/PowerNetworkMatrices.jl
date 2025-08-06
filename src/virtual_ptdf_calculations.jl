@@ -242,7 +242,6 @@ function Base.getindex(vptdf::VirtualPTDF, branch_name::String, bus)
     return _getindex(vptdf, row_, column_) * multiplier
 end
 
-
 """
 Gets the value of the element of the PTDF matrix given the row and column indices
 corresponding to the branch and buses one respectively. If `column` is a Colon then
