@@ -34,6 +34,12 @@ function get_isolated_buses(M::Ybus)
     [x for x in keys(M.subnetwork_axes) if length(M.subnetwork_axes[x][1]) == 1]
 end
 
+function get_default_reduction(sys::PSY.System)
+    ybus = Ybus(sys)
+    return ybus.network_reduction_data
+end 
+
+
 function get_reduction(
     ybus::Ybus,
     sys::PSY.System,
