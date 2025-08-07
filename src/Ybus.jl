@@ -114,7 +114,7 @@ function _ybus!(
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
-    Y11 = Y_l + (1im * PSY.get_b(br).from)
+    Y11 = Y_l + (PSY.get_g(br).from + 1im * PSY.get_b(br).from)
     if !isfinite(Y11) || !isfinite(Y_l)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
@@ -125,7 +125,7 @@ function _ybus!(
     y12[branch_ix] = Y12
     Y21 = Y12
     y21[branch_ix] = Y21
-    Y22 = Y_l + (1im * PSY.get_b(br).to)
+    Y22 = Y_l + (PSY.get_g(br).to + 1im * PSY.get_b(br).to)
     y22[branch_ix] = Y22
     return
 end
@@ -854,7 +854,7 @@ function Ybus(
             @warn "More than one island found; Network is not connected"
         end
     else
-        subnetworks = Dict{Int, Set{Int}}(bus_lookup[1] => Set(bus_lookup))
+        subnetworks = Dict{Int, Set{Int}}(bus_lookup[1] => Set(keys(bus_lookup)))
     end
     subnetwork_axes = _make_bus_subnetwork_axes(subnetworks)
     arc_subnetwork_axis = _make_arc_subnetwork_axis(subnetworks, nr)
