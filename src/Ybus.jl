@@ -270,25 +270,27 @@ function _ybus!(
     y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
     if primary_available
         primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
-        c = 1 / PSY.get_primary_turns_ratio(br)
+        adj[primary_ix, star_ix] = 1
+        adj[star_ix, primary_ix] = -1
+        fb[offset_ix + ix + n_entries] = primary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
         Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
-        Y11 = (Y_t * c^2)
+        tap = (PSY.get_primary_turns_ratio(br) * exp(PSY.get_phase_shift_primary(br) * 1im))
+        c_tap = (
+            PSY.get_primary_turns_ratio(br) *
+            exp(-1 * PSY.get_phase_shift_primary(br) * 1im)
+        )
+        Y11 = (Y_t / abs(tap)^2)
         if !isfinite(Y11) || !isfinite(y_shunt)
             error(
                 "Data in $(PSY.get_name(br)) is incorrect.
                 r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
             )
         end
-
-        adj[primary_ix, star_ix] = 1
-        adj[star_ix, primary_ix] = -1
-        fb[offset_ix + ix + n_entries] = primary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
-
         y11[offset_ix + ix + n_entries] = Y11 + y_shunt
-        Y12 = (-Y_t * c)
+        Y12 = (-Y_t / c_tap)
         y12[offset_ix + ix + n_entries] = Y12
-        Y21 = Y12
+        Y21 = (-Y_t / tap)
         y21[offset_ix + ix + n_entries] = Y21
         Y22 = Y_t
         y22[offset_ix + ix + n_entries] = Y22
@@ -296,25 +298,30 @@ function _ybus!(
     end
     if secondary_available
         secondary_ix, star_ix = get_bus_indices(secondary_star_arc, num_bus, nr)
-        c = 1 / PSY.get_secondary_turns_ratio(br)
+        adj[secondary_ix, star_ix] = 1
+        adj[star_ix, secondary_ix] = -1
+        fb[offset_ix + ix + n_entries] = secondary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
         Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
-        Y11 = (Y_t * c^2)
+        tap = (
+            PSY.get_secondary_turns_ratio(br) *
+            exp(PSY.get_phase_shift_secondary(br) * 1im)
+        )
+        c_tap = (
+            PSY.get_secondary_turns_ratio(br) *
+            exp(-1 * PSY.get_phase_shift_secondary(br) * 1im)
+        )
+        Y11 = (Y_t / abs(tap)^2)
         if !isfinite(Y11) || !isfinite(y_shunt)
             error(
                 "Data in $(PSY.get_name(br)) is incorrect.
                 r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
             )
         end
-
-        adj[secondary_ix, star_ix] = 1
-        adj[star_ix, secondary_ix] = -1
-        fb[offset_ix + ix + n_entries] = secondary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
-
         y11[offset_ix + ix + n_entries] = Y11
-        Y12 = (-Y_t * c)
+        Y12 = (-Y_t / c_tap)
         y12[offset_ix + ix + n_entries] = Y12
-        Y21 = Y12
+        Y21 = (-Y_t / tap)
         y21[offset_ix + ix + n_entries] = Y21
         Y22 = Y_t
         y22[offset_ix + ix + n_entries] = Y22
@@ -322,25 +329,28 @@ function _ybus!(
     end
     if tertiary_available
         tertiary_ix, star_ix = get_bus_indices(tertiary_star_arc, num_bus, nr)
-        c = 1 / PSY.get_tertiary_turns_ratio(br)
+        adj[tertiary_ix, star_ix] = 1
+        adj[star_ix, tertiary_ix] = -1
+        fb[offset_ix + ix + n_entries] = tertiary_ix
+        tb[offset_ix + ix + n_entries] = star_ix
         Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
-        Y11 = (Y_t * c^2)
+        tap =
+            (PSY.get_tertiary_turns_ratio(br) * exp(PSY.get_phase_shift_tertiary(br) * 1im))
+        c_tap = (
+            PSY.get_tertiary_turns_ratio(br) *
+            exp(-1 * PSY.get_phase_shift_tertiary(br) * 1im)
+        )
+        Y11 = (Y_t / abs(tap)^2)
         if !isfinite(Y11) || !isfinite(y_shunt)
             error(
                 "Data in $(PSY.get_name(br)) is incorrect.
                 r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
             )
         end
-
-        adj[tertiary_ix, star_ix] = 1
-        adj[star_ix, tertiary_ix] = -1
-        fb[offset_ix + ix + n_entries] = tertiary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
-
         y11[offset_ix + ix + n_entries] = Y11
-        Y12 = (-Y_t * c)
+        Y12 = (-Y_t / c_tap)
         y12[offset_ix + ix + n_entries] = Y12
-        Y21 = Y12
+        Y21 = (-Y_t / tap)
         y21[offset_ix + ix + n_entries] = Y21
         Y22 = Y_t
         y22[offset_ix + ix + n_entries] = Y22
