@@ -579,7 +579,7 @@ function _ybus!(
     nr::NetworkReductionData,
 )
     bus_no = get_bus_index(fa, num_bus, nr)
-    Y = PSY.get_impedance_active_power(fa) + im * PSY.get_impedance_reactive_power(fa)
+    Y = PSY.get_impedance_active_power(fa) - im * PSY.get_impedance_reactive_power(fa)
     if !isfinite(Y)
         error(
             "Data in $(PSY.get_name(fa)) is incorrect. Y = $(Y)",
