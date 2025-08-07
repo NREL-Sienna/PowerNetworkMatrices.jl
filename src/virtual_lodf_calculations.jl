@@ -223,7 +223,7 @@ function _getindex(
 
         # TODO: needs improvement to speed up computation (not much found...)
 
-        lin_solve = KLU.solve!(vlodf.K, Vector(vlodf.BA[vlodf.valid_ix, row]))
+        lin_solve = KLU.solve!(vlodf.K, collect(vlodf.BA[vlodf.valid_ix, row]))
         # get full lodf row
         for i in eachindex(vlodf.valid_ix)
             vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]

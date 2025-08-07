@@ -61,7 +61,7 @@ end
 
 get_axes(M::VirtualPTDF) = M.axes
 get_lookup(M::VirtualPTDF) = M.lookup
-get_ref_bus(M::VirtualPTDF) = Vector(keys(M.subnetwork_axes))
+get_ref_bus(M::VirtualPTDF) = sort!(collect(keys(M.subnetwork_axes)))
 get_ref_bus_position(M::VirtualPTDF) =
     [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
 get_network_reduction_data(M::VirtualPTDF) = M.network_reduction_data
@@ -204,7 +204,7 @@ function _getindex(
         # evaluate the value for the PTDF column
         # Needs improvement
         valid_ix = vptdf.valid_ix
-        lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[valid_ix, row]))
+        lin_solve = KLU.solve!(vptdf.K, collect(vptdf.BA[valid_ix, row]))
         buscount = size(vptdf, 1)
         ref_bus_positions = get_ref_bus_position(vptdf)
         if !isempty(vptdf.dist_slack) && length(ref_bus_positions) != 1
@@ -234,6 +234,12 @@ function _getindex(
 
         return vptdf.cache[row][column]
     end
+end
+
+function Base.getindex(vptdf::VirtualPTDF, branch_name::String, bus)
+    multiplier, arc = get_branch_multiplier(vptdf, branch_name)
+    row_, column_ = to_index(vptdf, arc, bus)
+    return _getindex(vptdf, row_, column_) * multiplier
 end
 
 """
