@@ -30,7 +30,7 @@ end
 # functions to get stored data
 get_axes(M::AdjacencyMatrix) = M.axes
 get_lookup(M::AdjacencyMatrix) = M.lookup
-get_ref_bus(M::AdjacencyMatrix) = collect(keys(M.subnetwork_axes))
+get_ref_bus(M::AdjacencyMatrix) = sort!(collect(keys(M.subnetwork_axes)))
 get_ref_bus_position(M::AdjacencyMatrix) =
     [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
 get_network_reduction_data(M::AdjacencyMatrix) = M.network_reduction_data
