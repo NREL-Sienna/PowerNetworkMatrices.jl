@@ -125,6 +125,7 @@ struct ABA_Matrix{
     axes::Ax
     lookup::L
     subnetwork_axes::Dict{Int, Ax}
+    ref_bus_position::Vector{Int}
     K::F
     network_reduction_data::NetworkReductionData
 end
@@ -132,8 +133,7 @@ end
 get_axes(M::ABA_Matrix) = M.axes
 get_lookup(M::ABA_Matrix) = M.lookup
 get_ref_bus(M::ABA_Matrix) = sort!(collect(keys(M.subnetwork_axes)))
-get_ref_bus_position(M::ABA_Matrix) =
-    [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_ref_bus_position(M::ABA_Matrix) = M.ref_bus_position
 get_network_reduction_data(M::ABA_Matrix) = M.network_reduction_data
 get_bus_axis(M::ABA_Matrix) = M.axes[1]
 get_bus_lookup(M::ABA_Matrix) = M.lookup[1]
@@ -148,10 +148,10 @@ function ABA_Matrix(sys::PSY.System;
         network_reductions = network_reductions,
         kwargs...,
     )
-    ref_bus_positions = Set(get_ref_bus_position(ymatrix))
+    ref_bus_positions = get_ref_bus_position(ymatrix)
     A = IncidenceMatrix(ymatrix)
     BA = BA_Matrix(ymatrix)
-    ABA = calculate_ABA_matrix(A.data, BA.data, ref_bus_positions)
+    ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
     axes, subnetwork_axes = _remake_axes_without_ref(ymatrix.axes, ymatrix.subnetwork_axes)
     bus_ax_ref = make_ax_ref(axes[1])
     lookup = (bus_ax_ref, bus_ax_ref)
@@ -165,6 +165,7 @@ function ABA_Matrix(sys::PSY.System;
         axes,
         lookup,
         subnetwork_axes,
+        ref_bus_positions,
         K,
         ymatrix.network_reduction_data,
     )
@@ -198,6 +199,7 @@ function factorize(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Di
         deepcopy(ABA.axes),
         deepcopy(ABA.lookup),
         deepcopy(ABA.subnetwork_axes),
+        deepcopy(ABA.ref_bus_position),
         klu(ABA.data),
         deepcopy(ABA.network_reduction_data),
     )
