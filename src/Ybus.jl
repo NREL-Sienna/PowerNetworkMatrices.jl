@@ -1087,76 +1087,71 @@ function _add_series_branches_to_ybus!(
 )
     bus_lookup = ybus.lookup[1]
     data = ybus.data
-    nrd = get_network_reduction_data(ybus)
     for (equivalent_arc, series_map_entry) in series_branch_map
-        series_impedance_from_to = 0.0
-        series_impedance_to_from = 0.0
-        shunt_admittance = 0.0
-        for series_segment in series_map_entry
-            segment_series_impedance_from_to,
-            segment_series_impedance_to_from,
-            segment_shunt_admittance =
-                _get_equivalent_line_parameters(ybus, equivalent_arc, series_segment, nrd)
-            series_impedance_from_to += segment_series_impedance_from_to
-            series_impedance_to_from += segment_series_impedance_to_from
-            shunt_admittance += segment_shunt_admittance
-        end
-        data[bus_lookup[equivalent_arc[1]], bus_lookup[equivalent_arc[2]]] +=
-            1 / series_impedance_from_to
-        data[bus_lookup[equivalent_arc[2]], bus_lookup[equivalent_arc[1]]] +=
-            1 / series_impedance_to_from
-        data[bus_lookup[equivalent_arc[1]], bus_lookup[equivalent_arc[1]]] +=
-            shunt_admittance / 2
-        data[bus_lookup[equivalent_arc[2]], bus_lookup[equivalent_arc[2]]] +=
-            shunt_admittance / 2
+        all_indices = get_ybus_indices_for_series_chain(series_map_entry, ybus)
+        equivalent_arc_indices = [bus_lookup[x] for x in equivalent_arc]
+        internal_indices = sort(setdiff(all_indices, equivalent_arc_indices))
+        ybus_indices = vcat(equivalent_arc_indices, internal_indices)
+        ybus_chain = Matrix(data[ybus_indices, ybus_indices])
+        ybus_boundary = _reduce_internal_nodes(ybus_chain)
+        data[equivalent_arc_indices, equivalent_arc_indices] = ybus_boundary
     end
     return
 end
 
-function _get_equivalent_line_parameters(
-    ybus::Ybus,
-    equivalent_arc::Tuple{Int, Int},
-    branch::Union{PSY.Branch, Tuple{PSY.ThreeWindingTransformer, Int}},
-    network_reduction_data::NetworkReductionData,
-)
-    fr_bus_no, to_bus_no = get_arc_tuple(branch, network_reduction_data)
-    data = ybus.data
+function get_ybus_indices_for_series_chain(series_map_entry::Vector{Any}, ybus::Ybus)
+    nrd = ybus.network_reduction_data
     bus_lookup = ybus.lookup[1]
-    series_impedance_from_to = 1 / data[bus_lookup[fr_bus_no], bus_lookup[to_bus_no]]
-    series_impedance_to_from = 1 / data[bus_lookup[to_bus_no], bus_lookup[fr_bus_no]]
-    shunt_admittance = 0.0
-    if fr_bus_no ∉ equivalent_arc
-        shunt_admittance += data[bus_lookup[fr_bus_no], bus_lookup[fr_bus_no]]
+    ybus_indices = Vector{Int}(undef, length(series_map_entry) + 1)
+    for (ix, segment) in enumerate(series_map_entry)
+        fr_bus_ix, to_bus_ix = get_segment_indices(segment, nrd, bus_lookup)
+        ybus_indices[ix] = fr_bus_ix
+        ybus_indices[ix + 1] = to_bus_ix
     end
-    if to_bus_no ∉ equivalent_arc
-        shunt_admittance += data[bus_lookup[to_bus_no], bus_lookup[to_bus_no]]
-    end
-    return series_impedance_from_to, series_impedance_to_from, shunt_admittance
+    return ybus_indices
 end
 
-function _get_equivalent_line_parameters(
-    ybus::Ybus,
-    equivalent_arc::Tuple{Int, Int},
-    branches::Set{PSY.Branch},
-    network_reduction_data::NetworkReductionData,
+function get_segment_indices(
+    segment::PSY.Branch,
+    nrd::NetworkReductionData,
+    lookup::Dict{Int, Int},
 )
-    series_impedance_from_to = 0.0
-    series_impedance_to_from = 0.0
-    shunt_admittance = 0.0
-    for branch in branches
-        segment_series_impedance_from_to,
-        segment_series_impedance_to_from,
-        segment_shunt_admittance = _get_equivalent_line_parameters(
-            ybus,
-            equivalent_arc,
-            branch,
-            network_reduction_data,
-        )
-        series_impedance_from_to += segment_series_impedance_from_to
-        series_impedance_to_from += segment_series_impedance_to_from
-        shunt_admittance += segment_shunt_admittance
-    end
-    return series_impedance_from_to, series_impedance_to_from, shunt_admittance
+    fr_bus_no, to_bus_no = get_arc_tuple(segment, nrd)
+    fr_bus_ix = lookup[fr_bus_no]
+    to_bus_ix = lookup[to_bus_no]
+    return fr_bus_ix, to_bus_ix
+end
+
+function get_segment_indices(
+    segment::Tuple{PSY.Transformer3W, Int64},
+    nrd::NetworkReductionData,
+    lookup::Dict{Int, Int},
+)
+    fr_bus_no, to_bus_no = get_arc_tuple(segment, nrd)
+    fr_bus_ix = lookup[fr_bus_no]
+    to_bus_ix = lookup[to_bus_no]
+    return fr_bus_ix, to_bus_ix
+end
+
+function get_segment_indices(
+    segment::Set{PSY.Branch},
+    nrd::NetworkReductionData,
+    lookup::Dict{Int, Int},
+)
+    br = first(segment)
+    return get_segment_indices(br, nrd, lookup)
+end
+
+function _reduce_internal_nodes(Y::Matrix{ComplexF32})
+    dim_Y = size(Y)[1]
+    keep_ix = [1, 2]
+    eliminate_ix = collect(3:dim_Y)
+    Y_kk = Y[keep_ix, keep_ix]
+    Y_ee = Y[eliminate_ix, eliminate_ix]
+    Y_ke = Y[keep_ix, eliminate_ix]
+    Y_ek = Y[eliminate_ix, keep_ix]
+    Y_reduced = Y_kk - Y_ke * (Y_ee \ Y_ek)
+    return Y_reduced
 end
 
 function _remake_reverse_direct_branch_map!(nr::NetworkReductionData)
