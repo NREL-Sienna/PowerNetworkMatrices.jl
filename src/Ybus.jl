@@ -151,28 +151,70 @@ function ybus_branch_entries(br::PSY.ACTransmission)
     return (Y11, Y12, Y21, Y22)
 end
 
-_get_angle(br::PSY.PhaseShiftingTransformer) = PSY.get_α(br)
-_get_angle(br::Union{PSY.TapTransformer, PSY.Transformer2W}) = PSY.get_phase_shift(br)
-
 _get_tap(::PSY.Transformer2W) = one(ComplexF32)
 _get_tap(br::PSY.TwoWindingTransformer) = PSY.get_tap(br)
 
 """Ybus entries for a `Transformer2W`, `TapTransformer`, or `PhaseShiftingTransformer`."""
 function ybus_branch_entries(br::PSY.TwoWindingTransformer)
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
-    tap = _get_tap(br) * exp(_get_angle(br) * 1im)
-    c_tap = _get_tap(br) * exp(-1 * _get_angle(br) * 1im)
+    tap = _get_tap(br) * exp(PSY.get_α(br) * 1im)
+    c_tap = _get_tap(br) * exp(-1 * PSY.get_α(br) * 1im)
     y_shunt = PSY.get_primary_shunt(br)
     Y11 = Y_t / abs2(tap)
     if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
         error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br)), tap = $(PSY.get_tap(br))",
+            "Data in $(summary(br)) gives a non-finite Ybus entry; check input data.",
         )
     end
     Y12 = -Y_t / c_tap
     Y21 = -Y_t / tap
     Y22 = Y_t
     return (Y11 + y_shunt, Y12, Y21, Y22)
+end
+
+"""Ybus branch entries for an arc in the wye model of a `ThreeWindingTransformer`."""
+function ybus_branch_entries(br::PSY.ThreeWindingTransformer, winding_number::Int)
+    if winding_number == 1
+        Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
+        tap = PSY.get_primary_turns_ratio(br) * exp(PSY.get_α_primary(br) * 1im)
+        c_tap = PSY.get_primary_turns_ratio(br) * exp(-1 * PSY.get_α_primary(br) * 1im)
+        Y11 = Y_t / abs2(tap)
+        y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
+        if !isfinite(Y11) || !isfinite(y_shunt)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
+            )
+        end
+        # primary bus alone gets the shunt term
+        Y11 += y_shunt
+    elseif winding_number == 2
+        Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
+        tap = PSY.get_secondary_turns_ratio(br) * exp(PSY.get_α_secondary(br) * 1im)
+        c_tap = PSY.get_secondary_turns_ratio(br) * exp(-1 * PSY.get_α_secondary(br) * 1im)
+        Y11 = Y_t / abs2(tap)
+        if !isfinite(Y11)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
+            )
+        end
+    elseif winding_number == 3
+        Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
+        tap = PSY.get_tertiary_turns_ratio(br) * exp(PSY.get_α_tertiary(br) * 1im)
+        c_tap = PSY.get_tertiary_turns_ratio(br) * exp(-1 * PSY.get_α_tertiary(br) * 1im)
+        Y11 = Y_t / abs2(tap)
+        if !isfinite(Y11)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
+            )
+        end
+    end
+    Y12 = (-Y_t / c_tap)
+    Y21 = (-Y_t / tap)
+    Y22 = Y_t
+    return (Y11, Y12, Y21, Y22)
 end
 
 """Handles ybus entries for most 2-node AC branches. The types handled here are:
@@ -227,15 +269,6 @@ function _ybus!(
     return
 end
 
-# temporary workaround for the fact that the angle field has a different name between
-# the two structs. see https://github.com/NREL-Sienna/PowerSystems.jl/issues/1508
-_get_angle_primary(br::PSY.Transformer3W) = PSY.get_phase_shift_primary(br)
-_get_angle_secondary(br::PSY.Transformer3W) = PSY.get_phase_shift_secondary(br)
-_get_angle_tertiary(br::PSY.Transformer3W) = PSY.get_phase_shift_tertiary(br)
-_get_angle_primary(br::PSY.PhaseShiftingTransformer3W) = PSY.get_α_primary(br)
-_get_angle_secondary(br::PSY.PhaseShiftingTransformer3W) = PSY.get_α_secondary(br)
-_get_angle_tertiary(br::PSY.PhaseShiftingTransformer3W) = PSY.get_α_tertiary(br)
-
 function _ybus!(
     y11::Vector{ComplexF32},
     y12::Vector{ComplexF32},
@@ -258,29 +291,16 @@ function _ybus!(
     secondary_available = PSY.get_available_secondary(br)
     tertiary_available = PSY.get_available_tertiary(br)
     n_entries = 0
-    y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
     if primary_available
         primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
         adj[primary_ix, star_ix] = 1
         adj[star_ix, primary_ix] = -1
         fb[offset_ix + ix + n_entries] = primary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
-        tap = (PSY.get_primary_turns_ratio(br) * exp(_get_angle_primary(br) * 1im))
-        c_tap = (PSY.get_primary_turns_ratio(br) * exp(-1 * _get_angle_primary(br) * 1im))
-        Y11 = (Y_t / abs2(tap))
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
-            )
-        end
-        y11[offset_ix + ix + n_entries] = Y11 + y_shunt
-        Y12 = (-Y_t / c_tap)
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries(br, 1)
+        y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
-        Y21 = (-Y_t / tap)
         y21[offset_ix + ix + n_entries] = Y21
-        Y22 = Y_t
         y22[offset_ix + ix + n_entries] = Y22
         n_entries += 1
     end
@@ -290,23 +310,10 @@ function _ybus!(
         adj[star_ix, secondary_ix] = -1
         fb[offset_ix + ix + n_entries] = secondary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
-        tap = (PSY.get_secondary_turns_ratio(br) * exp(_get_angle_secondary(br) * 1im))
-        c_tap =
-            (PSY.get_secondary_turns_ratio(br) * exp(-1 * _get_angle_secondary(br) * 1im))
-        Y11 = (Y_t / abs2(tap))
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
-            )
-        end
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries(br, 2)
         y11[offset_ix + ix + n_entries] = Y11
-        Y12 = (-Y_t / c_tap)
         y12[offset_ix + ix + n_entries] = Y12
-        Y21 = (-Y_t / tap)
         y21[offset_ix + ix + n_entries] = Y21
-        Y22 = Y_t
         y22[offset_ix + ix + n_entries] = Y22
         n_entries += 1
     end
@@ -316,22 +323,10 @@ function _ybus!(
         adj[star_ix, tertiary_ix] = -1
         fb[offset_ix + ix + n_entries] = tertiary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
-        tap = (PSY.get_tertiary_turns_ratio(br) * exp(_get_angle_tertiary(br) * 1im))
-        c_tap = (PSY.get_tertiary_turns_ratio(br) * exp(-1 * _get_angle_tertiary(br) * 1im))
-        Y11 = (Y_t / abs2(tap))
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
-            )
-        end
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries(br, 3)
         y11[offset_ix + ix + n_entries] = Y11
-        Y12 = (-Y_t / c_tap)
         y12[offset_ix + ix + n_entries] = Y12
-        Y21 = (-Y_t / tap)
         y21[offset_ix + ix + n_entries] = Y21
-        Y22 = Y_t
         y22[offset_ix + ix + n_entries] = Y22
         n_entries += 1
     end
