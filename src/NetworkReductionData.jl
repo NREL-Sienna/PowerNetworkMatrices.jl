@@ -137,3 +137,19 @@ function get_arc_axis(nr::NetworkReductionData)
     return arc_ax
 end
 
+function Base.show(io::IO, ::MIME{Symbol("text/plain")}, nrd::NetworkReductionData)
+    println("Network Reduction Summary:")
+    println("\tNumber of remapped buses: $(length(nrd.reverse_bus_search_map))")
+    println("\tNumber of direct branch mappings: $(length(nrd.direct_branch_map))")
+    println(
+        "\tNumber of parallel arcs (number of branches): $(length(nrd.parallel_branch_map)) ($(length(nrd.reverse_parallel_branch_map)))",
+    )
+    println(
+        "\tNumber of series arcs (number of branches): $(length(nrd.series_branch_map)) ($(length(nrd.reverse_series_branch_map)))",
+    )
+    println("\tNumber of 3WT winding arcs:$(length(nrd.transformer3W_map))")
+    println("\tNumber of removed buses: $(length(nrd.removed_buses))")
+    println("\tNumber of removed arcs: $(length(nrd.removed_arcs))")
+    println("\tNumber of added branches: $(length(nrd.added_branch_map))")
+    println("\tNumber of added admittances: $(length(nrd.added_admittance_map))")
+end
