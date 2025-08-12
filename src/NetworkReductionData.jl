@@ -27,8 +27,114 @@
     added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
     added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
         Dict{Tuple{Int, Int}, Complex{Float32}}()
+    all_branch_maps_by_type::Union{Nothing, Dict{String, Any}} = nothing
     reductions::ReductionContainer = ReductionContainer()
 end
+
+function populate_branch_maps_by_type!(nrd::NetworkReductionData)
+    all_branch_maps_by_type = Dict(
+        "direct_branch_map" =>
+            Dict{Type{<:PSY.Branch}, Dict{Tuple{Int, Int}, PSY.Branch}}(),
+        "reverse_direct_branch_map" =>
+            Dict{Type{<:PSY.Branch}, Dict{PSY.Branch, Tuple{Int, Int}}}(),
+        "parallel_branch_map" =>
+            Dict{Type{<:PSY.Branch}, Dict{Tuple{Int, Int}, Set{PSY.Branch}}}(),
+        "reverse_parallel_branch_map" =>
+            Dict{Type{<:PSY.Branch}, Dict{PSY.Branch, Tuple{Int, Int}}}(),
+        "series_branch_map" =>
+            Dict{Type{<:PSY.Branch}, Dict{Tuple{Int, Int}, Vector{Any}}}(),
+        "reverse_series_branch_map" =>
+            Dict{Type{<:PSY.Branch}, Dict{Any, Tuple{Int, Int}}}(),
+        "transformer3W_map" => Dict{
+            Type{<:PSY.ThreeWindingTransformer},
+            Dict{
+                Tuple{Int, Int},
+                Tuple{PSY.ThreeWindingTransformer, Int},
+            },
+        }(),
+        "reverse_transformer3W_map" => Dict{
+            Type{<:PSY.ThreeWindingTransformer},
+            Dict{
+                Tuple{PSY.ThreeWindingTransformer, Int},
+                Tuple{Int, Int},
+            },
+        }())
+
+    for (k, v) in nrd.direct_branch_map
+        map_by_type = get!(
+            all_branch_maps_by_type["direct_branch_map"],
+            _get_segment_type(v),
+            Dict{Tuple{Int, Int}, PSY.Branch}(),
+        )
+        map_by_type[k] = v
+    end
+    for (k, v) in nrd.reverse_direct_branch_map
+        map_by_type = get!(
+            all_branch_maps_by_type["reverse_direct_branch_map"],
+            _get_segment_type(k),
+            Dict{PSY.Branch, Tuple{Int, Int}}(),
+        )
+        map_by_type[k] = v
+    end
+    for (k, v) in nrd.parallel_branch_map
+        map_by_type = get!(
+            all_branch_maps_by_type["parallel_branch_map"],
+            _get_segment_type(v),
+            Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
+        )
+        map_by_type[k] = v
+    end
+    for (k, v) in nrd.reverse_parallel_branch_map
+        map_by_type = get!(
+            all_branch_maps_by_type["reverse_parallel_branch_map"],
+            _get_segment_type(k),
+            Dict{PSY.Branch, Tuple{Int, Int}}(),
+        )
+        map_by_type[k] = v
+    end
+    for (k, v) in nrd.series_branch_map
+        #Repeated entry for each type in series chain
+        for x in v
+            map_by_type = get!(
+                all_branch_maps_by_type["series_branch_map"],
+                _get_segment_type(x),
+                Dict{Tuple{Int, Int}, Vector{Any}}(),
+            )
+            map_by_type[k] = v
+        end
+    end
+    for (k, v) in nrd.reverse_series_branch_map
+        map_by_type = get!(
+            all_branch_maps_by_type["reverse_series_branch_map"],
+            _get_segment_type(k),
+            Dict{Tuple{Int, Int}, Vector{Any}}(),
+        )
+        map_by_type[k] = v
+    end
+    for (k, v) in nrd.transformer3W_map
+        map_by_type = get!(
+            all_branch_maps_by_type["transformer3W_map"],
+            _get_segment_type(v),
+            Dict{Tuple{Int, Int}, Vector{Any}}(),
+        )
+        map_by_type[k] = v
+    end
+    for (k, v) in nrd.reverse_transformer3W_map
+        map_by_type = get!(
+            all_branch_maps_by_type["reverse_transformer3W_map"],
+            _get_segment_type(k),
+            Dict{Tuple{Int, Int}, Vector{Any}}(),
+        )
+        map_by_type[k] = v
+    end
+
+    nrd.all_branch_maps_by_type = all_branch_maps_by_type
+    return
+end
+
+_get_segment_type(::T) where {T <: PSY.ACBranch} = T
+_get_segment_type(x::Set{PSY.Branch}) = typeof(first(x))
+_get_segment_type(x::Tuple{PSY.ThreeWindingTransformer, Int}) = typeof(first(x))
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
 get_bus_reduction_map(rb::NetworkReductionData) = rb.bus_reduction_map
