@@ -121,3 +121,19 @@ Interface to obtain the parent bus number of a reduced bus when radial branches 
 function get_mapped_bus_number(rb::NetworkReductionData, bus::PSY.ACBus)
     return get_mapped_bus_number(rb, PSY.get_number(bus))
 end
+
+"""
+Interface to obtain the arc axis based on the network reduction data
+"""
+function get_arc_axis(nr::NetworkReductionData)
+    direct_arcs = collect(keys(nr.direct_branch_map))
+    parallel_arcs = collect(keys(nr.parallel_branch_map))
+    series_arcs = collect(keys(nr.series_branch_map))
+    transformer_arcs = collect(keys(nr.transformer3W_map))
+    additional_arcs = collect(keys(nr.added_branch_map))
+    arc_ax = unique(
+        vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
+    )
+    return arc_ax
+end
+

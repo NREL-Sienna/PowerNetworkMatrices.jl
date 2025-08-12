@@ -926,14 +926,7 @@ function _make_arc_subnetwork_axis(
     subnetworks::Dict{Int, Set{Int}},
     nr::NetworkReductionData,
 )
-    direct_arcs = [x for x in keys(nr.direct_branch_map)]
-    parallel_arcs = [x for x in keys(nr.parallel_branch_map)]
-    series_arcs = [x for x in keys(nr.series_branch_map)]
-    transformer_arcs = [x for x in keys(nr.transformer3W_map)]
-    additional_arcs = [x for x in keys(nr.added_branch_map)]
-    arc_ax = unique(
-        vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
-    )
+    arc_ax = get_arc_axis(nr)
     arc_subnetwork_axis = Dict{Int, Vector{Tuple{Int, Int}}}()
     for k in keys(subnetworks)
         arc_subnetwork_axis[k] = Vector{Tuple{Int, Int}}()

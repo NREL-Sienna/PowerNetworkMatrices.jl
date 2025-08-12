@@ -53,16 +53,9 @@ end
 
 function BA_Matrix(ybus::Ybus)
     nr = ybus.network_reduction_data
-    direct_arcs = [x for x in keys(nr.direct_branch_map)]
-    parallel_arcs = [x for x in keys(nr.parallel_branch_map)]
-    series_arcs = [x for x in keys(nr.series_branch_map)]
-    transformer_arcs = [x for x in keys(nr.transformer3W_map)]
-    additional_arcs = [x for x in keys(nr.added_branch_map)]
     bus_ax = get_bus_axis(ybus)
     bus_lookup = get_bus_lookup(ybus)
-    arc_ax = unique(
-        vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
-    )
+    arc_ax = get_arc_axis(nr)
     n_isolated_buses = length(get_isolated_buses(ybus))
     n_entries = length(arc_ax) * 2 + n_isolated_buses
     BA_I = Vector{Int}(undef, n_entries)
