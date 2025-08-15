@@ -29,6 +29,7 @@ export validate_connectivity
 export VirtualLODF
 export VirtualPTDF
 export Ybus
+export BranchAdmittanceMatrix
 
 using DocStringExtensions
 import InfrastructureSystems
@@ -77,6 +78,7 @@ include("degree_two_reduction.jl")
 include("ward_reduction.jl")
 include("ReductionContainer.jl")
 include("NetworkReductionData.jl")
+include("BranchAdmittanceMatrix.jl")
 include("Ybus.jl")
 include("IncidenceMatrix.jl")
 include("AdjacencyMatrix.jl")
