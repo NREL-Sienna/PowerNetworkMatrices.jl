@@ -15,8 +15,8 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
     subnetwork_axes::Dict{Int, Ax}
     arc_subnetwork_axis::Dict{Int, Vector{Tuple{Int, Int}}}
     network_reduction_data::NetworkReductionData
-    branch_admittance_from_to::Union{BranchAdmittanceMatrix, Nothing}
-    branch_admittance_to_from::Union{BranchAdmittanceMatrix, Nothing}
+    branch_admittance_from_to::Union{ArcAdmittanceMatrix, Nothing}
+    branch_admittance_to_from::Union{ArcAdmittanceMatrix, Nothing}
 end
 
 get_axes(M::Ybus) = M.axes
@@ -836,33 +836,34 @@ function Ybus(
     SparseArrays.dropzeros!(ybus)
 
     if make_branch_admittance_matrices
-        yft_data = SparseArrays.sparse(
-            [1:length(fb); 1:length(fb)],
-            [fb; tb],
-            [y11; y12],
-            length(fb),
-            busnumber,
-        )
-        ytf_data = SparseArrays.sparse(
-            [1:length(tb); 1:length(tb)],
-            [tb; fb],
-            [y22; y21],
-            length(tb),
-            busnumber,
-        )
         arc_axis = get_arc_axis(fb, tb, bus_ax)
         arc_lookup = Dict{Tuple{Int, Int}, Int}()
         for (ix, arc_tuple) in enumerate(arc_axis)
             arc_lookup[arc_tuple] = ix
         end
-        branch_admittance_from_to = BranchAdmittanceMatrix(
+        rows_ix = [arc_lookup[(x, y)] for (x, y) in zip(bus_ax[fb], bus_ax[tb])]
+        yft_data = SparseArrays.sparse(
+            vcat(rows_ix, rows_ix),
+            [fb; tb],
+            [y11; y12],
+            length(arc_axis),
+            busnumber,
+        )
+        ytf_data = SparseArrays.sparse(
+            vcat(rows_ix, rows_ix),
+            [tb; fb],
+            [y22; y21],
+            length(arc_axis),
+            busnumber,
+        )
+        branch_admittance_from_to = ArcAdmittanceMatrix(
             yft_data,
             (arc_axis, bus_ax),
             (arc_lookup, bus_lookup),
             nr,
             :FromTo,
         )
-        branch_admittance_to_from = BranchAdmittanceMatrix(
+        branch_admittance_to_from = ArcAdmittanceMatrix(
             ytf_data,
             (arc_axis, bus_ax),
             (arc_lookup, bus_lookup),
@@ -1072,14 +1073,14 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         yft_data = new_y_ft.data[arc_ix, bus_ix]
         ytf_data = new_y_tf.data[arc_ix, bus_ix]
 
-        branch_admittance_from_to = BranchAdmittanceMatrix(
+        branch_admittance_from_to = ArcAdmittanceMatrix(
             yft_data,
             (arc_ax, bus_ax),
             (arc_lookup, bus_lookup),
             nr,
             :FromTo,
         )
-        branch_admittance_to_from = BranchAdmittanceMatrix(
+        branch_admittance_to_from = ArcAdmittanceMatrix(
             ytf_data,
             (arc_ax, bus_ax),
             (arc_lookup, bus_lookup),
@@ -1151,8 +1152,8 @@ end
 function _add_series_branches_to_ybus!(
     data::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
     bus_lookup::Dict{Int, Int},
-    yft::BranchAdmittanceMatrix,
-    ytf::BranchAdmittanceMatrix,
+    yft::ArcAdmittanceMatrix,
+    ytf::ArcAdmittanceMatrix,
     series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
     nrd::NetworkReductionData,
 )
@@ -1192,14 +1193,14 @@ function _add_series_branches_to_ybus!(
     yft_data = SparseArrays.sparse(I_yft, J_yft, V_yft, row_ix - 1, n_buses)
     ytf_data = SparseArrays.sparse(I_ytf, J_ytf, V_ytf, row_ix - 1, n_buses)
 
-    branch_admittance_from_to = BranchAdmittanceMatrix(
+    branch_admittance_from_to = ArcAdmittanceMatrix(
         yft_data,
         (arc_axis, get_bus_axis(yft)),
         (arc_lookup, get_bus_lookup(yft)),
         nrd,
         :FromTo,
     )
-    branch_admittance_to_from = BranchAdmittanceMatrix(
+    branch_admittance_to_from = ArcAdmittanceMatrix(
         ytf_data,
         (arc_axis, get_bus_axis(ytf)),
         (arc_lookup, get_bus_lookup(ytf)),
