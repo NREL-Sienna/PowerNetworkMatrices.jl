@@ -23,7 +23,6 @@ struct BranchAdmittanceMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Co
     direction::Symbol
 end
 
-
 # functions to get stored data
 get_axes(M::BranchAdmittanceMatrix) = M.axes
 get_lookup(M::BranchAdmittanceMatrix) = M.lookup
