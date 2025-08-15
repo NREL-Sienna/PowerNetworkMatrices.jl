@@ -173,7 +173,8 @@ function ybus_branch_entries(br::PSY.TwoWindingTransformer)
 end
 
 """Ybus branch entries for an arc in the wye model of a `ThreeWindingTransformer`."""
-function ybus_branch_entries(br::PSY.ThreeWindingTransformer, winding_number::Int)
+function ybus_branch_entries(tp::Tuple{PSY.ThreeWindingTransformer, Int})
+    (br, winding_number) = tp
     if winding_number == 1
         Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
         tap = PSY.get_primary_turns_ratio(br) * exp(PSY.get_α_primary(br) * 1im)
@@ -295,7 +296,7 @@ function _ybus!(
         adj[star_ix, primary_ix] = -1
         fb[offset_ix + ix + n_entries] = primary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        (Y11, Y12, Y21, Y22) = ybus_branch_entries(br, 1)
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries((br, 1))
         y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
         y21[offset_ix + ix + n_entries] = Y21
@@ -308,7 +309,7 @@ function _ybus!(
         adj[star_ix, secondary_ix] = -1
         fb[offset_ix + ix + n_entries] = secondary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        (Y11, Y12, Y21, Y22) = ybus_branch_entries(br, 2)
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries((br, 2))
         y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
         y21[offset_ix + ix + n_entries] = Y21
@@ -321,7 +322,7 @@ function _ybus!(
         adj[star_ix, tertiary_ix] = -1
         fb[offset_ix + ix + n_entries] = tertiary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        (Y11, Y12, Y21, Y22) = ybus_branch_entries(br, 3)
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries((br, 3))
         y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
         y21[offset_ix + ix + n_entries] = Y21
