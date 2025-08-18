@@ -95,6 +95,130 @@ function add_to_branch_maps!(
     return
 end
 
+function add_branch_entries_to_ybus!(
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
+    branch_ix::Int,
+    br::PSY.ACTransmission,
+)
+    Y11, Y12, Y21, Y22 = ybus_branch_entries(br)
+    y11[branch_ix] = Y11
+    y12[branch_ix] = Y12
+    y21[branch_ix] = Y21
+    y22[branch_ix] = Y22
+    return
+end
+
+function add_branch_entries_to_indexing_maps!(
+    num_bus::Dict{Int, Int},
+    branch_ix::Int,
+    nr::NetworkReductionData,
+    fb::Vector{Int},
+    tb::Vector{Int},
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
+    br::PSY.ACTransmission,
+)
+    arc = PSY.get_arc(br)
+    add_to_branch_maps!(nr, arc, br)
+    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
+    adj[bus_from_no, bus_to_no] = 1
+    adj[bus_to_no, bus_from_no] = -1
+    fb[branch_ix] = bus_from_no
+    tb[branch_ix] = bus_to_no
+    return
+end
+
+_get_shunt(br::PSY.ACTransmission, node::Symbol) =
+    PSY.get_g(br)[node] + 1im * PSY.get_b(br)[node]
+_get_shunt(::PSY.DiscreteControlledACBranch, ::Symbol) = zero(ComplexF32)
+
+"""Ybus entries for a `Line` or a `DiscreteControlledACBranch`."""
+function ybus_branch_entries(br::PSY.ACTransmission)
+    Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
+    Y11 = Y_l + _get_shunt(br, :from)
+    if !isfinite(Y11) || !isfinite(Y_l)
+        error(
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+        )
+    end
+    Y12 = -Y_l
+    Y21 = Y12
+    Y22 = Y_l + _get_shunt(br, :to)
+    return (Y11, Y12, Y21, Y22)
+end
+
+_get_tap(::PSY.Transformer2W) = one(ComplexF32)
+_get_tap(br::PSY.TwoWindingTransformer) = PSY.get_tap(br)
+
+"""Ybus entries for a `Transformer2W`, `TapTransformer`, or `PhaseShiftingTransformer`."""
+function ybus_branch_entries(br::PSY.TwoWindingTransformer)
+    Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
+    tap = _get_tap(br) * exp(PSY.get_α(br) * 1im)
+    c_tap = _get_tap(br) * exp(-1 * PSY.get_α(br) * 1im)
+    y_shunt = PSY.get_primary_shunt(br)
+    Y11 = Y_t / abs2(tap)
+    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
+        error(
+            "Data in $(summary(br)) gives a non-finite Ybus entry; check input data.",
+        )
+    end
+    Y12 = -Y_t / c_tap
+    Y21 = -Y_t / tap
+    Y22 = Y_t
+    return (Y11 + y_shunt, Y12, Y21, Y22)
+end
+
+"""Ybus branch entries for an arc in the wye model of a `ThreeWindingTransformer`."""
+function ybus_branch_entries(tp::Tuple{PSY.ThreeWindingTransformer, Int})
+    (br, winding_number) = tp
+    if winding_number == 1
+        Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
+        tap = PSY.get_primary_turns_ratio(br) * exp(PSY.get_α_primary(br) * 1im)
+        c_tap = PSY.get_primary_turns_ratio(br) * exp(-1 * PSY.get_α_primary(br) * 1im)
+        Y11 = Y_t / abs2(tap)
+        y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
+        if !isfinite(Y11) || !isfinite(y_shunt)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
+            )
+        end
+        # primary bus alone gets the shunt term
+        Y11 += y_shunt
+    elseif winding_number == 2
+        Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
+        tap = PSY.get_secondary_turns_ratio(br) * exp(PSY.get_α_secondary(br) * 1im)
+        c_tap = PSY.get_secondary_turns_ratio(br) * exp(-1 * PSY.get_α_secondary(br) * 1im)
+        Y11 = Y_t / abs2(tap)
+        if !isfinite(Y11)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
+            )
+        end
+    elseif winding_number == 3
+        Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
+        tap = PSY.get_tertiary_turns_ratio(br) * exp(PSY.get_α_tertiary(br) * 1im)
+        c_tap = PSY.get_tertiary_turns_ratio(br) * exp(-1 * PSY.get_α_tertiary(br) * 1im)
+        Y11 = Y_t / abs2(tap)
+        if !isfinite(Y11)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
+            )
+        end
+    end
+    Y12 = (-Y_t / c_tap)
+    Y21 = (-Y_t / tap)
+    Y22 = Y_t
+    return (Y11, Y12, Y21, Y22)
+end
+
+"""Handles ybus entries for most 2-node AC branches. The types handled here are:
+`Line`, `DiscreteControlledACBranch`, `Transformer2W`, `TapTransformer`, and `PhaseShiftingTransformer`.
+"""
 function _ybus!(
     y11::Vector{ComplexF32},
     y12::Vector{ComplexF32},
@@ -108,64 +232,8 @@ function _ybus!(
     nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
-    arc = PSY.get_arc(br)
-    add_to_branch_maps!(nr, arc, br)
-    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
-    Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
-    Y11 = Y_l + (PSY.get_g(br).from + 1im * PSY.get_b(br).from)
-    if !isfinite(Y11) || !isfinite(Y_l)
-        error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
-        )
-    end
-    y11[branch_ix] = Y11
-    Y12 = -Y_l
-    y12[branch_ix] = Y12
-    Y21 = Y12
-    y21[branch_ix] = Y21
-    Y22 = Y_l + (PSY.get_g(br).to + 1im * PSY.get_b(br).to)
-    y22[branch_ix] = Y22
-    return
-end
-
-function _ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
-    br::PSY.DiscreteControlledACBranch,
-    num_bus::Dict{Int, Int},
-    branch_ix::Int,
-    fb::Vector{Int},
-    tb::Vector{Int},
-    nr::NetworkReductionData,
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
-)
-    arc = PSY.get_arc(br)
-    add_to_branch_maps!(nr, arc, br)
-    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
-    Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
-    Y11 = Y_l
-    if !isfinite(Y11) || !isfinite(Y_l)
-        error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
-        )
-    end
-    y11[branch_ix] = Y11
-    Y12 = -Y_l
-    y12[branch_ix] = Y12
-    Y21 = Y12
-    y21[branch_ix] = Y21
-    Y22 = Y_l
-    y22[branch_ix] = Y22
+    add_branch_entries_to_indexing_maps!(num_bus, branch_ix, nr, fb, tb, adj, br)
+    add_branch_entries_to_ybus!(y11, y12, y21, y22, branch_ix, br)
     return
 end
 
@@ -176,7 +244,6 @@ function _ybus!(
     y22::Vector{ComplexF32},
     br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
-    reverse_bus_search_map::Dict{Int, Int},
     branch_ix::Int,
     fb::Vector{Int},
     tb::Vector{Int},
@@ -190,7 +257,6 @@ function _ybus!(
         y22,
         br.branch,
         num_bus,
-        reverse_bus_search_map,
         branch_ix,
         fb,
         tb,
@@ -205,50 +271,7 @@ function _ybus!(
     y12::Vector{ComplexF32},
     y21::Vector{ComplexF32},
     y22::Vector{ComplexF32},
-    br::PSY.Transformer2W,
-    num_bus::Dict{Int, Int},
-    branch_ix::Int,
-    fb::Vector{Int},
-    tb::Vector{Int},
-    nr::NetworkReductionData,
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
-)
-    arc = PSY.get_arc(br)
-    add_to_branch_maps!(nr, arc, br)
-    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
-
-    Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
-    tap = exp(PSY.get_phase_shift(br) * 1im)
-    c_tap = exp(-1 * PSY.get_phase_shift(br) * 1im)
-    y_shunt = PSY.get_primary_shunt(br)
-
-    Y11 = (Y_t / (tap * c_tap))
-    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
-        error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
-        )
-    end
-
-    y11[branch_ix] = Y11 + y_shunt
-    Y12 = -Y_t / c_tap
-    y12[branch_ix] = Y12
-    Y21 = -Y_t / tap
-    y21[branch_ix] = Y21
-    Y22 = Y_t
-    y22[branch_ix] = Y22
-    return
-end
-
-function _ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
-    br::PSY.Transformer3W,
+    br::PSY.ThreeWindingTransformer,
     num_bus::Dict{Int, Int},
     offset_ix::Int,
     fb::Vector{Int},
@@ -265,32 +288,16 @@ function _ybus!(
     secondary_available = PSY.get_available_secondary(br)
     tertiary_available = PSY.get_available_tertiary(br)
     n_entries = 0
-    y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
     if primary_available
         primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
         adj[primary_ix, star_ix] = 1
         adj[star_ix, primary_ix] = -1
         fb[offset_ix + ix + n_entries] = primary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
-        tap = (PSY.get_primary_turns_ratio(br) * exp(PSY.get_phase_shift_primary(br) * 1im))
-        c_tap = (
-            PSY.get_primary_turns_ratio(br) *
-            exp(-1 * PSY.get_phase_shift_primary(br) * 1im)
-        )
-        Y11 = (Y_t / abs(tap)^2)
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
-            )
-        end
-        y11[offset_ix + ix + n_entries] = Y11 + y_shunt
-        Y12 = (-Y_t / c_tap)
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries((br, 1))
+        y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
-        Y21 = (-Y_t / tap)
         y21[offset_ix + ix + n_entries] = Y21
-        Y22 = Y_t
         y22[offset_ix + ix + n_entries] = Y22
         n_entries += 1
     end
@@ -300,28 +307,10 @@ function _ybus!(
         adj[star_ix, secondary_ix] = -1
         fb[offset_ix + ix + n_entries] = secondary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
-        tap = (
-            PSY.get_secondary_turns_ratio(br) *
-            exp(PSY.get_phase_shift_secondary(br) * 1im)
-        )
-        c_tap = (
-            PSY.get_secondary_turns_ratio(br) *
-            exp(-1 * PSY.get_phase_shift_secondary(br) * 1im)
-        )
-        Y11 = (Y_t / abs(tap)^2)
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
-            )
-        end
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries((br, 2))
         y11[offset_ix + ix + n_entries] = Y11
-        Y12 = (-Y_t / c_tap)
         y12[offset_ix + ix + n_entries] = Y12
-        Y21 = (-Y_t / tap)
         y21[offset_ix + ix + n_entries] = Y21
-        Y22 = Y_t
         y22[offset_ix + ix + n_entries] = Y22
         n_entries += 1
     end
@@ -331,216 +320,14 @@ function _ybus!(
         adj[star_ix, tertiary_ix] = -1
         fb[offset_ix + ix + n_entries] = tertiary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
-        tap =
-            (PSY.get_tertiary_turns_ratio(br) * exp(PSY.get_phase_shift_tertiary(br) * 1im))
-        c_tap = (
-            PSY.get_tertiary_turns_ratio(br) *
-            exp(-1 * PSY.get_phase_shift_tertiary(br) * 1im)
-        )
-        Y11 = (Y_t / abs(tap)^2)
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
-            )
-        end
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries((br, 3))
         y11[offset_ix + ix + n_entries] = Y11
-        Y12 = (-Y_t / c_tap)
         y12[offset_ix + ix + n_entries] = Y12
-        Y21 = (-Y_t / tap)
         y21[offset_ix + ix + n_entries] = Y21
-        Y22 = Y_t
         y22[offset_ix + ix + n_entries] = Y22
         n_entries += 1
     end
     return n_entries
-end
-
-function _ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
-    br::PSY.PhaseShiftingTransformer3W,
-    num_bus::Dict{Int, Int},
-    offset_ix::Int,
-    fb::Vector{Int},
-    tb::Vector{Int},
-    ix::Int,
-    nr::NetworkReductionData,
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
-)
-    primary_star_arc = PSY.get_primary_star_arc(br)
-    secondary_star_arc = PSY.get_secondary_star_arc(br)
-    tertiary_star_arc = PSY.get_tertiary_star_arc(br)
-    add_to_branch_maps!(nr, primary_star_arc, secondary_star_arc, tertiary_star_arc, br)    #TODO - check this for case of some arcs unavailable
-    primary_available = PSY.get_available_primary(br)
-    secondary_available = PSY.get_available_secondary(br)
-    tertiary_available = PSY.get_available_tertiary(br)
-    n_entries = 0
-    y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
-    if primary_available
-        primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
-        adj[primary_ix, star_ix] = 1
-        adj[star_ix, primary_ix] = -1
-        fb[offset_ix + ix + n_entries] = primary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
-        Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
-        tap = (PSY.get_primary_turns_ratio(br) * exp(PSY.get_α_primary(br) * 1im))
-        c_tap = (PSY.get_primary_turns_ratio(br) * exp(-1 * PSY.get_α_primary(br) * 1im))
-        Y11 = (Y_t / abs(tap)^2)
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
-            )
-        end
-        y11[offset_ix + ix + n_entries] = Y11 + y_shunt
-        Y12 = (-Y_t / c_tap)
-        y12[offset_ix + ix + n_entries] = Y12
-        Y21 = (-Y_t / tap)
-        y21[offset_ix + ix + n_entries] = Y21
-        Y22 = Y_t
-        y22[offset_ix + ix + n_entries] = Y22
-        n_entries += 1
-    end
-    if secondary_available
-        secondary_ix, star_ix = get_bus_indices(secondary_star_arc, num_bus, nr)
-        adj[secondary_ix, star_ix] = 1
-        adj[star_ix, secondary_ix] = -1
-        fb[offset_ix + ix + n_entries] = secondary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
-        Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
-        tap = (PSY.get_secondary_turns_ratio(br) * exp(PSY.get_α_secondary(br) * 1im))
-        c_tap =
-            (PSY.get_secondary_turns_ratio(br) * exp(-1 * PSY.get_α_secondary(br) * 1im))
-        Y11 = (Y_t / abs(tap)^2)
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
-            )
-        end
-        y11[offset_ix + ix + n_entries] = Y11
-        Y12 = (-Y_t / c_tap)
-        y12[offset_ix + ix + n_entries] = Y12
-        Y21 = (-Y_t / tap)
-        y21[offset_ix + ix + n_entries] = Y21
-        Y22 = Y_t
-        y22[offset_ix + ix + n_entries] = Y22
-        n_entries += 1
-    end
-    if tertiary_available
-        tertiary_ix, star_ix = get_bus_indices(tertiary_star_arc, num_bus, nr)
-        adj[tertiary_ix, star_ix] = 1
-        adj[star_ix, tertiary_ix] = -1
-        fb[offset_ix + ix + n_entries] = tertiary_ix
-        tb[offset_ix + ix + n_entries] = star_ix
-        Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
-        tap = (PSY.get_tertiary_turns_ratio(br) * exp(PSY.get_α_tertiary(br) * 1im))
-        c_tap = (PSY.get_tertiary_turns_ratio(br) * exp(-1 * PSY.get_α_tertiary(br) * 1im))
-        Y11 = (Y_t / abs(tap)^2)
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
-            )
-        end
-        y11[offset_ix + ix + n_entries] = Y11
-        Y12 = (-Y_t / c_tap)
-        y12[offset_ix + ix + n_entries] = Y12
-        Y21 = (-Y_t / tap)
-        y21[offset_ix + ix + n_entries] = Y21
-        Y22 = Y_t
-        y22[offset_ix + ix + n_entries] = Y22
-        n_entries += 1
-    end
-    return n_entries
-end
-
-function _ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
-    br::PSY.TapTransformer,
-    num_bus::Dict{Int, Int},
-    branch_ix::Int,
-    fb::Vector{Int},
-    tb::Vector{Int},
-    nr::NetworkReductionData,
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
-)
-    arc = PSY.get_arc(br)
-    add_to_branch_maps!(nr, arc, br)
-    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
-
-    Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
-    tap = (PSY.get_tap(br) * exp(PSY.get_phase_shift(br) * 1im))
-    c_tap = (PSY.get_tap(br) * exp(-1 * PSY.get_phase_shift(br) * 1im))
-    y_shunt = PSY.get_primary_shunt(br)
-
-    Y11 = Y_t / (tap * c_tap)
-    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
-        error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br)), tap = $(PSY.get_tap(br))",
-        )
-    end
-
-    y11[branch_ix] = Y11 + y_shunt
-    Y12 = -Y_t / c_tap
-    y12[branch_ix] = Y12
-    Y21 = -Y_t / tap
-    y21[branch_ix] = Y21
-    Y22 = Y_t
-    y22[branch_ix] = Y22
-    return
-end
-
-function _ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
-    br::PSY.PhaseShiftingTransformer,
-    num_bus::Dict{Int, Int},
-    branch_ix::Int,
-    fb::Vector{Int},
-    tb::Vector{Int},
-    nr::NetworkReductionData,
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
-)
-    arc = PSY.get_arc(br)
-    add_to_branch_maps!(nr, arc, br)
-    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
-    Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
-    tap = (PSY.get_tap(br) * exp(PSY.get_α(br) * 1im))
-    c_tap = (PSY.get_tap(br) * exp(-1 * PSY.get_α(br) * 1im))
-    y_shunt = PSY.get_primary_shunt(br)
-    Y11 = (Y_t / abs(tap)^2)
-    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
-        error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br)), tap = $(PSY.get_tap(br))",
-        )
-    end
-
-    y11[branch_ix] = Y11 + y_shunt
-    Y12 = (-Y_t / c_tap)
-    y12[branch_ix] = Y12
-    Y21 = (-Y_t / tap)
-    y21[branch_ix] = Y21
-    Y22 = Y_t
-    y22[branch_ix] = Y22
-    return
 end
 
 function _ybus!(
@@ -595,40 +382,6 @@ function _ybus!(
     end
     sb[fa_ix] = bus_no
     ysh[fa_ix] = Y
-    return
-end
-
-function _ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
-    br::PSY.DiscreteControlledACBranch,
-    num_bus::Dict{Int, Int},
-    branch_ix::Int,
-    fb::Vector{Int},
-    tb::Vector{Int},
-    nr::NetworkReductionData,
-)
-    arc = PSY.get_arc(br)
-    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
-
-    if !isfinite(Y_l)
-        error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
-        )
-    end
-
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
-    fb[branch_ix] = bus_from_no
-    tb[branch_ix] = bus_to_no
-
-    y11[branch_ix] = Y_l
-    y12[branch_ix] = -Y_l
-    y21[branch_ix] = -Y_l
-    y22[branch_ix] = Y_l
     return
 end
 
