@@ -1068,10 +1068,11 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
 
     if new_y_ft !== nothing
         arc_ax = setdiff(get_arc_axis(new_y_ft), nr_new.removed_arcs)
+        arc_remove_ixs = indexin(nr_new.removed_arcs, get_arc_axis(new_y_ft))
+        arc_keep_ixs = setdiff(collect(1:length(get_arc_axis(new_y_ft))), arc_remove_ixs)
         arc_lookup = make_ax_ref(arc_ax)
-        arc_ix = [arc_lookup[x] for x in arc_ax]
-        yft_data = new_y_ft.data[arc_ix, bus_ix]
-        ytf_data = new_y_tf.data[arc_ix, bus_ix]
+        yft_data = new_y_ft.data[arc_keep_ixs, bus_ix]
+        ytf_data = new_y_tf.data[arc_keep_ixs, bus_ix]
 
         branch_admittance_from_to = ArcAdmittanceMatrix(
             yft_data,
@@ -1169,25 +1170,25 @@ function _add_series_branches_to_ybus!(
             _get_ordered_chain_bus_numbers(equivalent_arc, series_map_entry, nrd)
         ordered_bus_indices = [bus_lookup[x] for x in ordered_bus_numbers]
         equivalent_arc_indices = [ordered_bus_indices[1], ordered_bus_indices[end]]
-        ybus_chain = Matrix(data[ordered_bus_indices, ordered_bus_indices])
-        ybus_boundary = _reduce_internal_nodes(ybus_chain)
-        data[equivalent_arc_indices, equivalent_arc_indices] = ybus_boundary
+        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry)
+        ybus_d2_chain = Matrix(data[ordered_bus_indices, ordered_bus_indices])
+        ybus_boundary_d2_chain = _reduce_internal_nodes(ybus_d2_chain)
+        ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
+        data[equivalent_arc_indices, equivalent_arc_indices] = ybus_boundary_d2_chain
 
         push!(arc_axis, equivalent_arc)
-
         push!(I_yft, row_ix)
         push!(I_yft, row_ix)
         push!(J_yft, equivalent_arc_indices[1])
         push!(J_yft, equivalent_arc_indices[2])
-        push!(V_yft, yft[from_to_segments[1], ordered_bus_numbers[1]])
-        push!(V_yft, ybus_boundary[1, 2])
-
+        push!(V_yft, ybus_boundary_isolated_d2_chain[1, 1])
+        push!(V_yft, ybus_boundary_isolated_d2_chain[1, 2])
         push!(I_ytf, row_ix)
         push!(I_ytf, row_ix)
-        push!(J_ytf, equivalent_arc_indices[2])
         push!(J_ytf, equivalent_arc_indices[1])
-        push!(V_ytf, ytf[from_to_segments[end], ordered_bus_numbers[end]])
-        push!(V_ytf, ybus_boundary[2, 1])
+        push!(J_ytf, equivalent_arc_indices[2])
+        push!(V_ytf, ybus_boundary_isolated_d2_chain[2, 2])
+        push!(V_ytf, ybus_boundary_isolated_d2_chain[2, 1])
         row_ix += 1
     end
     yft_data = SparseArrays.sparse(I_yft, J_yft, V_yft, row_ix - 1, n_buses)
