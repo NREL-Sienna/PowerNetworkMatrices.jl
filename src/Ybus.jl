@@ -892,8 +892,7 @@ function _add_series_branches_to_ybus!(
     nrd,
 )
     for (equivalent_arc, series_map_entry) in series_branch_map
-        ordered_bus_numbers =
-            _get_ordered_chain_bus_numbers(equivalent_arc, series_map_entry, nrd)
+        ordered_bus_numbers, _ = _get_chain_data(equivalent_arc, series_map_entry, nrd)
         ordered_bus_indices = [bus_lookup[x] for x in ordered_bus_numbers]
         equivalent_arc_indices = [ordered_bus_indices[1], ordered_bus_indices[end]]
         ybus_chain = Matrix(data[ordered_bus_indices, ordered_bus_indices])
@@ -918,12 +917,11 @@ function _add_series_branches_to_ybus!(
     row_ix = size(yft)[1] + 1
     n_buses = size(yft)[2]
     for (equivalent_arc, series_map_entry) in series_branch_map
-        from_to_segments = _get_from_to_segments(series_map_entry, nrd)
-        ordered_bus_numbers =
-            _get_ordered_chain_bus_numbers(equivalent_arc, series_map_entry, nrd)
+        ordered_bus_numbers, segment_orientations =
+            _get_chain_data(equivalent_arc, series_map_entry, nrd)
         ordered_bus_indices = [bus_lookup[x] for x in ordered_bus_numbers]
         equivalent_arc_indices = [ordered_bus_indices[1], ordered_bus_indices[end]]
-        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry)
+        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry, segment_orientations)
         ybus_d2_chain = Matrix(data[ordered_bus_indices, ordered_bus_indices])
         ybus_boundary_d2_chain = _reduce_internal_nodes(ybus_d2_chain)
         ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
@@ -938,8 +936,8 @@ function _add_series_branches_to_ybus!(
         push!(V_yft, ybus_boundary_isolated_d2_chain[1, 2])
         push!(I_ytf, row_ix)
         push!(I_ytf, row_ix)
-        push!(J_ytf, equivalent_arc_indices[1])
         push!(J_ytf, equivalent_arc_indices[2])
+        push!(J_ytf, equivalent_arc_indices[1])
         push!(V_ytf, ybus_boundary_isolated_d2_chain[2, 2])
         push!(V_ytf, ybus_boundary_isolated_d2_chain[2, 1])
         row_ix += 1
@@ -964,32 +962,100 @@ function _add_series_branches_to_ybus!(
     return branch_admittance_from_to, branch_admittance_to_from
 end
 
-function _get_from_to_segments(series_map_entry::Vector{Any}, nrd::NetworkReductionData)
-    from_to_segments = Vector{Tuple{Int, Int}}()
-    for segment in series_map_entry
-        arc_tuple = get_arc_tuple(segment, nrd)
-        push!(from_to_segments, arc_tuple)
+function _build_chain_ybus(series_chain::Vector{Any}, segment_orientations::Vector{Symbol})
+    fb = Vector{Int}()
+    tb = Vector{Int}()
+    y11 = Vector{ComplexF32}()
+    y12 = Vector{ComplexF32}()
+    y21 = Vector{ComplexF32}()
+    y22 = Vector{ComplexF32}()
+    for (ix, segment) in enumerate(series_chain)
+        add_segment_to_ybus!(
+            segment,
+            y11,
+            y12,
+            y21,
+            y22,
+            fb,
+            tb,
+            ix,
+            segment_orientations[ix],
+        )
     end
-    return from_to_segments
+    return Matrix(
+        SparseArrays.sparse(
+            [fb; fb; tb; tb],  # row indices
+            [fb; tb; fb; tb],  # column indices
+            [y11; y12; y21; y22],  # values
+        ),
+    )
 end
-function _get_ordered_chain_bus_numbers(
+
+function add_segment_to_ybus!(
+    segment::PSY.Branch,
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
+    fb::Vector{Int},
+    tb::Vector{Int},
+    ix::Int,
+    segment_orientation::Symbol,
+)
+    (Y11, Y12, Y21, Y22) = ybus_branch_entries(segment)
+    push!(fb, ix)
+    push!(tb, ix + 1)
+    if segment_orientation == :FromTo
+        push!(y11, Y11)
+        push!(y12, Y12)
+        push!(y21, Y21)
+        push!(y22, Y22)
+    elseif segment_orientation == :ToFrom
+        push!(y11, Y22)
+        push!(y12, Y21)
+        push!(y21, Y12)
+        push!(y22, Y11)
+    else
+        error("Invalid segment orientation $(segment_orientation)")
+    end
+end
+function add_segment_to_ybus!(
+    segment::Set{PSY.Branch},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
+    fb::Vector{Int},
+    tb::Vector{Int},
+    ix::Int,
+    segment_orientation::Symbol,
+)
+    for branch in segment
+        add_segment_to_ybus!(branch, y11, y12, y21, y22, fb, tb, ix, segment_orientation)
+    end
+end
+
+function _get_chain_data(
     equivalent_arc::Tuple{Int, Int},
     series_map_entry::Vector{Any},
     nrd::NetworkReductionData,
 )
     ordered_bus_numbers = [equivalent_arc[1]]
+    segment_orientation = Vector{Symbol}()
     for segment in series_map_entry
         arc_tuple = get_arc_tuple(segment, nrd)
         if arc_tuple[1] in ordered_bus_numbers
             push!(ordered_bus_numbers, arc_tuple[2])
+            push!(segment_orientation, :FromTo)
         elseif arc_tuple[2] in ordered_bus_numbers
             push!(ordered_bus_numbers, arc_tuple[1])
+            push!(segment_orientation, :ToFrom)
         else
             error("Found disconnected series chain")
         end
     end
     @assert ordered_bus_numbers[end] == equivalent_arc[2]
-    return ordered_bus_numbers
+    return ordered_bus_numbers, segment_orientation
 end
 
 function _reduce_internal_nodes(Y::Matrix{ComplexF32})
