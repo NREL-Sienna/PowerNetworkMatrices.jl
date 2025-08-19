@@ -211,9 +211,6 @@ Interface to obtain the parent bus number of a reduced bus when radial branches 
 - `bus_number::Int`: Bus number of the reduced bus
 """
 function get_mapped_bus_number(rb::NetworkReductionData, bus_number::Int)
-    if isempty(rb)
-        return bus_number
-    end
     return get(rb.reverse_bus_search_map, bus_number, bus_number)
 end
 
