@@ -992,7 +992,7 @@ function _build_chain_ybus(series_chain::Vector{Any}, segment_orientations::Vect
 end
 
 function add_segment_to_ybus!(
-    segment::PSY.Branch,
+    segment::Union{PSY.Branch, Tuple{PSY.ThreeWindingTransformer, Int}},
     y11::Vector{ComplexF32},
     y12::Vector{ComplexF32},
     y21::Vector{ComplexF32},
