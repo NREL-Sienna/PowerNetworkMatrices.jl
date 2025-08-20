@@ -102,7 +102,7 @@ function _get_series_susceptance(segment::PSY.Branch)
     return PSY.get_series_susceptance(segment)
 end
 function _get_series_susceptance(segment::Set{PSY.Branch})
-    return sum([_get_series_susceptance(segment) for branch in segment])
+    return sum([_get_series_susceptance(branch) for branch in segment])
 end
 """
 Structure containing the ABA matrix and other relevant data.
