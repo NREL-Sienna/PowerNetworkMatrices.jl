@@ -64,10 +64,16 @@ function BA_Matrix(ybus::Ybus)
     for (ix_arc, arc) in enumerate(arc_ax)
         ix_from_bus = get_bus_index(arc[1], bus_lookup, nr)
         ix_to_bus = get_bus_index(arc[2], bus_lookup, nr)
-        Yt = -1 * ybus.data[ix_from_bus, ix_to_bus]
-        Zt = 1 / Yt
-        # TODO - should we consider phase shift?
-        b = 1 / imag(Zt)
+        # Get series susceptance from components, not the equivalent ybus for reductions of degree two nodes
+        # This results in reduced error relative to the DC power flow result without reductions
+        if haskey(ybus.network_reduction_data.series_branch_map, arc)
+            b = _get_series_susceptance(ybus.network_reduction_data.series_branch_map[arc])
+        else
+            Yt = -1 * ybus.data[ix_from_bus, ix_to_bus]
+            Zt = 1 / Yt
+            # TODO - should we consider phase shift?
+            b = 1 / imag(Zt)
+        end
         BA_I[2 * ix_arc - 1] = ix_from_bus
         BA_J[2 * ix_arc - 1] = ix_arc
         BA_V[2 * ix_arc - 1] = b
@@ -87,6 +93,17 @@ function BA_Matrix(ybus::Ybus)
     return BA_Matrix(data, axes, lookup, subnetwork_axes, ybus.network_reduction_data)
 end
 
+function _get_series_susceptance(series_chain::Vector{Any})
+    series_susceptances = [_get_series_susceptance(segment) for segment in series_chain]
+    total_susceptance = 1 / (sum((1.0 ./ series_susceptances)))
+    return total_susceptance
+end
+function _get_series_susceptance(segment::PSY.Branch)
+    return PSY.get_series_susceptance(segment)
+end
+function _get_series_susceptance(segment::Set{PSY.Branch})
+    return sum([_get_series_susceptance(segment) for branch in segment])
+end
 """
 Structure containing the ABA matrix and other relevant data.
 
