@@ -892,12 +892,18 @@ function _add_series_branches_to_ybus!(
     nrd,
 )
     for (equivalent_arc, series_map_entry) in series_branch_map
-        ordered_bus_numbers, _ = _get_chain_data(equivalent_arc, series_map_entry, nrd)
+        ordered_bus_numbers, segment_orientations =
+            _get_chain_data(equivalent_arc, series_map_entry, nrd)
         ordered_bus_indices = [bus_lookup[x] for x in ordered_bus_numbers]
-        equivalent_arc_indices = [ordered_bus_indices[1], ordered_bus_indices[end]]
-        ybus_chain = Matrix(data[ordered_bus_indices, ordered_bus_indices])
-        ybus_boundary = _reduce_internal_nodes(ybus_chain)
-        data[equivalent_arc_indices, equivalent_arc_indices] = ybus_boundary
+        equivalent_arc_indices = (ordered_bus_indices[1], ordered_bus_indices[end])
+        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry, segment_orientations)
+        ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
+        _apply_d2_chain_ybus!(
+            data,
+            ybus_isolated_d2_chain,
+            ybus_boundary_isolated_d2_chain,
+            equivalent_arc_indices,
+        )
     end
     return yft, ytf
 end
@@ -920,12 +926,15 @@ function _add_series_branches_to_ybus!(
         ordered_bus_numbers, segment_orientations =
             _get_chain_data(equivalent_arc, series_map_entry, nrd)
         ordered_bus_indices = [bus_lookup[x] for x in ordered_bus_numbers]
-        equivalent_arc_indices = [ordered_bus_indices[1], ordered_bus_indices[end]]
+        equivalent_arc_indices = (ordered_bus_indices[1], ordered_bus_indices[end])
         ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry, segment_orientations)
-        ybus_d2_chain = Matrix(data[ordered_bus_indices, ordered_bus_indices])
-        ybus_boundary_d2_chain = _reduce_internal_nodes(ybus_d2_chain)
         ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
-        data[equivalent_arc_indices, equivalent_arc_indices] = ybus_boundary_d2_chain
+        _apply_d2_chain_ybus!(
+            data,
+            ybus_isolated_d2_chain,
+            ybus_boundary_isolated_d2_chain,
+            equivalent_arc_indices,
+        )
 
         push!(arc_axis, equivalent_arc)
         push!(I_yft, row_ix)
@@ -960,6 +969,25 @@ function _add_series_branches_to_ybus!(
         :ToFrom,
     )
     return branch_admittance_from_to, branch_admittance_to_from
+end
+
+function _apply_d2_chain_ybus!(
+    ybus_full::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
+    ybus_chain::Matrix{ComplexF32},
+    ybus_chain_reduced::Matrix{ComplexF32},
+    equivalent_arc_indices::Tuple{Int, Int},
+)
+    equivalent_from_index, equivalent_to_index = equivalent_arc_indices
+    from_bus_entry_difference = ybus_chain_reduced[1, 1] - ybus_chain[1, 1]
+    from_to_bus_entry = ybus_chain_reduced[1, 2]
+    to_from_bus_entry = ybus_chain_reduced[2, 1]
+    to_bus_entry_difference = ybus_chain_reduced[end, end] - ybus_chain[end, end]
+
+    ybus_full[equivalent_from_index, equivalent_from_index] += from_bus_entry_difference
+    ybus_full[equivalent_from_index, equivalent_to_index] = from_to_bus_entry
+    ybus_full[equivalent_to_index, equivalent_from_index] = to_from_bus_entry
+    ybus_full[equivalent_to_index, equivalent_to_index] += to_bus_entry_difference
+    return
 end
 
 function _build_chain_ybus(series_chain::Vector{Any}, segment_orientations::Vector{Symbol})
