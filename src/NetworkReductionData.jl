@@ -187,6 +187,28 @@ function get_retained_branches_names(network_reduction_data::NetworkReductionDat
     ]
 end
 
+"""
+   get_ac_transmission_types(network_reduction_data::NetworkReductionData)
+
+Gets the concrete types of all AC transmission branches included in an instance of NetworkReductionData
+
+# Arguments
+- `network_reduction_data::NetworkReductionData`
+
+# Returns
+- `Vector{<:PSY.ACTransmission}`: Vector of the retained branch types.
+"""
+function get_ac_transmission_types(network_reduction_data::NetworkReductionData)
+    direct_types = unique(typeof.(keys(network_reduction_data.reverse_direct_branch_map)))
+    parallel_types =
+        unique(typeof.(keys(network_reduction_data.reverse_parallel_branch_map)))
+    series_types = unique(typeof.(keys(network_reduction_data.reverse_series_branch_map)))
+    transformer_3w_devices =
+        [first(tuple) for tuple in keys(network_reduction_data.reverse_transformer3W_map)]
+    transformer_3W_types = unique(typeof.(transformer_3w_devices))
+    return unique(vcat(direct_types, parallel_types, series_types, transformer_3W_types))
+end
+
 ##############################################################################
 ########################### Auxiliary functions ##############################
 ##############################################################################
