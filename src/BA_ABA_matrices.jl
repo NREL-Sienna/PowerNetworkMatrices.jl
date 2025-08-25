@@ -104,6 +104,11 @@ end
 function _get_series_susceptance(segment::Set{PSY.Branch})
     return sum([_get_series_susceptance(branch) for branch in segment])
 end
+function _get_series_susceptance(segment::Tuple{PSY.ThreeWindingTransformer, Int})
+    tfw, winding_int = segment
+    return PSY.get_series_susceptance(tfw)[winding_int]
+end
+
 """
 Structure containing the ABA matrix and other relevant data.
 
