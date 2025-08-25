@@ -98,10 +98,10 @@ function _get_series_susceptance(series_chain::Vector{Any})
     total_susceptance = 1 / (sum((1.0 ./ series_susceptances)))
     return total_susceptance
 end
-function _get_series_susceptance(segment::PSY.Branch)
+function _get_series_susceptance(segment::PSY.ACTransmission)
     return PSY.get_series_susceptance(segment)
 end
-function _get_series_susceptance(segment::Set{PSY.Branch})
+function _get_series_susceptance(segment::Set{PSY.ACTransmission})
     return sum([_get_series_susceptance(branch) for branch in segment])
 end
 function _get_series_susceptance(segment::Tuple{PSY.ThreeWindingTransformer, Int})

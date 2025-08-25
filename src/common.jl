@@ -89,7 +89,7 @@ function get_arc_tuple(br::PSY.ACTransmission, nr::NetworkReductionData)
 end
 
 #Assumes set of branches are in parallel 
-function get_arc_tuple(br::Set{PSY.Branch}, nr::NetworkReductionData)
+function get_arc_tuple(br::Set{PSY.ACTransmission}, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(first(br)), nr)
 end
 

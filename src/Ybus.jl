@@ -45,7 +45,7 @@ function get_reduction(
     return get_reduction(A, sys, reduction)
 end
 
-function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.Branch)
+function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.ACTransmission)
     direct_branch_map = get_direct_branch_map(nr)
     reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
     parallel_branch_map = get_parallel_branch_map(nr)
@@ -1020,7 +1020,7 @@ function _build_chain_ybus(series_chain::Vector{Any}, segment_orientations::Vect
 end
 
 function add_segment_to_ybus!(
-    segment::Union{PSY.Branch, Tuple{PSY.ThreeWindingTransformer, Int}},
+    segment::Union{PSY.ACTransmission, Tuple{PSY.ThreeWindingTransformer, Int}},
     y11::Vector{ComplexF32},
     y12::Vector{ComplexF32},
     y21::Vector{ComplexF32},
@@ -1048,7 +1048,7 @@ function add_segment_to_ybus!(
     end
 end
 function add_segment_to_ybus!(
-    segment::Set{PSY.Branch},
+    segment::Set{PSY.ACTransmission},
     y11::Vector{ComplexF32},
     y12::Vector{ComplexF32},
     y21::Vector{ComplexF32},
@@ -1099,7 +1099,7 @@ function _reduce_internal_nodes(Y::Matrix{ComplexF32})
 end
 
 function _remake_reverse_direct_branch_map!(nr::NetworkReductionData)
-    reverse_direct_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    reverse_direct_branch_map = Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     for (k, v) in nr.direct_branch_map
         reverse_direct_branch_map[v] = k
     end
@@ -1107,7 +1107,7 @@ function _remake_reverse_direct_branch_map!(nr::NetworkReductionData)
     return
 end
 function _remake_reverse_parallel_branch_map!(nr::NetworkReductionData)
-    reverse_parallel_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    reverse_parallel_branch_map = Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     for (k, v) in nr.parallel_branch_map
         for x in v
             reverse_parallel_branch_map[x] = k
@@ -1117,7 +1117,7 @@ function _remake_reverse_parallel_branch_map!(nr::NetworkReductionData)
     return
 end
 function _remake_reverse_series_branch_map!(nr::NetworkReductionData)
-    reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    reverse_series_branch_map = Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     for (k, v) in nr.series_branch_map
         for x in v
             reverse_series_branch_map[x] = k
