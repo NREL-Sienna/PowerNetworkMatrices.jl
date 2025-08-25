@@ -2,14 +2,14 @@
     irreducible_buses::Set{Int} = Set{Int}() # Buses that are not reduced in the network reduction
     bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}() # Maps reduced bus to the set of buses it was reduced to
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}()
-    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch} =
-        Dict{Tuple{Int, Int}, PSY.Branch}()
-    reverse_direct_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} =
-        Dict{PSY.Branch, Tuple{Int, Int}}()
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}} =
-        Dict{Tuple{Int, Int}, Set{PSY.Branch}}()
-    reverse_parallel_branch_map::Dict{PSY.Branch, Tuple{Int, Int}} =
-        Dict{PSY.Branch, Tuple{Int, Int}}()
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission} =
+        Dict{Tuple{Int, Int}, PSY.ACTransmission}()
+    reverse_direct_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}} =
+        Dict{PSY.ACTransmission, Tuple{Int, Int}}()
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}} =
+        Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}}()
+    reverse_parallel_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}} =
+        Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}} =
         Dict{Tuple{Int, Int}, Vector{Any}}()
     reverse_series_branch_map::Dict{Any, Tuple{Int, Int}} =
@@ -34,17 +34,20 @@ end
 function populate_branch_maps_by_type!(nrd::NetworkReductionData)
     all_branch_maps_by_type = Dict(
         "direct_branch_map" =>
-            Dict{Type{<:PSY.Branch}, Dict{Tuple{Int, Int}, PSY.Branch}}(),
+            Dict{Type{<:PSY.ACTransmission}, Dict{Tuple{Int, Int}, PSY.ACTransmission}}(),
         "reverse_direct_branch_map" =>
-            Dict{Type{<:PSY.Branch}, Dict{PSY.Branch, Tuple{Int, Int}}}(),
+            Dict{Type{<:PSY.ACTransmission}, Dict{PSY.ACTransmission, Tuple{Int, Int}}}(),
         "parallel_branch_map" =>
-            Dict{Type{<:PSY.Branch}, Dict{Tuple{Int, Int}, Set{PSY.Branch}}}(),
+            Dict{
+                Type{<:PSY.ACTransmission},
+                Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}},
+            }(),
         "reverse_parallel_branch_map" =>
-            Dict{Type{<:PSY.Branch}, Dict{PSY.Branch, Tuple{Int, Int}}}(),
+            Dict{Type{<:PSY.ACTransmission}, Dict{PSY.ACTransmission, Tuple{Int, Int}}}(),
         "series_branch_map" =>
-            Dict{Type{<:PSY.Branch}, Dict{Tuple{Int, Int}, Vector{Any}}}(),
+            Dict{Type{<:PSY.ACTransmission}, Dict{Tuple{Int, Int}, Vector{Any}}}(),
         "reverse_series_branch_map" =>
-            Dict{Type{<:PSY.Branch}, Dict{Any, Tuple{Int, Int}}}(),
+            Dict{Type{<:PSY.ACTransmission}, Dict{Any, Tuple{Int, Int}}}(),
         "transformer3W_map" => Dict{
             Type{<:PSY.ThreeWindingTransformer},
             Dict{
@@ -64,7 +67,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData)
         map_by_type = get!(
             all_branch_maps_by_type["direct_branch_map"],
             _get_segment_type(v),
-            Dict{Tuple{Int, Int}, PSY.Branch}(),
+            Dict{Tuple{Int, Int}, PSY.ACTransmission}(),
         )
         map_by_type[k] = v
     end
@@ -72,7 +75,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData)
         map_by_type = get!(
             all_branch_maps_by_type["reverse_direct_branch_map"],
             _get_segment_type(k),
-            Dict{PSY.Branch, Tuple{Int, Int}}(),
+            Dict{PSY.ACTransmission, Tuple{Int, Int}}(),
         )
         map_by_type[k] = v
     end
@@ -80,7 +83,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData)
         map_by_type = get!(
             all_branch_maps_by_type["parallel_branch_map"],
             _get_segment_type(v),
-            Dict{Tuple{Int, Int}, Set{PSY.Branch}}(),
+            Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}}(),
         )
         map_by_type[k] = v
     end
@@ -88,7 +91,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData)
         map_by_type = get!(
             all_branch_maps_by_type["reverse_parallel_branch_map"],
             _get_segment_type(k),
-            Dict{PSY.Branch, Tuple{Int, Int}}(),
+            Dict{PSY.ACTransmission, Tuple{Int, Int}}(),
         )
         map_by_type[k] = v
     end
@@ -133,7 +136,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData)
 end
 
 _get_segment_type(::T) where {T <: PSY.ACBranch} = T
-_get_segment_type(x::Set{PSY.Branch}) = typeof(first(x))
+_get_segment_type(x::Set{PSY.ACTransmission}) = typeof(first(x))
 _get_segment_type(x::Tuple{PSY.ThreeWindingTransformer, Int}) = typeof(first(x))
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
