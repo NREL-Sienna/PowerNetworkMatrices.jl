@@ -590,23 +590,25 @@ function Ybus(
 
     if make_branch_admittance_matrices
         arc_axis = get_arc_axis(fb, tb, bus_ax)
-        arc_lookup = Dict{Tuple{Int, Int}, Int}()
+        arc_count = length(arc_axis)
+        arc_lookup = sizehint!(Dict{Tuple{Int, Int}, Int}(), arc_count)
         for (ix, arc_tuple) in enumerate(arc_axis)
             arc_lookup[arc_tuple] = ix
         end
         rows_ix = [arc_lookup[(x, y)] for (x, y) in zip(bus_ax[fb], bus_ax[tb])]
+        rows_ix_nnz = vcat(rows_ix, rows_ix)
         yft_data = SparseArrays.sparse(
-            vcat(rows_ix, rows_ix),
+            rows_ix_nnz,
             [fb; tb],
             [y11; y12],
-            length(arc_axis),
+            arc_count,
             busnumber,
         )
         ytf_data = SparseArrays.sparse(
-            vcat(rows_ix, rows_ix),
+            rows_ix_nnz,
             [tb; fb],
             [y22; y21],
-            length(arc_axis),
+            arc_count,
             busnumber,
         )
         branch_admittance_from_to = ArcAdmittanceMatrix(
@@ -667,7 +669,8 @@ end
 Make subnetwork axes for BA_Matrix
 """
 function make_bus_arc_subnetwork_axes(ybus::Ybus)
-    subnetwork_axes = Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}()
+    subnetwork_count = length(ybus.subnetwork_axes)
+    subnetwork_axes = sizehint!(Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}(), subnetwork_count)
     for key in keys(ybus.subnetwork_axes)
         subnetwork_axes[key] = (ybus.subnetwork_axes[key][1], ybus.arc_subnetwork_axis[key])
     end
@@ -763,16 +766,16 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         push!(nr.removed_arcs, x)
         if haskey(nr.direct_branch_map, x)
             remake_reverse_direct_branch_map = true
-            pop!(nr.direct_branch_map, x)
+            delete!(nr.direct_branch_map, x)
         elseif haskey(nr.parallel_branch_map, x)
             remake_reverse_parallel_branch_map = true
-            pop!(nr.parallel_branch_map, x)
+            delete!(nr.parallel_branch_map, x)
         elseif haskey(nr.series_branch_map, x)
             remake_reverse_series_branch_map = true
-            pop!(nr.series_branch_map, x)
+            delete!(nr.series_branch_map, x)
         elseif haskey(nr.transformer3W_map, x)
             remake_reverse_transformer3W_map = true
-            pop!(nr.transformer3W_map, x)
+            delete!(nr.transformer3W_map, x)
         end
     end
     # Add additional entries to the ybus corresponding to the equivalent series arcs
@@ -869,7 +872,7 @@ function _make_subnetwork_axes(ybus, bus_numbers_to_remove, arcs_to_remove)
             new_ref_bus = pop!(axis_1)
             pop!(axis_2)
             subnetwork_axes[new_ref_bus] = (axis_1, axis_2)
-            # If a reference bus key is reduced, change the arc subnetwork axis key as well: 
+            # If a reference bus key is reduced, change the arc subnetwork axis key as well:
             arc_subnetwork_axis[new_ref_bus] = pop!(arc_subnetwork_axis, k)
         end
     end

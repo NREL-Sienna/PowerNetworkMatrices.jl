@@ -61,13 +61,14 @@ function BA_Matrix(ybus::Ybus)
     BA_I = Vector{Int}(undef, n_entries)
     BA_J = Vector{Int}(undef, n_entries)
     BA_V = Vector{Float64}(undef, n_entries)
+    nr_data = get_network_reduction_data(ybus)
     for (ix_arc, arc) in enumerate(arc_ax)
         ix_from_bus = get_bus_index(arc[1], bus_lookup, nr)
         ix_to_bus = get_bus_index(arc[2], bus_lookup, nr)
         # Get series susceptance from components, not the equivalent ybus for reductions of degree two nodes
         # This results in reduced error relative to the DC power flow result without reductions
-        if haskey(ybus.network_reduction_data.series_branch_map, arc)
-            b = _get_series_susceptance(ybus.network_reduction_data.series_branch_map[arc])
+        if is_arc_in_series_map(nr_data, arc)
+            b = _get_series_susceptance(get_mapped_series_branch(nr_data, arc))
         else
             Yt = -1 * ybus.data[ix_from_bus, ix_to_bus]
             Zt = 1 / Yt
