@@ -27,7 +27,7 @@
     added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
     added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
         Dict{Tuple{Int, Int}, Complex{Float32}}()
-    all_branch_maps_by_type::Union{Nothing, Dict{String, Any}} = nothing
+    all_branch_maps_by_type::Dict{String, Any} = Dict{String, Any}()
     reductions::ReductionContainer = ReductionContainer()
 end
 
@@ -172,9 +172,9 @@ end
 """
    get_retained_branches_names(network_reduction_data::NetworkReductionData)
 
-Gets the branch names that are retained after network reduction. This method only returns the 
-branch names from non-three winding transformer branches that have a one-to-one correspondence with 
-arcs after the reduction. This does not include parallel branches or branches that have been reduced as 
+Gets the branch names that are retained after network reduction. This method only returns the
+branch names from non-three winding transformer branches that have a one-to-one correspondence with
+arcs after the reduction. This does not include parallel branches or branches that have been reduced as
 part of a series chain of degree two nodes.
 
 # Arguments
@@ -199,17 +199,17 @@ Gets the concrete types of all AC transmission branches included in an instance 
 - `network_reduction_data::NetworkReductionData`
 
 # Returns
-- `Vector{<:PSY.ACTransmission}`: Vector of the retained branch types.
+- `Set{DataType}`: Vector of the retained branch types.
 """
 function get_ac_transmission_types(network_reduction_data::NetworkReductionData)
-    direct_types = unique(typeof.(keys(network_reduction_data.reverse_direct_branch_map)))
+    direct_types = Set(typeof.(keys(network_reduction_data.reverse_direct_branch_map)))
     parallel_types =
-        unique(typeof.(keys(network_reduction_data.reverse_parallel_branch_map)))
-    series_types = unique(typeof.(keys(network_reduction_data.reverse_series_branch_map)))
+        Set(typeof.(keys(network_reduction_data.reverse_parallel_branch_map)))
+    series_types = Set(typeof.(keys(network_reduction_data.reverse_series_branch_map)))
     transformer_3w_devices =
-        [first(tuple) for tuple in keys(network_reduction_data.reverse_transformer3W_map)]
-    transformer_3W_types = unique(typeof.(transformer_3w_devices))
-    return unique(vcat(direct_types, parallel_types, series_types, transformer_3W_types))
+        Set(first(tuple) for tuple in keys(network_reduction_data.reverse_transformer3W_map))
+    transformer_3W_types = typeof.(transformer_3w_devices)
+    return union(direct_types, parallel_types, series_types, transformer_3W_types)
 end
 
 ##############################################################################
@@ -263,6 +263,19 @@ function get_arc_axis(nr::NetworkReductionData)
         vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
     )
     return arc_ax
+end
+
+function is_arc_in_series_map(nr::NetworkReductionData, arc::Any)
+    return haskey(nr.series_branch_map, arc)
+end
+
+function get_mapped_series_branch(nr::NetworkReductionData, arc::Any)
+    if has_arc_in_series_map(nr, arc)
+        return nr.series_branch_map[arc]
+    else
+        error("Arc $arc not found in series branch map")
+    end
+    return
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, nrd::NetworkReductionData)
