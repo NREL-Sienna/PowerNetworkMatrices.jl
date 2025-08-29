@@ -670,7 +670,10 @@ Make subnetwork axes for BA_Matrix
 """
 function make_bus_arc_subnetwork_axes(ybus::Ybus)
     subnetwork_count = length(ybus.subnetwork_axes)
-    subnetwork_axes = sizehint!(Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}(), subnetwork_count)
+    subnetwork_axes = sizehint!(
+        Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}(),
+        subnetwork_count,
+    )
     for key in keys(ybus.subnetwork_axes)
         subnetwork_axes[key] = (ybus.subnetwork_axes[key][1], ybus.arc_subnetwork_axis[key])
     end
