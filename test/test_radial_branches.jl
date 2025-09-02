@@ -92,5 +92,4 @@ end
     rr = get_network_reduction_data(ybus)
     @test !haskey(rr.reverse_bus_search_map, 16)
     @test !haskey(rr.reverse_bus_search_map, 17)
-    #@test isa(PTDF(sys; network_reduction = rr), PTDF)     #TODO - look at this test once PTDF works; I think I have captured the functionality with other added tests
 end
