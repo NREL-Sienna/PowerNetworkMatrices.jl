@@ -335,7 +335,7 @@ function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetwo
 end
 
 function _compute_parallel_multiplier(
-    parallel_branch_set::Set{PSY.Branch},
+    parallel_branch_set::Set{PSY.ACTransmission},
     branch_name::String,
 )
     b_total = 0.0

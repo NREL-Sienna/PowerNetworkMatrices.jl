@@ -15,10 +15,8 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
     subnetwork_axes::Dict{Int, Ax}
     arc_subnetwork_axis::Dict{Int, Vector{Tuple{Int, Int}}}
     network_reduction_data::NetworkReductionData
-    yft::Union{SparseArrays.SparseMatrixCSC{ComplexF32, Int}, Nothing}
-    ytf::Union{SparseArrays.SparseMatrixCSC{ComplexF32, Int}, Nothing}
-    fb::Union{Vector{Int}, Nothing}
-    tb::Union{Vector{Int}, Nothing}
+    branch_admittance_from_to::Union{ArcAdmittanceMatrix, Nothing}
+    branch_admittance_to_from::Union{ArcAdmittanceMatrix, Nothing}
 end
 
 get_axes(M::Ybus) = M.axes
@@ -47,7 +45,7 @@ function get_reduction(
     return get_reduction(A, sys, reduction)
 end
 
-function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.Branch)
+function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.ACTransmission)
     direct_branch_map = get_direct_branch_map(nr)
     reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
     parallel_branch_map = get_parallel_branch_map(nr)
@@ -591,27 +589,46 @@ function Ybus(
     SparseArrays.dropzeros!(ybus)
 
     if make_branch_admittance_matrices
-        yft = SparseArrays.sparse(
-            [1:length(fb); 1:length(fb)],
+        arc_axis = get_arc_axis(fb, tb, bus_ax)
+        arc_count = length(arc_axis)
+        arc_lookup = sizehint!(Dict{Tuple{Int, Int}, Int}(), arc_count)
+        for (ix, arc_tuple) in enumerate(arc_axis)
+            arc_lookup[arc_tuple] = ix
+        end
+        rows_ix = [arc_lookup[(x, y)] for (x, y) in zip(bus_ax[fb], bus_ax[tb])]
+        rows_ix_nnz = vcat(rows_ix, rows_ix)
+        yft_data = SparseArrays.sparse(
+            rows_ix_nnz,
             [fb; tb],
             [y11; y12],
-            length(fb),
+            arc_count,
             busnumber,
         )
-        ytf = SparseArrays.sparse(
-            [1:length(tb); 1:length(tb)],
+        ytf_data = SparseArrays.sparse(
+            rows_ix_nnz,
             [tb; fb],
             [y22; y21],
-            length(tb),
+            arc_count,
             busnumber,
         )
+        branch_admittance_from_to = ArcAdmittanceMatrix(
+            yft_data,
+            (arc_axis, bus_ax),
+            (arc_lookup, bus_lookup),
+            nr,
+            :FromTo,
+        )
+        branch_admittance_to_from = ArcAdmittanceMatrix(
+            ytf_data,
+            (arc_axis, bus_ax),
+            (arc_lookup, bus_lookup),
+            nr,
+            :ToFrom,
+        )
     else
-        yft = nothing
-        ytf = nothing
-        fb = nothing
-        tb = nothing
+        branch_admittance_from_to = nothing
+        branch_admittance_to_from = nothing
     end
-
     if length(bus_lookup) > 1
         subnetworks = assign_reference_buses!(
             find_subnetworks(ybus, bus_ax; subnetwork_algorithm = subnetwork_algorithm),
@@ -633,10 +650,8 @@ function Ybus(
         subnetwork_axes,
         arc_subnetwork_axis,
         nr,
-        yft,
-        ytf,
-        fb,
-        tb,
+        branch_admittance_from_to,
+        branch_admittance_to_from,
     )
 
     for nr in network_reductions
@@ -645,11 +660,20 @@ function Ybus(
     return ybus
 end
 
+#TODO - handle arc axis consistently between BranchAdmittanceMatrices and IncidenceMatrix
+function get_arc_axis(fb::Vector{Int}, tb::Vector{Int}, bus_axis::Vector{Int})
+    return unique(collect(zip(bus_axis[fb], bus_axis[tb])))
+end
+
 """
 Make subnetwork axes for BA_Matrix
 """
 function make_bus_arc_subnetwork_axes(ybus::Ybus)
-    subnetwork_axes = Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}()
+    subnetwork_count = length(ybus.subnetwork_axes)
+    subnetwork_axes = sizehint!(
+        Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}(),
+        subnetwork_count,
+    )
     for key in keys(ybus.subnetwork_axes)
         subnetwork_axes[key] = (ybus.subnetwork_axes[key][1], ybus.arc_subnetwork_axis[key])
     end
@@ -679,14 +703,7 @@ function _make_arc_subnetwork_axis(
     subnetworks::Dict{Int, Set{Int}},
     nr::NetworkReductionData,
 )
-    direct_arcs = [x for x in keys(nr.direct_branch_map)]
-    parallel_arcs = [x for x in keys(nr.parallel_branch_map)]
-    series_arcs = [x for x in keys(nr.series_branch_map)]
-    transformer_arcs = [x for x in keys(nr.transformer3W_map)]
-    additional_arcs = [x for x in keys(nr.added_branch_map)]
-    arc_ax = unique(
-        vcat(direct_arcs, parallel_arcs, series_arcs, transformer_arcs, additional_arcs),
-    )
+    arc_ax = get_arc_axis(nr)
     arc_subnetwork_axis = Dict{Int, Vector{Tuple{Int, Int}}}()
     for k in keys(subnetworks)
         arc_subnetwork_axis[k] = Vector{Tuple{Int, Int}}()
@@ -752,20 +769,27 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         push!(nr.removed_arcs, x)
         if haskey(nr.direct_branch_map, x)
             remake_reverse_direct_branch_map = true
-            pop!(nr.direct_branch_map, x)
+            delete!(nr.direct_branch_map, x)
         elseif haskey(nr.parallel_branch_map, x)
             remake_reverse_parallel_branch_map = true
-            pop!(nr.parallel_branch_map, x)
+            delete!(nr.parallel_branch_map, x)
         elseif haskey(nr.series_branch_map, x)
             remake_reverse_series_branch_map = true
-            pop!(nr.series_branch_map, x)
+            delete!(nr.series_branch_map, x)
         elseif haskey(nr.transformer3W_map, x)
             remake_reverse_transformer3W_map = true
-            pop!(nr.transformer3W_map, x)
+            delete!(nr.transformer3W_map, x)
         end
     end
     # Add additional entries to the ybus corresponding to the equivalent series arcs
-    _add_series_branches_to_ybus!(ybus, nr_new.series_branch_map)
+    new_y_ft, new_y_tf = _add_series_branches_to_ybus!(
+        ybus.data,
+        get_bus_lookup(ybus),
+        ybus.branch_admittance_from_to,
+        ybus.branch_admittance_to_from,
+        nr_new.series_branch_map,
+        nr,
+    )
 
     remake_reverse_direct_branch_map && _remake_reverse_direct_branch_map!(nr)
     remake_reverse_parallel_branch_map && _remake_reverse_parallel_branch_map!(nr)
@@ -801,7 +825,33 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     subnetwork_axes, arc_subnetwork_axis =
         _make_subnetwork_axes(ybus, bus_numbers_to_remove, nr_new.removed_arcs)
 
-    #TODO - doesn't yet account for reduction in yft, ytf, fb, tb
+    if new_y_ft !== nothing
+        arc_ax = setdiff(get_arc_axis(new_y_ft), nr_new.removed_arcs)
+        arc_remove_ixs = indexin(nr_new.removed_arcs, get_arc_axis(new_y_ft))
+        arc_keep_ixs = setdiff(collect(1:length(get_arc_axis(new_y_ft))), arc_remove_ixs)
+        arc_lookup = make_ax_ref(arc_ax)
+        yft_data = new_y_ft.data[arc_keep_ixs, bus_ix]
+        ytf_data = new_y_tf.data[arc_keep_ixs, bus_ix]
+
+        branch_admittance_from_to = ArcAdmittanceMatrix(
+            yft_data,
+            (arc_ax, bus_ax),
+            (arc_lookup, bus_lookup),
+            nr,
+            :FromTo,
+        )
+        branch_admittance_to_from = ArcAdmittanceMatrix(
+            ytf_data,
+            (arc_ax, bus_ax),
+            (arc_lookup, bus_lookup),
+            nr,
+            :ToFrom,
+        )
+    else
+        branch_admittance_from_to = ybus.branch_admittance_from_to
+        branch_admittance_to_from = ybus.branch_admittance_to_from
+    end
+
     return Ybus(
         data,
         adjacency_data,
@@ -810,10 +860,8 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         subnetwork_axes,
         arc_subnetwork_axis,
         nr,
-        ybus.yft,
-        ybus.ytf,
-        ybus.fb,
-        ybus.tb,
+        branch_admittance_from_to,
+        branch_admittance_to_from,
     )
 end
 
@@ -827,7 +875,7 @@ function _make_subnetwork_axes(ybus, bus_numbers_to_remove, arcs_to_remove)
             new_ref_bus = pop!(axis_1)
             pop!(axis_2)
             subnetwork_axes[new_ref_bus] = (axis_1, axis_2)
-            # If a reference bus key is reduced, change the arc subnetwork axis key as well: 
+            # If a reference bus key is reduced, change the arc subnetwork axis key as well:
             arc_subnetwork_axis[new_ref_bus] = pop!(arc_subnetwork_axis, k)
         end
     end
@@ -842,85 +890,222 @@ function _make_subnetwork_axes(ybus, bus_numbers_to_remove, arcs_to_remove)
 end
 
 function _add_series_branches_to_ybus!(
-    ybus::Ybus,
+    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
+    bus_lookup::Dict{Int, Int},
+    yft::Nothing,
+    ytf::Nothing,
     series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
+    nrd,
 )
-    bus_lookup = ybus.lookup[1]
-    data = ybus.data
-    nrd = get_network_reduction_data(ybus)
     for (equivalent_arc, series_map_entry) in series_branch_map
-        series_impedance_from_to = 0.0
-        series_impedance_to_from = 0.0
-        shunt_admittance = 0.0
-        for series_segment in series_map_entry
-            segment_series_impedance_from_to,
-            segment_series_impedance_to_from,
-            segment_shunt_admittance =
-                _get_equivalent_line_parameters(ybus, equivalent_arc, series_segment, nrd)
-            series_impedance_from_to += segment_series_impedance_from_to
-            series_impedance_to_from += segment_series_impedance_to_from
-            shunt_admittance += segment_shunt_admittance
-        end
-        data[bus_lookup[equivalent_arc[1]], bus_lookup[equivalent_arc[2]]] +=
-            1 / series_impedance_from_to
-        data[bus_lookup[equivalent_arc[2]], bus_lookup[equivalent_arc[1]]] +=
-            1 / series_impedance_to_from
-        data[bus_lookup[equivalent_arc[1]], bus_lookup[equivalent_arc[1]]] +=
-            shunt_admittance / 2
-        data[bus_lookup[equivalent_arc[2]], bus_lookup[equivalent_arc[2]]] +=
-            shunt_admittance / 2
+        ordered_bus_numbers, segment_orientations =
+            _get_chain_data(equivalent_arc, series_map_entry, nrd)
+        ordered_bus_indices = [bus_lookup[x] for x in ordered_bus_numbers]
+        equivalent_arc_indices = (ordered_bus_indices[1], ordered_bus_indices[end])
+        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry, segment_orientations)
+        ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
+        _apply_d2_chain_ybus!(
+            data,
+            ybus_isolated_d2_chain,
+            ybus_boundary_isolated_d2_chain,
+            equivalent_arc_indices,
+        )
     end
+    return yft, ytf
+end
+
+function _add_series_branches_to_ybus!(
+    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
+    bus_lookup::Dict{Int, Int},
+    yft::ArcAdmittanceMatrix,
+    ytf::ArcAdmittanceMatrix,
+    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
+    nrd::NetworkReductionData,
+)
+    arc_lookup = get_arc_lookup(yft)
+    arc_axis = get_arc_axis(yft)
+    I_yft, J_yft, V_yft = SparseArrays.findnz(yft.data)
+    I_ytf, J_ytf, V_ytf = SparseArrays.findnz(ytf.data)
+    row_ix = size(yft)[1] + 1
+    n_buses = size(yft)[2]
+    for (equivalent_arc, series_map_entry) in series_branch_map
+        ordered_bus_numbers, segment_orientations =
+            _get_chain_data(equivalent_arc, series_map_entry, nrd)
+        ordered_bus_indices = [bus_lookup[x] for x in ordered_bus_numbers]
+        equivalent_arc_indices = (ordered_bus_indices[1], ordered_bus_indices[end])
+        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry, segment_orientations)
+        ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
+        _apply_d2_chain_ybus!(
+            data,
+            ybus_isolated_d2_chain,
+            ybus_boundary_isolated_d2_chain,
+            equivalent_arc_indices,
+        )
+
+        push!(arc_axis, equivalent_arc)
+        push!(I_yft, row_ix)
+        push!(I_yft, row_ix)
+        push!(J_yft, equivalent_arc_indices[1])
+        push!(J_yft, equivalent_arc_indices[2])
+        push!(V_yft, ybus_boundary_isolated_d2_chain[1, 1])
+        push!(V_yft, ybus_boundary_isolated_d2_chain[1, 2])
+        push!(I_ytf, row_ix)
+        push!(I_ytf, row_ix)
+        push!(J_ytf, equivalent_arc_indices[2])
+        push!(J_ytf, equivalent_arc_indices[1])
+        push!(V_ytf, ybus_boundary_isolated_d2_chain[2, 2])
+        push!(V_ytf, ybus_boundary_isolated_d2_chain[2, 1])
+        row_ix += 1
+    end
+    yft_data = SparseArrays.sparse(I_yft, J_yft, V_yft, row_ix - 1, n_buses)
+    ytf_data = SparseArrays.sparse(I_ytf, J_ytf, V_ytf, row_ix - 1, n_buses)
+
+    branch_admittance_from_to = ArcAdmittanceMatrix(
+        yft_data,
+        (arc_axis, get_bus_axis(yft)),
+        (arc_lookup, get_bus_lookup(yft)),
+        nrd,
+        :FromTo,
+    )
+    branch_admittance_to_from = ArcAdmittanceMatrix(
+        ytf_data,
+        (arc_axis, get_bus_axis(ytf)),
+        (arc_lookup, get_bus_lookup(ytf)),
+        nrd,
+        :ToFrom,
+    )
+    return branch_admittance_from_to, branch_admittance_to_from
+end
+
+function _apply_d2_chain_ybus!(
+    ybus_full::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
+    ybus_chain::Matrix{ComplexF32},
+    ybus_chain_reduced::Matrix{ComplexF32},
+    equivalent_arc_indices::Tuple{Int, Int},
+)
+    equivalent_from_index, equivalent_to_index = equivalent_arc_indices
+    from_bus_entry_difference = ybus_chain_reduced[1, 1] - ybus_chain[1, 1]
+    from_to_bus_entry = ybus_chain_reduced[1, 2]
+    to_from_bus_entry = ybus_chain_reduced[2, 1]
+    to_bus_entry_difference = ybus_chain_reduced[end, end] - ybus_chain[end, end]
+
+    ybus_full[equivalent_from_index, equivalent_from_index] += from_bus_entry_difference
+    ybus_full[equivalent_from_index, equivalent_to_index] = from_to_bus_entry
+    ybus_full[equivalent_to_index, equivalent_from_index] = to_from_bus_entry
+    ybus_full[equivalent_to_index, equivalent_to_index] += to_bus_entry_difference
     return
 end
 
-function _get_equivalent_line_parameters(
-    ybus::Ybus,
-    equivalent_arc::Tuple{Int, Int},
-    branch::Union{PSY.Branch, Tuple{PSY.ThreeWindingTransformer, Int}},
-    network_reduction_data::NetworkReductionData,
-)
-    fr_bus_no, to_bus_no = get_arc_tuple(branch, network_reduction_data)
-    data = ybus.data
-    bus_lookup = ybus.lookup[1]
-    series_impedance_from_to = 1 / data[bus_lookup[fr_bus_no], bus_lookup[to_bus_no]]
-    series_impedance_to_from = 1 / data[bus_lookup[to_bus_no], bus_lookup[fr_bus_no]]
-    shunt_admittance = 0.0
-    if fr_bus_no ∉ equivalent_arc
-        shunt_admittance += data[bus_lookup[fr_bus_no], bus_lookup[fr_bus_no]]
+function _build_chain_ybus(series_chain::Vector{Any}, segment_orientations::Vector{Symbol})
+    fb = Vector{Int}()
+    tb = Vector{Int}()
+    y11 = Vector{ComplexF32}()
+    y12 = Vector{ComplexF32}()
+    y21 = Vector{ComplexF32}()
+    y22 = Vector{ComplexF32}()
+    for (ix, segment) in enumerate(series_chain)
+        add_segment_to_ybus!(
+            segment,
+            y11,
+            y12,
+            y21,
+            y22,
+            fb,
+            tb,
+            ix,
+            segment_orientations[ix],
+        )
     end
-    if to_bus_no ∉ equivalent_arc
-        shunt_admittance += data[bus_lookup[to_bus_no], bus_lookup[to_bus_no]]
-    end
-    return series_impedance_from_to, series_impedance_to_from, shunt_admittance
+    return Matrix(
+        SparseArrays.sparse(
+            [fb; fb; tb; tb],  # row indices
+            [fb; tb; fb; tb],  # column indices
+            [y11; y12; y21; y22],  # values
+        ),
+    )
 end
 
-function _get_equivalent_line_parameters(
-    ybus::Ybus,
-    equivalent_arc::Tuple{Int, Int},
-    branches::Set{PSY.Branch},
-    network_reduction_data::NetworkReductionData,
+function add_segment_to_ybus!(
+    segment::Union{PSY.ACTransmission, Tuple{PSY.ThreeWindingTransformer, Int}},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
+    fb::Vector{Int},
+    tb::Vector{Int},
+    ix::Int,
+    segment_orientation::Symbol,
 )
-    series_impedance_from_to = 0.0
-    series_impedance_to_from = 0.0
-    shunt_admittance = 0.0
-    for branch in branches
-        segment_series_impedance_from_to,
-        segment_series_impedance_to_from,
-        segment_shunt_admittance = _get_equivalent_line_parameters(
-            ybus,
-            equivalent_arc,
-            branch,
-            network_reduction_data,
-        )
-        series_impedance_from_to += segment_series_impedance_from_to
-        series_impedance_to_from += segment_series_impedance_to_from
-        shunt_admittance += segment_shunt_admittance
+    (Y11, Y12, Y21, Y22) = ybus_branch_entries(segment)
+    push!(fb, ix)
+    push!(tb, ix + 1)
+    if segment_orientation == :FromTo
+        push!(y11, Y11)
+        push!(y12, Y12)
+        push!(y21, Y21)
+        push!(y22, Y22)
+    elseif segment_orientation == :ToFrom
+        push!(y11, Y22)
+        push!(y12, Y21)
+        push!(y21, Y12)
+        push!(y22, Y11)
+    else
+        error("Invalid segment orientation $(segment_orientation)")
     end
-    return series_impedance_from_to, series_impedance_to_from, shunt_admittance
+end
+function add_segment_to_ybus!(
+    segment::Set{PSY.ACTransmission},
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
+    fb::Vector{Int},
+    tb::Vector{Int},
+    ix::Int,
+    segment_orientation::Symbol,
+)
+    for branch in segment
+        add_segment_to_ybus!(branch, y11, y12, y21, y22, fb, tb, ix, segment_orientation)
+    end
+end
+
+function _get_chain_data(
+    equivalent_arc::Tuple{Int, Int},
+    series_map_entry::Vector{Any},
+    nrd::NetworkReductionData,
+)
+    ordered_bus_numbers = [equivalent_arc[1]]
+    segment_orientation = Vector{Symbol}()
+    for segment in series_map_entry
+        arc_tuple = get_arc_tuple(segment, nrd)
+        if arc_tuple[1] in ordered_bus_numbers
+            push!(ordered_bus_numbers, arc_tuple[2])
+            push!(segment_orientation, :FromTo)
+        elseif arc_tuple[2] in ordered_bus_numbers
+            push!(ordered_bus_numbers, arc_tuple[1])
+            push!(segment_orientation, :ToFrom)
+        else
+            error("Found disconnected series chain")
+        end
+    end
+    @assert ordered_bus_numbers[end] == equivalent_arc[2]
+    return ordered_bus_numbers, segment_orientation
+end
+
+function _reduce_internal_nodes(Y::Matrix{ComplexF32})
+    dim_Y = size(Y)[1]
+    keep_ix = [1, dim_Y]
+    eliminate_ix = collect(2:(dim_Y - 1))
+    Y_kk = Y[keep_ix, keep_ix]
+    Y_ee = Y[eliminate_ix, eliminate_ix]
+    Y_ke = Y[keep_ix, eliminate_ix]
+    Y_ek = Y[eliminate_ix, keep_ix]
+    Y_reduced = Y_kk - Y_ke * (Y_ee \ Y_ek)
+    return Y_reduced
 end
 
 function _remake_reverse_direct_branch_map!(nr::NetworkReductionData)
-    reverse_direct_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    reverse_direct_branch_map = Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     for (k, v) in nr.direct_branch_map
         reverse_direct_branch_map[v] = k
     end
@@ -928,7 +1113,7 @@ function _remake_reverse_direct_branch_map!(nr::NetworkReductionData)
     return
 end
 function _remake_reverse_parallel_branch_map!(nr::NetworkReductionData)
-    reverse_parallel_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    reverse_parallel_branch_map = Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     for (k, v) in nr.parallel_branch_map
         for x in v
             reverse_parallel_branch_map[x] = k
@@ -938,7 +1123,7 @@ function _remake_reverse_parallel_branch_map!(nr::NetworkReductionData)
     return
 end
 function _remake_reverse_series_branch_map!(nr::NetworkReductionData)
-    reverse_series_branch_map = Dict{PSY.Branch, Tuple{Int, Int}}()
+    reverse_series_branch_map = Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     for (k, v) in nr.series_branch_map
         for x in v
             reverse_series_branch_map[x] = k
