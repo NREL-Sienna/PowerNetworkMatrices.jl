@@ -1,3 +1,29 @@
+"""
+    DegreeTwoReduction <: NetworkReduction
+
+Network reduction algorithm that eliminates buses with exactly two connections by combining
+the incident branches into a single equivalent branch. This reduction preserves the electrical
+characteristics of the network while simplifying its topology.
+
+# Fields
+- `irreducible_buses::Vector{Int}`: List of bus numbers that should not be eliminated even if they have degree two
+- `reduce_reactive_power_injectors::Bool`: Whether to reduce buses with reactive power injections (default: true)
+
+# Examples
+```julia
+# Create degree-two reduction with default settings
+reduction = DegreeTwoReduction()
+
+# Create degree-two reduction protecting specific buses
+reduction = DegreeTwoReduction(irreducible_buses=[101, 205])
+
+# Create reduction that preserves buses with reactive power injections
+reduction = DegreeTwoReduction(reduce_reactive_power_injectors=false)
+
+# Apply to system
+ybus = Ybus(system; network_reductions=[reduction])
+```
+"""
 @kwdef struct DegreeTwoReduction <: NetworkReduction
     irreducible_buses::Vector{Int} = Vector{Int}()
     reduce_reactive_power_injectors::Bool = true
