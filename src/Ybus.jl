@@ -1,11 +1,51 @@
 """
-Nodal admittance matrix (Ybus) is an N x N matrix describing a power system with N buses. It represents the nodal admittance of the buses in a power system.
+    Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
 
-The Ybus Struct is indexed using the Bus Numbers, no need for them to be sequential
+Nodal admittance matrix (Y-bus) representing the electrical admittance relationships between
+buses in a power system. This N×N sparse complex matrix encodes the network topology and
+electrical parameters needed for power flow calculations and network analysis.
 
-The fields yft and ytf are the branch admittance matrices for the from-to and to-from branch admittances respectively. The rows correspond to branches and the columns to buses.
-The matrix columns are mapped to buses using fb, tb arrays of the matrix columns that correspond to the `from` and `to` buses.
-Using yft, ytf, and the voltage vector, the branch currents and power flows can be calculated.
+# Fields
+- `data::SparseArrays.SparseMatrixCSC{ComplexF32, Int}`: Sparse Y-bus matrix with complex admittance values
+- `adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int}`: Network connectivity information
+- `axes::Ax`: Tuple of bus axis vectors for indexing (bus_numbers, bus_numbers)
+- `lookup::L`: Tuple of lookup dictionaries mapping bus numbers to matrix indices
+- `subnetwork_axes::Dict{Int, Ax}`: Bus axes for each electrical island/subnetwork
+- `arc_subnetwork_axis::Dict{Int, Vector{Tuple{Int, Int}}}`: Arc axes for each subnetwork
+- `network_reduction_data::NetworkReductionData`: Metadata from network reduction operations
+- `branch_admittance_from_to::Union{ArcAdmittanceMatrix, Nothing}`: From-to branch admittance matrix
+- `branch_admittance_to_from::Union{ArcAdmittanceMatrix, Nothing}`: To-from branch admittance matrix
+
+# Key Features
+- Indexed by bus numbers (non-sequential numbering supported)
+- Supports network reductions (radial, degree-two, Ward)
+- Handles multiple electrical islands/subnetworks
+- Optional branch admittance matrices for power flow calculations
+- Sparse matrix representation for computational efficiency
+
+# Usage
+The Y-bus is fundamental for:
+- Power flow analysis: V = Y⁻¹I
+- Short circuit calculations
+- Network impedance analysis
+- Sensitivity analysis (PTDF/LODF)
+
+# Examples
+```julia
+# Basic Y-bus construction
+ybus = Ybus(system)
+
+# With branch admittance matrices for power flow
+ybus = Ybus(system; make_branch_admittance_matrices=true)
+
+# With network reductions
+ybus = Ybus(system; network_reductions=[RadialReduction(), DegreeTwoReduction()])
+```
+
+# See Also
+- [`PTDF`](@ref): Power Transfer Distribution Factors
+- [`LODF`](@ref): Line Outage Distribution Factors
+- [`NetworkReduction`](@ref): Network reduction algorithms
 """
 struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
     data::SparseArrays.SparseMatrixCSC{ComplexF32, Int}
@@ -27,15 +67,91 @@ get_network_reduction_data(M::Ybus) = M.network_reduction_data
 get_bus_axis(M::Ybus) = M.axes[1]
 get_bus_lookup(M::Ybus) = M.lookup[1]
 
+"""
+    get_isolated_buses(M::Ybus) -> Vector{Int}
+
+Return bus numbers that form isolated single-node subnetworks in the Y-bus matrix.
+
+Isolated buses are electrical islands containing only one bus with no connections to
+other parts of the network. These typically represent buses that were disconnected
+during network reduction operations or buses with no active branches.
+
+# Arguments
+- `M::Ybus`: Y-bus matrix to analyze
+
+# Returns
+- `Vector{Int}`: Vector of bus numbers that form isolated single-node subnetworks
+
+# Examples
+```julia
+ybus = Ybus(system)
+isolated = get_isolated_buses(ybus)
+println("Isolated buses: ", isolated)
+```
+"""
 function get_isolated_buses(M::Ybus)
     return [x for x in keys(M.subnetwork_axes) if length(M.subnetwork_axes[x][1]) == 1]
 end
 
+"""
+    get_default_reduction(sys::PSY.System) -> NetworkReductionData
+
+Build a Y-bus matrix from the system and return its default network reduction data.
+
+This function constructs a Y-bus matrix with no network reductions applied and returns
+the resulting `NetworkReductionData`, which contains the basic bus and branch mappings
+for the system without any reduction algorithms.
+
+# Arguments
+- `sys::PSY.System`: Power system to analyze
+
+# Returns
+- `NetworkReductionData`: Default network reduction data with basic system mappings
+
+# Examples
+```julia
+system = System("system.json")
+reduction_data = get_default_reduction(system)
+println("Number of buses: ", length(get_bus_reduction_map(reduction_data)))
+```
+
+# See Also
+- [`Ybus`](@ref): Y-bus matrix construction
+- [`NetworkReductionData`](@ref): Network reduction data structure
+"""
 function get_default_reduction(sys::PSY.System)
     ybus = Ybus(sys)
     return ybus.network_reduction_data
 end
 
+"""
+    get_reduction(ybus::Ybus, sys::PSY.System, reduction::RadialReduction) -> NetworkReductionData
+
+Apply radial network reduction to a Y-bus matrix.
+
+Radial reduction eliminates radial (dangling) buses that have only one connection.
+These buses do not affect power flows in the rest of the network and can be safely
+removed to reduce computational complexity.
+
+# Arguments
+- `ybus::Ybus`: Y-bus matrix to reduce
+- `sys::PSY.System`: Power system for validation
+- `reduction::RadialReduction`: Radial reduction configuration
+
+# Returns
+- `NetworkReductionData`: Reduction data containing eliminated buses and updated mappings
+
+# Examples
+```julia
+ybus = Ybus(system)
+reduction = RadialReduction(irreducible_buses=[101, 205])
+reduction_data = get_reduction(ybus, system, reduction)
+```
+
+# See Also
+- [`RadialReduction`](@ref): Radial reduction configuration
+- [`get_reduction`](@ref): Other reduction methods
+"""
 function get_reduction(
     ybus::Ybus,
     sys::PSY.System,
@@ -45,6 +161,26 @@ function get_reduction(
     return get_reduction(A, sys, reduction)
 end
 
+"""
+    add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.ACTransmission)
+
+Add an AC transmission branch to the appropriate branch mapping in NetworkReductionData.
+
+This function categorizes branches as direct (one-to-one), parallel (multiple branches
+between same buses), or creates new mappings as needed. It maintains both forward and
+reverse lookup dictionaries for efficient access.
+
+# Arguments
+- `nr::NetworkReductionData`: Network reduction data to modify
+- `arc::PSY.Arc`: Arc representing the branch connection
+- `br::PSY.ACTransmission`: AC transmission branch to add
+
+# Implementation Details
+- If arc already has a direct branch, converts to parallel mapping
+- If arc already has parallel branches, adds to existing set
+- Otherwise creates new direct mapping
+- Maintains reverse lookup consistency
+"""
 function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.ACTransmission)
     direct_branch_map = get_direct_branch_map(nr)
     reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
@@ -68,6 +204,32 @@ function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.ACT
     return
 end
 
+"""
+    add_to_branch_maps!(
+        nr::NetworkReductionData,
+        primary_star_arc::PSY.Arc,
+        secondary_star_arc::PSY.Arc,
+        tertiary_star_arc::PSY.Arc,
+        br::PSY.ThreeWindingTransformer
+    )
+
+Add a three-winding transformer to the transformer mapping in NetworkReductionData.
+
+Three-winding transformers are modeled using a star (wye) configuration with three arcs
+connecting to a virtual star bus. Each available winding is mapped separately.
+
+# Arguments
+- `nr::NetworkReductionData`: Network reduction data to modify
+- `primary_star_arc::PSY.Arc`: Arc for primary winding
+- `secondary_star_arc::PSY.Arc`: Arc for secondary winding
+- `tertiary_star_arc::PSY.Arc`: Arc for tertiary winding
+- `br::PSY.ThreeWindingTransformer`: Three-winding transformer to add
+
+# Implementation Details
+- Only adds arcs for available windings (checked via PSY.get_available_*)
+- Maintains transformer3W_map and reverse_transformer3W_map
+- Each winding is numbered (1=primary, 2=secondary, 3=tertiary)
+"""
 function add_to_branch_maps!(
     nr::NetworkReductionData,
     primary_star_arc::PSY.Arc,
@@ -95,6 +257,36 @@ function add_to_branch_maps!(
     return
 end
 
+"""
+    add_branch_entries_to_ybus!(
+        y11::Vector{ComplexF32},
+        y12::Vector{ComplexF32},
+        y21::Vector{ComplexF32},
+        y22::Vector{ComplexF32},
+        branch_ix::Int,
+        br::PSY.ACTransmission
+    )
+
+Add Y-bus matrix entries for an AC transmission branch to the admittance vectors.
+
+This function calculates the 2×2 Y-bus entries for a branch using `ybus_branch_entries()`
+and stores them in the provided vectors at the specified index. The entries represent
+the Pi-model admittances: Y11 (from-bus self), Y12 (from-to mutual), Y21 (to-from mutual),
+and Y22 (to-bus self).
+
+# Arguments
+- `y11::Vector{ComplexF32}`: Vector for from-bus self admittances
+- `y12::Vector{ComplexF32}`: Vector for from-to mutual admittances
+- `y21::Vector{ComplexF32}`: Vector for to-from mutual admittances
+- `y22::Vector{ComplexF32}`: Vector for to-bus self admittances
+- `branch_ix::Int`: Index where to store the branch entries
+- `br::PSY.ACTransmission`: AC transmission branch
+
+# Implementation Details
+- Calls `ybus_branch_entries()` to compute Pi-model parameters
+- Stores results directly in the provided vectors
+- Used during Y-bus matrix assembly process
+"""
 function add_branch_entries_to_ybus!(
     y11::Vector{ComplexF32},
     y12::Vector{ComplexF32},
@@ -111,6 +303,37 @@ function add_branch_entries_to_ybus!(
     return
 end
 
+"""
+    add_branch_entries_to_indexing_maps!(
+        num_bus::Dict{Int, Int},
+        branch_ix::Int,
+        nr::NetworkReductionData,
+        fb::Vector{Int},
+        tb::Vector{Int},
+        adj::SparseArrays.SparseMatrixCSC{Int8, Int},
+        br::PSY.ACTransmission
+    )
+
+Update indexing structures when adding an AC transmission branch to the Y-bus.
+
+This function handles the bookkeeping required when adding a branch: updates network
+reduction mappings, sets adjacency matrix entries, and records from/to bus indices
+for the branch in the Y-bus construction vectors.
+
+# Arguments
+- `num_bus::Dict{Int, Int}`: Mapping from bus numbers to matrix indices
+- `branch_ix::Int`: Branch index in the vectors
+- `nr::NetworkReductionData`: Network reduction data to update
+- `fb::Vector{Int}`: Vector of from-bus indices
+- `tb::Vector{Int}`: Vector of to-bus indices
+- `adj::SparseArrays.SparseMatrixCSC{Int8, Int}`: Adjacency matrix
+- `br::PSY.ACTransmission`: AC transmission branch to add
+
+# Implementation Details
+- Calls `add_to_branch_maps!()` to update reduction mappings
+- Updates adjacency matrix with branch connectivity
+- Records bus indices in from/to vectors for sparse matrix construction
+"""
 function add_branch_entries_to_indexing_maps!(
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -462,7 +685,60 @@ function _buildybus!(
 end
 
 """
-Builds a Ybus from the system. The return is a Ybus Array indexed with the bus numbers and the arc tuples.
+    Ybus(
+        sys::PSY.System;
+        make_branch_admittance_matrices::Bool = false,
+        network_reductions::Vector{NetworkReduction} = NetworkReduction[],
+        include_constant_impedance_loads::Bool = true,
+        subnetwork_algorithm = iterative_union_find,
+        kwargs...
+    ) -> Ybus
+
+Construct a nodal admittance matrix (Y-bus) from a power system.
+
+Builds the sparse complex Y-bus matrix representing the electrical admittance relationships
+between buses in the power system. Handles AC branches, transformers, shunt elements,
+and network reductions while maintaining connectivity analysis.
+
+# Arguments
+- `sys::PSY.System`: Power system to build Y-bus from
+
+# Keyword arguments
+- `make_branch_admittance_matrices::Bool=false`: Whether to construct branch admittance matrices for power flow
+- `network_reductions::Vector{NetworkReduction}=[]`: Network reduction algorithms to apply
+- `include_constant_impedance_loads::Bool=true`: Whether to include constant impedance loads as shunt admittances
+- `subnetwork_algorithm=iterative_union_find`: Algorithm for finding electrical islands
+
+# Returns
+- `Ybus`: Constructed Y-bus matrix with network topology and electrical parameters
+
+# Features
+- **Branch Support**: Lines, transformers, phase shifters, three-winding transformers
+- **Shunt Elements**: Fixed admittances, switched admittances, constant impedance loads
+- **Network Reductions**: Radial, degree-two, Ward reductions for computational efficiency
+- **Multiple Islands**: Handles disconnected network components with separate reference buses
+- **Branch Matrices**: Optional from-to/to-from admittance matrices for power flow calculations
+
+# Examples
+```julia
+# Basic Y-bus construction
+ybus = Ybus(system)
+
+# With branch admittance matrices for power flow
+ybus = Ybus(system; make_branch_admittance_matrices=true)
+
+# Apply network reductions for computational efficiency
+reductions = [RadialReduction(), DegreeTwoReduction()]
+ybus = Ybus(system; network_reductions=reductions)
+
+# Exclude constant impedance loads
+ybus = Ybus(system; include_constant_impedance_loads=false)
+```
+
+# See Also
+- [`NetworkReduction`](@ref): Network reduction algorithms
+- [`PTDF`](@ref): Power transfer distribution factors
+- [`LODF`](@ref): Line outage distribution factors
 """
 function Ybus(
     sys::PSY.System;
@@ -470,7 +746,6 @@ function Ybus(
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     include_constant_impedance_loads = true,
     subnetwork_algorithm = iterative_union_find,
-    kwargs...,
 )
     ref_bus_numbers = Set{Int}()
     nr = NetworkReductionData()
@@ -660,13 +935,65 @@ function Ybus(
     return ybus
 end
 
-#TODO - handle arc axis consistently between BranchAdmittanceMatrices and IncidenceMatrix
+"""
+    get_arc_axis(fb::Vector{Int}, tb::Vector{Int}, bus_axis::Vector{Int}) -> Vector{Tuple{Int, Int}}
+
+Generate unique arc axis from from-bus and to-bus index vectors.
+
+Creates a vector of unique (from_bus, to_bus) tuples representing the arcs (branches)
+in the system. Used for constructing branch admittance matrices and organizing
+network topology data.
+
+# Arguments
+- `fb::Vector{Int}`: Vector of from-bus indices into bus_axis
+- `tb::Vector{Int}`: Vector of to-bus indices into bus_axis
+- `bus_axis::Vector{Int}`: Vector of bus numbers
+
+# Returns
+- `Vector{Tuple{Int, Int}}`: Unique arcs as (from_bus_number, to_bus_number) tuples
+
+# Examples
+```julia
+fb = [1, 2, 1]  # indices into bus_axis
+tb = [2, 3, 3]  # indices into bus_axis
+bus_axis = [101, 102, 103]  # bus numbers
+arcs = get_arc_axis(fb, tb, bus_axis)
+# Returns: [(101, 102), (102, 103), (101, 103)]
+```
+
+# Implementation Details
+- Maps indices to actual bus numbers using bus_axis
+- Removes duplicates with unique()
+- Preserves arc direction (from → to)
+"""
 function get_arc_axis(fb::Vector{Int}, tb::Vector{Int}, bus_axis::Vector{Int})
+    #TODO - handle arc axis consistently between BranchAdmittanceMatrices and IncidenceMatrix
     return unique(collect(zip(bus_axis[fb], bus_axis[tb])))
 end
 
 """
-Make subnetwork axes for BA_Matrix
+    make_bus_arc_subnetwork_axes(ybus::Ybus) -> Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}
+
+Create subnetwork axes for BA_Matrix construction from a Y-bus matrix.
+
+Generates subnetwork-specific axes combining bus and arc information needed for
+constructing Bus-Arc (BA) matrices. Each subnetwork gets its own bus list and
+corresponding arc list for matrix indexing.
+
+# Arguments
+- `ybus::Ybus`: Y-bus matrix containing subnetwork information
+
+# Returns
+- `Dict{Int, Tuple{Vector{Int}, Vector{Tuple{Int, Int}}}}`: Dictionary mapping reference bus numbers to (bus_axis, arc_axis) tuples for each subnetwork
+
+# Implementation Details
+- Combines bus axes from `ybus.subnetwork_axes` with arc axes from `ybus.arc_subnetwork_axis`
+- Maintains consistency between bus and arc indexing within each electrical island
+- Used for constructing BA matrices that relate bus injections to branch flows
+
+# See Also
+- [`BA_Matrix`](@ref): Bus-Arc matrix construction
+- [`make_arc_bus_subnetwork_axes`](@ref): Arc-Bus variant
 """
 function make_bus_arc_subnetwork_axes(ybus::Ybus)
     subnetwork_count = length(ybus.subnetwork_axes)
@@ -681,7 +1008,28 @@ function make_bus_arc_subnetwork_axes(ybus::Ybus)
 end
 
 """
-Make subnetwork axes for IncidenceMatrix
+    make_arc_bus_subnetwork_axes(ybus::Ybus) -> Dict{Int, Tuple{Vector{Tuple{Int, Int}}, Vector{Int}}}
+
+Create subnetwork axes for IncidenceMatrix construction from a Y-bus matrix.
+
+Generates subnetwork-specific axes with arc-bus ordering needed for constructing
+incidence matrices. Each subnetwork gets its own arc list and corresponding bus
+list for matrix indexing.
+
+# Arguments
+- `ybus::Ybus`: Y-bus matrix containing subnetwork information
+
+# Returns
+- `Dict{Int, Tuple{Vector{Tuple{Int, Int}}, Vector{Int}}}`: Dictionary mapping reference bus numbers to (arc_axis, bus_axis) tuples for each subnetwork
+
+# Implementation Details
+- Swaps order compared to `make_bus_arc_subnetwork_axes` (arc first, bus second)
+- Uses same underlying data from `ybus.subnetwork_axes` and `ybus.arc_subnetwork_axis`
+- Used for constructing incidence matrices that relate branch connectivity to bus topology
+
+# See Also
+- [`IncidenceMatrix`](@ref): Network incidence matrix
+- [`make_bus_arc_subnetwork_axes`](@ref): Bus-Arc variant
 """
 function make_arc_bus_subnetwork_axes(ybus::Ybus)
     subnetwork_axes = Dict{Int, Tuple{Vector{Tuple{Int, Int}}, Vector{Int}}}()
@@ -720,6 +1068,46 @@ function _make_arc_subnetwork_axis(
     return arc_subnetwork_axis
 end
 
+"""
+    build_reduced_ybus(
+        ybus::Ybus,
+        sys::PSY.System,
+        network_reduction::NetworkReduction
+    ) -> Ybus
+
+Apply a network reduction algorithm to a Y-bus matrix.
+
+Computes the network reduction data using the specified reduction algorithm and
+then applies the reduction to create a new Y-bus matrix with eliminated buses
+and branches. The electrical behavior of the remaining network is preserved.
+
+# Arguments
+- `ybus::Ybus`: Original Y-bus matrix to reduce
+- `sys::PSY.System`: Power system for validation and data access
+- `network_reduction::NetworkReduction`: Reduction algorithm to apply
+
+# Returns
+- `Ybus`: New reduced Y-bus matrix with eliminated elements
+
+# Implementation Details
+- Calls `get_reduction()` to compute elimination data
+- Applies reduction via `_apply_reduction()`
+- Preserves electrical equivalence of remaining network
+- Updates all indexing and mapping structures
+
+# Examples
+```julia
+ybus = Ybus(system)
+reduction = RadialReduction()
+reduced_ybus = build_reduced_ybus(ybus, system, reduction)
+println("Original buses: ", length(get_bus_axis(ybus)))
+println("Reduced buses: ", length(get_bus_axis(reduced_ybus)))
+```
+
+# See Also
+- [`NetworkReduction`](@ref): Reduction algorithm types
+- [`get_reduction`](@ref): Reduction data computation
+"""
 function build_reduced_ybus(
     ybus::Ybus,
     sys::PSY.System,
@@ -1025,6 +1413,46 @@ function _build_chain_ybus(series_chain::Vector{Any}, segment_orientations::Vect
     )
 end
 
+"""
+    add_segment_to_ybus!(
+        segment::Union{PSY.ACTransmission, Tuple{PSY.ThreeWindingTransformer, Int}},
+        y11::Vector{ComplexF32},
+        y12::Vector{ComplexF32},
+        y21::Vector{ComplexF32},
+        y22::Vector{ComplexF32},
+        fb::Vector{Int},
+        tb::Vector{Int},
+        ix::Int,
+        segment_orientation::Symbol
+    )
+
+Add a branch segment to Y-bus vectors during series chain reduction.
+
+Adds the Y-bus entries for a single segment (branch or transformer winding) to the
+admittance vectors, handling the proper orientation. Used when building equivalent
+Y-bus entries for series chains of degree-two buses.
+
+# Arguments
+- `segment::Union{PSY.ACTransmission, Tuple{PSY.ThreeWindingTransformer, Int}}`: Branch segment to add
+- `y11::Vector{ComplexF32}`: Vector for from-bus self admittances
+- `y12::Vector{ComplexF32}`: Vector for from-to mutual admittances
+- `y21::Vector{ComplexF32}`: Vector for to-from mutual admittances
+- `y22::Vector{ComplexF32}`: Vector for to-bus self admittances
+- `fb::Vector{Int}`: Vector for from-bus indices
+- `tb::Vector{Int}`: Vector for to-bus indices
+- `ix::Int`: Index position for the segment
+- `segment_orientation::Symbol`: `:FromTo` or `:ToFrom` orientation
+
+# Implementation Details
+- Computes Pi-model entries using `ybus_branch_entries()`
+- Handles orientation by swapping entries for `:ToFrom`
+- Sets bus indices to consecutive values (ix, ix+1) for chain building
+- Used in degree-two network reduction algorithms
+
+# See Also
+- [`DegreeTwoReduction`](@ref): Degree-two bus elimination
+- [`ybus_branch_entries`](@ref): Pi-model computation
+"""
 function add_segment_to_ybus!(
     segment::Union{PSY.ACTransmission, Tuple{PSY.ThreeWindingTransformer, Int}},
     y11::Vector{ComplexF32},
@@ -1053,6 +1481,47 @@ function add_segment_to_ybus!(
         error("Invalid segment orientation $(segment_orientation)")
     end
 end
+
+"""
+    add_segment_to_ybus!(
+        segment::Set{PSY.ACTransmission},
+        y11::Vector{ComplexF32},
+        y12::Vector{ComplexF32},
+        y21::Vector{ComplexF32},
+        y22::Vector{ComplexF32},
+        fb::Vector{Int},
+        tb::Vector{Int},
+        ix::Int,
+        segment_orientation::Symbol
+    )
+
+Add multiple parallel branches as a single segment to Y-bus vectors.
+
+Handles the case where a segment in a series chain consists of multiple parallel
+branches between the same pair of buses. Each branch in the set is added to the
+same Y-bus position, effectively combining their admittances.
+
+# Arguments
+- `segment::Set{PSY.ACTransmission}`: Set of parallel AC transmission branches
+- `y11::Vector{ComplexF32}`: Vector for from-bus self admittances
+- `y12::Vector{ComplexF32}`: Vector for from-to mutual admittances
+- `y21::Vector{ComplexF32}`: Vector for to-from mutual admittances
+- `y22::Vector{ComplexF32}`: Vector for to-bus self admittances
+- `fb::Vector{Int}`: Vector for from-bus indices
+- `tb::Vector{Int}`: Vector for to-bus indices
+- `ix::Int`: Index position for the segment
+- `segment_orientation::Symbol`: `:FromTo` or `:ToFrom` orientation
+
+# Implementation Details
+- Iterates through all branches in the parallel set
+- Calls single-branch `add_segment_to_ybus!()` for each branch
+- Y-bus entries are accumulated at the same index position
+- Results in equivalent admittance of parallel combination
+
+# See Also
+- [`add_segment_to_ybus!`](@ref): Single branch variant
+- [`DegreeTwoReduction`](@ref): Series chain elimination
+"""
 function add_segment_to_ybus!(
     segment::Set{PSY.ACTransmission},
     y11::Vector{ComplexF32},
@@ -1144,7 +1613,40 @@ function _remake_reverse_transformer3W_map!(nr::NetworkReductionData)
 end
 
 """
-Validates connectivity by checking that the number of subnetworks is 1 (fully connected network).
+    validate_connectivity(M::Ybus) -> Bool
+
+Validate that the Y-bus represents a fully connected electrical network.
+
+Checks network connectivity by counting the number of electrical islands (subnetworks)
+in the Y-bus matrix. A fully connected network should have exactly one subnetwork.
+Multiple subnetworks indicate electrical isolation between parts of the system.
+
+# Arguments
+- `M::Ybus`: Y-bus matrix to validate
+
+# Returns
+- `Bool`: `true` if network is fully connected (single subnetwork), `false` otherwise
+
+# Examples
+```julia
+ybus = Ybus(system)
+if validate_connectivity(ybus)
+    println("Network is fully connected")
+else
+    println("Network has isolated islands")
+    islands = find_subnetworks(ybus)
+    println("Number of islands: ", length(islands))
+end
+```
+
+# Implementation Details
+- Uses `find_subnetworks()` to identify electrical islands
+- Single subnetwork indicates full electrical connectivity
+- Multiple subnetworks may require separate power flow solutions
+
+# See Also
+- [`find_subnetworks`](@ref): Identify electrical islands
+- [`validate_connectivity`](@ref): System-level connectivity validation
 """
 function validate_connectivity(M::Ybus)
     sub_nets = find_subnetworks(M)
@@ -1152,8 +1654,43 @@ function validate_connectivity(M::Ybus)
 end
 
 """
-Evaluates subnetworks by looking for the subsets of buses connected each other,
-but not connected with buses of other subsets.
+    find_subnetworks(M::Ybus) -> Dict{Int, Set{Int}}
+
+Identify electrical islands (subnetworks) in the Y-bus matrix.
+
+Analyzes the network topology to find groups of buses that are electrically connected
+to each other but isolated from other groups. Each subnetwork represents an electrical
+island that requires its own reference bus and can be solved independently.
+
+# Arguments
+- `M::Ybus`: Y-bus matrix to analyze
+
+# Returns
+- `Dict{Int, Set{Int}}`: Dictionary mapping reference bus numbers to sets of bus numbers in each subnetwork
+
+# Examples
+```julia
+ybus = Ybus(system)
+subnetworks = find_subnetworks(ybus)
+for (ref_bus, buses) in subnetworks
+    println("Island ", ref_bus, ": ", sort(collect(buses)))
+end
+
+if length(subnetworks) > 1
+    @warn "Network has ", length(subnetworks), " electrical islands"
+end
+```
+
+# Implementation Details
+- Uses adjacency matrix analysis to find connected components
+- Each subnetwork gets assigned a reference bus for voltage angle reference
+- Isolated buses or groups require separate power flow analysis
+- Critical for power flow initialization and solution
+
+# See Also
+- [`validate_connectivity`](@ref): Check for full connectivity
+- [`depth_first_search`](@ref): Graph traversal algorithm
+- [`iterative_union_find`](@ref): Alternative connectivity algorithm
 """
 function find_subnetworks(M::Ybus)
     bus_numbers = M.axes[2]
