@@ -3,6 +3,26 @@ struct WardReduction <: NetworkReduction
 end
 get_study_buses(nr::WardReduction) = nr.study_buses
 
+"""
+    get_ward_reduction(data, bus_lookup, bus_axis, boundary_buses, ref_bus_numbers, study_buses)
+
+Perform Ward reduction to create an equivalent network representation.
+
+Ward reduction is a network reduction technique that eliminates external buses while preserving 
+the electrical characteristics seen from the study buses. External buses are mapped to boundary 
+buses based on impedance criteria, and equivalent admittances are computed.
+
+# Arguments
+- `data::SparseArrays.SparseMatrixCSC{ComplexF32, Int}`: Admittance matrix of the system
+- `bus_lookup::Dict{Int, Int}`: Dictionary mapping bus numbers to matrix indices
+- `bus_axis::Vector{Int}`: Vector of all bus numbers in the system
+- `boundary_buses::Set{Int}`: Set of boundary bus numbers between study and external areas
+- `ref_bus_numbers::Set{Int}`: Set of reference bus numbers
+- `study_buses::Vector{Int}`: Vector of study bus numbers to retain
+
+# Returns
+- `Tuple`: Contains bus reduction map, reverse bus search map, added branch map, and added admittance map
+"""
 function get_ward_reduction(
     data::SparseArrays.SparseMatrixCSC{ComplexF32, Int},
     bus_lookup::Dict{Int, Int},
