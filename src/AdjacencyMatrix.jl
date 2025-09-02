@@ -1,23 +1,43 @@
 
 """
-Nodal incidence matrix (Adjacency) is an N x N matrix describing a power system with N buses. It represents the directed connectivity of the buses in a power system.
+    AdjacencyMatrix{Ax, L} <: PowerNetworkMatrix{Int8}
 
-The AdjacencyMatrix Struct is indexed using the Bus Numbers, no need for them to be sequential
+An N × N adjacency matrix representing the connectivity structure of a power system with N buses.
+This matrix describes the directed connectivity between buses, where non-zero entries indicate
+electrical connections through transmission lines, transformers, or other network elements.
 
-# Arguments
-- `data::SparseArrays.SparseMatrixCSC{Int8, Int}`:
-        stores the incidence matrix
-- `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors, the first one contains the names of each
-        line of the network (each one related to a row of the Matrix in "data"),
-        the second one contains the names of each bus of the network (each one
-        related to a column of the Matrix in "data")
-- `lookup<:NTuple{2, Dict}`:
-        Tuple containing 2 Dictionaries mapping the number of rows and columns
-        with the names of branches and buses
-- `ref_bus_positions::Set{Int}`:
-        Vector containing the indexes of the columns of the BA matrix corresponding
-        to the reference buses
+The matrix is indexed using bus numbers, which do not need to be sequential. Each element
+`A[i,j]` is non-zero if there is a direct electrical connection between bus `i` and bus `j`.
+Diagonal elements are typically zero since self-loops are not meaningful in power network topology.
+
+# Fields
+- `data::SparseArrays.SparseMatrixCSC{Int8, Int}`: The sparse adjacency matrix storing
+  connectivity information as Int8 values (0 for no connection, non-zero for connection)
+- `axes::Ax`: Tuple containing the axis labels for both dimensions. The first element contains
+  bus identifiers for rows, the second contains bus identifiers for columns (typically identical)
+- `lookup::L`: Tuple of dictionaries providing bidirectional mapping between bus names/numbers
+  and their corresponding matrix indices
+- `subnetwork_axes::Dict{Int, Ax}`: Dictionary mapping subnetwork identifiers to their
+  corresponding axis information, used for handling electrical islands
+- `network_reduction_data::NetworkReductionData`: Container for network reduction algorithms
+  and their associated data, enabling efficient matrix operations on reduced networks
+
+# Examples
+```julia
+# Create from a PowerSystems.System
+sys = System("case5.m")
+adj = AdjacencyMatrix(sys)
+
+# Create from a Ybus matrix
+ybus = Ybus(sys)
+adj = AdjacencyMatrix(ybus)
+
+# Check connectivity
+is_connected = validate_connectivity(adj)
+subnetworks = find_subnetworks(adj)
+```
+
+See also: [`Ybus`](@ref), [`IncidenceMatrix`](@ref), [`PowerNetworkMatrix`](@ref)
 """
 struct AdjacencyMatrix{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Int8}
     data::SparseArrays.SparseMatrixCSC{Int8, Int}
@@ -76,14 +96,38 @@ function get_reduction(
 end
 
 """
-Builds a AdjacencyMatrix from the system. The return is an N x N AdjacencyMatrix Array indexed with the bus numbers.
+    AdjacencyMatrix(sys::PSY.System; kwargs...)
 
+Construct an AdjacencyMatrix from a PowerSystems.System.
+
+# Arguments
+- `sys::PSY.System`: The power system from which to construct the adjacency matrix
+
+# Keyword arguments
+- `make_branch_admittance_matrices::Bool=false`: Whether to construct branch admittance matrices for power flow
+- `network_reductions::Vector{NetworkReduction}=[]`: Network reduction algorithms to apply
+- `include_constant_impedance_loads::Bool=true`: Whether to include constant impedance loads as shunt admittances
+- `subnetwork_algorithm=iterative_union_find`: Algorithm for finding electrical islands
+
+# Returns
+- `AdjacencyMatrix`: An N x N adjacency matrix indexed with bus numbers showing connectivity
 """
 function AdjacencyMatrix(sys::PSY.System; kwargs...)
     ybus = Ybus(sys; kwargs...)
     return AdjacencyMatrix(ybus)
 end
 
+"""
+    AdjacencyMatrix(ybus::Ybus)
+
+Construct an AdjacencyMatrix from a Ybus matrix.
+
+# Arguments
+- `ybus::Ybus`: The Ybus matrix from which to construct the adjacency matrix
+
+# Returns
+- `AdjacencyMatrix`: The constructed adjacency matrix showing bus connectivity
+"""
 function AdjacencyMatrix(ybus::Ybus)
     adj_matrix = deepcopy(ybus.adjacency_data)
     for i in 1:size(adj_matrix, 1)
