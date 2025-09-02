@@ -267,12 +267,12 @@ function get_arc_axis(nr::NetworkReductionData)
     return arc_ax
 end
 
-function is_arc_in_series_map(nr::NetworkReductionData, arc::Any)
+function is_arc_in_series_map(nr::NetworkReductionData, arc::Tuple{Int64, Int64})
     return haskey(nr.series_branch_map, arc)
 end
 
-function get_mapped_series_branch(nr::NetworkReductionData, arc::Any)
-    if has_arc_in_series_map(nr, arc)
+function get_mapped_series_branch(nr::NetworkReductionData, arc::Tuple{Int64, Int64})
+    if is_arc_in_series_map(nr, arc)
         return nr.series_branch_map[arc]
     else
         error("Arc $arc not found in series branch map")
