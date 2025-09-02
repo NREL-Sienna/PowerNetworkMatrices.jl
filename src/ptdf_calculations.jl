@@ -1,28 +1,51 @@
 """
-Power Transfer Distribution Factors (PTDF) indicate the incremental change in
-real power that occurs on transmission lines due to real power injections
-changes at the buses.
+Structure containing the Power Transfer Distribution Factor (PTDF) matrix and related power system data.
 
-The PTDF struct is indexed using the Bus numbers and Branch names.
+The PTDF matrix contains sensitivity coefficients that quantify how power injections at buses
+affect the power flows on transmission lines. Each element PTDF[i,j] represents the incremental
+change in flow on line i due to a unit power injection at bus j, under DC power flow assumptions.
 
-# Arguments
-- `data<:AbstractArray{Float64, 2}`:
-        the transposed PTDF matrix.
-- `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors: the first one showing the bus numbers,
-        the second showing the branch names. The information contained in this
-        field matches the axes of the fields `data`.
-- `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries mapping the bus numbers and branch
-        names with the indices of the matrix contained in `data`.
-- `subnetworks::Dict{Int, Set{Int}}`:
-        dictionary containing the set of bus indexes defining the subnetworks
-        of the system.
+# Fields
+- `data::M <: AbstractArray{Float64, 2}`:
+        The PTDF matrix data stored in transposed form for computational efficiency.
+        Element (i,j) represents the sensitivity of line j flow to bus i injection
+- `axes::Ax`:
+        Tuple containing (bus_numbers, branch_identifiers) for matrix dimensions
+- `lookup::L <: NTuple{2, Dict}`:
+        Tuple of dictionaries providing fast lookup from bus/branch identifiers to matrix indices
+- `subnetwork_axes::Dict{Int, Ax}`:
+        Mapping from reference bus numbers to their corresponding subnetwork axes
 - `tol::Base.RefValue{Float64}`:
-        tolerance used for sparsifying the matrix (dropping element whose
-        absolute value is below this threshold).
-- `network_reduction::NetworkReduction`:
-        Structure containing the details of the network reduction applied when computing the matrix
+        Tolerance threshold used for matrix sparsification (elements below this value are dropped)
+- `network_reduction_data::NetworkReductionData`:
+        Container for network reduction information applied during matrix construction
+
+# Mathematical Properties
+- **Matrix Form**: PTDF[i,j] = ∂f_i/∂P_j where f_i is flow on line i, P_j is injection at bus j
+- **Dimensions**: (n_buses × n_arcs) for all buses and impedance arcs
+- **Linear Superposition**: Total flow = Σ(PTDF[i,j] × P_j) for all injections P_j
+- **Physical Meaning**: Values represent the fraction of bus injection that flows through each line
+- **Reference Bus**: Rows corresponding to reference buses are typically zero
+
+# Applications
+- **Power Flow Analysis**: Rapid calculation of line flows for given injection patterns
+- **Sensitivity Studies**: Evaluate impact of generation/load changes on transmission flows
+- **Congestion Management**: Identify lines affected by specific injection changes
+- **Market Analysis**: Support nodal pricing and transmission rights calculations
+- **Planning Studies**: Assess transmission utilization under various scenarios
+
+# Computational Features
+- **Matrix Storage**: Stored in transposed form (bus × branch) for efficient computation
+- **Sparsification**: Small elements removed based on tolerance to reduce memory usage
+- **Reference Bus Handling**: Reference bus injections automatically handled in calculations
+- **Distributed Slack**: Supports distributed slack bus configurations for improved realism
+
+# Usage Notes
+- Access via `ptdf[bus, line]` returns the sensitivity coefficient
+- Matrix indexing uses bus numbers and branch identifiers
+- Sparsification improves memory efficiency but may introduce small numerical errors
+- Results valid under DC power flow assumptions (neglects voltage magnitudes and reactive power)
+- Reference bus choice affects the specific values but not the relative sensitivities
 """
 struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
        PowerNetworkMatrix{Float64}
@@ -266,6 +289,73 @@ function _calculate_PTDF_matrix_MKLPardiso(
     return
 end
 
+"""
+    PTDF(sys::PSY.System; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
+
+Construct a Power Transfer Distribution Factor (PTDF) matrix from a PowerSystems.System by computing
+the sensitivity of transmission line flows to bus power injections. This is the primary constructor
+for PTDF analysis starting from system data.
+
+# Arguments
+- `sys::PSY.System`: The power system from which to construct the PTDF matrix
+
+# Keyword Arguments
+- `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
+        Dictionary mapping bus numbers to distributed slack weights for realistic slack modeling.
+        Empty dictionary uses single slack bus (default behavior)
+- `linear_solver::String = "KLU"`:
+        Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
+- `tol::Float64 = eps()`:
+        Sparsification tolerance for dropping small matrix elements to reduce memory usage
+- `network_reductions::Vector{NetworkReduction} = NetworkReduction[]`:
+        Vector of network reduction algorithms to apply before matrix construction
+- `make_branch_admittance_matrices::Bool=false`:
+        Whether to construct branch admittance matrices for power flow calculations
+- `include_constant_impedance_loads::Bool=true`:
+        Whether to include constant impedance loads as shunt admittances in the network model
+- `subnetwork_algorithm=iterative_union_find`:
+        Algorithm used for identifying electrical islands and connected components
+- Additional keyword arguments are passed to the underlying matrix constructors
+
+# Returns
+- `PTDF`: The constructed PTDF matrix structure containing:
+  - Bus-to-impedance-arc injection sensitivity coefficients
+  - Network topology information and reference bus identification
+  - Sparsification tolerance and computational metadata
+
+# Construction Process
+1. **Ybus Construction**: Creates system admittance matrix with specified reductions
+2. **Incidence Matrix**: Builds bus-branch connectivity matrix A
+3. **BA Matrix**: Computes branch susceptance weighted incidence matrix
+4. **PTDF Computation**: Calculates power transfer distribution factors using A^T × B^(-1) × A
+5. **Distributed Slack**: Applies distributed slack correction if specified
+6. **Sparsification**: Removes small elements based on tolerance threshold
+
+# Distributed Slack Configuration
+- **Single Slack**: Empty `dist_slack` dictionary uses conventional single slack bus
+- **Distributed Slack**: Dictionary maps bus numbers to participation factors
+- **Normalization**: Participation factors automatically normalized to sum to 1.0
+- **Physical Meaning**: Distributed slack better represents generator response to load changes
+
+# Linear Solver Options
+- **"KLU"**: Sparse LU factorization (default, recommended for most cases)
+- **"Dense"**: Dense matrix operations (faster for small systems, higher memory usage)
+- **"MKLPardiso"**: Intel MKL Pardiso solver (requires MKL library, best for very large systems)
+
+# Mathematical Foundation
+The PTDF matrix is computed as:
+```
+PTDF = A^T × (A^T × B × A)^(-1) × A^T × B
+```
+where A is the incidence matrix and B is the susceptance matrix.
+
+# Notes
+- Results are valid under DC power flow assumptions (linear approximation)
+- Reference bus selection affects specific values but not relative sensitivities
+- Sparsification with `tol > eps()` can significantly reduce memory usage
+- Network reductions improve computational efficiency for large systems
+- Distributed slack provides more realistic representation of system response
+"""
 function PTDF(sys::PSY.System;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     linear_solver = "KLU",
@@ -290,22 +380,67 @@ function PTDF(sys::PSY.System;
 end
 
 """
-Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
+    PTDF(A::IncidenceMatrix, BA::BA_Matrix; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps())
+
+Construct a Power Transfer Distribution Factor (PTDF) matrix from existing incidence and BA matrices.
+This constructor is more efficient when the prerequisite matrices are already available and provides
+direct control over the underlying matrix computations.
 
 # Arguments
-- `A::IncidenceMatrix`:
-        Incidence Matrix (full structure)
-- `BA::BA_Matrix`:
-        BA matrix (full structure)
+- `A::IncidenceMatrix`: The incidence matrix containing bus-branch connectivity information
+- `BA::BA_Matrix`: The branch susceptance weighted incidence matrix (B × A)
 
 # Keyword Arguments
-- `dist_slack::Vector{Float64}`:
-        Vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses.
-- `linear_solver::String`:
-        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso.
-- `tol::Float64`:
-        Tolerance to eliminate entries in the PTDF matrix (default eps()).
+- `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
+        Dictionary mapping bus numbers to distributed slack participation factors.
+        Empty dictionary uses single slack bus (reference bus from matrices)
+- `linear_solver::String = "KLU"`:
+        Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
+- `tol::Float64 = eps()`:
+        Sparsification tolerance for dropping small matrix elements to reduce memory usage
+
+# Returns
+- `PTDF`: The constructed PTDF matrix structure with injection-to-flow sensitivity coefficients
+
+# Mathematical Computation
+The PTDF matrix is computed using the relationship:
+```
+PTDF = (A^T × B × A)^(-1) × A^T × B
+```
+where:
+- A is the incidence matrix representing bus-branch connectivity
+- B is the diagonal susceptance matrix (embedded in BA matrix)
+- The computation involves solving the ABA linear system for efficiency
+
+# Distributed Slack Handling
+- **Single Slack**: Uses reference bus identified from input matrices
+- **Distributed Slack**: Applies participation factor corrections to final PTDF
+- **Automatic Processing**: Dictionary converted to vector form matching matrix dimensions
+- **Validation**: Ensures distributed slack bus numbers exist in the network
+- **Normalization**: Participation factors automatically normalized to maintain power balance
+
+# Network Consistency Requirements
+- **Reduction Compatibility**: Both input matrices must have equivalent network reduction states
+- **Reference Alignment**: BA matrix reference buses determine the PTDF reference framework
+- **Topology Consistency**: Matrices must represent the same network topology
+
+# Performance Considerations
+- **Matrix Reuse**: More efficient when A and BA matrices are already computed
+- **Memory Management**: Sparsification reduces storage requirements significantly
+- **Solver Selection**: KLU recommended for sparse systems, Dense for small networks
+- **Computational Efficiency**: Avoids redundant system matrix construction
+
+# Error Handling and Validation
+- **Matrix Compatibility**: Validates that A and BA have consistent network reductions
+- **Slack Validation**: Checks that distributed slack buses exist in the matrix structure
+- **Solver Validation**: Ensures selected linear solver is supported and available
+- **Numerical Stability**: Handles singular systems and provides informative error messages
+
+# Usage Recommendations
+- **Preferred Method**: Use when incidence and BA matrices are already available
+- **Repeated Calculations**: Ideal for multiple PTDF computations with different slack configurations
+- **Large Systems**: Consider sparsification for memory efficiency
+- **Distributed Slack**: Provides more realistic modeling of generator response to load changes
 """
 function PTDF(
     A::IncidenceMatrix,
@@ -380,6 +515,17 @@ function Base.getindex(
     return A.data[bus_number, line_number]
 end
 
+"""
+    get_ptdf_data(ptdf::PTDF)
+
+Extract the PTDF matrix data in the standard orientation (non-transposed).
+
+# Arguments
+- `ptdf::PTDF`: The PTDF structure from which to extract data
+
+# Returns
+- `AbstractArray{Float64, 2}`: The PTDF matrix data with standard orientation
+"""
 function get_ptdf_data(ptdf::PTDF)
     return transpose(ptdf.data)
 end
