@@ -1,3 +1,29 @@
+"""
+    NetworkReductionData
+
+Mutable struct containing all data mappings and metadata for network reduction operations.
+This structure tracks how buses and branches are mapped, combined, or eliminated during
+network reduction algorithms.
+
+# Fields
+- `irreducible_buses::Set{Int}`: Buses that cannot be reduced
+- `bus_reduction_map::Dict{Int, Set{Int}}`: Maps retained buses to sets of eliminated buses  
+- `reverse_bus_search_map::Dict{Int, Int}`: Maps eliminated buses to their parent buses
+- `direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission}`: One-to-one branch mappings
+- `reverse_direct_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}}`: Reverse direct mappings
+- `parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}}`: Parallel branch combinations
+- `reverse_parallel_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}}`: Reverse parallel mappings  
+- `series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}}`: Series branch combinations
+- `reverse_series_branch_map::Dict{Any, Tuple{Int, Int}}`: Reverse series mappings
+- `transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}}`: Three-winding transformer mappings
+- `reverse_transformer3W_map::Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}`: Reverse transformer mappings
+- `removed_buses::Set{Int}`: Set of buses eliminated from the network
+- `removed_arcs::Set{Tuple{Int, Int}}`: Set of arcs eliminated from the network  
+- `added_admittance_map::Dict{Int, Complex{Float32}}`: Admittances added to buses during reduction
+- `added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}}`: New branches created during reduction
+- `all_branch_maps_by_type::Dict{String, Any}`: Branch mappings organized by component type
+- `reductions::ReductionContainer`: Container tracking applied reduction algorithms
+"""
 @kwdef mutable struct NetworkReductionData
     irreducible_buses::Set{Int} = Set{Int}() # Buses that are not reduced in the network reduction
     bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}() # Maps reduced bus to the set of buses it was reduced to
@@ -140,6 +166,17 @@ _get_segment_type(x::Set{PSY.ACTransmission}) = typeof(first(x))
 _get_segment_type(x::Tuple{PSY.ThreeWindingTransformer, Int}) = typeof(first(x))
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
+"""
+    get_bus_reduction_map(rb::NetworkReductionData)
+
+Get the bus reduction map from NetworkReductionData.
+
+# Arguments
+- `rb::NetworkReductionData`: The network reduction data
+
+# Returns
+- `Dict{Int, Set{Int}}`: Dictionary mapping retained buses to sets of removed buses
+"""
 get_bus_reduction_map(rb::NetworkReductionData) = rb.bus_reduction_map
 get_reverse_bus_search_map(rb::NetworkReductionData) = rb.reverse_bus_search_map
 get_direct_branch_map(rb::NetworkReductionData) = rb.direct_branch_map
@@ -154,6 +191,17 @@ get_removed_buses(rb::NetworkReductionData) = rb.removed_buses
 get_removed_arcs(rb::NetworkReductionData) = rb.removed_arcs
 get_added_admittance_map(rb::NetworkReductionData) = rb.added_admittance_map
 get_added_branch_map(rb::NetworkReductionData) = rb.added_branch_map
+"""
+    get_reductions(rb::NetworkReductionData)
+
+Get the reduction container from NetworkReductionData.
+
+# Arguments
+- `rb::NetworkReductionData`: The network reduction data
+
+# Returns
+- `ReductionContainer`: Container with the applied network reductions
+"""
 get_reductions(rb::NetworkReductionData) = rb.reductions
 
 has_radial_reduction(rb::NetworkReductionData) = has_radial_reduction(rb.reductions)
