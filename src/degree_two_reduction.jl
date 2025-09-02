@@ -10,8 +10,8 @@ function get_degree2_reduction(
     data::SparseArrays.SparseMatrixCSC{Int8, Int},
     bus_lookup::Dict{Int, Int},
     exempt_bus_positions::Set{Int},
-    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch},
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}},
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}},
     transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
 )
     reverse_bus_lookup = Dict(v => k for (k, v) in bus_lookup)
@@ -68,8 +68,8 @@ function _make_reverse_series_branch_map(
 end
 
 function _get_branch_map_entry(
-    direct_branch_map::Dict{Tuple{Int, Int}, PSY.Branch},
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.Branch}},
+    direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}},
     transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
     arc::Tuple{Int, Int},
 )
