@@ -753,7 +753,8 @@ function Ybus(
     reverse_bus_search_map = get_reverse_bus_search_map(nr)
 
     #Checking for isolated buses; building bus map.
-    for b in PSY.get_components(x -> PSY.get_available(x), PSY.ACBus, sys)
+    for b in PSY.get_components(PSY.ACBus, sys)
+        !PSY.get_available(b) && continue
         if PSY.get_bustype(b) != ACBusTypes.ISOLATED
             bus_reduction_map[PSY.get_number(b)] = Set{Int}()
             if PSY.get_bustype(b) == ACBusTypes.REF
@@ -767,8 +768,8 @@ function Ybus(
 
     #Building map for removed Breaker/Switches
     breaker_switches = Vector{PSY.DiscreteControlledACBranch}()
-    for br in
-        PSY.get_components(x -> PSY.get_available(x), PSY.DiscreteControlledACBranch, sys)
+    for br in PSY.get_components(PSY.DiscreteControlledACBranch, sys)
+        !PSY.get_available(br) && continue
         r = PSY.get_r(br)
         x = PSY.get_x(br)
         status = PSY.get_branch_status(br)
