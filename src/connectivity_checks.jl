@@ -119,6 +119,18 @@ function union_sets!(uf::Vector{Int}, x::Int, y::Int)
     end
 end
 
+"""
+    iterative_union_find(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
+
+Find connected subnetworks using iterative union-find algorithm.
+
+# Arguments
+- `M::SparseArrays.SparseMatrixCSC`: Sparse matrix representing network connectivity
+- `bus_numbers::Vector{Int}`: Vector containing the bus numbers of the system
+
+# Returns
+- `Dict{Int, Set{Int}}`: Dictionary mapping representative bus numbers to sets of connected buses
+"""
 function iterative_union_find(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
     @info "Finding subnetworks via iterative union find"
     rows = SparseArrays.rowvals(M)
@@ -153,6 +165,18 @@ function iterative_union_find(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vect
     return subnetworks
 end
 
+"""
+    depth_first_search(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
+
+Find connected subnetworks using depth-first search algorithm.
+
+# Arguments
+- `M::SparseArrays.SparseMatrixCSC`: Sparse matrix representing network connectivity
+- `bus_numbers::Vector{Int}`: Vector containing the bus numbers of the system
+
+# Returns
+- `Dict{Int, Set{Int}}`: Dictionary mapping representative bus numbers to sets of connected buses
+"""
 function depth_first_search(M::SparseArrays.SparseMatrixCSC, bus_numbers::Vector{Int})
     @info "Finding subnetworks via depth first search"
     rows = SparseArrays.rowvals(M)
