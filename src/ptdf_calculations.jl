@@ -360,12 +360,10 @@ function PTDF(sys::PSY.System;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     linear_solver = "KLU",
     tol::Float64 = eps(),
-    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
     Ymatrix = Ybus(
         sys;
-        network_reductions = network_reductions,
         kwargs...,
     )
     A = IncidenceMatrix(Ymatrix)
