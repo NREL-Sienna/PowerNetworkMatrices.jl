@@ -184,12 +184,24 @@ function find_parallel_arc(sys::System)
     return (-1, -1)
 end
 
+function test_all_subtypes(sys::System, network_reductions)
+    for T in subtypes(PNM.PowerNetworkMatrix)
+        # arc admittance matrix constructor has different args.
+        (T == PNM.Ybus || T == PNM.ArcAdmittanceMatrix) && continue
+        M = T(sys; network_reductions = deepcopy(network_reductions))
+        # test that it runs without error
+        @test M isa T
+    end
+    # return Ybus so we can inspect the network reduction data.
+    Y = Ybus(sys; network_reductions = deepcopy(network_reductions))
+    @test Y isa PNM.Ybus
+    return Y
+end
+
 @testset "3WT + radial" begin
-    # test that it runs without error
     sys = make_3WT_radial()
     network_reductions = NetworkReduction[RadialReduction()]
-    Y = Ybus(sys; network_reductions = network_reductions)
-    @test Y isa Any
+    Y = test_all_subtypes(sys, network_reductions)
     # test that the 3WT arc was actually reduced
     trf = first(get_components(PSY.Transformer3W, sys))
     trf_arcs = Tuple{Int, Int}[PNM.get_arc_tuple((trf, i)) for i in 1:3]
@@ -199,22 +211,18 @@ end
 end
 
 @testset "3WT + degree-2" begin
-    # test that it runs without error
     sys = make_3WT_deg2()
     network_reductions = NetworkReduction[DegreeTwoReduction()]
-    Y = Ybus(sys; network_reductions = network_reductions)
-    @test Y isa Any
+    Y = test_all_subtypes(sys, network_reductions)
     # test that the 3WT arc was actually reduced
     nrd = PNM.get_network_reduction_data(Y)
     @test Tuple{PSY.Transformer3W, Int} in types_in_series_reduction(nrd)
 end
 
 @testset "Parallel lines + radial" begin
-    # test that it runs without error
     sys = make_parallel_radial()
     network_reductions = NetworkReduction[RadialReduction()]
-    Y = Ybus(sys; network_reductions = network_reductions)
-    @test Y isa Any
+    Y = test_all_subtypes(sys, network_reductions)
     # test that the parallel lines were reduced
     nrd = PNM.get_network_reduction_data(Y)
     parallel_arc = find_parallel_arc(sys)
@@ -222,11 +230,9 @@ end
 end
 
 @testset "Parallel lines + degree-2" begin
-    # test that it runs without error
     sys = make_parallel_deg2()
     network_reductions = NetworkReduction[DegreeTwoReduction()]
-    Y = Ybus(sys; network_reductions = network_reductions)
-    @test Y isa Any
+    Y = test_all_subtypes(sys, network_reductions)
     # test that the parallel lines were reduced
     nrd = PNM.get_network_reduction_data(Y)
     @test Set{PSY.ACTransmission} in types_in_series_reduction(nrd)
