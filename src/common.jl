@@ -93,6 +93,10 @@ function get_arc_tuple(br::Set{PSY.ACTransmission}, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(first(br)), nr)
 end
 
+function get_arc_tuple(br::Set{PSY.ACTransmission})
+    return get_arc_tuple(PSY.get_arc(first(br)))
+end
+
 function get_arc_tuple(br::PSY.ACTransmission)
     return get_arc_tuple(PSY.get_arc(br))
 end

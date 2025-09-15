@@ -386,6 +386,20 @@ function ybus_branch_entries(br::PSY.ACTransmission)
     return (Y11, Y12, Y21, Y22)
 end
 
+function ybus_branch_entries(parallel_br::Set{PSY.ACTransmission})
+    arc = get_arc_tuple(first(parallel_br))
+    Y11 = Y12 = Y21 = Y22 = zero(ComplexF32)
+    for br in parallel_br
+        @assert get_arc_tuple(br) == arc
+        (y11, y12, y21, y22) = ybus_branch_entries(br)
+        Y11 += y11
+        Y12 += y12
+        Y21 += y21
+        Y22 += y22
+    end
+    return (Y11, Y12, Y21, Y22)
+end
+
 _get_tap(::PSY.Transformer2W) = one(ComplexF32)
 _get_tap(br::PSY.TwoWindingTransformer) = PSY.get_tap(br)
 
