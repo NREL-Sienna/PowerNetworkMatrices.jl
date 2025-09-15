@@ -914,11 +914,11 @@ function Ybus(
         PSY.get_components(
             x ->
                 PSY.get_available(x) &&
-                typeof(x) ∉ [
-                    PSY.Transformer3W,
-                    PSY.PhaseShiftingTransformer3W,
-                    PSY.DiscreteControlledACBranch,
-                ],
+                    typeof(x) ∉ [
+                        PSY.Transformer3W,
+                        PSY.PhaseShiftingTransformer3W,
+                        PSY.DiscreteControlledACBranch,
+                    ],
             PSY.ACTransmission,
             sys,
         ),
