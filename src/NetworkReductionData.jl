@@ -28,10 +28,16 @@ network reduction algorithms.
     irreducible_buses::Set{Int} = Set{Int}() # Buses that are not reduced in the network reduction
     bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}() # Maps reduced bus to the set of buses it was reduced to
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}()
-    direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission} =
-        Dict{Tuple{Int, Int}, PSY.ACTransmission}()
-    reverse_direct_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}} =
-        Dict{PSY.ACTransmission, Tuple{Int, Int}}()
+    direct_branch_map::Dict{
+        Tuple{Int, Int},
+        Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine},
+    } =
+        Dict{Tuple{Int, Int}, Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine}}()
+    reverse_direct_branch_map::Dict{
+        Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine},
+        Tuple{Int, Int},
+    } =
+        Dict{Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine}, Tuple{Int, Int}}()
     parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}} =
         Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}}()
     reverse_parallel_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}} =

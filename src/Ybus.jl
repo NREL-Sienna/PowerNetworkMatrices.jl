@@ -57,6 +57,7 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
     network_reduction_data::NetworkReductionData
     branch_admittance_from_to::Union{ArcAdmittanceMatrix, Nothing}
     branch_admittance_to_from::Union{ArcAdmittanceMatrix, Nothing}
+    data_facts::SparseArrays.SparseMatrixCSC{ComplexF32, Int}
 end
 
 get_axes(M::Ybus) = M.axes
@@ -204,6 +205,19 @@ function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.ACT
     return
 end
 
+function add_to_branch_maps!(
+    nr::NetworkReductionData,
+    arc::PSY.Arc,
+    br::PSY.TwoTerminalLCCLine,
+)
+    direct_branch_map = get_direct_branch_map(nr)
+    reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
+    arc_tuple = get_arc_tuple(arc, nr)
+    direct_branch_map[arc_tuple] = br
+    reverse_direct_branch_map[br] = arc_tuple
+    return
+end
+
 """
     add_to_branch_maps!(
         nr::NetworkReductionData,
@@ -293,7 +307,7 @@ function add_branch_entries_to_ybus!(
     y21::Vector{ComplexF32},
     y22::Vector{ComplexF32},
     branch_ix::Int,
-    br::PSY.ACTransmission,
+    br::Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine},
 )
     Y11, Y12, Y21, Y22 = ybus_branch_entries(br)
     y11[branch_ix] = Y11
@@ -341,7 +355,7 @@ function add_branch_entries_to_indexing_maps!(
     fb::Vector{Int},
     tb::Vector{Int},
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
-    br::PSY.ACTransmission,
+    br::Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine},
 )
     arc = PSY.get_arc(br)
     add_to_branch_maps!(nr, arc, br)
@@ -436,6 +450,22 @@ function ybus_branch_entries(tp::Tuple{PSY.ThreeWindingTransformer, Int})
     Y12 = (-Y_t / c_tap)
     Y21 = (-Y_t / tap)
     Y22 = Y_t
+    return (Y11, Y12, Y21, Y22)
+end
+
+function ybus_branch_entries(::PSY.TwoTerminalLCCLine)
+    Y11 = 0.0
+    Y12 = 0.0
+    Y21 = 0.0
+    Y22 = 0.0
+    return (Y11, Y12, Y21, Y22)
+end
+
+function ybus_facts_branch_entries(::PSY.TwoTerminalLCCLine)
+    Y11 = 0.0
+    Y12 = 0.0
+    Y21 = 0.0
+    Y22 = 0.0
     return (Y11, Y12, Y21, Y22)
 end
 
@@ -608,6 +638,45 @@ function _ybus!(
     return
 end
 
+function _ybus!(
+    y11::Vector{ComplexF32},
+    y12::Vector{ComplexF32},
+    y21::Vector{ComplexF32},
+    y22::Vector{ComplexF32},
+    br::PSY.TwoTerminalLCCLine,
+    num_bus::Dict{Int, Int},
+    branch_ix::Int,
+    fb::Vector{Int},
+    tb::Vector{Int},
+    nr::NetworkReductionData,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
+)
+    add_branch_entries_to_indexing_maps!(num_bus, branch_ix, nr, fb, tb, adj, br)
+    add_branch_entries_to_ybus!(y11, y12, y21, y22, branch_ix, br)
+    return
+end
+
+function _ybus_facts!(
+    y11_facts::Vector{ComplexF32},
+    y12_facts::Vector{ComplexF32},
+    y21_facts::Vector{ComplexF32},
+    y22_facts::Vector{ComplexF32},
+    br::PSY.TwoTerminalLCCLine,
+    num_bus::Dict{Int, Int},
+    branch_ix::Int,
+    fb_facts::Vector{Int},
+    tb_facts::Vector{Int},
+    nr::NetworkReductionData,
+)
+    y11_facts[branch_ix], y12_facts[branch_ix], y21_facts[branch_ix], y22_facts[branch_ix] =
+        0, 0, 0, 0
+    arc = PSY.get_arc(br)
+    bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
+    fb_facts[branch_ix] = bus_from_no
+    tb_facts[branch_ix] = bus_to_no
+    return
+end
+
 function _buildybus!(
     network_reduction_data::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -617,6 +686,7 @@ function _buildybus!(
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
     standard_loads::Vector{PSY.StandardLoad},
+    lccs::Vector{PSY.TwoTerminalLCCLine},
 )
     branch_entries_transformer_3w = 0
     for br in transformer_3w
@@ -626,7 +696,8 @@ function _buildybus!(
             PSY.get_available_tertiary(br),
         ])
     end
-    branchcount = length(branches) + branch_entries_transformer_3w
+    branchcount_facts = length(lccs)
+    branchcount = length(branches) + branch_entries_transformer_3w + branchcount_facts
     branchcount_no_3w = length(branches)
     fa_count = length(fixed_admittances)
     sa_count = length(switched_admittances)
@@ -640,8 +711,14 @@ function _buildybus!(
     y21 = zeros(ComplexF32, branchcount)
     y22 = zeros(ComplexF32, branchcount)
     ysh = zeros(ComplexF32, fa_count + sa_count + sl_count)
+    y11_facts = zeros(ComplexF32, branchcount_facts)
+    y12_facts = zeros(ComplexF32, branchcount_facts)
+    y21_facts = zeros(ComplexF32, branchcount_facts)
+    y22_facts = zeros(ComplexF32, branchcount_facts)
+    fb_facts = zeros(Int, branchcount_facts)
+    tb_facts = zeros(Int, branchcount_facts)
 
-    for (ix, b) in enumerate(branches)
+    for (ix, b) in enumerate([branches; lccs])
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
@@ -672,6 +749,20 @@ function _buildybus!(
     for (ix, fa) in enumerate([fixed_admittances; switched_admittances; standard_loads])
         _ybus!(ysh, fa, num_bus, ix, sb, network_reduction_data)
     end
+    for (ix, b) in enumerate(lccs)
+        _ybus_facts!(
+            y11_facts,
+            y12_facts,
+            y21_facts,
+            y22_facts,
+            b,
+            num_bus,
+            ix,
+            fb_facts,
+            tb_facts,
+            network_reduction_data,
+        )
+    end
     return (
         y11,
         y12,
@@ -681,6 +772,12 @@ function _buildybus!(
         fb,
         tb,
         sb,
+        y11_facts,
+        y12_facts,
+        y21_facts,
+        y22_facts,
+        fb_facts,
+        tb_facts,
     )
 end
 
@@ -817,11 +914,11 @@ function Ybus(
         PSY.get_components(
             x ->
                 PSY.get_available(x) &&
-                    typeof(x) ∉ [
-                        PSY.Transformer3W,
-                        PSY.PhaseShiftingTransformer3W,
-                        PSY.DiscreteControlledACBranch,
-                    ],
+                typeof(x) ∉ [
+                    PSY.Transformer3W,
+                    PSY.PhaseShiftingTransformer3W,
+                    PSY.DiscreteControlledACBranch,
+                ],
             PSY.ACTransmission,
             sys,
         ),
@@ -844,7 +941,22 @@ function Ybus(
     else
         PSY.StandardLoad[]
     end
-    y11, y12, y21, y22, ysh, fb, tb, sb =
+    lccs =
+        collect(PSY.get_components(x -> PSY.get_available(x), PSY.TwoTerminalLCCLine, sys))
+    y11,
+    y12,
+    y21,
+    y22,
+    ysh,
+    fb,
+    tb,
+    sb,
+    y11_facts,
+    y12_facts,
+    y21_facts,
+    y22_facts,
+    fb_facts,
+    tb_facts =
         _buildybus!(
             nr,
             adj,
@@ -854,6 +966,7 @@ function Ybus(
             fixed_admittances,
             switched_admittances,
             standard_loads,
+            lccs,
         )
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
@@ -863,6 +976,15 @@ function Ybus(
         busnumber,  # size (columns) - setting this explicitly is necessary for the case there are no branches
     )
     SparseArrays.dropzeros!(ybus)
+
+    ybus_facts = SparseArrays.sparse(
+        [fb_facts; fb_facts; tb_facts; tb_facts],  # row indices
+        [fb_facts; tb_facts; fb_facts; tb_facts],  # column indices
+        [y11_facts; y12_facts; y21_facts; y22_facts],  # values
+        busnumber,
+        busnumber,
+    )
+    SparseArrays.dropzeros!(ybus_facts)
 
     if make_branch_admittance_matrices
         arc_axis = get_arc_axis(fb, tb, bus_ax)
@@ -928,6 +1050,7 @@ function Ybus(
         nr,
         branch_admittance_from_to,
         branch_admittance_to_from,
+        ybus_facts,
     )
 
     for nr in network_reductions
