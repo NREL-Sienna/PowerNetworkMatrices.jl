@@ -10,7 +10,11 @@ end
 
 function find_parallel_arc(sys::System)
     arcs_seen = Set{Tuple{Int, Int}}()
-    for br in PSY.get_components(PSY.ACBranch, sys)
+    for br in PSY.get_components(
+        x -> !(typeof(x) <: PSY.ThreeWindingTransformer),
+        PSY.ACBranch,
+        sys,
+    )
         arc = PNM.get_arc_tuple(br)
         if arc in arcs_seen
             return arc
