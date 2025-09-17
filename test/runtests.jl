@@ -7,6 +7,7 @@ using InfrastructureSystems
 using PowerSystemCaseBuilder
 using TimeSeries
 using DelimitedFiles
+using InteractiveUtils
 
 const IS = InfrastructureSystems
 const PSY = PowerSystems

@@ -339,10 +339,10 @@ function _find_longest_valid_chain(
     adj_matrix::SparseArrays.SparseMatrixCSC,
     chain_path::Vector{Int},
 )
-    if adj_matrix[chain_path[1], chain_path[end]] == 0
+    if _is_valid_chain(adj_matrix, chain_path)
         return chain_path
     else
-        @warn "Nodes $(chain_path[1]) and $(chain_path[end]) already have a parallel path, searching for valid subchains."
+        @warn "Nodes $(chain_path[1]) and $(chain_path[end]) already have a parallel path or is circular, searching for valid subchains."
         subchains = Vector{Int}[]
         n = length(chain_path)
         for i in 1:n
@@ -352,7 +352,7 @@ function _find_longest_valid_chain(
         end
         subchains = sort([x for x in subchains if length(x) > 2]; by = length, rev = true)
         for subchain in subchains
-            if adj_matrix[subchain[1], subchain[end]] == 0
+            if _is_valid_chain(adj_matrix, subchain)
                 @warn "found a valid subchain $subchain"
                 return subchain
             end
@@ -360,4 +360,12 @@ function _find_longest_valid_chain(
     end
     @warn "No valid subchains found; skipping chain creation"
     return Vector{Int}()
+end
+
+function _is_valid_chain(adj_matrix::SparseArrays.SparseMatrixCSC, chain_path::Vector{Int})
+    if adj_matrix[chain_path[1], chain_path[end]] == 0 && chain_path[1] != chain_path[end]
+        return true
+    else
+        return false
+    end
 end
