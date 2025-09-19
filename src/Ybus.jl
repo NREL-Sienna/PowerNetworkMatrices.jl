@@ -1681,6 +1681,7 @@ function _get_chain_data(
     series_map_entry::Vector{Any},
     nrd::NetworkReductionData,
 )
+    equivalent_arc[1] == equivalent_arc[2] && @warn("trying to reduce a loop")
     ordered_bus_numbers = [equivalent_arc[1]]
     segment_orientation = Vector{Symbol}()
     for segment in series_map_entry
