@@ -84,20 +84,20 @@ function get_arc_tuple(arc::PSY.Arc, nr::NetworkReductionData)
         get(reverse_bus_search_map, arc_tuple_original[2], arc_tuple_original[2]),
     )
 end
-function get_arc_tuple(br::PSY.ACTransmission, nr::NetworkReductionData)
+function get_arc_tuple(br::Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine}, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(br), nr)
 end
 
 # Parallel branches: all oriented in same direction, so just take arc of first.
-function get_arc_tuple(br::Set{PSY.ACTransmission}, nr::NetworkReductionData)
+function get_arc_tuple(br::Set{Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine}}, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(first(br)), nr)
 end
 
-function get_arc_tuple(br::Set{PSY.ACTransmission})
+function get_arc_tuple(br::Set{Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine}})
     return get_arc_tuple(PSY.get_arc(first(br)))
 end
 
-function get_arc_tuple(br::PSY.ACTransmission)
+function get_arc_tuple(br::Union{PSY.ACTransmission, PSY.TwoTerminalLCCLine})
     return get_arc_tuple(PSY.get_arc(br))
 end
 
