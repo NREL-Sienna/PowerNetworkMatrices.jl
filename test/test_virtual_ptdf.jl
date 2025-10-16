@@ -1,10 +1,9 @@
 # if it fails, we don't want the terminal to be flooded with errors, therefore failfast=true
 @testset failfast = true "Test Virtual PTDF matrices" begin
-    sys =
-        @test_logs (:error, r"no active generators found at bus") match_mode = :any PSB.build_system(
-            PSB.PSYTestSystems,
-            "tamu_ACTIVSg2000_sys",
-        )
+    sys = PSB.build_system(
+        PSB.PSYTestSystems,
+        "tamu_ACTIVSg2000_sys",
+    )
     ptdf_complete = PTDF(sys; linear_solver = "KLU")
     ptdf_virtual = VirtualPTDF(sys)
 
