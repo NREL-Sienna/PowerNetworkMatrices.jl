@@ -21,6 +21,7 @@ export NetworkReductionData
 export RadialReduction
 export DegreeTwoReduction
 export WardReduction
+export LCCAdmittanceMatrix
 
 export depth_first_search
 export iterative_union_find
@@ -82,6 +83,7 @@ include("ArcAdmittanceMatrix.jl")
 include("Ybus.jl")
 include("IncidenceMatrix.jl")
 include("AdjacencyMatrix.jl")
+include("LCCAdmittanceMatrix.jl")
 include("connectivity_checks.jl")
 include("subnetworks.jl")
 include("common.jl")
