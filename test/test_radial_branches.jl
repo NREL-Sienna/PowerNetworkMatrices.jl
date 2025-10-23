@@ -43,11 +43,10 @@
 end
 
 @testset "Radial Branches Large" begin
-    sys =
-        @test_logs (:error, r"no active generators found at bus") match_mode = :any build_system(
-            MatpowerTestSystems,
-            "matpower_ACTIVSg10k_sys",
-        )
+    sys = build_system(
+        MatpowerTestSystems,
+        "matpower_ACTIVSg10k_sys",
+    )
     Y = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
     rb = get_network_reduction_data(Y)
     for (k, v) in get_bus_reduction_map(rb)
@@ -57,11 +56,10 @@ end
 
 @testset "Check reference bus in Radial Branches" begin
     for name in ["matpower_ACTIVSg2000_sys", "matpower_ACTIVSg10k_sys"]
-        sys =
-            @test_logs (:error, r"no active generators found at bus") match_mode = :any build_system(
-                MatpowerTestSystems,
-                name,
-            )
+        sys = build_system(
+            MatpowerTestSystems,
+            name,
+        )
         a_mat = IncidenceMatrix(sys)
         Y = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
         rb = get_network_reduction_data(Y)

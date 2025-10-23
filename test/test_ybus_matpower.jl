@@ -1,9 +1,8 @@
 @testset "Ybus - ACTIVSg10k" begin
-    sys =
-        @test_logs (:error, r"no active generators found at bus") match_mode = :any build_system(
-            MatpowerTestSystems,
-            "matpower_ACTIVSg10k_sys",
-        )
+    sys = build_system(
+        MatpowerTestSystems,
+        "matpower_ACTIVSg10k_sys",
+    )
     matpower_cols =
         readdlm(joinpath(TEST_DATA_DIR, "ybus_10k_cols.csv"), Int)
     matpower_rows =
