@@ -849,12 +849,35 @@ function Ybus(
                 sys,
             ),
         )
-    fixed_admittances =
-        collect(PSY.get_components(x -> PSY.get_available(x), PSY.FixedAdmittance, sys))
+    fixed_admittances = collect(
+        PSY.get_components(
+            x ->
+                PSY.get_available(x) &&
+                    PSY.get_bustype(PSY.get_bus(x)) != ACBusTypes.ISOLATED,
+            PSY.FixedAdmittance,
+            sys,
+        ),
+    )
     switched_admittances =
-        collect(PSY.get_components(x -> PSY.get_available(x), PSY.SwitchedAdmittance, sys))
+        collect(
+            PSY.get_components(
+                x ->
+                    PSY.get_available(x) &&
+                        PSY.get_bustype(PSY.get_bus(x)) != ACBusTypes.ISOLATED,
+                PSY.SwitchedAdmittance,
+                sys,
+            ),
+        )
     standard_loads = if include_constant_impedance_loads
-        collect(PSY.get_components(x -> PSY.get_available(x), PSY.StandardLoad, sys))
+        collect(
+            PSY.get_components(
+                x ->
+                    PSY.get_available(x) &&
+                        PSY.get_bustype(PSY.get_bus(x)) != ACBusTypes.ISOLATED,
+                PSY.StandardLoad,
+                sys,
+            ),
+        )
     else
         PSY.StandardLoad[]
     end
