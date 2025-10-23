@@ -1,9 +1,9 @@
 @testset "Large 2d Reduction Test" begin
-    sys =
-        @test_logs (:error, r"no active generators found at bus") match_mode = :any build_system(
-            MatpowerTestSystems,
-            "matpower_ACTIVSg10k_sys",
-        )
+    sys = build_system(
+        MatpowerTestSystems,
+        "matpower_ACTIVSg10k_sys",
+    )
     ybus = Ybus(sys)
     reduction = PNM.get_reduction(ybus, sys, DegreeTwoReduction())
+    @test !isempty(reduction.series_branch_map)
 end
