@@ -332,6 +332,8 @@ function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetwo
             return multiplier, v
         end
     end
+    error("Branch $branch_name not found in the network reduction data.")
+    return
 end
 
 function _compute_parallel_multiplier(
