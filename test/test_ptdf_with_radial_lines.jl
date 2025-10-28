@@ -92,7 +92,7 @@ end
                 Ybus(sys; network_reductions = NetworkReduction[RadialReduction()]),
             )
             # get number of buses
-            buscount = length(PNM.get_buses(sys))
+            buscount = length(PSY.get_components(get_available, PSY.ACBus, sys))
             # now compute distributed slack vector
             dist_slack = 1 / buscount * ones(buscount)
             # FIX ME: This is broken for the RTS system, so we skip it
