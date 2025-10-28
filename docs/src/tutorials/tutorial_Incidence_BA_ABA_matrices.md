@@ -34,14 +34,14 @@ featuring the following fields:
 
 ``` @repl tutorial_Incidence_BA_ABA_matrices
 # axis names: row and column names.
-# row names: names of the branches
+# row names: tuples of the arcs (from bus number, to bus number)
 # column names: names of the buses
 incidence_matrix.axes
 
 # data: Incidence Matrix
 incidence_matrix.data
 
-# lookup: dictionary linking the branches names and bus numbers with the row
+# lookup: dictionary linking the arc tuples and bus numbers with the row
 # and column numbers, respectively.
 incidence_matrix.axes
 
