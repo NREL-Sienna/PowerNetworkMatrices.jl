@@ -1,6 +1,6 @@
 # VirtualPTDF
 
-Contrary to the traditional `PTDF` matrix, the `VirtualPTDF` is a structure containing rows of the original matrix, related to specific system branches.
+Contrary to the traditional `PTDF` matrix, the `VirtualPTDF` is a structure containing rows of the original matrix, related to specific system arcs.
 The different rows of the `PTDF` matrix are cached in the `VirtualPTDF` structure as they are evaluated. This allows to keep just the portion of the original matrix which is of interest to the user, avoiding the unnecessary computation of the whole matrix.
 
 Refer to the different arguments of the `VirtualPTDF` methods by looking at the "Public API Reference" page.
@@ -27,8 +27,10 @@ As for the `PTDF` matrix, at first the `System` data must be loaded. The "RTS-GM
 
 ``` @repl tutorial_VirtualPTDF_matrix
 using PowerNetworkMatrices
+using PowerSystems
 using PowerSystemCaseBuilder
 
+const PSY = PowerSystems;
 const PNM = PowerNetworkMatrices;
 const PSB = PowerSystemCaseBuilder;
 
@@ -41,23 +43,23 @@ At this point the `VirtualPTDF` is initialized with the following simple command
 v_ptdf = VirtualPTDF(sys);
 ```
 
-Now, an element of the matrix can be computed by calling the branch name and bus number:
+Now, an element of the matrix can be computed by calling the arc tuple and bus number:
 
 ``` @repl tutorial_VirtualPTDF_matrix
-el_C31_2_105 = v_ptdf["C31-2", 105]
+el_C31_105 = v_ptdf[(318, 321), 105]
 ```
 
-Alternatively, the number of the branch and bus (corresponding to the number of the PTDF row and column) can be used. In this case the row and column numbers are mapped by the dictonaries contained in the `lookup` field. 
+Alternatively, the value can be indexed by row and column numbers directly. In this case the row and column numbers are mapped by the dictonaries contained in the `lookup` field. 
 
 ``` @repl tutorial_VirtualPTDF_matrix
-row_number = v_ptdf.lookup[1]["C31-2"]
+row_number = v_ptdf.lookup[1][(318, 321)]
 col_number = v_ptdf.lookup[2][105]
-el_C31_2_105_bis = v_ptdf[row_number, col_number]
+el_C31_105_bis = v_ptdf[row_number, col_number]
 ```
 
-**NOTE**: this example was made for the sake of completeness and considering the actual branch name and bus number is reccomended.
+**NOTE**: this example was made for the sake of completeness and considering the actual arc tuple and bus number is recommended.
 
-As previously mentioned, in order to evaluate a single element of the `VirtualPTDF`, the entire row related to the selected branch must be considered. For this reason it is cached in the `VirtualPTDF` structure for later calls.
+As previously mentioned, in order to evaluate a single element of the `VirtualPTDF`, the entire row related to the selected arc must be considered. For this reason it is cached in the `VirtualPTDF` structure for later calls.
 This is evident by looking at the following example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
@@ -65,11 +67,11 @@ sys_2k = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys");
 
 v_ptdf_2k = VirtualPTDF(sys_2k);
 
-# evaluate PTDF row related to branch "ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1"
-@time v_ptdf_2k["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", 8155]
+# evaluate PTDF row related to arc (5270, 5474)
+@time v_ptdf_2k[(5270, 5474), 8155]
 
 # call same element after the row has been stored
-@time v_ptdf_2k["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", 8155]
+@time v_ptdf_2k[(5270, 5474), 8155]
 ```
 
 ## `VirtualPTDF` with distributed slack bus
@@ -82,15 +84,15 @@ A vector of type `Vector{Float64}` is defined, specifying the weights for each b
 sys_2 = PSB.build_system(PSB.PSITestSystems, "c_sys5");
 
 # consider equal distribution accross each bus for this example
-buscount = length(PNM.get_buses(sys_2));
+buscount = length(PSY.get_components(get_available, PSY.ACBus, sys_2));
 dist_slack = 1 / buscount * ones(buscount);
-dist_slack_array = dist_slack / sum(dist_slack);
+dis_slack_dict = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 ```
 
 Now initialize the `VirtualPTDF` by defining the `dist_slack` field with the vector of weights previously computed:
 
 ``` @repl tutorial_VirtualPTDF_matrix
-v_ptdf_distr = VirtualPTDF(sys_2, dist_slack=dist_slack_array);
+v_ptdf_distr = VirtualPTDF(sys_2, dist_slack=dis_slack_dict);
 v_ptdf_orig = VirtualPTDF(sys_2);
 ```
 
