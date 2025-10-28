@@ -53,8 +53,6 @@ and then computing the branch-bus incidence matrix weighted by branch susceptanc
 # Keyword Arguments
 - `network_reductions::Vector{NetworkReduction} = Vector{NetworkReduction}()`:
         Vector of network reduction algorithms to apply before matrix construction
-- `make_branch_admittance_matrices::Bool=false`:
-        Whether to construct branch admittance matrices for power flow calculations
 - `include_constant_impedance_loads::Bool=true`:
         Whether to include constant impedance loads as shunt admittances in the network model
 - `subnetwork_algorithm=iterative_union_find`:
@@ -226,8 +224,6 @@ for DC power flow analysis and power system sensitivity studies.
         Whether to perform KLU factorization during construction for efficient linear system solving
 - `network_reductions::Vector{NetworkReduction} = NetworkReduction[]`: 
         Vector of network reduction algorithms to apply before matrix construction
-- `make_branch_admittance_matrices::Bool=false`: 
-        Whether to construct branch admittance matrices for power flow calculations
 - `include_constant_impedance_loads::Bool=true`: 
         Whether to include constant impedance loads as shunt admittances in the network model
 - `subnetwork_algorithm=iterative_union_find`: 
