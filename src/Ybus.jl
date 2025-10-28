@@ -13,14 +13,14 @@ electrical parameters needed for power flow calculations and network analysis.
 - `subnetwork_axes::Dict{Int, Ax}`: Bus axes for each electrical island/subnetwork
 - `arc_subnetwork_axis::Dict{Int, Vector{Tuple{Int, Int}}}`: Arc axes for each subnetwork
 - `network_reduction_data::NetworkReductionData`: Metadata from network reduction operations
-- `branch_admittance_from_to::Union{ArcAdmittanceMatrix, Nothing}`: From-to branch admittance matrix
-- `branch_admittance_to_from::Union{ArcAdmittanceMatrix, Nothing}`: To-from branch admittance matrix
+- `arc_admittance_from_to::Union{ArcAdmittanceMatrix, Nothing}`: From-to arc admittance matrix
+- `arc_admittance_to_from::Union{ArcAdmittanceMatrix, Nothing}`: To-from arc admittance matrix
 
 # Key Features
 - Indexed by bus numbers (non-sequential numbering supported)
 - Supports network reductions (radial, degree-two, Ward)
 - Handles multiple electrical islands/subnetworks
-- Optional branch admittance matrices for power flow calculations
+- Optional arc admittance matrices for power flow calculations
 - Sparse matrix representation for computational efficiency
 
 # Usage
@@ -35,8 +35,8 @@ The Y-bus is fundamental for:
 # Basic Y-bus construction
 ybus = Ybus(system)
 
-# With branch admittance matrices for power flow
-ybus = Ybus(system; make_branch_admittance_matrices=true)
+# With arc admittance matrices for power flow
+ybus = Ybus(system; make_arc_admittance_matrices=true)
 
 # With network reductions
 ybus = Ybus(system; network_reductions=[RadialReduction(), DegreeTwoReduction()])
@@ -55,8 +55,8 @@ struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
     subnetwork_axes::Dict{Int, Ax}
     arc_subnetwork_axis::Dict{Int, Vector{Tuple{Int, Int}}}
     network_reduction_data::NetworkReductionData
-    branch_admittance_from_to::Union{ArcAdmittanceMatrix, Nothing}
-    branch_admittance_to_from::Union{ArcAdmittanceMatrix, Nothing}
+    arc_admittance_from_to::Union{ArcAdmittanceMatrix, Nothing}
+    arc_admittance_to_from::Union{ArcAdmittanceMatrix, Nothing}
 end
 
 get_axes(M::Ybus) = M.axes
@@ -701,7 +701,7 @@ end
 """
     Ybus(
         sys::PSY.System;
-        make_branch_admittance_matrices::Bool = false,
+        make_arc_admittance_matrices::Bool = false,
         network_reductions::Vector{NetworkReduction} = NetworkReduction[],
         include_constant_impedance_loads::Bool = true,
         subnetwork_algorithm = iterative_union_find,
@@ -718,7 +718,7 @@ and network reductions while maintaining connectivity analysis.
 - `sys::PSY.System`: Power system to build Y-bus from
 
 # Keyword arguments
-- `make_branch_admittance_matrices::Bool=false`: Whether to construct branch admittance matrices for power flow
+- `make_arc_admittance_matrices::Bool=false`: Whether to construct arc admittance matrices for power flow
 - `network_reductions::Vector{NetworkReduction}=[]`: Network reduction algorithms to apply
 - `include_constant_impedance_loads::Bool=true`: Whether to include constant impedance loads as shunt admittances
 - `subnetwork_algorithm=iterative_union_find`: Algorithm for finding electrical islands
@@ -738,8 +738,8 @@ and network reductions while maintaining connectivity analysis.
 # Basic Y-bus construction
 ybus = Ybus(system)
 
-# With branch admittance matrices for power flow
-ybus = Ybus(system; make_branch_admittance_matrices=true)
+# With arc admittance matrices for power flow
+ybus = Ybus(system; make_arc_admittance_matrices=true)
 
 # Apply network reductions for computational efficiency
 reductions = [RadialReduction(), DegreeTwoReduction()]
@@ -756,7 +756,7 @@ ybus = Ybus(system; include_constant_impedance_loads=false)
 """
 function Ybus(
     sys::PSY.System;
-    make_branch_admittance_matrices::Bool = false,
+    make_arc_admittance_matrices::Bool = false,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     include_constant_impedance_loads = true,
     subnetwork_algorithm = iterative_union_find,
@@ -901,7 +901,7 @@ function Ybus(
     )
     SparseArrays.dropzeros!(ybus)
 
-    if make_branch_admittance_matrices
+    if make_arc_admittance_matrices
         arc_axis = get_arc_axis(fb, tb, bus_ax)
         arc_count = length(arc_axis)
         arc_lookup = sizehint!(Dict{Tuple{Int, Int}, Int}(), arc_count)
@@ -924,14 +924,14 @@ function Ybus(
             arc_count,
             busnumber,
         )
-        branch_admittance_from_to = ArcAdmittanceMatrix(
+        arc_admittance_from_to = ArcAdmittanceMatrix(
             yft_data,
             (arc_axis, bus_ax),
             (arc_lookup, bus_lookup),
             nr,
             :FromTo,
         )
-        branch_admittance_to_from = ArcAdmittanceMatrix(
+        arc_admittance_to_from = ArcAdmittanceMatrix(
             ytf_data,
             (arc_axis, bus_ax),
             (arc_lookup, bus_lookup),
@@ -939,8 +939,8 @@ function Ybus(
             :ToFrom,
         )
     else
-        branch_admittance_from_to = nothing
-        branch_admittance_to_from = nothing
+        arc_admittance_from_to = nothing
+        arc_admittance_to_from = nothing
     end
     if length(bus_lookup) > 1
         subnetworks = assign_reference_buses!(
@@ -963,8 +963,8 @@ function Ybus(
         subnetwork_axes,
         arc_subnetwork_axis,
         nr,
-        branch_admittance_from_to,
-        branch_admittance_to_from,
+        arc_admittance_from_to,
+        arc_admittance_to_from,
     )
 
     for nr in network_reductions
@@ -979,7 +979,7 @@ end
 Generate unique arc axis from from-bus and to-bus index vectors.
 
 Creates a vector of unique (from_bus, to_bus) tuples representing the arcs (branches)
-in the system. Used for constructing branch admittance matrices and organizing
+in the system. Used for constructing arc admittance matrices and organizing
 network topology data.
 
 # Arguments
@@ -1211,8 +1211,8 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     new_y_ft, new_y_tf = _add_series_branches_to_ybus!(
         ybus.data,
         get_bus_lookup(ybus),
-        ybus.branch_admittance_from_to,
-        ybus.branch_admittance_to_from,
+        ybus.arc_admittance_from_to,
+        ybus.arc_admittance_to_from,
         nr_new.series_branch_map,
         nr,
     )
@@ -1259,14 +1259,14 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         yft_data = new_y_ft.data[arc_keep_ixs, bus_ix]
         ytf_data = new_y_tf.data[arc_keep_ixs, bus_ix]
 
-        branch_admittance_from_to = ArcAdmittanceMatrix(
+        arc_admittance_from_to = ArcAdmittanceMatrix(
             yft_data,
             (arc_ax, bus_ax),
             (arc_lookup, bus_lookup),
             nr,
             :FromTo,
         )
-        branch_admittance_to_from = ArcAdmittanceMatrix(
+        arc_admittance_to_from = ArcAdmittanceMatrix(
             ytf_data,
             (arc_ax, bus_ax),
             (arc_lookup, bus_lookup),
@@ -1274,8 +1274,8 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
             :ToFrom,
         )
     else
-        branch_admittance_from_to = ybus.branch_admittance_from_to
-        branch_admittance_to_from = ybus.branch_admittance_to_from
+        arc_admittance_from_to = ybus.arc_admittance_from_to
+        arc_admittance_to_from = ybus.arc_admittance_to_from
     end
 
     return Ybus(
@@ -1286,8 +1286,8 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         subnetwork_axes,
         arc_subnetwork_axis,
         nr,
-        branch_admittance_from_to,
-        branch_admittance_to_from,
+        arc_admittance_from_to,
+        arc_admittance_to_from,
     )
 end
 
@@ -1386,21 +1386,21 @@ function _add_series_branches_to_ybus!(
     yft_data = SparseArrays.sparse(I_yft, J_yft, V_yft, row_ix - 1, n_buses)
     ytf_data = SparseArrays.sparse(I_ytf, J_ytf, V_ytf, row_ix - 1, n_buses)
 
-    branch_admittance_from_to = ArcAdmittanceMatrix(
+    arc_admittance_from_to = ArcAdmittanceMatrix(
         yft_data,
         (arc_axis, get_bus_axis(yft)),
         (arc_lookup, get_bus_lookup(yft)),
         nrd,
         :FromTo,
     )
-    branch_admittance_to_from = ArcAdmittanceMatrix(
+    arc_admittance_to_from = ArcAdmittanceMatrix(
         ytf_data,
         (arc_axis, get_bus_axis(ytf)),
         (arc_lookup, get_bus_lookup(ytf)),
         nrd,
         :ToFrom,
     )
-    return branch_admittance_from_to, branch_admittance_to_from
+    return arc_admittance_from_to, arc_admittance_to_from
 end
 
 function _apply_d2_chain_ybus!(
