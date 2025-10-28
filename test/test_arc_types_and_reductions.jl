@@ -68,7 +68,7 @@ end
     # test that the parallel lines were reduced
     nrd = PNM.get_network_reduction_data(Y)
     parallel_arc = find_parallel_arc(sys)
-    @test parallel_arc in PNM.get_removed_arcs(nrd)
+    @test parallel_arc in keys(nrd.parallel_branch_map)
 end
 
 @testset "Parallel lines + degree-2" begin
