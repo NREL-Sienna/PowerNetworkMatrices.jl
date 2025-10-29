@@ -45,8 +45,8 @@ function _test_matrices_ward_reduction(sys, study_buses)
     @test Set(Y.axes[2]) == Set(study_buses)
 
     PTDF_ = PTDF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
-    @test Set(PTDF_.axes[1]) == Set(study_buses)
-    @test Set(PTDF_.axes[2]) ==
+    @test Set(PNM.get_bus_axis(PTDF_)) == Set(study_buses)
+    @test Set(PNM.get_arc_axis(PTDF_)) ==
           union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
 
     LODF_ = LODF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
@@ -55,7 +55,18 @@ function _test_matrices_ward_reduction(sys, study_buses)
     @test Set(LODF_.axes[2]) ==
           union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
 
-    #TODO - add virtual PTDF/ virtual LODF
+    vPTDF_ =
+        VirtualPTDF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    @test Set(PNM.get_bus_axis(vPTDF_)) == Set(study_buses)
+    @test Set(PNM.get_arc_axis(vPTDF_)) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
+
+    vLODF_ =
+        VirtualLODF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    @test Set(vLODF_.axes[1]) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
+    @test Set(vLODF_.axes[2]) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
 end
 
 @testset "Basic ward reduction" begin

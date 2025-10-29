@@ -35,5 +35,3 @@ get_arc_lookup(M::ArcAdmittanceMatrix) = M.lookup[1]
 get_bus_axis(M::ArcAdmittanceMatrix) = M.axes[2]
 get_bus_lookup(M::ArcAdmittanceMatrix) = M.lookup[2]
 get_direction(M::ArcAdmittanceMatrix) = M.direction
-
-# TODO - define interface for getting arc admittance matrices from system

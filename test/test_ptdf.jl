@@ -199,7 +199,7 @@ end
     )
 
     # Test Throw error when isolated buses are connected to an available branch
-    @test_throws IS.ConflictingInputsError ptdf_2 = PTDF(sys_2)        #TODO - make this a more informative error
+    @test_throws IS.ConflictingInputsError ptdf_2 = PTDF(sys_2)
 end
 
 @testset "Test PTDF matrices with distributed slack" begin

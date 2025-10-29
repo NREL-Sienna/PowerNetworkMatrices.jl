@@ -147,7 +147,7 @@ function VirtualLODF(
         A.data,
         Set(ref_bus_positions),
     )
-    PTDF_diag[PTDF_diag .> 1 - 1e-6] .= 0.0 # TODO: magic number.
+    PTDF_diag[PTDF_diag .> 1 - LODF_ENTRY_TOLERANCE] .= 0.0
 
     if isempty(persistent_arcs)
         empty_cache =
