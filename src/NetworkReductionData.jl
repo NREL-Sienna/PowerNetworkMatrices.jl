@@ -57,7 +57,8 @@ network reduction algorithms.
         Dict{Tuple{Int, Int}, Complex{Float32}}()
     all_branch_maps_by_type::Dict{String, Any} = Dict{String, Any}()
     reductions::ReductionContainer = ReductionContainer()
-    name_to_arc_map::Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}} = Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}()
+    name_to_arc_map::Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}} =
+        Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}()
     filters_applied = Dict{Type, Function}() #Filters applied when populating branch maps by type
 end
 
@@ -76,7 +77,9 @@ function _add_to_map(double_circuit::Set{T}, filters::Dict) where {T <: PSY.ACTr
 end
 
 function _add_to_map(series_circuit::Vector, filters::Dict)
-    return any([get(filters, typeof(device), x -> true)(device) for device in series_circuit])
+    return any([
+        get(filters, typeof(device), x -> true)(device) for device in series_circuit
+    ])
 end
 
 function _get_name(device::T) where {T <: PSY.ACTransmission}
@@ -257,10 +260,10 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             map_by_type[k] = v
 
             name_to_arc_map = get!(
-                    nrd.name_to_arc_map,
-                    _get_segment_type(v),
-                    Dict{String, Tuple{Int, Int}}(),
-                )
+                nrd.name_to_arc_map,
+                _get_segment_type(v),
+                Dict{String, Tuple{Int, Int}}(),
+            )
             name_to_arc_map[_get_name(v)] = (k, "transformer3W_map")
         end
     end
@@ -310,6 +313,8 @@ get_removed_buses(rb::NetworkReductionData) = rb.removed_buses
 get_removed_arcs(rb::NetworkReductionData) = rb.removed_arcs
 get_added_admittance_map(rb::NetworkReductionData) = rb.added_admittance_map
 get_added_branch_map(rb::NetworkReductionData) = rb.added_branch_map
+get_name_to_arc_map(rb::NetworkReductionData) = rb.name_to_arc_map
+get_all_branch_maps_by_type(rb::NetworkReductionData) = rb.all_branch_maps_by_type
 """
     get_reductions(rb::NetworkReductionData)
 
