@@ -154,8 +154,8 @@ end
 
     @test nrd_both.bus_reduction_map != nrd_radial.bus_reduction_map
     @test nrd_both.reverse_bus_search_map == nrd_radial.reverse_bus_search_map
-
-    # TODO - add more testing for the composition of both reductions
+    @test isempty(nrd_radial.removed_buses)
+    @test !isempty(nrd_both.removed_buses)
 end
 
 @testset "14 bus; Ward reduction" begin

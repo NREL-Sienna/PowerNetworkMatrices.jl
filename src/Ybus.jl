@@ -520,7 +520,7 @@ function _ybus!(
     primary_star_arc = PSY.get_primary_star_arc(br)
     secondary_star_arc = PSY.get_secondary_star_arc(br)
     tertiary_star_arc = PSY.get_tertiary_star_arc(br)
-    add_to_branch_maps!(nr, primary_star_arc, secondary_star_arc, tertiary_star_arc, br)    #TODO - check this for case of some arcs unavailable
+    add_to_branch_maps!(nr, primary_star_arc, secondary_star_arc, tertiary_star_arc, br)
     primary_available = PSY.get_available_primary(br)
     secondary_available = PSY.get_available_secondary(br)
     tertiary_available = PSY.get_available_tertiary(br)
@@ -1749,12 +1749,9 @@ function _validate_study_buses(
     ybus::Ybus,
     study_buses::Vector{Int},
 )
-    #TODO - improve building the vector/set of valid bus numbers
-    valid_bus_numbers = Set{Int}()
-    for (k, v) in get_network_reduction_data(ybus).bus_reduction_map
-        push!(valid_bus_numbers, k)
-        union!(valid_bus_numbers, v)
-    end
+    nrd = get_network_reduction_data(ybus)
+    valid_bus_numbers =
+        union(Set(keys(nrd.bus_reduction_map)), Set(keys(nrd.reverse_bus_search_map)))
     for b in study_buses
         b ∉ valid_bus_numbers &&
             throw(IS.DataFormatError("Study bus $b not found in system"))
