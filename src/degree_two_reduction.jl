@@ -342,7 +342,7 @@ function _find_longest_valid_chain(
     if _is_valid_chain(adj_matrix, chain_path)
         return chain_path
     else
-        @warn "Nodes $(chain_path[1]) and $(chain_path[end]) already have a parallel path or is circular, searching for valid subchains."
+        @info "Nodes $(chain_path[1]) and $(chain_path[end]) already have a parallel path or is circular, searching for valid subchains."
         subchains = Vector{Int}[]
         n = length(chain_path)
         for i in 1:n
@@ -353,12 +353,12 @@ function _find_longest_valid_chain(
         subchains = sort([x for x in subchains if length(x) > 2]; by = length, rev = true)
         for subchain in subchains
             if _is_valid_chain(adj_matrix, subchain)
-                @warn "found a valid subchain $subchain"
+                @info "found a valid subchain $subchain"
                 return subchain
             end
         end
     end
-    @warn "No valid subchains found; skipping chain creation"
+    @debug "No valid subchains found; skipping chain creation"
     return Vector{Int}()
 end
 
