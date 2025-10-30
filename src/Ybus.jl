@@ -428,7 +428,8 @@ end
 
 """Ybus branch entries for an arc in the wye model of a `ThreeWindingTransformer`."""
 function ybus_branch_entries(tp::ThreeWindingTransformerWinding)
-    (br, winding_number) = tp
+    br = get_transformer(tp)
+    winding_number = get_winding_number(tp)
     if winding_number == 1
         Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
         tap = PSY.get_primary_turns_ratio(br) * exp(PSY.get_α_primary(br) * 1im)
