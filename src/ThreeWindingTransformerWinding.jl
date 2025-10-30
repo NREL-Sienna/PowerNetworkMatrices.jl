@@ -1,7 +1,7 @@
-struct ThreeWindingTransformerWinding <: PSY.ACTransmission
-    tranformer::PSY.ThreeWindingTransformer
+struct ThreeWindingTransformerWinding{T<:PSY.ThreeWindingTransformer} <: PSY.ACTransmission
+    transformer::T
     winding_number::Int
 end
 
-IS.@forward((ThreeWindingTransformerWinding, :tranformer), PSY.ThreeWindingTransformer)
+get_transformer(tw::ThreeWindingTransformerWinding) = tw.transformer
 get_winding_number(tw::ThreeWindingTransformerWinding) = tw.winding_number

@@ -115,7 +115,8 @@ function _add_to_map(device::Tuple{PSY.ThreeWindingTransformer, Int64}, filters:
 end
 
 function _get_name(three_wt_winding::ThreeWindingTransformerWinding)
-    transformer, winding = three_wt_winding
+    transformer = get_transformer(three_wt_winding)
+    winding = get_winding_number(three_wt_winding)
     return PSY.get_name(transformer) * "_winding_$winding"
 end
 

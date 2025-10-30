@@ -150,7 +150,7 @@ function _get_series_susceptance(segment::Set{<:PSY.ACTransmission})
 end
 function _get_series_susceptance(segment::ThreeWindingTransformerWinding)
     winding_int = get_winding_number(segment)
-    return PSY.get_series_susceptances(segment)[winding_int]
+    return PSY.get_series_susceptances(get_transformer(segment))[winding_int]
 end
 
 """
