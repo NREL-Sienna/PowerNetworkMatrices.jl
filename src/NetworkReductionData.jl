@@ -23,7 +23,7 @@ network reduction algorithms.
 - `added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}}`: New branches created during reduction
 - `all_branch_maps_by_type::Dict{String, Any}`: Branch mappings organized by component type
 - `reductions::ReductionContainer`: Container tracking applied reduction algorithms
-- `name_to_arc_map::Dict{String, Tuple{Int, Int}}`: Maps string names to their corresponding arcs for modeling in optimization models or power flow reporting after reductions applied. It is possible to have repeated arcs for some names if case of serial or parallel combinations.
+- `name_to_arc_map::Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}`: Maps string names to their corresponding arcs and the map where the arc can be found. Used in optimization models or power flow reporting after reductions are applied. It is possible to have repeated arcs for some names if case of serial or parallel combinations.
 - `filters_applied::Dict{Type, Function}`: Filters applied when populating branch maps by type
 """
 @kwdef mutable struct NetworkReductionData
