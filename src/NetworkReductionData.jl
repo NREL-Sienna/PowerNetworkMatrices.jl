@@ -87,6 +87,9 @@ function _add_to_map(
 end
 
 function _add_to_map(series_circuit::Vector{PSY.ACTransmission}, filters::Dict)
+    if isempty(filters)
+        return true
+    end
     @info "Series circuit contains mixed branch types, filters might be applied inconsistently."
     return any([
         get(filters, typeof(device), x -> true)(device) for device in series_circuit
