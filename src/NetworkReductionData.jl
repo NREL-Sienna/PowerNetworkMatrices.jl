@@ -38,10 +38,10 @@ network reduction algorithms.
         Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}}()
     reverse_parallel_branch_map::Dict{<:PSY.ACTransmission, Tuple{Int, Int}} =
         Dict{PSY.ACTransmission, Tuple{Int, Int}}()
-    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}} =
-        Dict{Tuple{Int, Int}, Vector{Any}}()
-    reverse_series_branch_map::Dict{Any, Tuple{Int, Int}} =
-        Dict{Any, Tuple{Int, Int}}()
+    series_branch_map::Dict{Tuple{Int, Int}, Vector{<:PSY.ACTransmission}} =
+        Dict{Tuple{Int, Int}, Vector{PSY.ACTransmission}}()
+    reverse_series_branch_map::Dict{<:PSY.ACTransmission, Tuple{Int, Int}} =
+        Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     transformer3W_map::Dict{
         Tuple{Int, Int},
         Tuple{PSY.ThreeWindingTransformer, Int},
@@ -76,7 +76,18 @@ function _add_to_map(double_circuit::Set{T}, filters::Dict) where {T <: PSY.ACTr
     return any([filters[T](device) for device in double_circuit])
 end
 
-function _add_to_map(series_circuit::Vector, filters::Dict)
+function _add_to_map(
+    series_circuit::Vector{T},
+    filters::Dict,
+) where {T <: PSY.ACTransmission}
+    if !haskey(filters, T)
+        return true
+    end
+    return any([filters[T](device) for device in series_circuit])
+end
+
+function _add_to_map(series_circuit::Vector{PSY.ACTransmission}, filters::Dict)
+    @info "Series circuit contains mixed branch types, filters might be applied inconsistently."
     return any([
         get(filters, typeof(device), x -> true)(device) for device in series_circuit
     ])
@@ -88,8 +99,7 @@ end
 
 function _get_name(double_circuit::Set{T}) where {T <: PSY.ACTransmission}
     base_string = join(intersect(PSY.get_name.(double_circuit)...))
-    base_string *= "double_circuit"
-    return base_string
+    return base_string *= "double_circuit"
 end
 
 function _add_to_map(device::Tuple{PSY.ThreeWindingTransformer, Int64}, filters::Dict)

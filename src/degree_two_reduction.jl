@@ -42,7 +42,7 @@ function get_degree2_reduction(
 )
     reverse_bus_lookup = Dict(v => k for (k, v) in bus_lookup)
     arc_maps = find_degree2_chains(data, exempt_bus_positions)
-    series_branch_map = Dict{Tuple{Int, Int}, Vector{Any}}()
+    series_branch_map = Dict{Tuple{Int, Int}, Vector{<:PSY.ACTransmission}}()
 
     removed_buses = Set{Int}()
     removed_arcs = Set{Tuple{Int, Int}}()
@@ -54,7 +54,7 @@ function get_degree2_reduction(
         segment_numbers = [reverse_bus_lookup[x] for x in segment_ix]
         @assert composite_arc[1] == segment_numbers[1]
         @assert composite_arc[2] == segment_numbers[end]
-        segments = Vector{Any}()
+        segments = Vector{PSY.ACTransmission}()
         for ix in 1:(length(segment_numbers) - 1)
             segment_arc = (segment_numbers[ix], segment_numbers[ix + 1])
             segment_arc, entry = _get_branch_map_entry(
@@ -67,16 +67,16 @@ function get_degree2_reduction(
             push!(removed_arcs, segment_arc)
             ix != 1 && push!(removed_buses, segment_numbers[ix])
         end
-        series_branch_map[composite_arc] = segments
+        series_branch_map[composite_arc] = identity.(segments)
     end
     reverse_series_branch_map = _make_reverse_series_branch_map(series_branch_map)
     return series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs
 end
 
 function _make_reverse_series_branch_map(
-    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
+    series_branch_map::Dict{Tuple{Int, Int}, Vector{<:PSY.ACTransmission}},
 )
-    reverse_series_branch_map = Dict{Any, Tuple{Int, Int}}()
+    reverse_series_branch_map = Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     for (composite_arc, vector_segments) in series_branch_map
         for segment in vector_segments
             # Segment composed of parallel branches:
