@@ -37,7 +37,7 @@ function get_degree2_reduction(
     bus_lookup::Dict{Int, Int},
     exempt_bus_positions::Set{Int},
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}},
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{<:PSY.ACTransmission}},
     transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
 )
     reverse_bus_lookup = Dict(v => k for (k, v) in bus_lookup)
@@ -95,7 +95,7 @@ end
 
 function _get_branch_map_entry(
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}},
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{<:PSY.ACTransmission}},
     transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
     arc::Tuple{Int, Int},
 )

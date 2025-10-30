@@ -181,7 +181,11 @@ reverse lookup dictionaries for efficient access.
 - Otherwise creates new direct mapping
 - Maintains reverse lookup consistency
 """
-function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.ACTransmission)
+function add_to_branch_maps!(
+    nr::NetworkReductionData,
+    arc::PSY.Arc,
+    br::T,
+) where {T <: PSY.ACTransmission}
     direct_branch_map = get_direct_branch_map(nr)
     reverse_direct_branch_map = get_reverse_direct_branch_map(nr)
     parallel_branch_map = get_parallel_branch_map(nr)
@@ -194,7 +198,7 @@ function add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.ACT
         corresponding_branch = direct_branch_map[arc_tuple]
         delete!(direct_branch_map, arc_tuple)
         delete!(reverse_direct_branch_map, corresponding_branch)
-        parallel_branch_map[arc_tuple] = Set([corresponding_branch, br])
+        parallel_branch_map[arc_tuple] = Set{T}([corresponding_branch, br])
         reverse_parallel_branch_map[corresponding_branch] = arc_tuple
         reverse_parallel_branch_map[br] = arc_tuple
     else
@@ -372,7 +376,7 @@ function ybus_branch_entries(br::PSY.ACTransmission)
     return (Y11, Y12, Y21, Y22)
 end
 
-function ybus_branch_entries(parallel_br::Set{PSY.ACTransmission})
+function ybus_branch_entries(parallel_br::Set{<:PSY.ACTransmission})
     arc = get_arc_tuple(first(parallel_br))
     Y11 = Y12 = Y21 = Y22 = zero(ComplexF32)
     for br in parallel_br
@@ -1522,7 +1526,7 @@ end
 
 """
     add_segment_to_ybus!(
-        segment::Set{PSY.ACTransmission},
+        segment::Set{<:PSY.ACTransmission},
         y11::Vector{ComplexF32},
         y12::Vector{ComplexF32},
         y21::Vector{ComplexF32},
@@ -1540,7 +1544,7 @@ branches between the same pair of buses. Each branch in the set is added to the
 same Y-bus position, effectively combining their admittances.
 
 # Arguments
-- `segment::Set{PSY.ACTransmission}`: Set of parallel AC transmission branches
+- `segment::Set{<:PSY.ACTransmission}`: Set of parallel AC transmission branches
 - `y11::Vector{ComplexF32}`: Vector for from-bus self admittances
 - `y12::Vector{ComplexF32}`: Vector for from-to mutual admittances
 - `y21::Vector{ComplexF32}`: Vector for to-from mutual admittances
@@ -1561,7 +1565,7 @@ same Y-bus position, effectively combining their admittances.
 - [`DegreeTwoReduction`](@ref): Series chain elimination
 """
 function add_segment_to_ybus!(
-    segment::Set{PSY.ACTransmission},
+    segment::Set{<:PSY.ACTransmission},
     y11::Vector{ComplexF32},
     y12::Vector{ComplexF32},
     y21::Vector{ComplexF32},
@@ -1574,6 +1578,7 @@ function add_segment_to_ybus!(
     for branch in segment
         add_segment_to_ybus!(branch, y11, y12, y21, y22, fb, tb, ix, segment_orientation)
     end
+    return
 end
 
 function _get_chain_data(
