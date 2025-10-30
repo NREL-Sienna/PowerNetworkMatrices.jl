@@ -77,5 +77,5 @@ end
     Y = test_all_subtypes(sys, network_reductions)
     # test that the parallel lines were reduced
     nrd = PNM.get_network_reduction_data(Y)
-    @test Set{PSY.ACTransmission} in types_in_series_reduction(nrd)
+    @test Set{PSY.Line} in types_in_series_reduction(nrd)
 end

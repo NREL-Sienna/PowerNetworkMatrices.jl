@@ -34,9 +34,9 @@ network reduction algorithms.
         Dict{Tuple{Int, Int}, PSY.ACTransmission}()
     reverse_direct_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}} =
         Dict{PSY.ACTransmission, Tuple{Int, Int}}()
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}} =
+    parallel_branch_map::Dict{Tuple{Int, Int}, Set{<:PSY.ACTransmission}} =
         Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}}()
-    reverse_parallel_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}} =
+    reverse_parallel_branch_map::Dict{<:PSY.ACTransmission, Tuple{Int, Int}} =
         Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}} =
         Dict{Tuple{Int, Int}, Vector{Any}}()
@@ -284,8 +284,8 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
 end
 
 _get_segment_type(::T) where {T <: PSY.ACBranch} = T
-_get_segment_type(x::Set{PSY.ACTransmission}) = typeof(first(x))
-_get_segment_type(x::Tuple{PSY.ThreeWindingTransformer, Int}) = typeof(first(x))
+_get_segment_type(::Set{T}) where {T <: PSY.ACTransmission} = T
+_get_segment_type(::Tuple{T, Int}) where {T <: PSY.ThreeWindingTransformer} = T
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
 """
