@@ -161,12 +161,17 @@ function get_reduction(
     return get_reduction(A, sys, reduction)
 end
 
-function _push_parallel_branch!(parallel_branch_map::Dict, arc_tuple::Tuple{Int, Int}, br::T) where {T <: PSY.ACTransmission}
+function _push_parallel_branch!(
+    parallel_branch_map::Dict,
+    arc_tuple::Tuple{Int, Int},
+    br::T,
+) where {T <: PSY.ACTransmission}
     if eltype(parallel_branch_map[arc_tuple]) == T
         push!(parallel_branch_map[arc_tuple], br)
     else
         @warn "Mismatch in parallel device types for arc $(arc_tuple). This could indicate issues in the network data."
-        parallel_branch_map[arc_tuple] = Set{PSY.ACTransmission}([parallel_branch_map[arc_tuple]..., br])
+        parallel_branch_map[arc_tuple] =
+            Set{PSY.ACTransmission}([parallel_branch_map[arc_tuple]..., br])
     end
     return
 end
@@ -422,7 +427,7 @@ function ybus_branch_entries(br::PSY.TwoWindingTransformer)
 end
 
 """Ybus branch entries for an arc in the wye model of a `ThreeWindingTransformer`."""
-function ybus_branch_entries(tp::Tuple{PSY.ThreeWindingTransformer, Int})
+function ybus_branch_entries(tp::ThreeWindingTransformerWinding)
     (br, winding_number) = tp
     if winding_number == 1
         Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
@@ -1470,7 +1475,7 @@ end
 
 """
     add_segment_to_ybus!(
-        segment::Union{PSY.ACTransmission, Tuple{PSY.ThreeWindingTransformer, Int}},
+        segment::PSY.ACTransmission
         y11::Vector{ComplexF32},
         y12::Vector{ComplexF32},
         y21::Vector{ComplexF32},
@@ -1509,7 +1514,7 @@ Y-bus entries for series chains of degree-two buses.
 - [`ybus_branch_entries`](@ref): Pi-model computation
 """
 function add_segment_to_ybus!(
-    segment::Union{PSY.ACTransmission, Tuple{PSY.ThreeWindingTransformer, Int}},
+    segment::PSY.ACTransmission,
     y11::Vector{ComplexF32},
     y12::Vector{ComplexF32},
     y21::Vector{ComplexF32},
@@ -1661,7 +1666,7 @@ end
 
 function _remake_reverse_transformer3W_map!(nr::NetworkReductionData)
     reverse_transformer3W_map =
-        Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
+        Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}()
     for (k, v) in nr.transformer3W_map
         reverse_transformer3W_map[v] = k
     end
