@@ -245,7 +245,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 map_by_type = get!(
                     all_branch_maps_by_type["series_branch_map"],
                     _get_segment_type(segment),
-                    Dict{Tuple{Int, Int}, Vector{Any}}(),
+                    Dict{Tuple{Int, Int}, Vector{eltype(v)}}(),
                 )
                 map_by_type[k] = v
 
@@ -263,7 +263,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             map_by_type = get!(
                 all_branch_maps_by_type["reverse_series_branch_map"],
                 _get_segment_type(k),
-                Dict{Tuple{Int, Int}, Vector{Any}}(),
+                Dict{Tuple{Int, Int}, Vector{eltype(v)}}(),
             )
             map_by_type[k] = v
         end
@@ -273,7 +273,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             map_by_type = get!(
                 all_branch_maps_by_type["transformer3W_map"],
                 _get_segment_type(v),
-                Dict{Tuple{Int, Int}, Vector{Any}}(),
+                Dict{Tuple{Int, Int}, Vector{eltype(v)}}(),
             )
             map_by_type[k] = v
 
@@ -290,7 +290,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             map_by_type = get!(
                 all_branch_maps_by_type["reverse_transformer3W_map"],
                 _get_segment_type(k),
-                Dict{Tuple{Int, Int}, Vector{Any}}(),
+                Dict{Tuple{Int, Int}, Vector{eltype(v)}}(),
             )
             map_by_type[k] = v
         end
