@@ -161,6 +161,16 @@ function get_reduction(
     return get_reduction(A, sys, reduction)
 end
 
+function _push_parallel_branch!(parallel_branch_map::Dict, arc_tuple::Tuple{Int, Int}, br::T) where {T <: PSY.ACTransmission}
+    if eltype(parallel_branch_map[arc_tuple]) == T
+        push!(parallel_branch_map[arc_tuple], br)
+    else
+        @warn "Mismatch in parallel device types for arc $(arc_tuple). This could indicate issues in the network data."
+        parallel_branch_map[arc_tuple] = Set{PSY.ACTransmission}([parallel_branch_map[arc_tuple]..., br])
+    end
+    return
+end
+
 """
     add_to_branch_maps!(nr::NetworkReductionData, arc::PSY.Arc, br::PSY.ACTransmission)
 
@@ -192,13 +202,13 @@ function add_to_branch_maps!(
     reverse_parallel_branch_map = get_reverse_parallel_branch_map(nr)
     arc_tuple = get_arc_tuple(arc, nr)
     if haskey(parallel_branch_map, arc_tuple)
-        push!(parallel_branch_map[arc_tuple], br)
+        _push_parallel_branch!(parallel_branch_map, arc_tuple, br)
         reverse_parallel_branch_map[br] = arc_tuple
     elseif haskey(direct_branch_map, arc_tuple)
         corresponding_branch = direct_branch_map[arc_tuple]
         delete!(direct_branch_map, arc_tuple)
         delete!(reverse_direct_branch_map, corresponding_branch)
-        parallel_branch_map[arc_tuple] = Set{T}([corresponding_branch, br])
+        parallel_branch_map[arc_tuple] = Set(identity.([corresponding_branch, br]))
         reverse_parallel_branch_map[corresponding_branch] = arc_tuple
         reverse_parallel_branch_map[br] = arc_tuple
     else
