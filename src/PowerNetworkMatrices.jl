@@ -72,6 +72,7 @@ import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 # network calculations
 include("PowerNetworkMatrix.jl")
 include("definitions.jl")
+include("ThreeWindingTransformerWinding.jl")
 include("NetworkReduction.jl")
 include("radial_reduction.jl")
 include("degree_two_reduction.jl")

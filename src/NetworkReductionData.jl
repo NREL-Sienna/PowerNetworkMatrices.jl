@@ -15,8 +15,8 @@ network reduction algorithms.
 - `reverse_parallel_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}}`: Reverse parallel mappings
 - `series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}}`: Series branch combinations
 - `reverse_series_branch_map::Dict{Any, Tuple{Int, Int}}`: Reverse series mappings
-- `transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}}`: Three-winding transformer mappings
-- `reverse_transformer3W_map::Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}`: Reverse transformer mappings
+- `transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding}`: Three-winding transformer mappings
+- `reverse_transformer3W_map::Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}`: Reverse transformer mappings
 - `removed_buses::Set{Int}`: Set of buses eliminated from the network
 - `removed_arcs::Set{Tuple{Int, Int}}`: Set of arcs eliminated from the network
 - `added_admittance_map::Dict{Int, Complex{Float32}}`: Admittances added to buses during reduction
@@ -44,12 +44,12 @@ network reduction algorithms.
         Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     transformer3W_map::Dict{
         Tuple{Int, Int},
-        Tuple{PSY.ThreeWindingTransformer, Int},
-    } = Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}}()
+        ThreeWindingTransformerWinding,
+    } = Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding}()
     reverse_transformer3W_map::Dict{
-        Tuple{PSY.ThreeWindingTransformer, Int},
+        ThreeWindingTransformerWinding,
         Tuple{Int, Int},
-    } = Dict{Tuple{PSY.ThreeWindingTransformer, Int}, Tuple{Int, Int}}()
+    } = Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}()
     removed_buses::Set{Int} = Set{Int}()
     removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
     added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
@@ -114,7 +114,7 @@ function _add_to_map(device::Tuple{PSY.ThreeWindingTransformer, Int64}, filters:
     return _add_to_map(device[1], filters)
 end
 
-function _get_name(three_wt_winding::Tuple{PSY.ThreeWindingTransformer, Int})
+function _get_name(three_wt_winding::ThreeWindingTransformerWinding)
     transformer, winding = three_wt_winding
     return PSY.get_name(transformer) * "_winding_$winding"
 end
@@ -175,13 +175,13 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             Type{<:PSY.ThreeWindingTransformer},
             Dict{
                 Tuple{Int, Int},
-                Tuple{PSY.ThreeWindingTransformer, Int},
+                ThreeWindingTransformerWinding,
             },
         }(),
         "reverse_transformer3W_map" => Dict{
             Type{<:PSY.ThreeWindingTransformer},
             Dict{
-                Tuple{PSY.ThreeWindingTransformer, Int},
+                ThreeWindingTransformerWinding,
                 Tuple{Int, Int},
             },
         }())

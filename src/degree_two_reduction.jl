@@ -38,7 +38,7 @@ function get_degree2_reduction(
     exempt_bus_positions::Set{Int},
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
     parallel_branch_map::Dict{Tuple{Int, Int}, Set{<:PSY.ACTransmission}},
-    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
+    transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding},
 )
     reverse_bus_lookup = Dict(v => k for (k, v) in bus_lookup)
     arc_maps = find_degree2_chains(data, exempt_bus_positions)
@@ -96,7 +96,7 @@ end
 function _get_branch_map_entry(
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
     parallel_branch_map::Dict{Tuple{Int, Int}, Set{<:PSY.ACTransmission}},
-    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
+    transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding},
     arc::Tuple{Int, Int},
 )
     reverse_arc = (arc[2], arc[1])
