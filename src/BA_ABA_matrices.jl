@@ -137,9 +137,9 @@ function BA_Matrix(ybus::Ybus)
     return BA_Matrix(data, axes, lookup, subnetwork_axes, ybus.network_reduction_data)
 end
 
-function _get_series_susceptance(series_chain::Vector{Any})
-    series_susceptances = [_get_series_susceptance(segment) for segment in series_chain]
-    total_susceptance = 1 / (sum((1.0 ./ series_susceptances)))
+function _get_series_susceptance(series_chain::Vector{<:PSY.ACTransmission})
+    series_susceptances_sum = sum(inv(_get_series_susceptance(x)) for x in series_chain)
+    total_susceptance = 1 / series_susceptances_sum
     return total_susceptance
 end
 function _get_series_susceptance(segment::PSY.ACTransmission)
