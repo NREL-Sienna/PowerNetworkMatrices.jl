@@ -1324,7 +1324,7 @@ function _add_series_branches_to_ybus!(
     bus_lookup::Dict{Int, Int},
     yft::Nothing,
     ytf::Nothing,
-    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
+    series_branch_map::Dict{Tuple{Int, Int}, Vector{<:PSY.ACTransmission}},
     nrd,
 )
     for (equivalent_arc, series_map_entry) in series_branch_map
@@ -1349,7 +1349,7 @@ function _add_series_branches_to_ybus!(
     bus_lookup::Dict{Int, Int},
     yft::ArcAdmittanceMatrix,
     ytf::ArcAdmittanceMatrix,
-    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
+    series_branch_map::Dict{Tuple{Int, Int}, Vector{<:PSY.ACTransmission}},
     nrd::NetworkReductionData,
 )
     arc_lookup = get_arc_lookup(yft)
@@ -1426,7 +1426,10 @@ function _apply_d2_chain_ybus!(
     return
 end
 
-function _build_chain_ybus(series_chain::Vector{Any}, segment_orientations::Vector{Symbol})
+function _build_chain_ybus(
+    series_chain::Vector{<:PSY.ACTransmission},
+    segment_orientations::Vector{Symbol},
+)
     fb = Vector{Int}()
     tb = Vector{Int}()
     y11 = Vector{ComplexF32}()
@@ -1583,7 +1586,7 @@ end
 
 function _get_chain_data(
     equivalent_arc::Tuple{Int, Int},
-    series_map_entry::Vector{Any},
+    series_map_entry::Vector{<:PSY.ACTransmission},
     nrd::NetworkReductionData,
 )
     equivalent_arc[1] == equivalent_arc[2] && @warn("trying to reduce a loop")
