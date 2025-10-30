@@ -79,3 +79,22 @@ end
     nrd = PNM.get_network_reduction_data(Y)
     @test Set{PSY.Line} in types_in_series_reduction(nrd)
 end
+
+@testset "Test Reductions with filters" begin
+    sys_rts_da = build_system(PSISystems, "modified_RTS_GMLC_DA_sys")
+
+    ptdf = VirtualPTDF(
+        sys_rts_da;
+        network_reductions = NetworkReduction[
+            RadialReduction(),
+            DegreeTwoReduction(),
+        ],
+    )
+    PowerNetworkMatrices.populate_branch_maps_by_type!(PNM.get_network_reduction_data(ptdf),
+        Dict(Line => x -> occursin("B", get_name(x)),
+            TapTransformer => x -> occursin("B", get_name(x))))
+    @test PNM.has_filtered_branches(PNM.get_network_reduction_data(ptdf))
+    for k in keys(PNM.get_network_reduction_data(ptdf).name_to_arc_map[Line])
+        @test occursin("B", k)
+    end
+end
