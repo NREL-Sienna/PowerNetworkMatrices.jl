@@ -166,12 +166,12 @@ function _push_parallel_branch!(
     arc_tuple::Tuple{Int, Int},
     br::T,
 ) where {T <: PSY.ACTransmission}
-    if eltype(parallel_branch_map[arc_tuple]) == T
-        push!(parallel_branch_map[arc_tuple], br)
+    if get_branch_type(parallel_branch_map[arc_tuple]) == T
+        add_branch!(parallel_branch_map[arc_tuple], br)
     else
         @warn "Mismatch in parallel device types for arc $(arc_tuple). This could indicate issues in the network data."
         parallel_branch_map[arc_tuple] =
-            Set{PSY.ACTransmission}([parallel_branch_map[arc_tuple]..., br])
+            BranchesParallel([parallel_branch_map[arc_tuple].branches..., br])
     end
     return
 end
@@ -213,7 +213,8 @@ function add_to_branch_maps!(
         corresponding_branch = direct_branch_map[arc_tuple]
         delete!(direct_branch_map, arc_tuple)
         delete!(reverse_direct_branch_map, corresponding_branch)
-        parallel_branch_map[arc_tuple] = Set(identity.([corresponding_branch, br]))
+        BranchesParallel([corresponding_branch, br])
+        parallel_branch_map[arc_tuple] = BranchesParallel([corresponding_branch, br])
         reverse_parallel_branch_map[corresponding_branch] = arc_tuple
         reverse_parallel_branch_map[br] = arc_tuple
     else
@@ -260,18 +261,21 @@ function add_to_branch_maps!(
     reverse_transformer3W_map = get_reverse_transformer3W_map(nr)
     if PSY.get_available_primary(br)
         primary_star_arc_tuple = get_arc_tuple(primary_star_arc, nr)
-        transformer3W_map[primary_star_arc_tuple] = (br, 1)
-        reverse_transformer3W_map[(br, 1)] = primary_star_arc_tuple
+        winding = ThreeWindingTransformerWinding(br, 1)
+        transformer3W_map[primary_star_arc_tuple] = winding
+        reverse_transformer3W_map[winding] = primary_star_arc_tuple
     end
     if PSY.get_available_secondary(br)
         secondary_star_arc_tuple = get_arc_tuple(secondary_star_arc, nr)
-        transformer3W_map[secondary_star_arc_tuple] = (br, 2)
-        reverse_transformer3W_map[(br, 2)] = secondary_star_arc_tuple
+        winding = ThreeWindingTransformerWinding(br, 2)
+        transformer3W_map[secondary_star_arc_tuple] = winding
+        reverse_transformer3W_map[winding] = secondary_star_arc_tuple
     end
     if PSY.get_available_tertiary(br)
         tertiary_star_arc_tuple = get_arc_tuple(tertiary_star_arc, nr)
-        transformer3W_map[tertiary_star_arc_tuple] = (br, 3)
-        reverse_transformer3W_map[(br, 3)] = tertiary_star_arc_tuple
+        winding = ThreeWindingTransformerWinding(br, 3)
+        transformer3W_map[tertiary_star_arc_tuple] = winding
+        reverse_transformer3W_map[winding] = tertiary_star_arc_tuple
     end
     return
 end
@@ -391,7 +395,7 @@ function ybus_branch_entries(br::PSY.ACTransmission)
     return (Y11, Y12, Y21, Y22)
 end
 
-function ybus_branch_entries(parallel_br::Set{<:PSY.ACTransmission})
+function ybus_branch_entries(parallel_br::BranchesParallel)
     arc = get_arc_tuple(first(parallel_br))
     Y11 = Y12 = Y21 = Y22 = zero(ComplexF32)
     for br in parallel_br
@@ -551,7 +555,7 @@ function _ybus!(
         adj[star_ix, primary_ix] = -1
         fb[offset_ix + ix + n_entries] = primary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        (Y11, Y12, Y21, Y22) = ybus_branch_entries((br, 1))
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries(ThreeWindingTransformerWinding(br, 1))
         y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
         y21[offset_ix + ix + n_entries] = Y21
@@ -564,7 +568,7 @@ function _ybus!(
         adj[star_ix, secondary_ix] = -1
         fb[offset_ix + ix + n_entries] = secondary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        (Y11, Y12, Y21, Y22) = ybus_branch_entries((br, 2))
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries(ThreeWindingTransformerWinding(br, 2))
         y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
         y21[offset_ix + ix + n_entries] = Y21
@@ -577,7 +581,7 @@ function _ybus!(
         adj[star_ix, tertiary_ix] = -1
         fb[offset_ix + ix + n_entries] = tertiary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        (Y11, Y12, Y21, Y22) = ybus_branch_entries((br, 3))
+        (Y11, Y12, Y21, Y22) = ybus_branch_entries(ThreeWindingTransformerWinding(br, 3))
         y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
         y21[offset_ix + ix + n_entries] = Y21
@@ -1340,7 +1344,7 @@ function _add_series_branches_to_ybus!(
     bus_lookup::Dict{Int, Int},
     yft::Nothing,
     ytf::Nothing,
-    series_branch_map::Dict{Tuple{Int, Int}, Vector{<:PSY.ACTransmission}},
+    series_branch_map::Dict{Tuple{Int, Int}, BranchesSeries},
     nrd,
 )
     for (equivalent_arc, series_map_entry) in series_branch_map
@@ -1365,7 +1369,7 @@ function _add_series_branches_to_ybus!(
     bus_lookup::Dict{Int, Int},
     yft::ArcAdmittanceMatrix,
     ytf::ArcAdmittanceMatrix,
-    series_branch_map::Dict{Tuple{Int, Int}, Vector{<:PSY.ACTransmission}},
+    series_branch_map::Dict{Tuple{Int, Int}, BranchesSeries},
     nrd::NetworkReductionData,
 )
     arc_lookup = get_arc_lookup(yft)
@@ -1443,7 +1447,7 @@ function _apply_d2_chain_ybus!(
 end
 
 function _build_chain_ybus(
-    series_chain::Vector{<:PSY.ACTransmission},
+    series_chain::BranchesSeries,
     segment_orientations::Vector{Symbol},
 )
     fb = Vector{Int}()
@@ -1545,7 +1549,7 @@ end
 
 """
     add_segment_to_ybus!(
-        segment::Set{<:PSY.ACTransmission},
+        segment::BranchesParallel,
         y11::Vector{ComplexF32},
         y12::Vector{ComplexF32},
         y21::Vector{ComplexF32},
@@ -1563,7 +1567,7 @@ branches between the same pair of buses. Each branch in the set is added to the
 same Y-bus position, effectively combining their admittances.
 
 # Arguments
-- `segment::Set{<:PSY.ACTransmission}`: Set of parallel AC transmission branches
+- `segment::BranchesParallel`: Set of parallel AC transmission branches
 - `y11::Vector{ComplexF32}`: Vector for from-bus self admittances
 - `y12::Vector{ComplexF32}`: Vector for from-to mutual admittances
 - `y21::Vector{ComplexF32}`: Vector for to-from mutual admittances
@@ -1584,7 +1588,7 @@ same Y-bus position, effectively combining their admittances.
 - [`DegreeTwoReduction`](@ref): Series chain elimination
 """
 function add_segment_to_ybus!(
-    segment::Set{<:PSY.ACTransmission},
+    segment::BranchesParallel,
     y11::Vector{ComplexF32},
     y12::Vector{ComplexF32},
     y21::Vector{ComplexF32},
@@ -1602,7 +1606,7 @@ end
 
 function _get_chain_data(
     equivalent_arc::Tuple{Int, Int},
-    series_map_entry::Vector{<:PSY.ACTransmission},
+    series_map_entry::BranchesSeries,
     nrd::NetworkReductionData,
 )
     equivalent_arc[1] == equivalent_arc[2] && @warn("trying to reduce a loop")

@@ -37,12 +37,12 @@ function get_degree2_reduction(
     bus_lookup::Dict{Int, Int},
     exempt_bus_positions::Set{Int},
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{<:PSY.ACTransmission}},
+    parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel},
     transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding},
 )
     reverse_bus_lookup = Dict(v => k for (k, v) in bus_lookup)
     arc_maps = find_degree2_chains(data, exempt_bus_positions)
-    series_branch_map = Dict{Tuple{Int, Int}, Vector{<:PSY.ACTransmission}}()
+    series_branch_map = Dict{Tuple{Int, Int}, BranchesSeries}()
 
     removed_buses = Set{Int}()
     removed_arcs = Set{Tuple{Int, Int}}()
@@ -54,7 +54,7 @@ function get_degree2_reduction(
         segment_numbers = [reverse_bus_lookup[x] for x in segment_ix]
         @assert composite_arc[1] == segment_numbers[1]
         @assert composite_arc[2] == segment_numbers[end]
-        segments = Vector{PSY.ACTransmission}()
+        segments = BranchesSeries()
         for ix in 1:(length(segment_numbers) - 1)
             segment_arc = (segment_numbers[ix], segment_numbers[ix + 1])
             segment_arc, entry = _get_branch_map_entry(
@@ -63,30 +63,48 @@ function get_degree2_reduction(
                 transformer3W_map,
                 segment_arc,
             )
-            push!(segments, entry)
+            add_branch!(segments, entry)
             push!(removed_arcs, segment_arc)
             ix != 1 && push!(removed_buses, segment_numbers[ix])
         end
-        series_branch_map[composite_arc] = identity.(segments)
+        series_branch_map[composite_arc] = segments
     end
     reverse_series_branch_map = _make_reverse_series_branch_map(series_branch_map)
     return series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs
 end
 
+function _add_to_reverse_series_branch_map!(
+    reverse_series_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}},
+    composite_arc::Tuple{Int, Int},
+    segment::BranchesParallel,
+)
+    for branch in segment.branches
+        reverse_series_branch_map[branch] = composite_arc
+    end
+    return
+end
+
+function _add_to_reverse_series_branch_map!(
+    reverse_series_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}},
+    composite_arc::Tuple{Int, Int},
+    segment::PSY.ACTransmission,
+)
+    reverse_series_branch_map[segment] = composite_arc
+    return
+end
+
 function _make_reverse_series_branch_map(
-    series_branch_map::Dict{Tuple{Int, Int}, Vector{<:PSY.ACTransmission}},
+    series_branch_map::Dict{Tuple{Int, Int}, BranchesSeries},
 )
     reverse_series_branch_map = Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     for (composite_arc, vector_segments) in series_branch_map
-        for segment in vector_segments
-            # Segment composed of parallel branches:
-            if isa(segment, Set)
-                for x in segment
-                    reverse_series_branch_map[x] = composite_arc
-                end
-                # Segment composed of single branch or part of a 3WT:
-            else
-                reverse_series_branch_map[segment] = composite_arc
+        for segment_collection in values(vector_segments.branches)
+            for segment in segment_collection
+                _add_to_reverse_series_branch_map!(
+                    reverse_series_branch_map,
+                    composite_arc,
+                    segment,
+                )
             end
         end
     end
@@ -95,7 +113,7 @@ end
 
 function _get_branch_map_entry(
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{<:PSY.ACTransmission}},
+    parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel},
     transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding},
     arc::Tuple{Int, Int},
 )
