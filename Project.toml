@@ -1,7 +1,7 @@
 name = "PowerNetworkMatrices"
 uuid = "bed98974-b02a-5e2f-9fe0-a103f5c450dd"
-authors = ["Jose Daniel Lara", "Alessandro Francesco Castelli", "Sourabh Dalvi"]
 version = "0.13.0"
+authors = ["Jose Daniel Lara", "Alessandro Francesco Castelli", "Sourabh Dalvi"]
 
 [deps]
 AppleAccelerate = "13e28ba4-7ad8-5781-acae-3021b1ed3924"
