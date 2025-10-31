@@ -111,7 +111,7 @@ function BA_Matrix(ybus::Ybus)
         # Get series susceptance from components, not the equivalent ybus for reductions of degree two nodes
         # This results in reduced error relative to the DC power flow result without reductions
         if is_arc_in_series_map(nr_data, arc)
-            b = _get_series_susceptance(get_mapped_series_branch(nr_data, arc))
+            b = get_series_susceptance(get_mapped_series_branch(nr_data, arc))
         else
             Yt = -1 * ybus.data[ix_from_bus, ix_to_bus]
             Zt = 1 / Yt
@@ -137,20 +137,8 @@ function BA_Matrix(ybus::Ybus)
     return BA_Matrix(data, axes, lookup, subnetwork_axes, ybus.network_reduction_data)
 end
 
-function _get_series_susceptance(series_chain::Vector{<:PSY.ACTransmission})
-    series_susceptances_sum = sum(inv(_get_series_susceptance(x)) for x in series_chain)
-    total_susceptance = 1 / series_susceptances_sum
-    return total_susceptance
-end
-function _get_series_susceptance(segment::PSY.ACTransmission)
+function get_series_susceptance(segment::PSY.ACTransmission)
     return PSY.get_series_susceptance(segment)
-end
-function _get_series_susceptance(segment::Set{<:PSY.ACTransmission})
-    return sum([_get_series_susceptance(branch) for branch in segment])
-end
-function _get_series_susceptance(segment::ThreeWindingTransformerWinding)
-    winding_int = get_winding_number(segment)
-    return PSY.get_series_susceptances(get_transformer(segment))[winding_int]
 end
 
 """
