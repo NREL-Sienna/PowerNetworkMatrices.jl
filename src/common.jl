@@ -89,11 +89,11 @@ function get_arc_tuple(br::PSY.ACTransmission, nr::NetworkReductionData)
 end
 
 # Parallel branches: all oriented in same direction, so just take arc of first.
-function get_arc_tuple(br::Set{<:PSY.ACTransmission}, nr::NetworkReductionData)
+function get_arc_tuple(br::BranchesParallel, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(first(br)), nr)
 end
 
-function get_arc_tuple(br::Set{<:PSY.ACTransmission})
+function get_arc_tuple(br::BranchesParallel)
     return get_arc_tuple(PSY.get_arc(first(br)))
 end
 
