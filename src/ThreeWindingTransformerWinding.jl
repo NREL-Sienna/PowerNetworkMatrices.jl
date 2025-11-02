@@ -33,3 +33,26 @@ function get_series_susceptance(segment::ThreeWindingTransformerWinding)
     winding_int = get_winding_number(segment)
     return PSY.get_series_susceptances(tfw)[winding_int]
 end
+
+function get_arc_tuple(tr::ThreeWindingTransformerWinding)
+    t3W = get_transformer(tr)
+    arc_number = get_winding_number(tr)
+    if arc_number == 1
+        return (
+            PSY.get_number(PSY.get_from(PSY.get_primary_star_arc(t3W))),
+            PSY.get_number(PSY.get_to(PSY.get_primary_star_arc(t3W))),
+        )
+    elseif arc_number == 2
+        return (
+            PSY.get_number(PSY.get_from(PSY.get_secondary_star_arc(t3W))),
+            PSY.get_number(PSY.get_to(PSY.get_secondary_star_arc(t3W))),
+        )
+    elseif arc_number == 3
+        return (
+            PSY.get_number(PSY.get_from(PSY.get_tertiary_star_arc(t3W))),
+            PSY.get_number(PSY.get_to(PSY.get_tertiary_star_arc(t3W))),
+        )
+    else
+        throw(error("Three-winding transformer arc number must be 1, 2, or 3"))
+    end
+end

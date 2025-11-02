@@ -39,3 +39,11 @@ end
 function get_series_susceptance(segment::BranchesParallel)
     return sum([get_series_susceptance(branch) for branch in segment.branches])
 end
+
+function Base.iterate(bp::BranchesParallel)
+    return iterate(bp.branches)
+end
+
+function Base.iterate(bp::BranchesParallel, state)
+    return iterate(bp.branches, state)
+end

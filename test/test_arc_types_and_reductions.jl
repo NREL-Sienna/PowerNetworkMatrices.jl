@@ -46,7 +46,11 @@ end
     Y = test_all_subtypes(sys, network_reductions)
     # test that the 3WT arc was actually reduced
     trf = first(get_components(PSY.Transformer3W, sys))
-    trf_arcs = Tuple{Int, Int}[PNM.get_arc_tuple((trf, i)) for i in 1:3]
+    trf_arcs = Tuple{Int, Int}[
+        PNM.get_arc_tuple(PSY.get_primary_star_arc(trf)),
+        PNM.get_arc_tuple(PSY.get_secondary_star_arc(trf)),
+        PNM.get_arc_tuple(PSY.get_tertiary_star_arc(trf)),
+    ]
     nrd = PNM.get_network_reduction_data(Y)
     @test any(arc in PNM.get_removed_arcs(nrd) for arc in trf_arcs) ||
           any(reverse(arc) in PNM.get_removed_arcs(nrd) for arc in trf_arcs)
