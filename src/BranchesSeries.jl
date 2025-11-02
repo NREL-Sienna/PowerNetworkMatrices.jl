@@ -128,3 +128,11 @@ function add_to_map(series_circuit::BranchesSeries, filters::Dict)
     end
     error("Invalid condition reached in add_to_map for BranchesSeries")
 end
+
+function Base.:(==)(a::BranchesSeries, b::BranchesSeries)
+    return a.branches == b.branches
+end
+
+function Base.show(io::IO, x::MIME{Symbol("text/plain")}, y::BranchesSeries)
+    show(io, x, y.branches)
+end
