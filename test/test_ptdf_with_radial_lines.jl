@@ -193,3 +193,9 @@ end
     end
     @test test_value
 end
+
+@testset "PTDF with d2 reduction" begin
+    sys = PSB.build_system(PSB.PSISystems, "RTS_GMLC_DA_sys")
+    ptdf = PTDF(sys; network_reductions = NetworkReduction[PNM.DegreeTwoReduction()])
+    @test isa(ptdf, PTDF)
+end

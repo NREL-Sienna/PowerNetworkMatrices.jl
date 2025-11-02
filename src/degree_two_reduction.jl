@@ -37,12 +37,12 @@ function get_degree2_reduction(
     bus_lookup::Dict{Int, Int},
     exempt_bus_positions::Set{Int},
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}},
-    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
+    parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel},
+    transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding},
 )
     reverse_bus_lookup = Dict(v => k for (k, v) in bus_lookup)
     arc_maps = find_degree2_chains(data, exempt_bus_positions)
-    series_branch_map = Dict{Tuple{Int, Int}, Vector{Any}}()
+    series_branch_map = Dict{Tuple{Int, Int}, BranchesSeries}()
 
     removed_buses = Set{Int}()
     removed_arcs = Set{Tuple{Int, Int}}()
@@ -54,7 +54,7 @@ function get_degree2_reduction(
         segment_numbers = [reverse_bus_lookup[x] for x in segment_ix]
         @assert composite_arc[1] == segment_numbers[1]
         @assert composite_arc[2] == segment_numbers[end]
-        segments = Vector{Any}()
+        segments = BranchesSeries()
         for ix in 1:(length(segment_numbers) - 1)
             segment_arc = (segment_numbers[ix], segment_numbers[ix + 1])
             segment_arc, entry = _get_branch_map_entry(
@@ -63,7 +63,7 @@ function get_degree2_reduction(
                 transformer3W_map,
                 segment_arc,
             )
-            push!(segments, entry)
+            add_branch!(segments, entry)
             push!(removed_arcs, segment_arc)
             ix != 1 && push!(removed_buses, segment_numbers[ix])
         end
@@ -73,20 +73,38 @@ function get_degree2_reduction(
     return series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs
 end
 
-function _make_reverse_series_branch_map(
-    series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}},
+function _add_to_reverse_series_branch_map!(
+    reverse_series_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}},
+    composite_arc::Tuple{Int, Int},
+    segment::BranchesParallel,
 )
-    reverse_series_branch_map = Dict{Any, Tuple{Int, Int}}()
+    for branch in segment.branches
+        reverse_series_branch_map[branch] = composite_arc
+    end
+    return
+end
+
+function _add_to_reverse_series_branch_map!(
+    reverse_series_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}},
+    composite_arc::Tuple{Int, Int},
+    segment::PSY.ACTransmission,
+)
+    reverse_series_branch_map[segment] = composite_arc
+    return
+end
+
+function _make_reverse_series_branch_map(
+    series_branch_map::Dict{Tuple{Int, Int}, BranchesSeries},
+)
+    reverse_series_branch_map = Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     for (composite_arc, vector_segments) in series_branch_map
-        for segment in vector_segments
-            # Segment composed of parallel branches:
-            if isa(segment, Set)
-                for x in segment
-                    reverse_series_branch_map[x] = composite_arc
-                end
-                # Segment composed of single branch or part of a 3WT:
-            else
-                reverse_series_branch_map[segment] = composite_arc
+        for segment_collection in values(vector_segments.branches)
+            for segment in segment_collection
+                _add_to_reverse_series_branch_map!(
+                    reverse_series_branch_map,
+                    composite_arc,
+                    segment,
+                )
             end
         end
     end
@@ -95,8 +113,8 @@ end
 
 function _get_branch_map_entry(
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
-    parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}},
-    transformer3W_map::Dict{Tuple{Int, Int}, Tuple{PSY.ThreeWindingTransformer, Int}},
+    parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel},
+    transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding},
     arc::Tuple{Int, Int},
 )
     reverse_arc = (arc[2], arc[1])
@@ -342,7 +360,7 @@ function _find_longest_valid_chain(
     if _is_valid_chain(adj_matrix, chain_path)
         return chain_path
     else
-        @warn "Nodes $(chain_path[1]) and $(chain_path[end]) already have a parallel path or is circular, searching for valid subchains."
+        @info "Nodes $(chain_path[1]) and $(chain_path[end]) already have a parallel path or is circular, searching for valid subchains."
         subchains = Vector{Int}[]
         n = length(chain_path)
         for i in 1:n
@@ -353,12 +371,12 @@ function _find_longest_valid_chain(
         subchains = sort([x for x in subchains if length(x) > 2]; by = length, rev = true)
         for subchain in subchains
             if _is_valid_chain(adj_matrix, subchain)
-                @warn "found a valid subchain $subchain"
+                @info "found a valid subchain $subchain"
                 return subchain
             end
         end
     end
-    @warn "No valid subchains found; skipping chain creation"
+    @debug "No valid subchains found; skipping chain creation"
     return Vector{Int}()
 end
 
