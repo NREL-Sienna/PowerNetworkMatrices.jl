@@ -12,5 +12,3 @@
     # Otherwise concatonate names:
     @test PNM.get_name(bp) == "B1_C2_double_circuit"
 end
-
-

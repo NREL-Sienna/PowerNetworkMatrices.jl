@@ -58,7 +58,7 @@ function compute_parallel_multiplier(
 end
 
 function get_series_susceptance(segment::BranchesParallel)
-    return sum([get_series_susceptance(branch) for branch in segment.branches])
+    return sum(get_series_susceptance(branch) for branch in segment.branches)
 end
 
 function Base.iterate(bp::BranchesParallel)
