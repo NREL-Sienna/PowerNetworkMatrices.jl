@@ -62,51 +62,15 @@ network reduction algorithms.
     filters_applied = Dict{Type, Function}() #Filters applied when populating branch maps by type
 end
 
-function _add_to_map(device::T, filters::Dict) where {T <: PSY.ACTransmission}
+function add_to_map(device::T, filters::Dict) where {T <: PSY.ACTransmission}
     if !haskey(filters, T)
         return true
     end
     return filters[T](device)
 end
 
-function _add_to_map(double_circuit::Set{T}, filters::Dict) where {T <: PSY.ACTransmission}
-    if !haskey(filters, T)
-        return true
-    end
-    return any([filters[T](device) for device in double_circuit])
-end
-
-function _add_to_map(
-    series_circuit::Vector{T},
-    filters::Dict,
-) where {T <: PSY.ACTransmission}
-    if !haskey(filters, T)
-        return true
-    end
-    return any([filters[T](device) for device in series_circuit])
-end
-
-function _add_to_map(series_circuit::Vector{PSY.ACTransmission}, filters::Dict)
-    if isempty(filters)
-        return true
-    end
-
-    if isempty(intersect(typeof.(series_circuit), keys(filters)))
-        return true
-    end
-
-    @info "Series circuit contains mixed branch types, filters might be applied inconsistently."
-    return any([
-        get(filters, typeof(device), x -> true)(device) for device in series_circuit
-    ])
-end
-
 function get_name(device::T) where {T <: PSY.ACTransmission}
     return PSY.get_name(device)
-end
-
-function _add_to_map(device::Tuple{PSY.ThreeWindingTransformer, Int64}, filters::Dict)
-    return _add_to_map(device[1], filters)
 end
 
 """
@@ -177,7 +141,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         }())
 
     for (k, v) in nrd.direct_branch_map
-        if _add_to_map(v, filters)
+        if add_to_map(v, filters)
             map_by_type = get!(
                 all_branch_maps_by_type["direct_branch_map"],
                 _get_segment_type(v),
@@ -193,7 +157,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         end
     end
     for (k, v) in nrd.reverse_direct_branch_map
-        if _add_to_map(k, filters)
+        if add_to_map(k, filters)
             map_by_type = get!(
                 all_branch_maps_by_type["reverse_direct_branch_map"],
                 _get_segment_type(k),
@@ -203,7 +167,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         end
     end
     for (k, v) in nrd.parallel_branch_map
-        if _add_to_map(v, filters)
+        if add_to_map(v, filters)
             map_by_type = get!(
                 all_branch_maps_by_type["parallel_branch_map"],
                 _get_segment_type(v),
@@ -219,7 +183,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         end
     end
     for (k, v) in nrd.reverse_parallel_branch_map
-        if _add_to_map(k, filters)
+        if add_to_map(k, filters)
             map_by_type = get!(
                 all_branch_maps_by_type["reverse_parallel_branch_map"],
                 _get_segment_type(k),
@@ -230,7 +194,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
     end
     for (k, v) in nrd.series_branch_map
         #Repeated entry for each type in series chain
-        if _add_to_map(v, filters)
+        if add_to_map(v, filters)
             for segment in v
                 map_by_type = get!(
                     all_branch_maps_by_type["series_branch_map"],
@@ -249,7 +213,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         end
     end
     for (k, v) in nrd.reverse_series_branch_map
-        if _add_to_map(k, filters)
+        if add_to_map(k, filters)
             map_by_type = get!(
                 all_branch_maps_by_type["reverse_series_branch_map"],
                 _get_segment_type(k),
@@ -260,7 +224,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         end
     end
     for (k, v) in nrd.transformer3W_map
-        if _add_to_map(v, filters)
+        if add_to_map(v, filters)
             map_by_type = get!(
                 all_branch_maps_by_type["transformer3W_map"],
                 _get_segment_type(v),
@@ -277,7 +241,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         end
     end
     for (k, v) in nrd.reverse_transformer3W_map
-        if _add_to_map(k, filters)
+        if add_to_map(k, filters)
             map_by_type = get!(
                 all_branch_maps_by_type["reverse_transformer3W_map"],
                 _get_segment_type(k),
@@ -293,8 +257,8 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
 end
 
 _get_segment_type(::T) where {T <: PSY.ACBranch} = T
-_get_segment_type(::Set{T}) where {T <: PSY.ACTransmission} = T
-_get_segment_type(::Tuple{T, Int}) where {T <: PSY.ThreeWindingTransformer} = T
+_get_segment_type(::BranchesParallel{T}) where {T <: PSY.ACTransmission} = T
+_get_segment_type(::ThreeWindingTransformerWinding{T}) where {T <: PSY.ThreeWindingTransformer} = T
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
 """

@@ -56,3 +56,7 @@ function get_arc_tuple(tr::ThreeWindingTransformerWinding)
         throw(error("Three-winding transformer arc number must be 1, 2, or 3"))
     end
 end
+
+function add_to_map(device::ThreeWindingTransformerWinding, filters::Dict)
+    return add_to_map(get_transformer(device), filters)
+end

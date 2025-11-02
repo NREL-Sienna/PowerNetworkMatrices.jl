@@ -11,7 +11,9 @@ BranchesSeries() = BranchesSeries(
 
 function add_branch!(bs::BranchesSeries, branch::T) where {T <: PSY.ACTransmission}
     if isempty(bs.branches)
+        # add the branch just once and return
         push!(get!(bs.branches, T, Vector{T}()), branch)
+        return
     end
 
     if haskey(bs.branches, T) && !bs.needs_insertion_order
@@ -26,9 +28,12 @@ function add_branch!(bs::BranchesSeries, branch::T) where {T <: PSY.ACTransmissi
         end
         push!(get!(bs.branches, T, Vector{T}()), branch)
         push!(bs.insertion_order, (T, 1))
+    elseif !haskey(bs.branches, T) && !isempty(bs.insertion_order)
+        push!(get!(bs.branches, T, Vector{T}()), branch)
+        push!(bs.insertion_order, (T, length(bs.branches[T])))
     else
         push!(bs.branches[T], branch)
-        push!(bs.insertion_order, (T, length(bs.branches[T]) + 1))
+        push!(bs.insertion_order, (T, length(bs.branches[T])))
     end
     return
 end
@@ -93,4 +98,33 @@ function get_series_susceptance(series_chain::BranchesSeries)
     series_susceptances_sum = sum(inv(get_series_susceptance(x)) for x in series_chain)
     total_susceptance = 1 / series_susceptances_sum
     return total_susceptance
+end
+
+function add_to_map(series_circuit::BranchesSeries, filters::Dict)
+    if isempty(filters)
+        return true
+    end
+
+    if series_circuit.needs_insertion_order
+        if isempty(intersect(keys(series_circuit.branches), keys(filters)))
+            return true
+        end
+
+        @warn "Series circuit contains mixed branch types, filters might be applied to more components than intended. Use Logging.Debug for additional information."
+        @debug "Series circuit branch types: $(keys(series_circuit.branches))"
+        @debug "Series circuit branch names: $(vcat([PSY.get_name.(v) for (k , v) in series_circuit.branches]))"
+        for (branch_type, branch_list) in series_circuit.branches
+            filter = get(filters, branch_type, x -> true)
+            for device in branch_list
+                if !filter(device)
+                    return false
+                end
+            end
+        end
+        return true
+    else
+        filter = filters[first(keys(series_circuit.branches))]
+        return all([filter(device) for device in first(values(series_circuit.branches))])
+    end
+    error("Invalid condition reached in add_to_map for BranchesSeries")
 end

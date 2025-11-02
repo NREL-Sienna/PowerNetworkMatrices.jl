@@ -47,3 +47,31 @@ end
 function Base.iterate(bp::BranchesParallel, state)
     return iterate(bp.branches, state)
 end
+
+function Base.length(bp::BranchesParallel)
+    return length(bp.branches)
+end
+
+function add_to_map(double_circuit::BranchesParallel{T}, filters::Dict) where {T <: PSY.ACTransmission}
+    if isabstracttype(T)
+        @warn "Parallel circuit contains mixed branch types, filters might be applied to more components than intended. Use Logging.Debug for additional information."
+        @debug "Parallel circuit branch types: $(keys(double_circuit.branches))"
+        @debug "Parallel circuit branch names: $(vcat([PSY.get_name.(v) for (k , v) in double_circuit.branches]))"
+        for branch in double_circuit.branches
+            filter = get(filters, typeof(branch), x -> true)
+            for device in branch
+                if !filter(device)
+                    return false
+                end
+            end
+        end
+        return true
+    end
+
+    if !haskey(filters, T)
+        return true
+    else
+        return any([filters[T](device) for device in double_circuit])
+    end
+    error("Invalid condition reached in add_to_map for BranchesParallel")
+end
