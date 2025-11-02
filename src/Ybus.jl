@@ -1174,17 +1174,16 @@ function build_reduced_ybus(
     sys::PSY.System,
     network_reduction::NetworkReduction,
 )
+    validate_reduction_type(
+        network_reduction,
+        get_reductions(get_network_reduction_data(ybus)),
+    )
     network_reduction_data = get_reduction(ybus, sys, network_reduction)
     return _apply_reduction(ybus, network_reduction_data)
 end
 
 #NOTE: this is the key function that composes sequential reductions; this function needs cleanup, review, and more testing.
 function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
-    #TODO - we should change this to do this validation before we compute the reduction
-    validate_reduction_type(
-        get_reductions(nr_new),
-        get_reductions(get_network_reduction_data(ybus)),
-    )
     remake_reverse_direct_branch_map = false
     remake_reverse_parallel_branch_map = false
     remake_reverse_series_branch_map = false
