@@ -259,7 +259,9 @@ end
 
 _get_segment_type(::T) where {T <: PSY.ACBranch} = T
 _get_segment_type(::BranchesParallel{T}) where {T <: PSY.ACTransmission} = T
-_get_segment_type(::ThreeWindingTransformerWinding{T}) where {T <: PSY.ThreeWindingTransformer} = T
+_get_segment_type(
+    ::ThreeWindingTransformerWinding{T},
+) where {T <: PSY.ThreeWindingTransformer} = T
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
 """
