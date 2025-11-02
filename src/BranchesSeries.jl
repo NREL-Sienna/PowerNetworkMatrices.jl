@@ -9,7 +9,7 @@ BranchesSeries() = BranchesSeries(
     false,
     Vector{Tuple{DataType, Int}}())
 
-function add_branch!(bs::BranchesSeries, branch::T) where {T<:PSY.ACTransmission}
+function add_branch!(bs::BranchesSeries, branch::T) where {T <: PSY.ACTransmission}
     if isempty(bs.branches)
         push!(get!(bs.branches, T, Vector{T}()), branch)
     end
@@ -80,9 +80,12 @@ function Base.iterate(bs::BranchesSeries, state)
     end
 end
 
-Base.length(bs::BranchesSeries) = bs.needs_insertion_order ?
-    length(bs.insertion_order) :
-    sum(length(v) for v in values(bs.branches))
+Base.length(bs::BranchesSeries) =
+    if bs.needs_insertion_order
+        length(bs.insertion_order)
+    else
+        sum(length(v) for v in values(bs.branches))
+    end
 
 Base.eltype(::Type{BranchesSeries}) = PSY.ACTransmission
 
