@@ -213,7 +213,6 @@ function add_to_branch_maps!(
         corresponding_branch = direct_branch_map[arc_tuple]
         delete!(direct_branch_map, arc_tuple)
         delete!(reverse_direct_branch_map, corresponding_branch)
-        BranchesParallel([corresponding_branch, br])
         parallel_branch_map[arc_tuple] = BranchesParallel([corresponding_branch, br])
         reverse_parallel_branch_map[corresponding_branch] = arc_tuple
         reverse_parallel_branch_map[br] = arc_tuple

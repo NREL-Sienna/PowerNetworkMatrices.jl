@@ -102,4 +102,6 @@ end
     for k in keys(PNM.get_network_reduction_data(ptdf).name_to_arc_map[Line])
         @test occursin("B", k)
     end
+    PNM.empty!(PNM.get_network_reduction_data(ptdf))
+    @test isempty(PNM.get_network_reduction_data(ptdf))
 end

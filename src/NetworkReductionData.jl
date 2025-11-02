@@ -11,9 +11,9 @@ network reduction algorithms.
 - `reverse_bus_search_map::Dict{Int, Int}`: Maps eliminated buses to their parent buses
 - `direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission}`: One-to-one branch mappings
 - `reverse_direct_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}}`: Reverse direct mappings
-- `parallel_branch_map::Dict{Tuple{Int, Int}, Set{PSY.ACTransmission}}`: Parallel branch combinations
+- `parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel}`: Parallel branch combinations
 - `reverse_parallel_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}}`: Reverse parallel mappings
-- `series_branch_map::Dict{Tuple{Int, Int}, Vector{Any}}`: Series branch combinations
+- `series_branch_map::Dict{Tuple{Int, Int}, BranchesSeries}`: Series branch combinations
 - `reverse_series_branch_map::Dict{Any, Tuple{Int, Int}}`: Reverse series mappings
 - `transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding}`: Three-winding transformer mappings
 - `reverse_transformer3W_map::Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}`: Reverse transformer mappings
@@ -109,7 +109,6 @@ and stores the applied filters in `nrd.filters_applied`.
 - `nothing`: This function modifies the input structure in-place
 """
 function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict())
-    empty!(nrd)
     all_branch_maps_by_type = Dict(
         "direct_branch_map" =>
             Dict{Type{<:PSY.ACTransmission}, Dict{Tuple{Int, Int}, PSY.ACTransmission}}(),
