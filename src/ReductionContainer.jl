@@ -9,26 +9,29 @@ has_degree_two_reduction(rb::ReductionContainer) = !isnothing(rb.degree_two_redu
 has_ward_reduction(rb::ReductionContainer) = !isnothing(rb.ward_reduction)
 
 function validate_reduction_type(
-    new_reduction::ReductionContainer,
+    new_reduction::NetworkReduction,
     prior_reductions::ReductionContainer,
 )
-    if has_radial_reduction(new_reduction) && has_radial_reduction(prior_reductions)
+    if typeof(new_reduction) == RadialReduction && has_radial_reduction(prior_reductions)
         throw(IS.DataFormatError("Radial reduction is applied twice to the same system"))
     end
-    if has_degree_two_reduction(new_reduction) && has_degree_two_reduction(prior_reductions)
+    if typeof(new_reduction) == DegreeTwoReduction &&
+       has_degree_two_reduction(prior_reductions)
         throw(
             IS.DataFormatError("Degree two reduction is applied twice to the same system"),
         )
     end
-    if has_ward_reduction(new_reduction) && has_ward_reduction(prior_reductions)
+    if typeof(new_reduction) == WardReduction && has_ward_reduction(prior_reductions)
         throw(IS.DataFormatError("Ward reduction is applied twice to the same system"))
     end
     if has_ward_reduction(prior_reductions)
         throw(IS.DataFormatError("Ward reduction must be the last applied reduction"))
     end
-    if has_radial_reduction(new_reduction) && has_degree_two_reduction(prior_reductions)
+    if typeof(new_reduction) == RadialReduction &&
+       has_degree_two_reduction(prior_reductions)
         @warn "When applying both RadialReduction and DegreeTwoReduction, it is likely beneficial to apply RadialReduction first."
     end
+    return
 end
 
 function add_reduction!(r1::ReductionContainer, r2::ReductionContainer)
