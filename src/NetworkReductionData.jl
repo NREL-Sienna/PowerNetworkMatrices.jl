@@ -160,7 +160,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         "series_branch_map" =>
             Dict{Type{<:PSY.ACTransmission}, Dict{Tuple{Int, Int}, BranchesSeries}}(),
         "reverse_series_branch_map" =>
-            Dict{Type{<:PSY.ACTransmission}, Dict{BranchesSeries, Tuple{Int, Int}}}(),
+            Dict{Type{<:PSY.ACTransmission}, Dict{PSY.ACTransmission, Tuple{Int, Int}}}(),
         "transformer3W_map" => Dict{
             Type{<:PSY.ThreeWindingTransformer},
             Dict{
@@ -254,7 +254,8 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             map_by_type = get!(
                 all_branch_maps_by_type["reverse_series_branch_map"],
                 _get_segment_type(k),
-                Dict{BranchesSeries, Tuple{Int, Int}}(),
+                # Dict can be indexed by individual branches or BranchesParallel
+                Dict{PSY.ACTransmission, Tuple{Int, Int}}(),
             )
             map_by_type[k] = v
         end
