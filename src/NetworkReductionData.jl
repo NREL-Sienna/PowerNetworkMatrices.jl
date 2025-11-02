@@ -109,6 +109,7 @@ and stores the applied filters in `nrd.filters_applied`.
 - `nothing`: This function modifies the input structure in-place
 """
 function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict())
+    empty!(nrd)
     all_branch_maps_by_type = Dict(
         "direct_branch_map" =>
             Dict{Type{<:PSY.ACTransmission}, Dict{Tuple{Int, Int}, PSY.ACTransmission}}(),
@@ -313,6 +314,13 @@ function Base.isempty(rb::NetworkReductionData)
         end
     end
     return true
+end
+
+function Base.empty!(rb::NetworkReductionData)
+    for field in fieldnames(NetworkReductionData)
+        empty!(getfield(rb, field))
+    end
+    return
 end
 
 """
