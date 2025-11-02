@@ -52,7 +52,10 @@ function Base.length(bp::BranchesParallel)
     return length(bp.branches)
 end
 
-function add_to_map(double_circuit::BranchesParallel{T}, filters::Dict) where {T <: PSY.ACTransmission}
+function add_to_map(
+    double_circuit::BranchesParallel{T},
+    filters::Dict,
+) where {T <: PSY.ACTransmission}
     if isabstracttype(T)
         @warn "Parallel circuit contains mixed branch types, filters might be applied to more components than intended. Use Logging.Debug for additional information."
         @debug "Parallel circuit branch types: $(keys(double_circuit.branches))"
@@ -74,4 +77,12 @@ function add_to_map(double_circuit::BranchesParallel{T}, filters::Dict) where {T
         return any([filters[T](device) for device in double_circuit])
     end
     error("Invalid condition reached in add_to_map for BranchesParallel")
+end
+
+function Base.:(==)(a::BranchesParallel, b::BranchesParallel)
+    return a.branches == b.branches
+end
+
+function Base.show(io::IO, x::MIME{Symbol("text/plain")}, y::BranchesParallel)
+    show(io, x, y.branches)
 end
