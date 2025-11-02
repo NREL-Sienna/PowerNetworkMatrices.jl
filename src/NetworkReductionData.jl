@@ -249,7 +249,6 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         end
     end
     for (k, v) in nrd.reverse_series_branch_map
-        @show k, v
         if _add_to_map(k, filters)
             map_by_type = get!(
                 all_branch_maps_by_type["reverse_series_branch_map"],
