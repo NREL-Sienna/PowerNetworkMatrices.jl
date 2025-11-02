@@ -65,3 +65,9 @@ function Base.isempty(rb::ReductionContainer)
     end
     return true
 end
+
+function Base.empty!(rb::ReductionContainer)
+    for field in fieldnames(ReductionContainer)
+        setfield!(rb, field, nothing)
+    end
+end

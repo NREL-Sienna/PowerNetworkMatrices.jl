@@ -328,25 +328,10 @@ function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetwo
     for (k, v) in nr.reverse_parallel_branch_map
         if branch_name == PSY.get_name(k)
             parallel_branch_set = nr.parallel_branch_map[v]
-            multiplier = _compute_parallel_multiplier(parallel_branch_set, branch_name)
+            multiplier = compute_parallel_multiplier(parallel_branch_set, branch_name)
             return multiplier, v
         end
     end
     error("Branch $branch_name not found in the network reduction data.")
     return
-end
-
-function _compute_parallel_multiplier(
-    parallel_branch_set::Set{PSY.ACTransmission},
-    branch_name::String,
-)
-    b_total = 0.0
-    b_branch = 0.0
-    for br in parallel_branch_set
-        if PSY.get_name(br) == branch_name
-            b_branch += PSY.get_series_susceptance(br)
-        end
-        b_total += PSY.get_series_susceptance(br)
-    end
-    return b_branch / b_total
 end
