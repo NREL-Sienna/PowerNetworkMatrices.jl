@@ -62,7 +62,8 @@ end
     Y = test_all_subtypes(sys, network_reductions)
     # test that the 3WT arc was actually reduced
     nrd = PNM.get_network_reduction_data(Y)
-    @test Tuple{PSY.Transformer3W, Int} in types_in_series_reduction(nrd)
+    @test PNM.ThreeWindingTransformerWinding{Transformer3W} in
+          types_in_series_reduction(nrd)
 end
 
 @testset "Parallel lines + radial" begin
@@ -72,7 +73,7 @@ end
     # test that the parallel lines were reduced
     nrd = PNM.get_network_reduction_data(Y)
     parallel_arc = find_parallel_arc(sys)
-    @test parallel_arc in PNM.get_removed_arcs(nrd)
+    @test parallel_arc in keys(nrd.parallel_branch_map)
 end
 
 @testset "Parallel lines + degree-2" begin
@@ -81,7 +82,7 @@ end
     Y = test_all_subtypes(sys, network_reductions)
     # test that the parallel lines were reduced
     nrd = PNM.get_network_reduction_data(Y)
-    @test Set{PSY.Line} in types_in_series_reduction(nrd)
+    @test PNM.BranchesParallel{Line} in types_in_series_reduction(nrd)
 end
 
 @testset "Test Reductions with filters" begin
