@@ -1,13 +1,13 @@
 struct BranchesParallel{T <: PSY.ACTransmission} <: PSY.ACTransmission
-    branches::Set{T}
+    branches::Vector{T}
 end
 
 function BranchesParallel(branches::Vector{T}) where {T <: PSY.ACTransmission}
-    return BranchesParallel{T}(Set{T}(branches))
+    return BranchesParallel{T}(Vector{T}(branches))
 end
 
 function BranchesParallel(branches::Vector)
-    return BranchesParallel{ACTransmission}(Set{ACTransmission}(branches))
+    return BranchesParallel{PSY.ACTransmission}(Vector{PSY.ACTransmission}(branches))
 end
 
 function add_branch!(bp::BranchesParallel{T}, branch::T) where {T <: PSY.ACTransmission}
@@ -17,8 +17,29 @@ end
 get_branch_type(::BranchesParallel{T}) where {T <: PSY.ACTransmission} = T
 
 function get_name(bp::BranchesParallel{T}) where {T <: PSY.ACTransmission}
-    base_string = join(intersect(PSY.get_name.(bp.branches)...))
+    base_string = _longest_starting_substring(PSY.get_name.(bp.branches)...)
+    if isempty(base_string)
+        base_string = join(PSY.get_name.(bp.branches), "_") * "_"
+    end
     return base_string *= "double_circuit"
+end
+
+function _longest_starting_substring(branch_names...)
+    first_name = first(branch_names)
+    n_chars = minimum(length.(branch_names))
+    n_branches = length(branch_names)
+    for ix in 1:n_chars
+        for jx in 2:n_branches
+            if branch_names[jx][ix] != first_name[ix]
+                if ix == 1
+                    return ""
+                else
+                    return first_name[1:(ix - 1)]
+                end
+            end
+        end
+    end
+    return first_name[1:n_chars]
 end
 
 function compute_parallel_multiplier(
