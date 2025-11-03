@@ -12,10 +12,10 @@ Diagonal elements are typically zero since self-loops are not meaningful in powe
 
 # Fields
 - `data::SparseArrays.SparseMatrixCSC{Int8, Int}`: The sparse adjacency matrix storing
-  connectivity information as Int8 values (0 for no connection, non-zero for connection)
+  connectivity information as Int8 values (zero for no connection, non-zero for connection)
 - `axes::Ax`: Tuple containing the axis labels for both dimensions. The first element contains
   bus identifiers for rows, the second contains bus identifiers for columns (typically identical)
-- `lookup::L`: Tuple of dictionaries providing bidirectional mapping between bus names/numbers
+- `lookup::L`: Tuple of dictionaries providing bidirectional mapping between bus numbers
   and their corresponding matrix indices
 - `subnetwork_axes::Dict{Int, Ax}`: Dictionary mapping subnetwork identifiers to their
   corresponding axis information, used for handling electrical islands
@@ -104,7 +104,6 @@ Construct an AdjacencyMatrix from a PowerSystems.System.
 - `sys::PSY.System`: The power system from which to construct the adjacency matrix
 
 # Keyword arguments
-- `make_branch_admittance_matrices::Bool=false`: Whether to construct branch admittance matrices for power flow
 - `network_reductions::Vector{NetworkReduction}=[]`: Network reduction algorithms to apply
 - `include_constant_impedance_loads::Bool=true`: Whether to include constant impedance loads as shunt admittances
 - `subnetwork_algorithm=iterative_union_find`: Algorithm for finding electrical islands

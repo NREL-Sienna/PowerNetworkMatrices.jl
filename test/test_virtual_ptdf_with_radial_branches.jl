@@ -21,7 +21,7 @@ end
     # check if VirtualPTDF have same values as PTDF row-wise
     # sys = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys")
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")   # ! remove
-    buscount = length(PNM.get_buses(sys))
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys))
     dist_slack_factor = 1 / buscount #* ones(buscount)
     dist_slack = Dict{Int, Float64}()
     for i in 1:buscount

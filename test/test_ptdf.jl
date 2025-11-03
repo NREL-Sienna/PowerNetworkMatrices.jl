@@ -76,7 +76,10 @@
     arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, sys5)]
     @test setdiff(PNM.get_arc_axis(P5), arc_tuples) ==
           Tuple{Int, Int}[]
-    @test setdiff(PNM.get_bus_axis(P5), PSY.get_number.(PNM.get_buses(sys5))) == String[]
+    @test setdiff(
+        PNM.get_bus_axis(P5),
+        PSY.get_number.(PSY.get_available_components(PSY.ACBus, sys5)),
+    ) == String[]
 
     # auxiliary function
     PRTS_sparse = PTDF(RTS; tol = 1e-3)
@@ -160,7 +163,7 @@ end
     @test length(axes(ptdf_1)[1]) == 5
 
     sys_2 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    branches_2 = PNM.get_ac_branches(sys_2)
+    branch_2 = PSY.get_component(PSY.Line, sys_2, "2")
 
     PSY.add_component!(
         sys_2,
@@ -180,23 +183,23 @@ end
         sys_2,
         PSY.Line(;
             name = "7",
-            available = branches_2[2].available,
-            active_power_flow = branches_2[2].active_power_flow,
-            reactive_power_flow = branches_2[2].reactive_power_flow,
+            available = branch_2.available,
+            active_power_flow = branch_2.active_power_flow,
+            reactive_power_flow = branch_2.reactive_power_flow,
             arc = PSY.Arc(;
                 from = PSY.get_component(PSY.ACBus, sys_2, "nodeA"),
                 to = PSY.get_component(PSY.ACBus, sys_2, "isolated_node_1"),
             ),
-            r = branches_2[2].r,
-            x = branches_2[2].x,
-            b = branches_2[2].b,
-            rating = get_rating(branches_2[2]),
-            angle_limits = get_angle_limits(branches_2[2]),
+            r = branch_2.r,
+            x = branch_2.x,
+            b = branch_2.b,
+            rating = get_rating(branch_2),
+            angle_limits = get_angle_limits(branch_2),
         ),
     )
 
     # Test Throw error when isolated buses are connected to an available branch
-    @test_throws IS.ConflictingInputsError ptdf_2 = PTDF(sys_2)        #TODO - make this a more informative error
+    @test_throws IS.ConflictingInputsError ptdf_2 = PTDF(sys_2)
 end
 
 @testset "Test PTDF matrices with distributed slack" begin
@@ -207,7 +210,7 @@ end
 
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
-    buscount = length(PNM.get_buses(sys5))
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys5))
 
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
@@ -228,7 +231,7 @@ end
 
     # 2 reference bus system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")
-    buscount = length(PNM.get_buses(sys))
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys))
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 
@@ -237,7 +240,7 @@ end
 
     # incorrect dist_slack array length
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    buscount = length(PNM.get_buses(sys5)) + 1
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys5)) + 1
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 

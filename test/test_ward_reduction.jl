@@ -45,8 +45,8 @@ function _test_matrices_ward_reduction(sys, study_buses)
     @test Set(Y.axes[2]) == Set(study_buses)
 
     PTDF_ = PTDF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
-    @test Set(PTDF_.axes[1]) == Set(study_buses)
-    @test Set(PTDF_.axes[2]) ==
+    @test Set(PNM.get_bus_axis(PTDF_)) == Set(study_buses)
+    @test Set(PNM.get_arc_axis(PTDF_)) ==
           union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
 
     LODF_ = LODF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
@@ -55,7 +55,18 @@ function _test_matrices_ward_reduction(sys, study_buses)
     @test Set(LODF_.axes[2]) ==
           union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
 
-    #TODO - add virtual PTDF/ virtual LODF
+    vPTDF_ =
+        VirtualPTDF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    @test Set(PNM.get_bus_axis(vPTDF_)) == Set(study_buses)
+    @test Set(PNM.get_arc_axis(vPTDF_)) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
+
+    vLODF_ =
+        VirtualLODF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    @test Set(vLODF_.axes[1]) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
+    @test Set(vLODF_.axes[2]) ==
+          union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
 end
 
 @testset "Basic ward reduction" begin
@@ -81,15 +92,25 @@ end
     _test_matrices_ward_reduction(sys, study_buses)
 end
 
-#=
-#TODO - develop more robust testing for correctness of PTDF
 @testset "Test similarity of PTDF with Ward" begin
     sys = PSB.build_system(PSB.PSIDSystems, "3 Bus Inverter Base")
     ptdf_3 = PTDF(sys)
-    ptdf_2 = PTDF(sys; network_reductions = NetworkReduction[WardReduction([101, 102])])
-    @test abs(ptdf_3["BUS 1-BUS 2-i_1", 102] - ptdf_2["BUS 1-BUS 2-i_1", 102]) < 0.0025
+    ptdf_2 = @test_logs (
+        :warn,
+        r"Equivalent branch computed during Ward reduction is in parallel with existing system branch",
+    ) match_mode = :any PTDF(
+        sys;
+        network_reductions = NetworkReduction[WardReduction([101, 102])],
+    )
+    existing_line_susceptance = PSY.get_series_susceptance(
+        ptdf_2.network_reduction_data.direct_branch_map[(101, 102)],
+    )
+    ward_line_susceptance =
+        1 / imag(1 / (ptdf_2.network_reduction_data.added_branch_map[(101, 102)]))
+    ward_multiplier =
+        existing_line_susceptance / (existing_line_susceptance + ward_line_susceptance)
+    @test abs(ptdf_3[(101, 102), 102] - ward_multiplier * ptdf_2[(101, 102), 102]) < 0.007
 end
-=#
 
 @testset "Ward corner cases" begin
     sys = build_hvdc_with_small_island()

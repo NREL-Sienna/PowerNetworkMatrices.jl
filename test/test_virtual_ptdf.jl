@@ -96,7 +96,7 @@ end
 @testset "Test Virtual PTDF with distributed slack" begin
     # get 5 bus system
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
-    buscount = length(PNM.get_buses(sys))
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys))
     dist_slack_factor = 1 / buscount
     dist_slack = Dict(i => dist_slack_factor for i in 1:buscount)
     # compute full PTDF
@@ -114,7 +114,7 @@ end
     # check if an error is correctly thrown
     # 2 reference bus system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")
-    buscount = length(PNM.get_buses(sys))
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys))
     dist_slack_factor = 1 / buscount
     dist_slack = Dict(i => dist_slack_factor for i in 1:buscount)
     ptdf_1 = VirtualPTDF(sys; dist_slack = dist_slack)
@@ -122,7 +122,7 @@ end
 
     # entry in dist_slack dict not belonging to system/matrix
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    buscount = length(PNM.get_buses(sys5)) + 1
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys5)) + 1
     dist_slack_factor = 1 / buscount
     dist_slack = Dict(i => dist_slack_factor for i in 1:buscount)
     @test_throws InfrastructureSystems.InvalidValue VirtualPTDF(
@@ -161,7 +161,10 @@ end
     # test get axes values
     arc_tuples = [PNM.get_arc_tuple(arc) for arc in get_components(Arc, sys)]
     @test setdiff(PNM.get_arc_axis(vptdf), arc_tuples) == []
-    @test setdiff(PNM.get_bus_axis(vptdf), PSY.get_number.(PNM.get_buses(sys))) == String[]
+    @test setdiff(
+        PNM.get_bus_axis(vptdf),
+        PSY.get_number.(PSY.get_available_components(ACBus, sys)),
+    ) == String[]
 
     # test show
     test_value = false
