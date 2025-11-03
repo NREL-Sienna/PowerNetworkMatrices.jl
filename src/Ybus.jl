@@ -1182,53 +1182,16 @@ function build_reduced_ybus(
     return _apply_reduction(ybus, network_reduction_data)
 end
 
-#NOTE: this is the key function that composes sequential reductions; this function needs cleanup, review, and more testing.
 function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
-    remake_reverse_direct_branch_map = false
-    remake_reverse_parallel_branch_map = false
-    remake_reverse_series_branch_map = false
-    remake_reverse_transformer3W_map = false
+    # These quantities are modified and used to construct the new Ybus
     data = get_data(ybus)
     adjacency_data = ybus.adjacency_data
-    lookup = get_lookup(ybus)
-    bus_lookup = lookup[1]
-    nr = ybus.network_reduction_data
-    bus_numbers_to_remove = Vector{Int}()
-    for (k, v) in nr_new.reverse_bus_search_map
-        nr.reverse_bus_search_map[k] = v
-        push!(bus_numbers_to_remove, k)
-    end
-    for x in nr_new.removed_buses
-        push!(nr.removed_buses, x)
-        push!(bus_numbers_to_remove, x)
-        delete!(nr.bus_reduction_map, x)
-    end
-    for (k, v) in nr_new.bus_reduction_map
-        if haskey(nr.bus_reduction_map, k)
-            union!(nr.bus_reduction_map[k], nr_new.bus_reduction_map[k])
-            for x in v
-                delete!(nr.bus_reduction_map, x)
-            end
-        else
-            error("Bus $k was previously reduced")
-        end
-    end
-    for x in nr_new.removed_arcs
-        push!(nr.removed_arcs, x)
-        if haskey(nr.direct_branch_map, x)
-            remake_reverse_direct_branch_map = true
-            delete!(nr.direct_branch_map, x)
-        elseif haskey(nr.parallel_branch_map, x)
-            remake_reverse_parallel_branch_map = true
-            delete!(nr.parallel_branch_map, x)
-        elseif haskey(nr.series_branch_map, x)
-            remake_reverse_series_branch_map = true
-            delete!(nr.series_branch_map, x)
-        elseif haskey(nr.transformer3W_map, x)
-            remake_reverse_transformer3W_map = true
-            delete!(nr.transformer3W_map, x)
-        end
-    end
+    bus_lookup = get_bus_lookup(ybus)
+    nr = get_network_reduction_data(ybus)
+
+    bus_numbers_to_remove = _apply_bus_reductions!(nr, nr_new)
+    _remove_arcs_from_branch_maps!(nr, nr_new)
+
     # Add additional entries to the ybus corresponding to the equivalent series arcs
     new_y_ft, new_y_tf = _add_series_branches_to_ybus!(
         ybus.data,
@@ -1238,35 +1201,15 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         nr_new.series_branch_map,
         nr,
     )
-
-    remake_reverse_direct_branch_map && _remake_reverse_direct_branch_map!(nr)
-    remake_reverse_parallel_branch_map && _remake_reverse_parallel_branch_map!(nr)
-    remake_reverse_series_branch_map && _remake_reverse_series_branch_map!(nr)
-    remake_reverse_transformer3W_map && _remake_reverse_transformer3W_map!(nr)
-    #Assumes only the last reduction (Ward) can add branches and admittances
-    nr.added_branch_map = nr_new.added_branch_map
-    nr.added_admittance_map = nr_new.added_admittance_map
-    if isempty(nr.series_branch_map)
-        nr.series_branch_map = nr_new.series_branch_map
-        nr.reverse_series_branch_map = nr_new.reverse_series_branch_map
-    elseif !isempty(nr_new.series_branch_map) && !isempty(nr.series_branch_map)
-        error(
-            "Cannot compose series branch maps; should not apply multiple reductions that generate series branch maps",
-        )
-    end
-    for (bus_no, admittance) in nr.added_admittance_map
-        data[bus_lookup[bus_no], bus_lookup[bus_no]] += admittance
-    end
-    for (bus_tuple, admittance) in nr.added_branch_map
-        bus_from, bus_to = bus_tuple
-        data[bus_lookup[bus_from], bus_lookup[bus_to]] += admittance
-        data[bus_lookup[bus_to], bus_lookup[bus_from]] += admittance
-    end
+    _apply_added_components!(nr, nr_new, data, bus_lookup)
+    _apply_series_branch_maps!(nr, nr_new)
     add_reduction!(nr.reductions, nr_new.reductions)
     union!(nr.irreducible_buses, nr_new.irreducible_buses)
+
+    # Remake bus axes, lookup, and data matrices without removed buses:
     bus_ax = setdiff(get_bus_axis(ybus), bus_numbers_to_remove)
     bus_lookup = make_ax_ref(bus_ax)
-    bus_ix = [ybus.lookup[1][x] for x in bus_ax]
+    bus_ix = [get_bus_lookup(ybus)[x] for x in bus_ax]
     adjacency_data = adjacency_data[bus_ix, bus_ix]
     data = data[bus_ix, bus_ix]
 
@@ -1313,7 +1256,103 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     )
 end
 
-function _make_subnetwork_axes(ybus, bus_numbers_to_remove, arcs_to_remove)
+function _apply_bus_reductions!(nr::NetworkReductionData, nr_new::NetworkReductionData)
+    bus_numbers_to_remove = Vector{Int}()
+    for (k, v) in nr_new.reverse_bus_search_map
+        nr.reverse_bus_search_map[k] = v
+        push!(bus_numbers_to_remove, k)
+    end
+    for x in nr_new.removed_buses
+        push!(nr.removed_buses, x)
+        push!(bus_numbers_to_remove, x)
+        delete!(nr.bus_reduction_map, x)
+    end
+    for (k, v) in nr_new.bus_reduction_map
+        if haskey(nr.bus_reduction_map, k)
+            union!(nr.bus_reduction_map[k], nr_new.bus_reduction_map[k])
+            for x in v
+                delete!(nr.bus_reduction_map, x)
+            end
+        else
+            error("Bus $k was previously reduced")
+        end
+    end
+    return bus_numbers_to_remove
+end
+
+function _remove_arcs_from_branch_maps!(
+    nr::NetworkReductionData,
+    nr_new::NetworkReductionData,
+)
+    remake_reverse_direct_branch_map = false
+    remake_reverse_parallel_branch_map = false
+    remake_reverse_series_branch_map = false
+    remake_reverse_transformer3W_map = false
+    for x in nr_new.removed_arcs
+        push!(nr.removed_arcs, x)
+        if haskey(nr.direct_branch_map, x)
+            remake_reverse_direct_branch_map = true
+            delete!(nr.direct_branch_map, x)
+        elseif haskey(nr.parallel_branch_map, x)
+            remake_reverse_parallel_branch_map = true
+            delete!(nr.parallel_branch_map, x)
+        elseif haskey(nr.series_branch_map, x)
+            remake_reverse_series_branch_map = true
+            delete!(nr.series_branch_map, x)
+        elseif haskey(nr.transformer3W_map, x)
+            remake_reverse_transformer3W_map = true
+            delete!(nr.transformer3W_map, x)
+        end
+    end
+    remake_reverse_direct_branch_map && _remake_reverse_direct_branch_map!(nr)
+    remake_reverse_parallel_branch_map && _remake_reverse_parallel_branch_map!(nr)
+    remake_reverse_series_branch_map && _remake_reverse_series_branch_map!(nr)
+    remake_reverse_transformer3W_map && _remake_reverse_transformer3W_map!(nr)
+    return
+end
+
+function _apply_added_components!(
+    nr::NetworkReductionData,
+    nr_new::NetworkReductionData,
+    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int},
+    bus_lookup::Dict{Int, Int},
+)
+    if !isempty(nr_new.added_branch_map) && !isempty(nr.added_branch_map) ||
+       !isempty(nr_new.added_admittance_map) && !isempty(nr.added_admittance_map)
+        error(
+            "Only the final applied reduction can add new branches and/or admittances to the Ybus (e.g. Ward Reduction)",
+        )
+    end
+    nr.added_branch_map = nr_new.added_branch_map
+    nr.added_admittance_map = nr_new.added_admittance_map
+    for (bus_no, admittance) in nr.added_admittance_map
+        data[bus_lookup[bus_no], bus_lookup[bus_no]] += admittance
+    end
+    for (bus_tuple, admittance) in nr.added_branch_map
+        bus_from, bus_to = bus_tuple
+        data[bus_lookup[bus_from], bus_lookup[bus_to]] += admittance
+        data[bus_lookup[bus_to], bus_lookup[bus_from]] += admittance
+    end
+    return
+end
+
+function _apply_series_branch_maps!(nr::NetworkReductionData, nr_new::NetworkReductionData)
+    if isempty(nr.series_branch_map)
+        nr.series_branch_map = nr_new.series_branch_map
+        nr.reverse_series_branch_map = nr_new.reverse_series_branch_map
+    elseif !isempty(nr_new.series_branch_map) && !isempty(nr.series_branch_map)
+        error(
+            "Cannot compose series branch maps; should not apply multiple reductions that generate series branch maps",
+        )
+    end
+    return
+end
+
+function _make_subnetwork_axes(
+    ybus::Ybus,
+    bus_numbers_to_remove::Vector{Int},
+    arcs_to_remove::Set{Tuple{Int, Int}},
+)
     subnetwork_axes = deepcopy(ybus.subnetwork_axes)
     arc_subnetwork_axis = deepcopy(ybus.arc_subnetwork_axis)
     for (k, values) in subnetwork_axes
