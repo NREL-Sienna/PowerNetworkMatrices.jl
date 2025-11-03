@@ -84,7 +84,7 @@ A vector of type `Vector{Float64}` is defined, specifying the weights for each b
 sys_2 = PSB.build_system(PSB.PSITestSystems, "c_sys5");
 
 # consider equal distribution accross each bus for this example
-buscount = length(PSY.get_components(get_available, PSY.ACBus, sys_2));
+buscount = length(PSY.get_available_components(PSY.ACBus, sys_2));
 dist_slack = 1 / buscount * ones(buscount);
 dis_slack_dict = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 ```

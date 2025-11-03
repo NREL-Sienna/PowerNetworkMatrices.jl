@@ -78,7 +78,7 @@
           Tuple{Int, Int}[]
     @test setdiff(
         PNM.get_bus_axis(P5),
-        PSY.get_number.(PSY.get_components(get_available, PSY.ACBus, sys5)),
+        PSY.get_number.(PSY.get_available_components(PSY.ACBus, sys5)),
     ) == String[]
 
     # auxiliary function
@@ -210,7 +210,7 @@ end
 
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
-    buscount = length(PSY.get_components(get_available, PSY.ACBus, sys5))
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys5))
 
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
@@ -231,7 +231,7 @@ end
 
     # 2 reference bus system
     sys = PSB.build_system(PSISystems, "2Area 5 Bus System")
-    buscount = length(PSY.get_components(get_available, PSY.ACBus, sys))
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys))
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 
@@ -240,7 +240,7 @@ end
 
     # incorrect dist_slack array length
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    buscount = length(PSY.get_components(get_available, PSY.ACBus, sys5)) + 1
+    buscount = length(PSY.get_available_components(PSY.ACBus, sys5)) + 1
     dist_slack = 1 / buscount * ones(buscount)
     slack_array = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount)
 

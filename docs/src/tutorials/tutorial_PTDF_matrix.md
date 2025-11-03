@@ -59,7 +59,7 @@ Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus.
 
 ``` @repl tutorial_PTDF_matrix
 # consider equal distribution accross each bus for this example
-buscount = length(PSY.get_components(get_available, PSY.ACBus, sys));
+buscount = length(PSY.get_available_components(PSY.ACBus, sys));
 dist_slack = 1 / buscount * ones(buscount);
 dist_slack_array = dist_slack / sum(dist_slack);
 ```
