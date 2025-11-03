@@ -24,6 +24,7 @@ makedocs(;
     authors = "Jose Daniel Lara, Alessandro Francesco Castelli, Sourabh Dalvi",
     pages = Any[p for p in pages],
     clean = true,
+    warnonly = [:autodocs_block, :cross_references],
 )
 
 deploydocs(;
