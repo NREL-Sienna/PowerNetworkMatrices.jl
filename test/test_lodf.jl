@@ -48,7 +48,10 @@
         total_error3 = 0.0
         for ix in 1:6, jx in 1:6
             total_error3 +=
-                abs(L5NS_from_ptdf3[ix_to_tuple_map[ix], ix_to_tuple_map[jx]] .- Lodf_5[ix, jx])
+                abs(
+                    L5NS_from_ptdf3[ix_to_tuple_map[ix], ix_to_tuple_map[jx]] .-
+                    Lodf_5[ix, jx],
+                )
         end
         @test isapprox(sum(total_error3), 0.0, atol = 1e-3)
     end
