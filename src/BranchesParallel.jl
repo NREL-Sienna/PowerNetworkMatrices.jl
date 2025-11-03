@@ -2,11 +2,8 @@ struct BranchesParallel{T <: PSY.ACTransmission} <: PSY.ACTransmission
     branches::Vector{T}
 end
 
-function BranchesParallel(branches::Vector{T}) where {T <: PSY.ACTransmission}
-    return BranchesParallel{T}(Vector{T}(branches))
-end
-
-function BranchesParallel(branches::Vector)
+# Constructor for the mixed types
+function BranchesParallel(branches::Vector{PSY.ACTransmission})
     return BranchesParallel{PSY.ACTransmission}(Vector{PSY.ACTransmission}(branches))
 end
 
