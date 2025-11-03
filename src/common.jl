@@ -84,16 +84,29 @@ function get_arc_tuple(arc::PSY.Arc, nr::NetworkReductionData)
         get(reverse_bus_search_map, arc_tuple_original[2], arc_tuple_original[2]),
     )
 end
+
+function get_arc_tuple(
+    tr::ThreeWindingTransformerWinding,
+    nr::NetworkReductionData,
+)
+    reverse_bus_search_map = get_reverse_bus_search_map(nr)
+    arc_tuple_original = get_arc_tuple(tr)
+    return (
+        get(reverse_bus_search_map, arc_tuple_original[1], arc_tuple_original[1]),
+        get(reverse_bus_search_map, arc_tuple_original[2], arc_tuple_original[2]),
+    )
+end
+
 function get_arc_tuple(br::PSY.ACTransmission, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(br), nr)
 end
 
 # Parallel branches: all oriented in same direction, so just take arc of first.
-function get_arc_tuple(br::Set{PSY.ACTransmission}, nr::NetworkReductionData)
+function get_arc_tuple(br::BranchesParallel, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(first(br)), nr)
 end
 
-function get_arc_tuple(br::Set{PSY.ACTransmission})
+function get_arc_tuple(br::BranchesParallel)
     return get_arc_tuple(PSY.get_arc(first(br)))
 end
 
@@ -103,40 +116,6 @@ end
 
 get_arc_tuple(arc::PSY.Arc) =
     (PSY.get_number(PSY.get_from(arc)), PSY.get_number(PSY.get_to(arc)))
-
-function get_arc_tuple(tr3W_tuple::Tuple{<:PSY.ThreeWindingTransformer, Int})
-    t3W, arc_number = tr3W_tuple
-    if arc_number == 1
-        return (
-            PSY.get_number(PSY.get_from(PSY.get_primary_star_arc(t3W))),
-            PSY.get_number(PSY.get_to(PSY.get_primary_star_arc(t3W))),
-        )
-    elseif arc_number == 2
-        return (
-            PSY.get_number(PSY.get_from(PSY.get_secondary_star_arc(t3W))),
-            PSY.get_number(PSY.get_to(PSY.get_secondary_star_arc(t3W))),
-        )
-    elseif arc_number == 3
-        return (
-            PSY.get_number(PSY.get_from(PSY.get_tertiary_star_arc(t3W))),
-            PSY.get_number(PSY.get_to(PSY.get_tertiary_star_arc(t3W))),
-        )
-    else
-        throw(error("Three-winding transformer arc number must be 1, 2, or 3"))
-    end
-end
-
-function get_arc_tuple(
-    tr3W_tuple::Tuple{T, Int},
-    nr::NetworkReductionData,
-) where {T <: PSY.ThreeWindingTransformer}
-    reverse_bus_search_map = get_reverse_bus_search_map(nr)
-    arc_tuple_original = get_arc_tuple(tr3W_tuple)
-    return (
-        get(reverse_bus_search_map, arc_tuple_original[1], arc_tuple_original[1]),
-        get(reverse_bus_search_map, arc_tuple_original[2], arc_tuple_original[2]),
-    )
-end
 
 """
 Gets the AC branches for a system
