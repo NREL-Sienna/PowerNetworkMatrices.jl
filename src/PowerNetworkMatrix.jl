@@ -340,7 +340,11 @@ function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetwo
 
     if !isempty(nr.reverse_transformer3W_map)
         if branch_name in PSY.get_name.(keys(nr.reverse_transformer3W_map))
-            throw(IS.ConflictingInputsError("Branch $branch_name is a three-winding transformer, it can't be used to index directly in to a $T."))
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $branch_name is a three-winding transformer, it can't be used to index directly in to a $T.",
+                ),
+            )
         end
     end
 

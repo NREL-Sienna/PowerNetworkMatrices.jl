@@ -117,33 +117,6 @@ end
 get_arc_tuple(arc::PSY.Arc) =
     (PSY.get_number(PSY.get_from(arc)), PSY.get_number(PSY.get_to(arc)))
 
-"""
-Gets the AC branches for a system
-"""
-function get_ac_branches(
-    sys::PSY.System,
-    radial_branches::Set{String} = Set{String}(),
-)::Vector{PSY.ACTransmission}
-    collection_br = Vector{PSY.ACTransmission}()
-    for br in PSY.get_components(
-        x -> PSY.get_available(x) && !(typeof(x) <: PSY.Transformer3W),
-        PSY.ACTransmission,
-        sys,
-    )
-        arc = PSY.get_arc(br)
-        name = PSY.get_name(br)
-        check_arc_validity(arc, name)
-
-        if PSY.get_name(br) ∉ radial_branches
-            _add_to_collection!(collection_br, br)
-        end
-    end
-
-    return sort!(collection_br;
-        by = get_arc_tuple,
-    )
-end
-
 function get_switched_admittances(sys::PSY.System, reverse_bus_search_map)
     collection = Vector{PSY.SwitchedAdmittance}()
     for sa in
@@ -194,38 +167,6 @@ function _add_branch_to_lookup!(
         push!(branch_type, typeof(branch))
     end
     return
-end
-
-"""
-Gets the non-isolated buses from a given System
-"""
-function get_buses(
-    sys::PSY.System,
-    bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}(),
-)::Vector{PSY.ACBus}
-    leaf_buses = Set{PSY.Int}()
-    if !isempty(bus_reduction_map)
-        for vals in values(bus_reduction_map)
-            union!(leaf_buses, vals)
-        end
-    end
-
-    count_i = 1
-    all_buses = PSY.get_components(PSY.ACBus, sys)
-    buses = Vector{PSY.ACBus}(undef, length(all_buses))
-    for b in all_buses
-        if PSY.get_bustype(b) == ACBusTypes.ISOLATED
-            continue
-        end
-
-        if PSY.get_number(b) ∈ leaf_buses
-            continue
-        end
-        buses[count_i] = b
-        count_i += 1
-    end
-
-    return sort!(deleteat!(buses, count_i:length(buses)); by = x -> PSY.get_number(x))
 end
 
 """

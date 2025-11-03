@@ -78,7 +78,7 @@ function from_hdf5(::Type{PTDF}, filename::AbstractString)
             lookup,
             subnetwork_axes,
             tol,
-            NetworkReductionData(), #TODO - support serialization of NetworkReductionData
+            NetworkReductionData(),
         )
     end
 end

@@ -309,8 +309,6 @@ for PTDF analysis starting from system data.
         Sparsification tolerance for dropping small matrix elements to reduce memory usage
 - `network_reductions::Vector{NetworkReduction} = NetworkReduction[]`:
         Vector of network reduction algorithms to apply before matrix construction
-- `make_branch_admittance_matrices::Bool=false`:
-        Whether to construct branch admittance matrices for power flow calculations
 - `include_constant_impedance_loads::Bool=true`:
         Whether to include constant impedance loads as shunt admittances in the network model
 - `subnetwork_algorithm=iterative_union_find`:

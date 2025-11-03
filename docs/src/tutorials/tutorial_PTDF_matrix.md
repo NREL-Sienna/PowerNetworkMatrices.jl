@@ -37,14 +37,6 @@ a_matrix = IncidenceMatrix(sys);
 ptdf_2 = PTDF(a_matrix, ba_matrix);
 get_ptdf_data(ptdf_2)
 
-# get the buses and branches of the system
-branches = PNM.get_ac_branches(sys);
-buses = PNM.get_buses(sys);
-ptdf_3 = PTDF(branches, buses);
-get_ptdf_data(ptdf_3)
-```
-
-NOTE: both the `get_ac_branches` and `get_ac_branches` functions are not exported by the `PowerNetworkMatrices` package, and therefore require the package name to be called as a prefix. However, they are shown here just for the sake of making an example.
 
 ## Available methods for the computation of the `PTDF` matrix
 
@@ -67,7 +59,7 @@ Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus.
 
 ``` @repl tutorial_PTDF_matrix
 # consider equal distribution accross each bus for this example
-buscount = length(PNM.get_buses(sys));
+buscount = length(PSY.get_available_components(PSY.ACBus, sys));
 dist_slack = 1 / buscount * ones(buscount);
 dist_slack_array = dist_slack / sum(dist_slack);
 ```

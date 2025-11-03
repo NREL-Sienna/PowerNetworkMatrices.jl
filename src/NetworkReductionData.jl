@@ -23,7 +23,7 @@ network reduction algorithms.
 - `added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}}`: New branches created during reduction
 - `all_branch_maps_by_type::Dict{String, Any}`: Branch mappings organized by component type
 - `reductions::ReductionContainer`: Container tracking applied reduction algorithms
-- `name_to_arc_map::Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}`: Lazily filled with the call to [`populate_branch_maps_by_type!`](@ref), maps string names to their corresponding arcs and the map where the arc can be found. Used in optimization models or power flow reporting after reductions are applied. It is possible to have repeated arcs for some names if case of serial or parallel combinations.
+- `name_to_arc_map::Dict{Type, DataStructures.SortedDict{String, Tuple{Tuple{Int, Int}, String}}}`: Lazily filled with the call to [`populate_branch_maps_by_type!`](@ref), maps string names to their corresponding arcs and the map where the arc can be found. Used in optimization models or power flow reporting after reductions are applied. It is possible to have repeated arcs for some names if case of serial or parallel combinations.
 - `filters_applied::Dict{Type, Function}`: Filters applied when populating branch maps by type
 - `direct_branch_name_map::Dict{String, Tuple{Int, Int}}`: Lazily filled, maps branch names to their corresponding arc tuples for direct branches
 """
@@ -58,8 +58,11 @@ network reduction algorithms.
         Dict{Tuple{Int, Int}, Complex{Float32}}()
     all_branch_maps_by_type::Dict{String, Any} = Dict{String, Any}()
     reductions::ReductionContainer = ReductionContainer()
-    name_to_arc_map::Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}} =
-        Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}()
+    name_to_arc_map::Dict{
+        Type,
+        DataStructures.SortedDict{String, Tuple{Tuple{Int, Int}, String}},
+    } =
+        DataStructures.SortedDict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}()
     filters_applied = Dict{Type, Function}() #Filters applied when populating branch maps by type
     direct_branch_name_map::Dict{String, Tuple{Int, Int}} =
         Dict{String, Tuple{Int, Int}}()
@@ -388,6 +391,9 @@ function isequal(
     rb2::NetworkReductionData,
 )
     for field in fieldnames(NetworkReductionData)
+        # direct_branch_name_map is populated when indexing into matrices with branch names
+        # this should not prevent using matrices for downstream computations (e.g. LODF(A, BA, ABA))
+        field == :direct_branch_name_map && continue
         if getfield(rb1, field) != getfield(rb2, field)
             return false
         end
