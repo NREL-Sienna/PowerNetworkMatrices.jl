@@ -320,18 +320,30 @@ get_lookup(mat::PowerNetworkMatrix) = mat.lookup
 
 function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetworkMatrix}
     nr = A.network_reduction_data
-    for (k, v) in nr.reverse_direct_branch_map
-        if branch_name == PSY.get_name(k)
-            return 1.0, v
+    if isempty!(nr.direct_branch_name_map)
+        populate_direct_branch_name_map!(nr)
+    end
+    if haskey(nr.direct_branch_name_map, branch_name)
+        arc_tuple = nr.direct_branch_name_map[branch_name]
+        return 1.0, arc_tuple
+    end
+
+    if !isempty(nr.reverse_parallel_branch_map)
+        for (k, v) in nr.reverse_parallel_branch_map
+            if branch_name == PSY.get_name(k)
+                parallel_branch_set = nr.parallel_branch_map[v]
+                multiplier = compute_parallel_multiplier(parallel_branch_set, branch_name)
+                return multiplier, v
+            end
         end
     end
-    for (k, v) in nr.reverse_parallel_branch_map
-        if branch_name == PSY.get_name(k)
-            parallel_branch_set = nr.parallel_branch_map[v]
-            multiplier = compute_parallel_multiplier(parallel_branch_set, branch_name)
-            return multiplier, v
+
+    if !isempty(nr.reverse_transformer3W_map)
+        if branch_name in PSY.get_name.(keys(nr.reverse_transformer3W_map))
+            throw(IS.ConflictingInputsError("Branch $branch_name is a three-winding transformer, it can't be used to index directly in to a $T."))
         end
     end
+
     error("Branch $branch_name not found in the network reduction data.")
     return
 end

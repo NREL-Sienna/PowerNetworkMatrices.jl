@@ -23,8 +23,9 @@ network reduction algorithms.
 - `added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}}`: New branches created during reduction
 - `all_branch_maps_by_type::Dict{String, Any}`: Branch mappings organized by component type
 - `reductions::ReductionContainer`: Container tracking applied reduction algorithms
-- `name_to_arc_map::Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}`: Maps string names to their corresponding arcs and the map where the arc can be found. Used in optimization models or power flow reporting after reductions are applied. It is possible to have repeated arcs for some names if case of serial or parallel combinations.
+- `name_to_arc_map::Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}`: Lazily filled with the call to [`populate_branch_maps_by_type!`](@ref), maps string names to their corresponding arcs and the map where the arc can be found. Used in optimization models or power flow reporting after reductions are applied. It is possible to have repeated arcs for some names if case of serial or parallel combinations.
 - `filters_applied::Dict{Type, Function}`: Filters applied when populating branch maps by type
+- `direct_branch_name_map::Dict{String, Tuple{Int, Int}}`: Lazily filled, maps branch names to their corresponding arc tuples for direct branches
 """
 @kwdef mutable struct NetworkReductionData
     irreducible_buses::Set{Int} = Set{Int}() # Buses that are not reduced in the network reduction
@@ -60,6 +61,8 @@ network reduction algorithms.
     name_to_arc_map::Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}} =
         Dict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}()
     filters_applied = Dict{Type, Function}() #Filters applied when populating branch maps by type
+    direct_branch_name_map::Dict{String, Tuple{Int, Int}} =
+        Dict{String, Tuple{Int, Int}}()
 end
 
 function add_to_map(device::T, filters::Dict) where {T <: PSY.ACTransmission}
@@ -71,6 +74,13 @@ end
 
 function get_name(device::T) where {T <: PSY.ACTransmission}
     return PSY.get_name(device)
+end
+
+function populate_direct_branch_name_map!(nr::NetworkReductionData)
+    for (arc_tuple, branch) in nr.direct_branch_map
+        branch_name = get_name(branch)
+        nr.direct_branch_name_map[branch_name] = arc_tuple
+    end
 end
 
 """
@@ -250,7 +260,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             map_by_type[k] = v
         end
     end
-
+    populate_direct_branch_name_map!(nrd)
     nrd.all_branch_maps_by_type = all_branch_maps_by_type
     nrd.filters_applied = filters
     return
