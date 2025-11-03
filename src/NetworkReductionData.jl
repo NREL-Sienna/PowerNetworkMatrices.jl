@@ -388,6 +388,9 @@ function isequal(
     rb2::NetworkReductionData,
 )
     for field in fieldnames(NetworkReductionData)
+        # direct_branch_name_map is populated when indexing into matrices with branch names
+        # this should not prevent using matrices for downstream computations (e.g. LODF(A, BA, ABA))
+        field == :direct_branch_name_map && continue
         if getfield(rb1, field) != getfield(rb2, field)
             return false
         end
