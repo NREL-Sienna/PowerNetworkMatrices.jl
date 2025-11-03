@@ -58,7 +58,10 @@ network reduction algorithms.
         Dict{Tuple{Int, Int}, Complex{Float32}}()
     all_branch_maps_by_type::Dict{String, Any} = Dict{String, Any}()
     reductions::ReductionContainer = ReductionContainer()
-    name_to_arc_map::Dict{Type, DataStructures.SortedDict{String, Tuple{Tuple{Int, Int}, String}}} =
+    name_to_arc_map::Dict{
+        Type,
+        DataStructures.SortedDict{String, Tuple{Tuple{Int, Int}, String}},
+    } =
         DataStructures.SortedDict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}()
     filters_applied = Dict{Type, Function}() #Filters applied when populating branch maps by type
     direct_branch_name_map::Dict{String, Tuple{Int, Int}} =
