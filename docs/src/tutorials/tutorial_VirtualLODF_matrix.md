@@ -14,7 +14,7 @@ Once the `VirtualLODF` is initialized, each row of the matrix can be evaluated s
 1. Define the `VirtualPTDF` structure
 2. Call any element of the matrix to define and store the relative row as well as showing the selected element
 
-Regarding point 2, if the row has been stored previosly then the desired element is just loaded from the cache and shown.
+Regarding point 2, if the row has been stored previously then the desired element is just loaded from the cache and shown.
 
 The flowchart below shows how the `VirtualLODF` is structured and how it works. Examples will be presented in the following sections.
 
@@ -42,25 +42,25 @@ At this point the `VirtualLODF` is initialized with the following simple command
 v_lodf = VirtualLODF(sys);
 ```
 
-Now, an element of the matrix can be computed by calling the branch name and bus number:
+Now, an element of the matrix can be computed by using the arc tuples as indices:
 
 ``` @repl tutorial_VirtualPTDF_matrix
-el_C31_2_105 = v_lodf["C31-2", "A3"]
+el_v_lodf = v_lodf[(221, 222), (202, 206)]
 ```
 
-This element represent the portion flowing on line "A3" now diverted on line "C31-2" as a consequence of its outage.
+This element represent the portion flowing on arc (202, 206) now diverted on arc (221, 222) as a consequence of its outage.
 
-Alternatively, the number of the branch and bus (corresponding to the number of the PTDF row and column) can be used. In this case the row and column numbers are mapped by the dictonaries contained in the `lookup` field. 
+Alternatively, the value can be indexted by row and column numbers directly. In this case the row and column numbers are mapped by the dictonaries contained in the `lookup` field. 
 
 ``` @repl tutorial_VirtualPTDF_matrix
-row_number = v_lodf.lookup[1]["C31-2"]
-col_number = v_lodf.lookup[2]["A3"]
+row_number = v_lodf.lookup[1][ (202, 206)]
+col_number = v_lodf.lookup[2][(221, 222)]
 el_C31_2_105_bis = v_lodf[row_number, col_number]
 ```
 
-**NOTE**: this example was made for the sake of completeness and considering the actual branch names is recommended.
+**NOTE**: this example was made for the sake of completeness and considering the actual arc tuples is recommended.
 
-As previosly mentioned, in order to evaluate a single element of the `VirtualLODF`, the entire row related to the selected branch must be considered. For this reason it is cached for later calls.
+As previously mentioned, in order to evaluate a single element of the `VirtualLODF`, the entire row related to the selected branch must be considered. For this reason it is cached for later calls.
 This is evident by looking at the following example:
 
 ``` @repl tutorial_VirtualPTDF_matrix
@@ -68,13 +68,12 @@ sys_2k = PSB.build_system(PSB.PSYTestSystems, "tamu_ACTIVSg2000_sys");
 
 v_lodf_2k = VirtualLODF(sys_2k);
 
-# evaluate PTDF row related to branch "ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1"
-@time v_lodf_2k["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", 
-                "BRYAN 1 1   -8159-BRYAN 1 0   -8158-i_1"]
+# evaluate PTDF row related to arc (5270, 5474)
+@time v_lodf_2k[(5270, 5474), (2118, 2113)]
+
 
 # call same element after the row has been stored
-@time v_lodf_2k["ODESSA 2 0  -1001-ODESSA 3 0  -1064-i_1", 
-                "BRYAN 1 1   -8159-BRYAN 1 0   -8158-i_1"]
+@time v_lodf_2k[(5270, 5474), (2118, 2113)]
 ```
 
 ## "Sparse" `VirtualPTDF`

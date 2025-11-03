@@ -10,6 +10,7 @@ RTS = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys");
 
 # mixed up ids for data_5bus_pu
 Br5NS_ids = [2, 3, 5, 1, 4, 6]
+Arc5NS_ids = [(1, 4), (1, 5), (3, 4), (1, 2), (2, 3), (4, 5)]
 Bu5NS_ids = [1, 3, 4, 5, 2]
 
 #PTDFs obtained from Matpower
@@ -44,7 +45,29 @@ S14_slackB1 = [
     0 -0.0004 -0.0016 -0.0026 0.0016 0.0291 -0.0177 -0.0177 -0.0259 -0.0161 0.0061 0.4789 -0.1697 -0.0887
     0 -0.0019 -0.0071 -0.0117 0.0070 0.1307 -0.0797 -0.0797 -0.1163 -0.0724 0.0274 0.1902 0.2367 -0.3992
 ]
-
+S14_slackB1_branch_axis = [
+    "Line1",
+    "Line2",
+    "Line3",
+    "Line4",
+    "Line5",
+    "Line6",
+    "Line7",
+    "Trans3",
+    "Trans1",
+    "Trans2",
+    "Line8",
+    "Line9",
+    "Line10",
+    "Trans4",
+    "Line16",
+    "Line11",
+    "Line12",
+    "Line13",
+    "Line14",
+    "Line15",
+]
+S14_slackB1_bus_axis = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 SRTS_GMLC = [
     4.3622133e-01 -5.0667922e-01 9.5577219e-02 -2.4803183e-01 2.2677242e-01 -1.1462705e-01 -6.3832228e-03 -9.2586105e-03 -3.6226097e-02 9.9311880e-03 -2.0064389e-03 -4.2092103e-03 0.0000000e+00 6.9688071e-03 2.6008884e-02 1.9576891e-02 2.1306964e-02 2.2112779e-02 1.4259349e-02 9.6353986e-03 2.2861035e-02 2.2250187e-02 7.0922262e-03 5.2364366e-02 3.2160772e-03 3.2799419e-03 1.2059153e-03 3.4601686e-03 3.6381080e-03 3.8833320e-03 3.8413949e-03 3.8413949e-03 3.6077558e-03 4.0750340e-03 4.3148064e-03 4.6472541e-03 4.8299042e-03 4.3254387e-03 3.5979639e-03 4.3403745e-03 4.6377944e-03 4.3746589e-03 5.0875328e-03 5.7372356e-03 4.1303189e-03 4.3297890e-03 6.0945721e-03 2.6917529e-03 1.4962539e-02 1.4977176e-02 1.4501844e-02 1.5018481e-02 1.5059261e-02 1.5115463e-02 1.5105851e-02 1.5105851e-02 1.5052305e-02 1.5159398e-02 1.5031209e-02 1.5473681e-02 1.5477894e-02 1.4566971e-02 1.3567224e-02 1.3914828e-02 1.3012992e-02 1.2536577e-02 1.4928667e-02 1.5810266e-02 1.2899443e-02 1.2944075e-02 1.6295145e-02 1.3921298e-02 1.6852627e-02
     2.4269538e-01 2.2009340e-01 -1.9957646e-01 9.3061431e-02 1.5524446e-01 1.0217173e-01 1.2947746e-02 1.8866403e-02 -1.0964748e-02 6.4707034e-02 4.2097980e-03 8.8083642e-03 0.0000000e+00 -1.4541938e-02 -5.4315692e-02 -4.0883663e-02 -4.4498466e-02 -4.6182130e-02 -2.9782017e-02 -2.0128411e-02 -4.7745532e-02 -4.6469229e-02 -1.4818928e-02 -1.0934673e-01 -6.8268141e-03 -6.9587647e-03 -2.6736264e-03 -7.3311304e-03 -7.6987703e-03 -8.2054267e-03 -8.1187807e-03 -8.1187807e-03 -7.6360599e-03 -8.6015016e-03 -9.0924447e-03 -9.7882127e-03 -1.0164671e-02 -9.1030737e-03 -7.5659408e-03 -9.1180051e-03 -9.7301352e-03 -9.1824726e-03 -1.0682178e-02 -1.2042328e-02 -8.6739288e-03 -9.0890851e-03 -1.2790410e-02 -5.7125214e-03 -3.1278559e-02 -3.1309074e-02 -3.0318090e-02 -3.1395188e-02 -3.1480208e-02 -3.1597378e-02 -3.1577340e-02 -3.1577340e-02 -3.1465706e-02 -3.1688974e-02 -3.1421723e-02 -3.2344201e-02 -3.2352983e-02 -3.0453869e-02 -2.8369573e-02 -2.9094265e-02 -2.7214097e-02 -2.6220856e-02 -3.1207941e-02 -3.3045920e-02 -2.6977367e-02 -2.7070417e-02 -3.4056809e-02 -2.9107755e-02 -3.5219059e-02
@@ -299,6 +322,7 @@ Lodf_5 = [
     -1.0000 0.3448 0.3071 -1.0000 -1.0000 -0.3071
     -0.4571 -0.6552 1.0000 -0.4571 -0.4571 -1.0000
 ]
+Lodf_5_branch_axis = ["1", "2", "3", "4", "5", "6"]
 
 Lodf_14 = [
     -1.0 1.0 -0.207667 -0.272435 -0.360507 -0.207667 -0.289868 -0.0293549 -0.0215445 0.0596783 0.036132 0.00397419 0.010449 0.0 -0.0293549 -0.036132 -0.030043 -0.036132 0.00397419 0.030043
@@ -322,8 +346,30 @@ Lodf_14 = [
     0.00255259 -0.00255259 0.00266262 0.00349304 -0.0031259 0.00266262 -0.0211974 0.0435042 0.0319291 -0.0884437 0.0877169 -1.0 0.652198 -1.38778e-16 0.0435042 -0.0877169 0.222319 -0.0877169 -1.0 -0.222319
     0.0114817 -0.0114817 0.0119766 0.0157118 -0.0140605 0.0119766 -0.0953466 0.195684 0.143618 -0.397823 0.394554 -0.132283 -0.347802 1.38778e-16 0.195684 -0.394554 1.0 -0.394554 -0.132283 -1.0
 ]
+Lodf_14_branch_axis = [
+    "Line1",
+    "Line2",
+    "Line3",
+    "Line4",
+    "Line5",
+    "Line6",
+    "Line7",
+    "Trans3",
+    "Trans1",
+    "Trans2",
+    "Line8",
+    "Line9",
+    "Line10",
+    "Trans4",
+    "Line16",
+    "Line11",
+    "Line12",
+    "Line13",
+    "Line14",
+    "Line15",
+]
 
-Ybus5_matpower = Matrix{Complex{Float64}}(undef, 5, 5)
+Ybus5_matpower = zeros(Complex, 5, 5)
 Ybus5_matpower[1, 1] = 22.2506856885351 - 222.484376885351im
 Ybus5_matpower[2, 1] = -3.52348402099997 + 35.2348402099996im
 Ybus5_matpower[4, 1] = -3.2569046378322 + 32.569046378322im
@@ -342,7 +388,7 @@ Ybus5_matpower[1, 5] = -15.470297029703 + 154.70297029703im
 Ybus5_matpower[4, 5] = -3.33366670000333 + 33.3366670000333im
 Ybus5_matpower[5, 5] = 18.8039637297063 - 188.020637297063im
 
-Ybus14_matpower = Matrix{Complex{Float64}}(undef, 14, 14)
+Ybus14_matpower = zeros(Complex, 14, 14)
 Ybus14_matpower[1, 1] = 6.02502905576822 - 19.4470702055144im
 Ybus14_matpower[2, 1] = -4.99913160079803 + 15.2630865231796im
 Ybus14_matpower[5, 1] = -1.02589745497019 + 4.23498368233483im
@@ -427,3 +473,168 @@ Ybus3_matpower[3, 2] = -0.689655172413793 + 8.275862068965518im
 Ybus3_matpower[1, 3] = -0.689655172413793 + 8.275862068965518im
 Ybus3_matpower[2, 3] = -0.689655172413793 + 8.275862068965518im
 Ybus3_matpower[3, 3] = 1.379310344827586 - 16.351724137931036im
+
+function build_hvdc_with_single_bus_island()
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    bus15 = ACBus(;
+        number = 15,
+        name = "Bus 15",
+        available = true,
+        bustype = ACBusTypes.REF,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.9, max = 1.05),
+        base_voltage = 69.0,
+    )
+    add_component!(sys, bus15)
+    load15 = PowerLoad(;
+        name = "Load_15",
+        available = true,
+        bus = bus15,
+        active_power = 0.0, # Per-unitized by device base_power
+        reactive_power = 0.0, # Per-unitized by device base_power
+        base_power = 10.0, # MVA
+        max_active_power = 1.0, # 10 MW per-unitized by device base_power
+        max_reactive_power = 0.0,
+    )
+    add_component!(sys, load15)
+    gen15 = ThermalStandard(;
+        name = "Gen_15",
+        available = true,
+        status = true,
+        bus = bus15,
+        active_power = 0.0, # Per-unitized by device base_power
+        reactive_power = 0.0, # Per-unitized by device base_power
+        rating = 1.0, # 30 MW per-unitized by device base_power
+        active_power_limits = (min = 0.2, max = 1.0), # 6 MW to 30 MW per-unitized by device base_power
+        reactive_power_limits = nothing, # Per-unitized by device base_power
+        ramp_limits = (up = 0.2, down = 0.2), # 6 MW/min up or down, per-unitized by device base_power
+        operation_cost = ThermalGenerationCost(nothing),
+        base_power = 30.0, # MVA
+        time_limits = (up = 8.0, down = 8.0), # Hours
+        must_run = false,
+        prime_mover_type = PrimeMovers.CC,
+        fuel = ThermalFuels.NATURAL_GAS,
+    )
+    add_component!(sys, gen15)
+    bus14 = get_component(ACBus, sys, "Bus 14")
+    hvdc1 = TwoTerminalHVDCLine(;
+        name = "Line18",
+        available = true,
+        active_power_flow = 0.0,
+        arc = Arc(; from = bus14, to = bus15),
+        active_power_limits_from = (min = -100.0, max = 100.0),
+        active_power_limits_to = (min = -100.0, max = 100.0),
+        reactive_power_limits_from = (min = -100.0, max = 100.0),
+        reactive_power_limits_to = (min = -100.0, max = 100.0),
+    )
+    add_component!(sys, hvdc1)
+    return sys
+end
+
+function build_hvdc_with_small_island()
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    bus15 = ACBus(;
+        number = 15,
+        name = "Bus 15",
+        available = true,
+        bustype = ACBusTypes.REF,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.9, max = 1.05),
+        base_voltage = 69.0,
+    )
+    bus16 = ACBus(;
+        number = 16,
+        name = "Bus 16",
+        available = true,
+        bustype = ACBusTypes.PV,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.9, max = 1.05),
+        base_voltage = 69.0,
+    )
+    bus17 = ACBus(;
+        number = 17,
+        name = "Bus 17",
+        available = true,
+        bustype = ACBusTypes.PQ,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.9, max = 1.05),
+        base_voltage = 69.0,
+    )
+    add_component!(sys, bus15)
+    add_component!(sys, bus16)
+    add_component!(sys, bus17)
+
+    line17 = Line(;
+        name = "Line17",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = Arc(; from = bus15, to = bus16),
+        r = 0.00281, # Per-unit
+        x = 0.0281, # Per-unit
+        b = (from = 0.00356, to = 0.00356), # Per-unit
+        rating = 2.0, # Line rating of 200 MVA / System base of 100 MVA
+        angle_limits = (min = -0.7, max = 0.7),
+    )
+    add_component!(sys, line17)
+    line18 = Line(;
+        name = "Line18",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = Arc(; from = bus15, to = bus17),
+        r = 0.00281, # Per-unit
+        x = 0.0281, # Per-unit
+        b = (from = 0.00356, to = 0.00356), # Per-unit
+        rating = 2.0, # Line rating of 200 MVA / System base of 100 MVA
+        angle_limits = (min = -0.7, max = 0.7),
+    )
+    add_component!(sys, line18)
+    load16 = PowerLoad(;
+        name = "Bus16",
+        available = true,
+        bus = bus16,
+        active_power = 0.0, # Per-unitized by device base_power
+        reactive_power = 0.0, # Per-unitized by device base_power
+        base_power = 10.0, # MVA
+        max_active_power = 1.0, # 10 MW per-unitized by device base_power
+        max_reactive_power = 0.0,
+    )
+    add_component!(sys, load16)
+    gen17 = ThermalStandard(;
+        name = "Bus17",
+        available = true,
+        status = true,
+        bus = bus17,
+        active_power = 0.0, # Per-unitized by device base_power
+        reactive_power = 0.0, # Per-unitized by device base_power
+        rating = 1.0, # 30 MW per-unitized by device base_power
+        active_power_limits = (min = 0.2, max = 1.0), # 6 MW to 30 MW per-unitized by device base_power
+        reactive_power_limits = nothing, # Per-unitized by device base_power
+        ramp_limits = (up = 0.2, down = 0.2), # 6 MW/min up or down, per-unitized by device base_power
+        operation_cost = ThermalGenerationCost(nothing),
+        base_power = 30.0, # MVA
+        time_limits = (up = 8.0, down = 8.0), # Hours
+        must_run = false,
+        prime_mover_type = PrimeMovers.CC,
+        fuel = ThermalFuels.NATURAL_GAS,
+    )
+    add_component!(sys, gen17)
+    bus14 = get_component(ACBus, sys, "Bus 14")
+    hvdc1 = TwoTerminalHVDCLine(;
+        name = "Line18",
+        available = true,
+        active_power_flow = 0.0,
+        arc = Arc(; from = bus14, to = bus15),
+        active_power_limits_from = (min = -100.0, max = 100.0),
+        active_power_limits_to = (min = -100.0, max = 100.0),
+        reactive_power_limits_from = (min = -100.0, max = 100.0),
+        reactive_power_limits_to = (min = -100.0, max = 100.0),
+    )
+    add_component!(sys, hvdc1)
+    return sys
+end

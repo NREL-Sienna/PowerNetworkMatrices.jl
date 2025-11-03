@@ -1,7 +1,7 @@
 """
 The Virtual Power Transfer Distribution Factor (VirtualPTDF) structure gathers
 the rows of the PTDF matrix as they are evaluated on-the-go. These rows are
-evalauted independently, cached in the structure and do not require the
+evaluated independently, cached in the structure and do not require the
 computation of the whole matrix (therefore significantly reducing the
 computational requirements).
 
@@ -14,7 +14,7 @@ matrix.
 - `K::KLU.KLUFactorization{Float64, Int}`:
         LU factorization matrices of the ABA matrix, evaluated by means of KLU
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        BA matric
+        BA matrix
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the columns of the BA matrix corresponding
         to the reference buses
@@ -42,24 +42,31 @@ matrix.
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
-    ref_bus_positions::Set{Int}
     dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
     temp_data::Vector{Float64}
     valid_ix::Vector{Int}
     cache::RowCache
-    subnetworks::Dict{Int, Set{Int}}
+    subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
-    radial_network_reduction::RadialNetworkReduction
+    network_reduction_data::NetworkReductionData
 end
+
+get_axes(M::VirtualPTDF) = M.axes
+get_lookup(M::VirtualPTDF) = M.lookup
+get_ref_bus(M::VirtualPTDF) = sort!(collect(keys(M.subnetwork_axes)))
+get_ref_bus_position(M::VirtualPTDF) =
+    [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::VirtualPTDF) = M.network_reduction_data
+get_bus_lookup(M::VirtualPTDF) = M.lookup[2]
+get_arc_lookup(M::VirtualPTDF) = M.lookup[1]
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
     summary(io, array)
@@ -67,90 +74,6 @@ function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
     println(io, ":")
     Base.print_array(io, array)
     return
-end
-
-"""
-Builds the PTDF matrix from a group of branches and buses. The return is a
-VirtualPTDF struct with an empty cache.
-
-# Arguments
-- `branches`:
-        Vector of the system's AC branches.
-- `buses::Vector{PSY.ACBus}`:
-        Vector of the system's buses.
-
-# Keyword Arguments
-- `dist_slack::Vector{Float64} = Float64[]`:
-        Vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses.
-- `tol::Float64 = eps()`:
-        Tolerance related to sparsification and values to drop.
-- `max_cache_size::Int`:
-        max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
-- `persistent_lines::Vector{String}`:
-        line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
-"""
-function VirtualPTDF(
-    branches,
-    buses::Vector{PSY.ACBus};
-    dist_slack::Vector{Float64} = Float64[],
-    tol::Float64 = eps(),
-    max_cache_size::Int = MAX_CACHE_SIZE_MiB,
-    persistent_lines::Vector{String} = String[],
-    radial_network_reduction::RadialNetworkReduction = RadialNetworkReduction(),
-)
-    if length(dist_slack) != 0
-        @info "Distributed bus"
-    end
-
-    #Get axis names
-    line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    axes = (line_ax, bus_ax)
-    M, bus_ax_ref = calculate_adjacency(branches, buses)
-    line_ax_ref = make_ax_ref(line_ax)
-    look_up = (line_ax_ref, bus_ax_ref)
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_ax_ref)
-    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-    ref_bus_positions = find_slack_positions(buses)
-    subnetworks = find_subnetworks(M, bus_ax)
-    if length(subnetworks) > 1
-        @info "Network is not connected, using subnetworks"
-        subnetworks = assign_reference_buses!(subnetworks, ref_bus_positions, bus_ax_ref)
-    end
-    temp_data = zeros(length(bus_ax))
-
-    if isempty(persistent_lines)
-        empty_cache =
-            RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
-    else
-        init_persistent_dict = Set{Int}(line_ax_ref[k] for k in persistent_lines)
-        empty_cache =
-            RowCache(
-                max_cache_size * MiB,
-                init_persistent_dict,
-                length(bus_ax) * sizeof(Float64),
-            )
-    end
-
-    return VirtualPTDF(
-        klu(ABA),
-        BA,
-        ref_bus_positions,
-        dist_slack,
-        axes,
-        look_up,
-        temp_data,
-        setdiff(1:length(temp_data), ref_bus_positions),
-        empty_cache,
-        subnetworks,
-        Ref(tol),
-        radial_network_reduction,
-    )
 end
 
 """
@@ -162,35 +85,77 @@ struct with an empty cache.
         PSY system for which the matrix is constructed
 
 # Keyword Arguments
-- `dist_slack::Vector{Float64}=Float64[]`:
-        vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buse
-- `reduce_radial_branches::Bool=false`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
+- `dist_slack::Vector{Float64} = Float64[]`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
+- `tol::Float64 = eps()`:
+        Tolerance related to sparsification and values to drop.
+- `max_cache_size::Int`:
+        max cache size in MiB (initialized as MAX_CACHE_SIZE_MiB).
+- `persistent_lines::Vector{String}`:
+        line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
 function VirtualPTDF(
     sys::PSY.System;
-    dist_slack::Vector{Float64} = Float64[],
-    reduce_radial_branches::Bool = false,
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
+    tol::Float64 = eps(),
+    max_cache_size::Int = MAX_CACHE_SIZE_MiB,
+    persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
-    if reduce_radial_branches
-        A = IncidenceMatrix(sys)
-        dist_slack, rb = redistribute_dist_slack(dist_slack, A)
-    else
-        rb = RadialNetworkReduction()
-    end
-    branches = get_ac_branches(sys, rb.radial_branches)
-    buses = get_buses(sys, rb.bus_reduction_map)
-    return VirtualPTDF(
-        branches,
-        buses;
-        dist_slack = dist_slack,
-        radial_network_reduction = rb,
+    Ymatrix = Ybus(
+        sys;
+        network_reductions = network_reductions,
         kwargs...,
+    )
+    ref_bus_positions = get_ref_bus_position(Ymatrix)
+    A = IncidenceMatrix(Ymatrix)
+    if !(isempty(dist_slack))
+        dist_slack_vector = redistribute_dist_slack(dist_slack, A, A.network_reduction_data)
+    else
+        dist_slack_vector = Float64[]
+    end
+    BA = BA_Matrix(Ymatrix)
+    ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
+    bus_ax = get_bus_axis(A)
+    axes = A.axes
+    look_up = A.lookup
+    subnetwork_axes = A.subnetwork_axes
+    if length(subnetwork_axes) > 1
+        @info "Network is not connected, using subnetworks"
+    end
+    temp_data = zeros(length(axes[2]))
+
+    if isempty(persistent_arcs)
+        empty_cache =
+            RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
+    else
+        init_persistent_dict = Set{Int}(look_up[1][k] for k in persistent_arcs)
+        empty_cache =
+            RowCache(
+                max_cache_size * MiB,
+                init_persistent_dict,
+                length(bus_ax) * sizeof(Float64),
+            )
+    end
+
+    return VirtualPTDF(
+        klu(ABA),
+        BA.data,
+        dist_slack_vector,
+        axes,
+        look_up,
+        temp_data,
+        setdiff(1:length(temp_data), ref_bus_positions),
+        empty_cache,
+        subnetwork_axes,
+        Ref(tol),
+        Ymatrix.network_reduction_data,
     )
 end
 
@@ -239,14 +204,14 @@ function _getindex(
         # evaluate the value for the PTDF column
         # Needs improvement
         valid_ix = vptdf.valid_ix
-        lin_solve = KLU.solve!(vptdf.K, Vector(vptdf.BA[valid_ix, row]))
+        lin_solve = KLU.solve!(vptdf.K, collect(vptdf.BA[valid_ix, row]))
         buscount = size(vptdf, 1)
-
-        if !isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) != 1
+        ref_bus_positions = get_ref_bus_position(vptdf)
+        if !isempty(vptdf.dist_slack) && length(ref_bus_positions) != 1
             error(
-                "Distibuted slack is not supported for systems with multiple reference buses.",
+                "Distributed slack is not supported for systems with multiple reference buses.",
             )
-        elseif isempty(vptdf.dist_slack) && length(vptdf.ref_bus_positions) < buscount
+        elseif isempty(vptdf.dist_slack) && length(ref_bus_positions) < buscount
             for i in eachindex(valid_ix)
                 vptdf.temp_data[valid_ix[i]] = lin_solve[i]
             end
@@ -269,6 +234,12 @@ function _getindex(
 
         return vptdf.cache[row][column]
     end
+end
+
+function Base.getindex(vptdf::VirtualPTDF, branch_name::String, bus)
+    multiplier, arc = get_branch_multiplier(vptdf, branch_name)
+    row_, column_ = to_index(vptdf, arc, bus)
+    return _getindex(vptdf, row_, column_) * multiplier
 end
 
 """
@@ -307,11 +278,11 @@ Base.setindex!(::VirtualPTDF, _, ::CartesianIndex) =
 
 get_ptdf_data(mat::VirtualPTDF) = mat.cache.temp_cache
 
-function get_branch_ax(ptdf::VirtualPTDF)
+function get_arc_axis(ptdf::VirtualPTDF)
     return ptdf.axes[1]
 end
 
-function get_bus_ax(ptdf::VirtualPTDF)
+function get_bus_axis(ptdf::VirtualPTDF)
     return ptdf.axes[2]
 end
 

@@ -11,21 +11,6 @@ License, v. 2.0.
 abstract type PowerNetworkMatrix{T} <: AbstractArray{T, 2} end
 
 """
-Evaluates the bus indices for the given branch.
-
-# Arguments
-- `branch`:
-        system's branch
-- `bus_lookup`:
-        dictionary mapping the system's buses and branches
-"""
-function get_bus_indices(branch, bus_lookup)
-    fr_b = bus_lookup[PSY.get_number(PSY.get_from(PSY.get_arc(branch)))]
-    to_b = bus_lookup[PSY.get_number(PSY.get_to(PSY.get_arc(branch)))]
-    return fr_b, to_b
-end
-
-"""
 Evaluates the map linking the system's buses and branches.
 
 # Arguments
@@ -37,7 +22,7 @@ function make_ax_ref(buses::AbstractVector{PSY.ACBus})
 end
 
 """
-Checkes if repetitions are present in the dictionary mapping buses and branches.
+Checks if repetitions are present in the dictionary mapping buses and branches.
 
 # Arguments
 - `ax::AbstractVector`:
@@ -53,8 +38,9 @@ function make_ax_ref(ax::AbstractVector)
     end
     return ref
 end
+stores_transpose(::PowerNetworkMatrix) = false
 
-# AbstractArray interface: overloadig methods
+# AbstractArray interface: overloading methods
 Base.isempty(A::PowerNetworkMatrix) = isempty(A.data)
 Base.size(A::PowerNetworkMatrix) = size(A.data)
 Base.LinearIndices(A::PowerNetworkMatrix) =
@@ -83,7 +69,7 @@ Gets bus indices to a certain branch name
 - `lookup::Dict`:
         Dictionary mapping branch and buses
 """
-function lookup_index(i::PSY.ACBranch, lookup::Dict)
+function lookup_index(i::PSY.Arc, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
 
@@ -157,7 +143,7 @@ Structure to store the keys of a power network matrix
 
 # Arguments
 - `I<:Tuple`:
-        turple containing the indices of the matrix
+        tuple containing the indices of the matrix
 """
 struct PowerNetworkMatrixKey{T <: Tuple}
     I::T
@@ -219,11 +205,18 @@ Base.getindex(a::PowerNetworkMatrix, k::PowerNetworkMatrixKey) = a[k.I...]
 
 function Base.summary(io::IO, A::PowerNetworkMatrix)
     _summary(io, A)
-    for (k, ax) in enumerate(A.axes)
+    if stores_transpose(A)
+        axes = (A.axes[2], A.axes[1])
+    else
+        axes = A.axes
+    end
+    for (k, ax) in enumerate(axes)
         print(io, "    Dimension $k, ")
         show(IOContext(io, :limit => true), ax)
         println(io)
     end
+    stores_transpose(A) &&
+        println(io, "Note!! The data shown below corresponds to the transposed matrix.")
     print(io, "And data with size ", size(A))
     return
 end
@@ -312,8 +305,8 @@ function Base.show(io::IO, array::PowerNetworkMatrix)
 end
 
 Base.to_index(b::PSY.ACBus) = PSY.get_number(b)
-Base.to_index(b::T) where {T <: PSY.ACBranch} = PSY.get_name(b)
-
+Base.to_index(b::T) where {T <: PSY.ACBranch} = get_arc_tuple(b)
+Base.to_index(b::PSY.Arc) = get_arc_tuple(b)
 """returns the raw array data of the `PowerNetworkMatrix`"""
 get_data(mat::PowerNetworkMatrix) = mat.data
 
@@ -324,3 +317,37 @@ get_data(mat::PowerNetworkMatrix) = mat.data
     PTDF the first dimension is branches and the second dimension is buses
 """
 get_lookup(mat::PowerNetworkMatrix) = mat.lookup
+
+function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetworkMatrix}
+    nr = A.network_reduction_data
+    if isempty(nr.direct_branch_name_map)
+        populate_direct_branch_name_map!(nr)
+    end
+    if haskey(nr.direct_branch_name_map, branch_name)
+        arc_tuple = nr.direct_branch_name_map[branch_name]
+        return 1.0, arc_tuple
+    end
+
+    if !isempty(nr.reverse_parallel_branch_map)
+        for (k, v) in nr.reverse_parallel_branch_map
+            if branch_name == PSY.get_name(k)
+                parallel_branch_set = nr.parallel_branch_map[v]
+                multiplier = compute_parallel_multiplier(parallel_branch_set, branch_name)
+                return multiplier, v
+            end
+        end
+    end
+
+    if !isempty(nr.reverse_transformer3W_map)
+        if branch_name in PSY.get_name.(keys(nr.reverse_transformer3W_map))
+            throw(
+                IS.ConflictingInputsError(
+                    "Branch $branch_name is a three-winding transformer, it can't be used to index directly in to a $T.",
+                ),
+            )
+        end
+    end
+
+    error("Branch $branch_name not found in the network reduction data.")
+    return
+end

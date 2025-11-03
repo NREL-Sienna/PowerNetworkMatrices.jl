@@ -33,7 +33,7 @@ The latest stable release of PowerNetworkMatrices can be installed using the Jul
 For the current development version, "checkout" this package with
 
 ```julia
-] add PowerNetworkMatrices#master
+] add PowerNetworkMatrices#main
 ```
 
 ------------

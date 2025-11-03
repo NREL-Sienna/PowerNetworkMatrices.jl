@@ -1,40 +1,73 @@
 """
-Power Transfer Distribution Factors (PTDF) indicate the incremental change in
-real power that occurs on transmission lines due to real power injections
-changes at the buses.
+Structure containing the Power Transfer Distribution Factor (PTDF) matrix and related power system data.
 
-The PTDF struct is indexed using the Bus numbers and Branch names.
+The PTDF matrix contains sensitivity coefficients that quantify how power injections at buses
+affect the power flows on transmission lines. Each element PTDF[i,j] represents the incremental
+change in flow on line i due to a unit power injection at bus j, under DC power flow assumptions.
 
-# Arguments
-- `data<:AbstractArray{Float64, 2}`:
-        the transposed PTDF matrix.
-- `axes<:NTuple{2, Dict}`:
-        Tuple containing two vectors: the first one showing the bus numbers,
-        the second showing the branch names. The information contained in this
-        field matches the axes of the fiels `data`.
-- `lookup<:NTuple{2, Dict}`:
-        Tuple containing two dictionaries mapping the bus numbers and branch
-        names with the indices of the matrix contained in `data`.
-- `subnetworks::Dict{Int, Set{Int}}`:
-        dictionary containing the set of bus indexes defining the subnetworks
-        of the system.
+# Fields
+- `data::M <: AbstractArray{Float64, 2}`:
+        The PTDF matrix data stored in transposed form for computational efficiency.
+        Element (i,j) represents the sensitivity of line j flow to bus i injection
+- `axes::Ax`:
+        Tuple containing (bus_numbers, branch_identifiers) for matrix dimensions
+- `lookup::L <: NTuple{2, Dict}`:
+        Tuple of dictionaries providing fast lookup from bus/branch identifiers to matrix indices
+- `subnetwork_axes::Dict{Int, Ax}`:
+        Mapping from reference bus numbers to their corresponding subnetwork axes
 - `tol::Base.RefValue{Float64}`:
-        tolerance used for sparsifying the matrix (dropping element whose
-        absolute value is below this threshold).
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+        Tolerance threshold used for matrix sparsification (elements below this value are dropped)
+- `network_reduction_data::NetworkReductionData`:
+        Container for network reduction information applied during matrix construction
+
+# Mathematical Properties
+- **Matrix Form**: PTDF[i,j] = ∂f_i/∂P_j where f_i is flow on line i, P_j is injection at bus j
+- **Dimensions**: (n_buses × n_arcs) for all buses and impedance arcs
+- **Linear Superposition**: Total flow = Σ(PTDF[i,j] × P_j) for all injections P_j
+- **Physical Meaning**: Values represent the fraction of bus injection that flows through each line
+- **Reference Bus**: Rows corresponding to reference buses are typically zero
+
+# Applications
+- **Power Flow Analysis**: Rapid calculation of line flows for given injection patterns
+- **Sensitivity Studies**: Evaluate impact of generation/load changes on transmission flows
+- **Congestion Management**: Identify lines affected by specific injection changes
+- **Market Analysis**: Support nodal pricing and transmission rights calculations
+- **Planning Studies**: Assess transmission utilization under various scenarios
+
+# Computational Features
+- **Matrix Storage**: Stored in transposed form (bus × branch) for efficient computation
+- **Sparsification**: Small elements removed based on tolerance to reduce memory usage
+- **Reference Bus Handling**: Reference bus injections automatically handled in calculations
+- **Distributed Slack**: Supports distributed slack bus configurations for improved realism
+
+# Usage Notes
+- Access via `ptdf[bus, line]` returns the sensitivity coefficient
+- Matrix indexing uses bus numbers and branch identifiers
+- Sparsification improves memory efficiency but may introduce small numerical errors
+- Results valid under DC power flow assumptions (neglects voltage magnitudes and reactive power)
+- Reference bus choice affects the specific values but not the relative sensitivities
 """
 struct PTDF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
        PowerNetworkMatrix{Float64}
     data::M
     axes::Ax
     lookup::L
-    subnetworks::Dict{Int, Set{Int}}
-    ref_bus_positions::Set{Int}
+    subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
-    radial_network_reduction::RadialNetworkReduction
+    network_reduction_data::NetworkReductionData
 end
+
+get_axes(M::PTDF) = M.axes
+get_lookup(M::PTDF) = M.lookup
+get_ref_bus(M::PTDF) = sort!(collect(keys(M.subnetwork_axes)))
+get_ref_bus_position(M::PTDF) = [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::PTDF) = M.network_reduction_data
+get_bus_axis(M::PTDF) = M.axes[1]
+get_bus_lookup(M::PTDF) = M.lookup[1]
+get_arc_axis(M::PTDF) = M.axes[2]
+get_arc_lookup(M::PTDF) = M.lookup[2]
+
+stores_transpose(::PTDF) = true
 
 """
 Deserialize a PTDF from an HDF5 file.
@@ -43,43 +76,6 @@ Deserialize a PTDF from an HDF5 file.
 - `filename::AbstractString`: File containing a serialized PTDF.
 """
 PTDF(filename::AbstractString) = from_hdf5(PTDF, filename)
-
-function _buildptdf(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    dist_slack::Vector{Float64},
-    linear_solver::String)
-    if linear_solver == "KLU"
-        PTDFm, A = calculate_PTDF_matrix_KLU(
-            branches,
-            buses,
-            bus_lookup,
-            dist_slack,
-        )
-    elseif linear_solver == "Dense"
-        PTDFm, A = calculate_PTDF_matrix_DENSE(
-            branches,
-            buses,
-            bus_lookup,
-            dist_slack,
-        )
-    elseif linear_solver == "MKLPardiso"
-        if !USE_MKL
-            error(
-                "The MKL library is not available. Check that your hardware and operating system support MKL.",
-            )
-        end
-        PTDFm, A = calculate_PTDF_matrix_MKLPardiso(
-            branches,
-            buses,
-            bus_lookup,
-            dist_slack,
-        )
-    end
-
-    return PTDFm, A
-end
 
 function _buildptdf_from_matrices(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -92,9 +88,9 @@ function _buildptdf_from_matrices(
     elseif linear_solver == "Dense"
         # Convert SparseMatrices to Dense
         PTDFm = _calculate_PTDF_matrix_DENSE(
-            Matrix(A),
-            Matrix(BA),
-            A.ref_bus_positions,
+            A,
+            BA,
+            ref_bus_positions,
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
@@ -106,7 +102,7 @@ function _buildptdf_from_matrices(
 end
 
 """
-Funciton for internal use only.
+Function for internal use only.
 
 Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
 
@@ -130,13 +126,13 @@ function _calculate_PTDF_matrix_KLU(
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     K = klu(ABA)
-    # inizialize matrices for evaluation
+    # initialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
     copyto!(PTDFm_t, BA)
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
-            "Distibuted slack is not supported for systems with multiple reference buses.",
+            "Distributed slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         PTDFm_t[valid_ix, :] = KLU.solve!(K, PTDFm_t[valid_ix, :])
@@ -156,30 +152,6 @@ function _calculate_PTDF_matrix_KLU(
     return
 end
 
-"""
-Computes the PTDF matrix by means of the KLU.LU factorization for sparse matrices.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function calculate_PTDF_matrix_KLU(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_lookup)
-    PTDFm = _calculate_PTDF_matrix_KLU(A, BA, ref_bus_positions, dist_slack)
-    return PTDFm, A
-end
-
 function _binfo_check(binfo::Int)
     if binfo != 0
         if binfo < 0
@@ -194,7 +166,7 @@ function _binfo_check(binfo::Int)
 end
 
 """
-Funciton for internal use only.
+Function for internal use only.
 
 Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
 
@@ -224,7 +196,7 @@ function _calculate_PTDF_matrix_DENSE(
     BA = Matrix(BA[valid_ixs, :])
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
-            "Distibuted slack is not supported for systems with multiple reference buses.",
+            "Distributed slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
         getrs!('N', ABA, bipiv, BA)
@@ -246,31 +218,7 @@ function _calculate_PTDF_matrix_DENSE(
 end
 
 """
-Computes the PTDF matrix by means of the LAPACK and BLAS functions for dense matrices.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function calculate_PTDF_matrix_DENSE(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_lookup)
-    PTDFm = _calculate_PTDF_matrix_DENSE(A, BA, ref_bus_positions, dist_slack)
-    return PTDFm, A
-end
-
-"""
-Funciton for internal use only.
+Function for internal use only.
 
 Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 
@@ -280,7 +228,7 @@ Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix
 - `ref_bus_positions::Set{Int}`:
-        vector containing the indexes of the referece slack buses.
+        vector containing the indexes of the reference slack buses.
 - `dist_slack::Vector{Float64}`:
         vector containing the weights for the distributed slacks.
 """
@@ -311,14 +259,14 @@ function _calculate_PTDF_matrix_MKLPardiso(
     Pardiso.set_iparm!(ps, 13, 0)
     Pardiso.set_iparm!(ps, 32, 1)
 
-    # inizialize matrices for evaluation
+    # initialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
 
     full_BA = Matrix(BA[valid_ix, :])
     if !isempty(dist_slack) && length(ref_bus_positions) != 1
         error(
-            "Distibuted slack is not supported for systems with multiple reference buses.",
+            "Distributed slack is not supported for systems with multiple reference buses.",
         )
     elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
         Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
@@ -342,201 +290,179 @@ function _calculate_PTDF_matrix_MKLPardiso(
 end
 
 """
-Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
+    PTDF(sys::PSY.System; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
+
+Construct a Power Transfer Distribution Factor (PTDF) matrix from a PowerSystems.System by computing
+the sensitivity of transmission line flows to bus power injections. This is the primary constructor
+for PTDF analysis starting from system data.
 
 # Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
-- `bus_lookup::Dict{Int, Int}`:
-        dictionary mapping the bus numbers with their enumerated indexes.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function calculate_PTDF_matrix_MKLPardiso(
-    branches,
-    buses::Vector{PSY.ACBus},
-    bus_lookup::Dict{Int, Int},
-    dist_slack::Vector{Float64})
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_lookup)
-    PTDFm = _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
-    return PTDFm, A
-end
-
-"""
-Builds the PTDF matrix from a group of branches and buses. The return is a PTDF array indexed with the bus numbers.
-
-# Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
+- `sys::PSY.System`: The power system from which to construct the PTDF matrix
 
 # Keyword Arguments
-- `dist_slack::Vector{Float64}`:
-        vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses
-- `linear_solver::String`:
-        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso
-- `tol::Float64`:
-        Tolerance to eliminate entries in the PTDF matrix (default eps())
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the ma
+- `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
+        Dictionary mapping bus numbers to distributed slack weights for realistic slack modeling.
+        Empty dictionary uses single slack bus (default behavior)
+- `linear_solver::String = "KLU"`:
+        Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
+- `tol::Float64 = eps()`:
+        Sparsification tolerance for dropping small matrix elements to reduce memory usage
+- `network_reductions::Vector{NetworkReduction} = NetworkReduction[]`:
+        Vector of network reduction algorithms to apply before matrix construction
+- `include_constant_impedance_loads::Bool=true`:
+        Whether to include constant impedance loads as shunt admittances in the network model
+- `subnetwork_algorithm=iterative_union_find`:
+        Algorithm used for identifying electrical islands and connected components
+- Additional keyword arguments are passed to the underlying matrix constructors
+
+# Returns
+- `PTDF`: The constructed PTDF matrix structure containing:
+  - Bus-to-impedance-arc injection sensitivity coefficients
+  - Network topology information and reference bus identification
+  - Sparsification tolerance and computational metadata
+
+# Construction Process
+1. **Ybus Construction**: Creates system admittance matrix with specified reductions
+2. **Incidence Matrix**: Builds bus-branch connectivity matrix A
+3. **BA Matrix**: Computes branch susceptance weighted incidence matrix
+4. **PTDF Computation**: Calculates power transfer distribution factors using A^T × B^(-1) × A
+5. **Distributed Slack**: Applies distributed slack correction if specified
+6. **Sparsification**: Removes small elements based on tolerance threshold
+
+# Distributed Slack Configuration
+- **Single Slack**: Empty `dist_slack` dictionary uses conventional single slack bus
+- **Distributed Slack**: Dictionary maps bus numbers to participation factors
+- **Normalization**: Participation factors automatically normalized to sum to 1.0
+- **Physical Meaning**: Distributed slack better represents generator response to load changes
+
+# Linear Solver Options
+- **"KLU"**: Sparse LU factorization (default, recommended for most cases)
+- **"Dense"**: Dense matrix operations (faster for small systems, higher memory usage)
+- **"MKLPardiso"**: Intel MKL Pardiso solver (requires MKL library, best for very large systems)
+
+# Mathematical Foundation
+The PTDF matrix is computed as:
+```
+PTDF = A^T × (A^T × B × A)^(-1) × A^T × B
+```
+where A is the incidence matrix and B is the susceptance matrix.
+
+# Notes
+- Results are valid under DC power flow assumptions (linear approximation)
+- Reference bus selection affects specific values but not relative sensitivities
+- Sparsification with `tol > eps()` can significantly reduce memory usage
+- Network reductions improve computational efficiency for large systems
+- Distributed slack provides more realistic representation of system response
 """
-function PTDF(
-    branches,
-    buses::Vector{PSY.ACBus};
-    dist_slack::Vector{Float64} = Float64[],
-    linear_solver::String = "KLU",
+function PTDF(sys::PSY.System;
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
+    linear_solver = "KLU",
     tol::Float64 = eps(),
-    radial_network_reduction::RadialNetworkReduction = RadialNetworkReduction(),
-)
-    validate_linear_solver(linear_solver)
-
-    #Get axis names
-    line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    axes = (bus_ax, line_ax)
-    M, bus_ax_ref = calculate_adjacency(branches, buses)
-    ref_bus_positions = find_slack_positions(buses, bus_ax_ref)
-    subnetworks =
-        assign_reference_buses!(find_subnetworks(M, bus_ax), ref_bus_positions, bus_ax_ref)
-    if length(subnetworks) > 1
-        @info "Network is not connected, using subnetworks"
-    end
-    look_up = (bus_ax_ref, make_ax_ref(line_ax))
-    S, _ = _buildptdf(
-        branches,
-        buses,
-        look_up[1],
-        dist_slack,
-        linear_solver,
-    )
-    if tol > eps()
-        return PTDF(
-            sparsify(S, tol),
-            axes,
-            look_up,
-            subnetworks,
-            ref_bus_positions,
-            Ref(tol),
-            radial_network_reduction,
-        )
-    end
-    return PTDF(
-        S,
-        axes,
-        look_up,
-        subnetworks,
-        ref_bus_positions,
-        Ref(tol),
-        radial_network_reduction,
-    )
-end
-
-"""
-Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
-Note that `dist_slack` and `reduce_radial_branches` kwargs are explicitly mentioned because needed inside of the function.
-
-# Arguments
-- `sys::PSY.System`:
-        PSY system for which the matrix is constructed
-
-# Keyword Arguments
-- `dist_slack::Vector{Float64}=Float64[]`:
-        vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buse
-- `reduce_radial_branches::Bool=false`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
-"""
-function PTDF(
-    sys::PSY.System;
-    dist_slack::Vector{Float64} = Float64[],
-    reduce_radial_branches::Bool = false,
     kwargs...,
 )
-    if reduce_radial_branches
-        A = IncidenceMatrix(sys)
-        dist_slack, rb = redistribute_dist_slack(dist_slack, A)
-    else
-        rb = RadialNetworkReduction()
-    end
-    branches = get_ac_branches(sys, rb.radial_branches)
-    buses = get_buses(sys, rb.bus_reduction_map)
-    return PTDF(
-        branches,
-        buses;
-        dist_slack = dist_slack,
-        radial_network_reduction = rb,
+    Ymatrix = Ybus(
+        sys;
         kwargs...,
+    )
+    A = IncidenceMatrix(Ymatrix)
+    BA = BA_Matrix(Ymatrix)
+    return PTDF(
+        A,
+        BA;
+        dist_slack = dist_slack,
+        linear_solver = linear_solver,
+        tol = tol,
     )
 end
 
 """
-Builds the PTDF matrix from a system. The return is a PTDF array indexed with the bus numbers.
+    PTDF(A::IncidenceMatrix, BA::BA_Matrix; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps())
+
+Construct a Power Transfer Distribution Factor (PTDF) matrix from existing incidence and BA matrices.
+This constructor is more efficient when the prerequisite matrices are already available and provides
+direct control over the underlying matrix computations.
 
 # Arguments
-- `A::IncidenceMatrix`:
-        Incidence Matrix (full structure)
-- `BA::BA_Matrix`:
-        BA matrix (full structure)
+- `A::IncidenceMatrix`: The incidence matrix containing bus-branch connectivity information
+- `BA::BA_Matrix`: The branch susceptance weighted incidence matrix (B × A)
 
 # Keyword Arguments
-- `dist_slack::Vector{Float64}`:
-        Vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses.
-- `linear_solver::String`:
-        Linear solver to be used. Options are "Dense", "KLU" and "MKLPardiso.
-- `tol::Float64`:
-        Tolerance to eliminate entries in the PTDF matrix (default eps()).
-- `reduce_radial_branches::Bool`:
-        True to reduce the network by simplifying the radial branches and mapping the
-        eliminate buses
+- `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
+        Dictionary mapping bus numbers to distributed slack participation factors.
+        Empty dictionary uses single slack bus (reference bus from matrices)
+- `linear_solver::String = "KLU"`:
+        Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
+- `tol::Float64 = eps()`:
+        Sparsification tolerance for dropping small matrix elements to reduce memory usage
+
+# Returns
+- `PTDF`: The constructed PTDF matrix structure with injection-to-flow sensitivity coefficients
+
+# Mathematical Computation
+The PTDF matrix is computed using the relationship:
+```
+PTDF = (A^T × B × A)^(-1) × A^T × B
+```
+where:
+- A is the incidence matrix representing bus-branch connectivity
+- B is the diagonal susceptance matrix (embedded in BA matrix)
+- The computation involves solving the ABA linear system for efficiency
+
+# Distributed Slack Handling
+- **Single Slack**: Uses reference bus identified from input matrices
+- **Distributed Slack**: Applies participation factor corrections to final PTDF
+- **Automatic Processing**: Dictionary converted to vector form matching matrix dimensions
+- **Validation**: Ensures distributed slack bus numbers exist in the network
+- **Normalization**: Participation factors automatically normalized to maintain power balance
+
+# Network Consistency Requirements
+- **Reduction Compatibility**: Both input matrices must have equivalent network reduction states
+- **Reference Alignment**: BA matrix reference buses determine the PTDF reference framework
+- **Topology Consistency**: Matrices must represent the same network topology
+
+# Performance Considerations
+- **Matrix Reuse**: More efficient when A and BA matrices are already computed
+- **Memory Management**: Sparsification reduces storage requirements significantly
+- **Solver Selection**: KLU recommended for sparse systems, Dense for small networks
+- **Computational Efficiency**: Avoids redundant system matrix construction
+
+# Error Handling and Validation
+- **Matrix Compatibility**: Validates that A and BA have consistent network reductions
+- **Slack Validation**: Checks that distributed slack buses exist in the matrix structure
+- **Solver Validation**: Ensures selected linear solver is supported and available
+- **Numerical Stability**: Handles singular systems and provides informative error messages
+
+# Usage Recommendations
+- **Preferred Method**: Use when incidence and BA matrices are already available
+- **Repeated Calculations**: Ideal for multiple PTDF computations with different slack configurations
+- **Large Systems**: Consider sparsification for memory efficiency
+- **Distributed Slack**: Provides more realistic modeling of generator response to load changes
 """
 function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
-    dist_slack::Vector{Float64} = Float64[],
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
     linear_solver = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = false,
 )
-    validate_linear_solver(linear_solver)
-    @warn "PTDF creates via other matrices doesn't compute the subnetworks"
-    if reduce_radial_branches
-        if !isempty(BA.radial_network_reduction)
-            radial_network_reduction = BA.radial_network_reduction
-            @info "Non-empty `radial_branches` field found in BA matrix. PTDF is evaluated considering radial branches and leaf nodes removed."
-        else
-            error("BA has empty `radial_branches` field.")
-        end
-        A_matrix = reduce_A_matrix(
-            A,
-            radial_network_reduction.bus_reduction_map,
-            radial_network_reduction.meshed_branches,
-        )
-        axes = BA.axes
-        lookup = BA.lookup
+    if !(isempty(dist_slack))
+        dist_slack = redistribute_dist_slack(dist_slack, A, A.network_reduction_data)
     else
-        if isempty(BA.radial_network_reduction)
-            radial_network_reduction = RadialNetworkReduction()
-            A_matrix = A.data
-            axes = (A.axes[2], A.axes[1])
-            lookup = (A.lookup[2], A.lookup[1])
-        else
-            error(
-                "Field `radial_branches` in BA must be empty if `reduce_radial_branches` is not true.",
-            )
-        end
+        dist_slack = Float64[]
     end
+    validate_linear_solver(linear_solver)
+    if !isequal(A.network_reduction_data, BA.network_reduction_data)
+        error("A and BA matrices have non-equivalent network reductions.")
+    end
+    axes = BA.axes
+    lookup = BA.lookup
+    A_matrix = A.data
+    subnetwork_axes = BA.subnetwork_axes
+    ref_bus_positions = get_ref_bus_position(BA)
     S = _buildptdf_from_matrices(
         A_matrix,
         BA.data,
-        BA.ref_bus_positions,
+        Set(ref_bus_positions),
         dist_slack,
         linear_solver,
     )
@@ -545,20 +471,18 @@ function PTDF(
             sparsify(S, tol),
             axes,
             lookup,
-            Dict{Int, Set{Int}}(),
-            BA.ref_bus_positions,
+            subnetwork_axes,
             Ref(tol),
-            radial_network_reduction,
+            BA.network_reduction_data,
         )
     else
         return PTDF(
             S,
             axes,
             lookup,
-            Dict{Int, Set{Int}}(),
-            BA.ref_bus_positions,
+            subnetwork_axes,
             Ref(tol),
-            radial_network_reduction,
+            BA.network_reduction_data,
         )
     end
 end
@@ -567,9 +491,15 @@ end
 ########################### Auxiliary functions ##############################
 ##############################################################################
 
+function Base.getindex(A::PTDF, branch_name::String, bus)
+    multiplier, arc = get_branch_multiplier(A, branch_name)
+    i, j = to_index(A, bus, arc)
+    return A.data[i, j] * multiplier
+end
+
 # PTDF stores the transposed matrix. Overload indexing and how data is exported.
-function Base.getindex(A::PTDF, line, bus)
-    i, j = to_index(A, bus, line)
+function Base.getindex(A::PTDF, arc, bus)
+    i, j = to_index(A, bus, arc)
     return A.data[i, j]
 end
 
@@ -581,16 +511,19 @@ function Base.getindex(
     return A.data[bus_number, line_number]
 end
 
+"""
+    get_ptdf_data(ptdf::PTDF)
+
+Extract the PTDF matrix data in the standard orientation (non-transposed).
+
+# Arguments
+- `ptdf::PTDF`: The PTDF structure from which to extract data
+
+# Returns
+- `AbstractArray{Float64, 2}`: The PTDF matrix data with standard orientation
+"""
 function get_ptdf_data(ptdf::PTDF)
     return transpose(ptdf.data)
-end
-
-function get_branch_ax(ptdf::PTDF)
-    return ptdf.axes[2]
-end
-
-function get_bus_ax(ptdf::PTDF)
-    return ptdf.axes[1]
 end
 
 function get_tol(ptdf::PTDF)
@@ -598,24 +531,22 @@ function get_tol(ptdf::PTDF)
 end
 
 function redistribute_dist_slack(
-    dist_slack::Vector{Float64},
+    dist_slack::Dict{Int, Float64},
     A::IncidenceMatrix,
+    nr::NetworkReductionData,
 )
-    dist_slack1 = deepcopy(dist_slack)
-    rb = RadialNetworkReduction(A)
-    # if original length of dist_slack is correct
-    if length(dist_slack) == size(A.data, 2)
-        for i in keys(rb.bus_reduction_map)
-            for j in rb.bus_reduction_map[i]
-                dist_slack1[A.lookup[2][i]] += dist_slack1[A.lookup[2][j]]
-                dist_slack1[A.lookup[2][j]] = -9999
-            end
+    dist_slack_vector = zeros(length(A.axes[2]))
+    for (bus_no, dist_slack_factor) in dist_slack
+        bus_no_ = get(nr.reverse_bus_search_map, bus_no, bus_no)
+        if !haskey(A.lookup[2], bus_no_)
+            throw(
+                IS.InvalidValue(
+                    "Bus number $bus_no_ not found in the incidence matrix. Correct your slack distribution specification.",
+                ),
+            )
         end
-        # redefine dist_slack
-        return dist_slack1[dist_slack1 .!= -9999], rb
-        # otherwise throw an error
-    elseif !isempty(dist_slack) && length(dist_slack) != size(A.data, 2)
-        error("Distributed bus specification doesn't match the number of the buses.")
+        ix = A.lookup[2][bus_no_]
+        dist_slack_vector[ix] += dist_slack_factor
     end
-    return dist_slack, rb
+    return dist_slack_vector
 end
