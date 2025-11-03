@@ -320,7 +320,7 @@ get_lookup(mat::PowerNetworkMatrix) = mat.lookup
 
 function get_branch_multiplier(A::T, branch_name::String) where {T <: PowerNetworkMatrix}
     nr = A.network_reduction_data
-    if isempty!(nr.direct_branch_name_map)
+    if isempty(nr.direct_branch_name_map)
         populate_direct_branch_name_map!(nr)
     end
     if haskey(nr.direct_branch_name_map, branch_name)
