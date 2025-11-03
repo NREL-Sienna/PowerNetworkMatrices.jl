@@ -36,7 +36,7 @@ a_matrix = IncidenceMatrix(sys);
 # previously computed matrices
 ptdf_2 = PTDF(a_matrix, ba_matrix);
 get_ptdf_data(ptdf_2)
-
+```
 
 ## Available methods for the computation of the `PTDF` matrix
 
