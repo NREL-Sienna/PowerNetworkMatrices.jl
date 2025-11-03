@@ -54,6 +54,8 @@ else
     const USE_AA = false
 end
 
+import DataStructures
+import DataStructures: SortedDict
 import SparseArrays
 import SparseArrays: rowvals, nzrange
 import HDF5
