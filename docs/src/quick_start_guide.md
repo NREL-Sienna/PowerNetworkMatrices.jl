@@ -2,10 +2,10 @@
 
 !!! note
     `PowerSystemCaseBuilder.jl` is a helper library that makes it easier to reproduce examples in the documentation and tutorials. Normally you would pass your local files to create the system data instead of calling the function `build_system`.
-    For more details visit [PowerSystemCaseBuilder Documentation](https://nrel-sienna.github.io/PowerSystems.jl/stable/tutorials/powersystembuilder/)
+    For more details visit [PowerSystemCaseBuilder Documentation](https://nrel-sienna.github.io/PowerSystemCaseBuilder.jl/stable)
 
 For more details about loading data and adding more dynamic components check the
-[Creating a System with Dynamic devices](https://nrel-sienna.github.io/PowerSystems.jl/stable/modeler_guide/system_dynamic_data/)
+[Creating a System with Dynamic devices](https://nrel-sienna.github.io/PowerSystems.jl/stable/tutorials/add_dynamic_data/)
 section of the documentation in `PowerSystems.jl`.
 
 ## Loading data
@@ -24,7 +24,7 @@ sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
 ## Computation of the PTDF matrix
 
-Once system data is loaded, netwrok matrices can be evaluated. The following
+Once system data is loaded, network matrices can be evaluated. The following
 example shows how the PTDF matrix is computed.
 
 The function `PTDF` is called for the evaluation of the matrix and other data. These

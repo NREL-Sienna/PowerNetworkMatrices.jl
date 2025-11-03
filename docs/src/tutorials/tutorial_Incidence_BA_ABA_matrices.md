@@ -4,7 +4,7 @@ In this tutorial the `IncidenceMatrix`, `BA_matrix` and `ABA_matrix` are present
 The methods used for their evaluation, as well as how data is stored is shown in
 the following subsections.
 
-The matrices here presented are the building blocks for the compuation of the PTDF and LODF matrices.
+The matrices here presented are the building blocks for the computation of the PTDF and LODF matrices.
 
 ## IncidenceMatrix
 
@@ -34,14 +34,14 @@ featuring the following fields:
 
 ``` @repl tutorial_Incidence_BA_ABA_matrices
 # axis names: row and column names.
-# row names: names of the branches
+# row names: tuples of the arcs (from bus number, to bus number)
 # column names: names of the buses
 incidence_matrix.axes
 
 # data: Incidence Matrix
 incidence_matrix.data
 
-# lookup: dictionary linking the branches names and bus numbers with the row
+# lookup: dictionary linking the arc tuples and bus numbers with the row
 # and column numbers, respectively.
 incidence_matrix.axes
 
@@ -63,7 +63,7 @@ the column related to the reference bus is discarded.
 ## BA_Matrix
 
 The `BA_Matrix` is a structure containing the matrix coming from the product of the
-`IncidenceMatrix` and the diagonal matrix containing the impedence of the system's branches ("B" matrix).
+`IncidenceMatrix` and the diagonal matrix containing the impedance of the system's branches ("B" matrix).
 
 The `BA_Matrix` is computed as follows:
 

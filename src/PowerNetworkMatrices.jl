@@ -1,7 +1,6 @@
 module PowerNetworkMatrices
 
 export ABA_Matrix
-export AdjacencyMatrix
 export BA_Matrix
 export factorize
 export find_subnetworks
@@ -9,17 +8,28 @@ export from_hdf5
 export get_ptdf_data
 export get_lodf_data
 export get_bus_reduction_map
-export get_radial_branches
+export get_ward_reduction
+export get_reductions
+export get_network_reduction_data
 export IncidenceMatrix
+export AdjacencyMatrix
 export is_factorized
 export LODF
 export PTDF
-export RadialNetworkReduction
+export NetworkReduction
+export NetworkReductionData
+export RadialReduction
+export DegreeTwoReduction
+export WardReduction
+
+export depth_first_search
+export iterative_union_find
 export to_hdf5
 export validate_connectivity
 export VirtualLODF
 export VirtualPTDF
 export Ybus
+export ArcAdmittanceMatrix
 
 using DocStringExtensions
 import InfrastructureSystems
@@ -44,6 +54,8 @@ else
     const USE_AA = false
 end
 
+import DataStructures
+import DataStructures: SortedDict
 import SparseArrays
 import SparseArrays: rowvals, nzrange
 import HDF5
@@ -61,14 +73,25 @@ import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 
 # network calculations
 include("PowerNetworkMatrix.jl")
-include("incedence_matrix.jl")
-include("adjacency_matrix.jl")
-include("network_radial_reduction.jl")
+include("definitions.jl")
+include("ThreeWindingTransformerWinding.jl")
+include("BranchesSeries.jl")
+include("BranchesParallel.jl")
+include("NetworkReduction.jl")
+include("radial_reduction.jl")
+include("degree_two_reduction.jl")
+include("ward_reduction.jl")
+include("ReductionContainer.jl")
+include("NetworkReductionData.jl")
+include("ArcAdmittanceMatrix.jl")
+include("Ybus.jl")
+include("IncidenceMatrix.jl")
+include("AdjacencyMatrix.jl")
+include("connectivity_checks.jl")
+include("subnetworks.jl")
 include("common.jl")
 include("BA_ABA_matrices.jl")
-include("definitions.jl")
 include("ptdf_calculations.jl")
-include("ybus_calculations.jl")
 include("row_cache.jl")
 include("virtual_ptdf_calculations.jl")
 include("lodf_calculations.jl")

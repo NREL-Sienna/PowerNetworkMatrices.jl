@@ -1,31 +1,61 @@
 """
-The Line Outage Distribution Factor (LODF) matrix gathers a sensitivity coefficients
-of how a change in a line's flow affects the flows on other lines in the system.
+Structure containing the Line Outage Distribution Factor (LODF) matrix and related power system data.
 
-# Arguments
-- `data<:AbstractArray{Float64, 2}`:
-        the transposed LODF matrix.
-- `axes<:NTuple{2, Dict}`:
-        Tuple containing two identical vectors containing the names of the
-        branches related to each row/column.
-- `lookup<:NTuple{2, Dict}`:
-        Tuple containing two identical dictionaries mapping the branches
-         their enumerated indexes (row and column numbers).
+The LODF matrix contains sensitivity coefficients that quantify how the outage of one transmission 
+line affects the power flows on all other lines in the system. Each element LODF[i,j] represents 
+the change in flow on line i when line j is taken out of service, normalized by the pre-outage 
+flow on line j.
+
+# Fields
+- `data::M <: AbstractArray{Float64, 2}`:
+        The LODF matrix data stored in transposed form for computational efficiency. 
+        Element (i,j) represents the sensitivity of line j flow to line i outage
+- `axes::Ax`:
+        Tuple of identical branch/arc identifier vectors for both matrix dimensions
+- `lookup::L <: NTuple{2, Dict}`:
+        Tuple of identical dictionaries providing fast lookup from branch identifiers to matrix indices
+- `subnetwork_axes::Dict{Int, Ax}`:
+        Mapping from reference bus numbers to their corresponding subnetwork branch axes
 - `tol::Base.RefValue{Float64}`:
-        tolerance used for sparsifying the matrix (dropping element whose
-        absolute value is below this threshold).
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+        Tolerance threshold used for matrix sparsification (elements below this value are dropped)
+- `network_reduction_data::NetworkReductionData`:
+        Container for network reduction information applied during matrix construction
+
+# Mathematical Properties
+- **Matrix Form**: LODF[i,j] = ∂f_i/∂P_j where f_i is flow on line i, P_j is injection change due to line j outage
+- **Dimensions**: (n_branches × n_branches) for all transmission lines in the system
+- **Diagonal Elements**: Always -1 (100% flow reduction on the outaged line itself)
+- **Symmetry**: Generally non-symmetric matrix reflecting directional flow sensitivities
+- **Physical Meaning**: Values represent fraction of pre-outage flow that redistributes to other lines
+
+# Applications
+- **Contingency Analysis**: Evaluate impact of single line outages on system flows
+- **Security Assessment**: Identify critical transmission bottlenecks and vulnerable lines
+- **System Planning**: Analyze network robustness and redundancy requirements
+- **Real-time Operations**: Support operator decision-making for preventive/corrective actions
+
+# Computational Notes
+- **Storage**: Matrix stored in transposed form for efficient column-wise access patterns
+- **Sparsification**: Small elements removed based on tolerance to reduce memory usage
+- **Linear Approximation**: Based on DC power flow assumptions (neglects voltage magnitudes and reactive power)
+- **Single Contingencies**: Designed for single line outage analysis (N-1 contingencies)
+
+# Usage Notes
+- Access via `lodf[monitored_line, outaged_line]` returns sensitivity coefficient
+- Diagonal elements are always -1.0 representing complete flow loss on outaged line
+- Matrix sparsification improves performance but may introduce small numerical errors
+- Results valid under DC power flow assumptions and normal operating conditions
 """
 struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
        PowerNetworkMatrix{Float64}
     data::M
     axes::Ax
     lookup::L
+    subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
-    radial_network_reduction::RadialNetworkReduction
+    network_reduction_data::NetworkReductionData
 end
+stores_transpose(::LODF) = true
 
 function _buildlodf(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -48,9 +78,9 @@ function _buildlodf(
 end
 
 function _buildlodf(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int64},
-    k::KLU.KLUFactorization{Float64, Int64},
-    ba::SparseArrays.SparseMatrixCSC{Float64, Int64},
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    k::KLU.KLUFactorization{Float64, Int},
+    ba::SparseArrays.SparseMatrixCSC{Float64, Int},
     ref_bus_positions::Set{Int},
     linear_solver::String,
 )
@@ -63,10 +93,10 @@ function _buildlodf(
 end
 
 function _calculate_LODF_matrix_KLU(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int64},
-    k::KLU.KLUFactorization{Float64, Int64},
-    ba::SparseArrays.SparseMatrixCSC{Float64, Int64},
-    ref_bus_positions::Set{Int64},
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    k::KLU.KLUFactorization{Float64, Int},
+    ba::SparseArrays.SparseMatrixCSC{Float64, Int},
+    ref_bus_positions::Set{Int},
 )
     linecount = size(ba, 2)
     # get inverse of aba
@@ -80,7 +110,7 @@ function _calculate_LODF_matrix_KLU(
     m_I = Int[]
     m_V = Float64[]
     for iline in 1:linecount
-        if (1.0 - ptdf_denominator[iline, iline]) < 1.0E-06
+        if (1.0 - ptdf_denominator[iline, iline]) < LODF_ENTRY_TOLERANCE
             push!(m_I, iline)
             push!(m_V, 1.0)
         else
@@ -103,7 +133,7 @@ function _calculate_LODF_matrix_KLU(
     m_I = Int[]
     m_V = Float64[]
     for iline in 1:linecount
-        if (1.0 - ptdf_denominator_t[iline, iline]) < 1.0E-06
+        if (1.0 - ptdf_denominator_t[iline, iline]) < LODF_ENTRY_TOLERANCE
             push!(m_I, iline)
             push!(m_V, 1.0)
         else
@@ -126,7 +156,7 @@ function _calculate_LODF_matrix_DENSE(
     ptdf_denominator_t = a * ptdf
     m_V = Float64[]
     for iline in 1:linecount
-        if (1.0 - ptdf_denominator_t[iline, iline]) < 1.0E-06
+        if (1.0 - ptdf_denominator_t[iline, iline]) < LODF_ENTRY_TOLERANCE
             push!(m_V, 1.0)
         else
             push!(m_V, 1.0 - ptdf_denominator_t[iline, iline])
@@ -145,7 +175,7 @@ function _pardiso_sequential_LODF!(
     ptdf_denominator_t::Matrix{Float64},
     chunk_size::Int = DEFAULT_LODF_CHUNK_SIZE,
 )
-    @info "Line Count too large for single compute using Pardiso. Employing Sequential Calulations using a chunk_size=$(chunk_size)"
+    @info "Line Count too large for single compute using Pardiso. Employing Sequential Calculations using a chunk_size=$(chunk_size)"
     linecount = size(lodf_t, 1)
     @assert LinearAlgebra.ishermitian(A)
     ps = Pardiso.MKLPardisoSolver()
@@ -238,7 +268,7 @@ function _calculate_LODF_matrix_MKLPardiso(
     m_I = Int[]
     m_V = Float64[]
     for iline in 1:linecount
-        if (1.0 - ptdf_denominator_t[iline, iline]) < 1.0E-06
+        if (1.0 - ptdf_denominator_t[iline, iline]) < LODF_ENTRY_TOLERANCE
             push!(m_I, iline)
             push!(m_V, 1.0)
         else
@@ -258,119 +288,137 @@ function _calculate_LODF_matrix_MKLPardiso(
 end
 
 """
-Builds the LODF matrix given the data of branches and buses of the system.
+    LODF(sys::PSY.System; linear_solver::String = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
+
+Construct a Line Outage Distribution Factor (LODF) matrix from a PowerSystems.System by computing 
+the sensitivity of line flows to single line outages. This is the primary constructor for LODF 
+analysis starting from system data.
 
 # Arguments
-- `branches`:
-        vector of the System AC branches
-- `buses::Vector{PSY.ACBus}`:
-        vector of the System buses
+- `sys::PSY.System`: The power system from which to construct the LODF matrix
 
 # Keyword Arguments
-- `linear_solver`::String
-        linear solver to use for matrix evaluation.
-        Available options: "KLU", "Dense" (OpenBLAS) or "MKLPardiso".
-        Default solver: "KLU".
-- `tol::Float64`:
-        Tolerance to eliminate entries in the LODF matrix (default eps())
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the ma
-"""
-function LODF(
-    branches,
-    buses::Vector{PSY.ACBus};
-    linear_solver::String = "KLU",
-    tol::Float64 = eps(),
-    radial_network_reduction::RadialNetworkReduction = RadialNetworkReduction(),
-)
+- `linear_solver::String = "KLU"`: 
+        Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
+- `tol::Float64 = eps()`: 
+        Sparsification tolerance for dropping small matrix elements to reduce memory usage
+- `network_reductions::Vector{NetworkReduction} = NetworkReduction[]`: 
+        Vector of network reduction algorithms to apply before matrix construction
+- `include_constant_impedance_loads::Bool=true`: 
+        Whether to include constant impedance loads as shunt admittances in the network model
+- `subnetwork_algorithm=iterative_union_find`: 
+        Algorithm used for identifying electrical islands and connected components
+- Additional keyword arguments are passed to the underlying matrix constructors
 
-    # get axis names
-    line_ax = [branch.name for branch in branches]
-    axes = (line_ax, line_ax)
-    line_map = make_ax_ref(line_ax)
-    look_up = (line_map, line_map)
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    bus_lookup = make_ax_ref(bus_ax)
-    # get network matrices
-    ptdf_t, a = calculate_PTDF_matrix_KLU(branches, buses, bus_lookup, Float64[])
+# Returns
+- `LODF`: The constructed LODF matrix structure containing:
+  - Line-to-line outage sensitivity coefficients
+  - Network topology information and branch identifiers
+  - Sparsification tolerance and computational metadata
 
-    if tol > eps()
-        lodf_t = _buildlodf(a, ptdf_t, linear_solver)
-        return LODF(
-            sparsify(lodf_t, tol),
-            axes,
-            look_up,
-            Ref(tol),
-            radial_network_reduction,
-        )
-    else
-        return LODF(
-            _buildlodf(a, ptdf_t, linear_solver),
-            axes,
-            look_up,
-            Ref(tol),
-            radial_network_reduction,
-        )
-    end
-end
+# Construction Process
+1. **Ybus Construction**: Creates system admittance matrix with specified reductions
+2. **Incidence Matrix**: Builds bus-branch connectivity matrix A
+3. **BA Matrix**: Computes branch susceptance weighted incidence matrix
+4. **PTDF Calculation**: Derives power transfer distribution factors
+5. **LODF Computation**: Calculates line outage distribution factors from PTDF
+6. **Sparsification**: Applies tolerance threshold to reduce matrix density
 
-"""
-Builds the LODF matrix from a system.
-Note that `reduce_radial_branches` kwargs is explicitly mentioned because needed inside of the function.
+# Linear Solver Options
+- **"KLU"**: Sparse LU factorization (default, recommended for most cases)
+- **"Dense"**: Dense matrix operations (faster for small systems)
+- **"MKLPardiso"**: Intel MKL Pardiso solver (requires MKL, best for very large systems)
 
-# Arguments
-- `sys::PSY.System`:
-        Power Systems system
+# Mathematical Foundation
+The LODF matrix is computed using the relationship:
+```
+LODF = (A * PTDF) / (1 - diag(A * PTDF))
+```
+where A is the incidence matrix and PTDF is the power transfer distribution factor matrix.
 
-# Keyword Arguments
-- `reduce_radial_branches::Bool=false`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
+# Notes
+- Sparsification with `tol > eps()` can significantly reduce memory usage
+- Network reductions can improve computational efficiency for large systems
+- Results are valid under DC power flow assumptions (linear approximation)
+- Diagonal elements are always -1.0 representing complete flow loss on outaged lines
+- For very large systems, consider using "MKLPardiso" solver with appropriate chunk size
 """
 function LODF(
     sys::PSY.System;
-    reduce_radial_branches::Bool = false,
+    linear_solver::String = "KLU",
+    tol::Float64 = eps(),
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
-    if reduce_radial_branches
-        rb = RadialNetworkReduction(IncidenceMatrix(sys))
-    else
-        rb = RadialNetworkReduction()
-    end
-    branches = get_ac_branches(sys, rb.radial_branches)
-    buses = get_buses(sys, rb.bus_reduction_map)
-    return LODF(branches, buses; radial_network_reduction = rb, kwargs...)
+    Ymatrix = Ybus(
+        sys;
+        network_reductions = network_reductions,
+        kwargs...,
+    )
+    A = IncidenceMatrix(Ymatrix)
+    BA = BA_Matrix(Ymatrix)
+    ptdf = PTDF(A, BA)
+    return LODF(A, ptdf; linear_solver = linear_solver, tol = tol, kwargs...)
 end
 
 """
-Builds the LODF matrix given the Incidence Matrix and the PTDF matrix of the system.
+    LODF(A::IncidenceMatrix, PTDFm::PTDF; linear_solver::String = "KLU", tol::Float64 = eps())
 
-NOTE: tol is referred to the LODF sparsification, not the PTDF one. PTDF matrix
-must be considered as NON sparsified ("tol" argument not specified when calling
-the PTDF method).
+Construct a Line Outage Distribution Factor (LODF) matrix from existing incidence and PTDF matrices.
+This constructor is more efficient when the prerequisite matrices are already available.
 
 # Arguments
-- `A::IncidenceMatrix`:
-        Structure containing the Incidence matrix of the system.
-- `PTDFm::PTDF`:
-        Strucutre containing the transposed PTDF matrix of the system.
-- `linear_solver::String`:
-        Linear solver to be used. Options are "Dense" and "KLU".
-- `tol::Float64`:
-        Tolerance to eliminate entries in the LODF matrix (default eps()).
-- `reduce_radial_branches::Bool`:
-        True to reduce the network by simplifying the radial branches and mapping the
-        eliminate buses
+- `A::IncidenceMatrix`: The incidence matrix containing bus-branch connectivity information
+- `PTDFm::PTDF`: The power transfer distribution factor matrix (should be non-sparsified for accuracy)
+
+# Keyword Arguments
+- `linear_solver::String = "KLU"`: 
+        Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
+- `tol::Float64 = eps()`: 
+        Sparsification tolerance for the LODF matrix (not applied to input PTDF)
+
+# Returns
+- `LODF`: The constructed LODF matrix structure with line outage sensitivity coefficients
+
+# Mathematical Computation
+The LODF matrix is computed using the formula:
+```
+LODF = (A * PTDF) / (1 - diag(A * PTDF))
+```
+where:
+- A is the incidence matrix representing bus-branch connectivity
+- PTDF contains power transfer distribution factors
+- The denominator (1 - diagonal terms) accounts for the outaged line's own flow
+
+# Important Notes
+- **PTDF Sparsification**: The input PTDF matrix should be non-sparsified (constructed with default tolerance) to avoid accuracy issues
+- **Tolerance Application**: The `tol` parameter only affects LODF sparsification, not the input PTDF
+- **Network Consistency**: Both input matrices must have equivalent network reduction states
+- **Diagonal Elements**: Automatically set to -1.0 representing complete flow loss on outaged lines
+
+# Performance Considerations
+- **Matrix Validation**: Warns if input PTDF was sparsified and converts to dense format for accuracy
+- **Memory Usage**: Sparsification with `tol > eps()` can significantly reduce memory requirements
+- **Computational Efficiency**: More efficient than system-based constructor when matrices exist
+
+# Error Handling
+- Validates that incidence and PTDF matrices have consistent network reduction data
+- Issues warnings if sparsified PTDF matrices are used (potential accuracy issues)
+- Supports automatic conversion of sparse PTDF to dense format when necessary
+
+# Linear Solver Selection
+- **"KLU"**: Recommended for most applications (sparse, numerically stable)
+- **"Dense"**: Faster for smaller systems but higher memory usage
+- **"MKLPardiso"**: Best performance for very large systems (requires MKL library)
 """
 function LODF(
     A::IncidenceMatrix,
     PTDFm::PTDF;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = false,
 )
     validate_linear_solver(linear_solver)
+    subnetwork_axes = make_arc_arc_subnetwork_axes(A)
 
     if PTDFm.tol.x > 1e-15
         warn_msg = string(
@@ -383,69 +431,85 @@ function LODF(
         PTDFm_data = PTDFm.data
     end
 
-    if reduce_radial_branches
-        if !isempty(PTDFm.radial_network_reduction)
-            radial_network_reduction = PTDFm.radial_network_reduction
-            @info "Non-empty `radial_network_reduction` field found in PTDF matrix. LODF is evaluated considering radial branches and leaf nodes removed."
-        else
-            error("PTDF has empty `radial_network_reduction` field.")
-        end
-        A_matrix = reduce_A_matrix(
-            A,
-            radial_network_reduction.bus_reduction_map,
-            radial_network_reduction.meshed_branches,
-        )
-        ax_ref = make_ax_ref(sort!(collect(radial_network_reduction.meshed_branches)))
-    else
-        if isempty(PTDFm.radial_network_reduction)
-            radial_network_reduction = RadialNetworkReduction()
-            A_matrix = A.data
-            ax_ref = make_ax_ref(A.axes[1])
-        else
-            error(
-                "Field `radial_network_reduction` in PTDF must be empty if `reduce_radial_network_reduction` is not true.",
-            )
-        end
+    if !isequal(A.network_reduction_data, PTDFm.network_reduction_data)
+        error("A and PTDF matrices have non-equivalent network reductions.")
     end
+    ax_ref = make_ax_ref(get_arc_axis(A))
 
     if tol > eps()
-        lodf_t = _buildlodf(A_matrix, PTDFm_data, linear_solver)
+        lodf_t = _buildlodf(A.data, PTDFm_data, linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
-            (A.axes[1], A.axes[1]),
+            (get_arc_axis(A), get_arc_axis(A)),
             (ax_ref, ax_ref),
+            subnetwork_axes,
             Ref(tol),
-            radial_network_reduction,
+            A.network_reduction_data,
         )
     end
     return LODF(
-        _buildlodf(A_matrix, PTDFm_data, linear_solver),
-        (A.axes[1], A.axes[1]),
+        _buildlodf(A.data, PTDFm_data, linear_solver),
+        (get_arc_axis(A), get_arc_axis(A)),
         (ax_ref, ax_ref),
+        subnetwork_axes,
         Ref(tol),
-        radial_network_reduction,
+        A.network_reduction_data,
     )
 end
 
 """
-Builds the LODF matrix given the Incidence Matrix and the PTDF matrix of the system.
+    LODF(A::IncidenceMatrix, ABA::ABA_Matrix, BA::BA_Matrix; linear_solver::String = "KLU", tol::Float64 = eps())
 
-NOTE: this method does not support distributed slack bus.
+Construct a Line Outage Distribution Factor (LODF) matrix from incidence, ABA, and BA matrices.
+This constructor provides direct control over the underlying matrix computations and is most
+efficient when the prerequisite matrices with factorization are already available.
 
 # Arguments
-- `A::IncidenceMatrix`:
-        Structure containing the Incidence matrix of the system.
-- `ABA::ABA_Matrix`:
-        Structure containing the ABA matrix of the system.
-- `BA::BA_Matrix`:
-        Structure containing the transposed BA matrix of the system.
-- `linear_solver::String`:
-        Linear solver to be used. Options are "Dense" and "KLU".
-- `tol::Float64`:
-        Tolerance to eliminate entries in the LODF matrix (default eps()).
-- `reduce_radial_branches::Bool`:
-        True to reduce the network by simplifying the radial branches and mapping the
-        eliminate buses
+- `A::IncidenceMatrix`: The incidence matrix containing bus-branch connectivity information
+- `ABA::ABA_Matrix`: The bus susceptance matrix (A^T * B * A), preferably with KLU factorization
+- `BA::BA_Matrix`: The branch susceptance weighted incidence matrix (B * A)
+
+# Keyword Arguments
+- `linear_solver::String = "KLU"`: 
+        Linear solver algorithm for matrix computations. Currently only "KLU" is supported
+- `tol::Float64 = eps()`: 
+        Sparsification tolerance for dropping small matrix elements
+
+# Returns
+- `LODF`: The constructed LODF matrix structure with line outage sensitivity coefficients
+
+# Mathematical Computation
+This method computes LODF using the factorized form:
+```
+LODF = (A * ABA^(-1) * BA) / (1 - diag(A * ABA^(-1) * BA))
+```
+where:
+- A is the incidence matrix
+- ABA^(-1) uses the factorized form from the ABA matrix (requires `ABA.K` to be factorized)
+- BA is the susceptance-weighted incidence matrix
+
+# Requirements and Limitations
+- **Factorization Required**: The ABA matrix should be pre-factorized (contains KLU factorization) for efficiency
+- **Single Slack Bus**: This method does not support distributed slack bus configurations
+- **Network Consistency**: All three input matrices must have equivalent network reduction states
+- **Solver Limitation**: Currently only supports "KLU" linear solver
+
+# Performance Advantages
+- **Pre-factorization**: Leverages existing KLU factorization in ABA matrix for maximum efficiency
+- **Direct Computation**: Avoids intermediate PTDF calculation, reducing computational steps
+- **Memory Efficient**: Works directly with sparse matrix structures throughout computation
+- **Numerical Stability**: Uses numerically stable KLU solver for matrix operations
+
+# Error Handling
+- Validates network reduction consistency across all three input matrices
+- Raises error if matrices have mismatched reduction states
+- Validates linear solver selection (currently only "KLU" supported)
+
+# Usage Recommendations
+- Use this constructor when you have pre-computed and factorized matrices available
+- Ensure ABA matrix is factorized using `factorize(ABA)` or constructed with `factorize=true`
+- For systems with distributed slack, use the PTDF-based constructor instead
+- Most efficient option for repeated LODF computations on the same network topology
 """
 function LODF(
     A::IncidenceMatrix,
@@ -453,53 +517,37 @@ function LODF(
     BA::BA_Matrix;
     linear_solver::String = "KLU",
     tol::Float64 = eps(),
-    reduce_radial_branches::Bool = false,
 )
-    validate_linear_solver(linear_solver)
-    ax_ref = make_ax_ref(A.axes[1])
-    if reduce_radial_branches
-        # BA and ABA must contain the same, non-empty RadialNetworkReduction stucture
-        if !isempty(BA.radial_network_reduction) &&
-           !isempty(ABA.radial_network_reduction) &&
-           isequal(BA.radial_network_reduction, ABA.radial_network_reduction)
-            radial_network_reduction = BA.radial_network_reduction
-            @info "Non-empty `radial_branches` field found in BA and ABA matrix. LODF is evaluated considering radial branches and leaf nodes removed."
-        else
-            error("Mismatch in `radial_branches` field between BA and ABA matrices.")
-        end
-        A_matrix = reduce_A_matrix(
-            A,
-            radial_network_reduction.bus_reduction_map,
-            radial_network_reduction.meshed_branches,
+    if !(
+        isequal(A.network_reduction_data, BA.network_reduction_data) &&
+        isequal(BA.network_reduction_data, ABA.network_reduction_data)
+    )
+        error(
+            "Mismatch in `NetworkReduction`, A, BA, and ABA matrices must be computed with the same network reduction.",
         )
-    else
-        # BA and ABA must contain the same, empty RadialNetworkReduction stucture
-        if isempty(BA.radial_network_reduction) && isempty(ABA.radial_network_reduction)
-            radial_network_reduction = RadialNetworkReduction()
-            A_matrix = A.data
-        else
-            error(
-                "Field `radial_branches` in BA and ABA must be empty if `reduce_radial_branches` is not true.",
-            )
-        end
     end
-
+    validate_linear_solver(linear_solver)
+    subnetwork_axes = make_arc_arc_subnetwork_axes(A)
+    ax_ref = make_ax_ref(get_arc_axis(A))
     if tol > eps()
-        lodf_t = _buildlodf(A_matrix, ABA.K, BA.data, A.ref_bus_positions, linear_solver)
+        lodf_t =
+            _buildlodf(A.data, ABA.K, BA.data, Set(get_ref_bus_position(A)), linear_solver)
         return LODF(
             sparsify(lodf_t, tol),
-            (A.axes[1], A.axes[1]),
+            (get_arc_axis(A), get_arc_axis(A)),
             (ax_ref, ax_ref),
+            subnetwork_axes,
             Ref(tol),
-            radial_network_reduction,
+            A.network_reduction_data,
         )
     end
     return LODF(
-        _buildlodf(A_matrix, ABA.K, BA.data, A.ref_bus_positions, linear_solver),
-        (A.axes[1], A.axes[1]),
+        _buildlodf(A.data, ABA.K, BA.data, Set(get_ref_bus_position(A)), linear_solver),
+        (get_arc_axis(A), get_arc_axis(A)),
         (ax_ref, ax_ref),
+        subnetwork_axes,
         Ref(tol),
-        radial_network_reduction,
+        A.network_reduction_data,
     )
 end
 
@@ -509,8 +557,15 @@ end
 
 # NOTE: the LODF matrix is saved as transposed!
 
-function Base.getindex(A::LODF, selected_line, outage_line)
-    i, j = to_index(A, outage_line, selected_line)
+function Base.getindex(A::LODF, selected_branch_name::String, outage_branch_name::String)
+    multiplier_selected, arc_selected = get_branch_multiplier(A, selected_branch_name)
+    multiplier_outage, arc_outage = get_branch_multiplier(A, outage_branch_name)
+    i, j = to_index(A, arc_outage, arc_selected)
+    return A.data[i, j] * multiplier_selected * multiplier_outage
+end
+
+function Base.getindex(A::LODF, selected_arc, outage_arc)
+    i, j = to_index(A, outage_arc, selected_arc)
     return A.data[i, j]
 end
 
@@ -522,11 +577,22 @@ function Base.getindex(
     return A.data[outage_line_number, selected_line_number]
 end
 
+"""
+    get_lodf_data(lodf::LODF)
+
+Extract the LODF matrix data in the standard orientation (non-transposed).
+
+# Arguments
+- `lodf::LODF`: The LODF structure from which to extract data
+
+# Returns
+- `AbstractArray{Float64, 2}`: The LODF matrix data with standard orientation
+"""
 function get_lodf_data(lodf::LODF)
     return transpose(lodf.data)
 end
 
-function get_branch_ax(lodf::LODF)
+function get_arc_axis(lodf::LODF)
     return lodf.axes[1]
 end
 

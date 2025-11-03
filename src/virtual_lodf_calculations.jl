@@ -1,7 +1,7 @@
 """
 The Virtual Line Outage Distribution Factor (VirtualLODF) structure gathers
 the rows of the LODF matrix as they are evaluated on-the-go. These rows are
-evalauted independently, cached in the structure and do not require the
+evaluated independently, cached in the structure and do not require the
 computation of the whole matrix (therefore significantly reducing the
 computational requirements).
 
@@ -22,6 +22,9 @@ The VirtualLODF struct is indexed using branch names.
 - `ref_bus_positions::Set{Int}`:
         Vector containing the indexes of the rows of the transposed BA matrix
         corresponding to the reference buses.
+- `dist_slack::Vector{Float64}`:
+        Vector of weights to be used as distributed slack bus.
+        The distributed slack vector has to be the same length as the number of buses.
 - `axes<:NTuple{2, Dict}`:
         Tuple containing two vectors showing the branch names.
 - `lookup<:NTuple{2, Dict}`:
@@ -38,24 +41,23 @@ The VirtualLODF struct is indexed using branch names.
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 """
 struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     K::KLU.KLUFactorization{Float64, Int}
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     A::SparseArrays.SparseMatrixCSC{Int8, Int}
     inv_PTDF_A_diag::Vector{Float64}
-    ref_bus_positions::Set{Int}
+    dist_slack::Vector{Float64}
     axes::Ax
     lookup::L
     valid_ix::Vector{Int}
     temp_data::Vector{Float64}
     cache::RowCache
-    subnetworks::Dict{Int, Set{Int}}
+    subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
-    radial_network_reduction::RadialNetworkReduction
+    network_reduction_data::NetworkReductionData
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
@@ -69,7 +71,7 @@ end
 function _get_PTDF_A_diag(
     K::KLU.KLUFactorization{Float64, Int},
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    A::SparseArrays.SparseMatrixCSC{Int8, Int64},
+    A::SparseArrays.SparseMatrixCSC{Int8, Int},
     ref_bus_positions::Set{Int},
 )
     # get inverse of ABA
@@ -103,92 +105,55 @@ struct with an empty cache.
         PSY system for which the matrix is constructed
 
 # Keyword Arguments
-- `reduce_radial_branches::Bool=false`:
-        if True the matrix will be evaluated discarding
-        all the radial branches and leaf buses (optional, default value is false)
+- `network_reduction::NetworkReduction`:
+        Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
 function VirtualLODF(
     sys::PSY.System;
-    reduce_radial_branches::Bool = false,
-    kwargs...,
-)
-    if reduce_radial_branches
-        rb = RadialNetworkReduction(IncidenceMatrix(sys))
-    else
-        rb = RadialNetworkReduction()
-    end
-    branches = get_ac_branches(sys, rb.radial_branches)
-    buses = get_buses(sys, rb.bus_reduction_map)
-    return VirtualLODF(branches, buses; radial_network_reduction = rb, kwargs...)
-end
-
-"""
-Builds the LODF matrix from a group of branches and buses. The return is a
-VirtualLODF struct with an empty cache.
-
-# Arguments
-- `branches`:
-        Vector of the system's AC branches.
-- `buses::Vector{PSY.ACBus}`:
-        Vector of the system's buses.
-
-# Keyword Arguments
-- `tol::Float64 = eps()`:
-        Tolerance related to sparsification and values to drop.
-- `max_cache_size::Int`:
-        max cache size in MiB (inizialized as MAX_CACHE_SIZE_MiB).
-- `persistent_lines::Vector{String}`:
-        line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
-- `radial_network_reduction::RadialNetworkReduction`:
-        Structure containing the radial branches and leaf buses that were removed
-        while evaluating the matrix
-"""
-function VirtualLODF(
-    branches,
-    buses::Vector{PSY.ACBus};
+    dist_slack::Vector{Float64} = Float64[],
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
-    persistent_lines::Vector{String} = String[],
-    radial_network_reduction::RadialNetworkReduction = RadialNetworkReduction(),
+    persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
+    network_reductions::Vector{NetworkReduction} = NetworkReduction[],
+    kwargs...,
 )
-
-    #Get axis names and lookups
-    line_ax = [PSY.get_name(branch) for branch in branches]
-    bus_ax = [PSY.get_number(bus) for bus in buses]
-    axes = (line_ax, line_ax)
-    # get matrices
-    M, bus_ax_ref = calculate_adjacency(branches, buses)
-    A, ref_bus_positions = calculate_A_matrix(branches, buses)
-    BA = calculate_BA_matrix(branches, bus_ax_ref)
-    K = klu(calculate_ABA_matrix(A, BA, ref_bus_positions))
-    # get lookups, reference bus positions and subnetworks
-    line_ax_ref = make_ax_ref(line_ax)
-    look_up = (line_ax_ref, line_ax_ref)
-    ref_bus_positions = find_slack_positions(buses)
-    subnetworks = find_subnetworks(M, bus_ax)
-    # check subnetworks
-    if length(subnetworks) > 1
-        @info "Network is not connected, using subnetworks"
-        subnetworks = assign_reference_buses!(subnetworks, ref_bus_positions, bus_ax_ref)
+    if length(dist_slack) != 0
+        @info "Distributed bus"
     end
-    # get diagonal of PTDF
+    Ymatrix = Ybus(
+        sys;
+        network_reductions = network_reductions,
+        kwargs...,
+    )
+    ref_bus_positions = get_ref_bus_position(Ymatrix)
+    A = IncidenceMatrix(Ymatrix)
+    arc_ax = get_arc_axis(A)
+    axes = (arc_ax, arc_ax)
+    arc_ax_ref = make_ax_ref(arc_ax)
+    look_up = (arc_ax_ref, arc_ax_ref)
+    subnetwork_axes = make_arc_arc_subnetwork_axes(A)
+    BA = BA_Matrix(Ymatrix)
+    ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
+    K = klu(ABA)
+    bus_ax = get_bus_axis(A)
+
     temp_data = zeros(length(bus_ax))
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
     PTDF_diag = _get_PTDF_A_diag(
         K,
-        BA,
-        A,
-        ref_bus_positions,
+        BA.data,
+        A.data,
+        Set(ref_bus_positions),
     )
-    PTDF_diag[PTDF_diag .> 1 - 1e-6] .= 0.0
-    # initialize structure
-    if isempty(persistent_lines)
+    PTDF_diag[PTDF_diag .> 1 - LODF_ENTRY_TOLERANCE] .= 0.0
+
+    if isempty(persistent_arcs)
         empty_cache =
             RowCache(max_cache_size * MiB, Set{Int}(), length(bus_ax) * sizeof(Float64))
     else
-        init_persistent_dict = Set{Int}(line_ax_ref[k] for k in persistent_lines)
+        init_persistent_dict = Set{Int}(A.lookup[1][k] for k in persistent_arcs)
         empty_cache =
             RowCache(
                 max_cache_size * MiB,
@@ -196,20 +161,21 @@ function VirtualLODF(
                 length(bus_ax) * sizeof(Float64),
             )
     end
+
     return VirtualLODF(
         K,
-        BA,
-        A,
+        BA.data,
+        A.data,
         1.0 ./ (1.0 .- PTDF_diag),
-        ref_bus_positions,
+        dist_slack,
         axes,
         look_up,
         valid_ix,
         temp_data,
         empty_cache,
-        subnetworks,
+        subnetwork_axes,
         Ref(tol),
-        radial_network_reduction,
+        Ymatrix.network_reduction_data,
     )
 end
 
@@ -257,7 +223,7 @@ function _getindex(
 
         # TODO: needs improvement to speed up computation (not much found...)
 
-        lin_solve = KLU.solve!(vlodf.K, Vector(vlodf.BA[vlodf.valid_ix, row]))
+        lin_solve = KLU.solve!(vlodf.K, collect(vlodf.BA[vlodf.valid_ix, row]))
         # get full lodf row
         for i in eachindex(vlodf.valid_ix)
             vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
@@ -312,7 +278,7 @@ Base.setindex!(::VirtualLODF, _, ::CartesianIndex) =
 
 get_lodf_data(mat::VirtualLODF) = mat.cache.temp_cache
 
-function get_branch_ax(mat::VirtualLODF)
+function get_arc_axis(mat::VirtualLODF)
     return mat.axes[1]
 end
 
