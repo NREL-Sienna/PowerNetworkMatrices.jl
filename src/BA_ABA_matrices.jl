@@ -111,7 +111,7 @@ function BA_Matrix(ybus::Ybus)
         # Get series susceptance from components, not the equivalent ybus for reductions of degree two nodes
         # This results in reduced error relative to the DC power flow result without reductions
         if is_arc_in_series_map(nr_data, arc)
-            b = _get_series_susceptance(get_mapped_series_branch(nr_data, arc))
+            b = get_series_susceptance(get_mapped_series_branch(nr_data, arc))
         else
             Yt = -1 * ybus.data[ix_from_bus, ix_to_bus]
             Zt = 1 / Yt
@@ -137,27 +137,15 @@ function BA_Matrix(ybus::Ybus)
     return BA_Matrix(data, axes, lookup, subnetwork_axes, ybus.network_reduction_data)
 end
 
-function _get_series_susceptance(series_chain::Vector{Any})
-    series_susceptances = [_get_series_susceptance(segment) for segment in series_chain]
-    total_susceptance = 1 / (sum((1.0 ./ series_susceptances)))
-    return total_susceptance
-end
-function _get_series_susceptance(segment::PSY.ACTransmission)
+function get_series_susceptance(segment::PSY.ACTransmission)
     return PSY.get_series_susceptance(segment)
-end
-function _get_series_susceptance(segment::Set{PSY.ACTransmission})
-    return sum([_get_series_susceptance(branch) for branch in segment])
-end
-function _get_series_susceptance(segment::Tuple{PSY.ThreeWindingTransformer, Int})
-    tfw, winding_int = segment
-    return PSY.get_series_susceptances(tfw)[winding_int]
 end
 
 """
 Structure containing the ABA matrix and related power system analysis data.
 
-The ABA matrix represents the bus susceptance matrix computed as A^T * B * A, where A is the 
-incidence matrix and B is the branch susceptance matrix. This matrix is fundamental for DC 
+The ABA matrix represents the bus susceptance matrix computed as A^T * B * A, where A is the
+incidence matrix and B is the branch susceptance matrix. This matrix is fundamental for DC
 power flow analysis, sensitivity calculations, and linear power system studies.
 
 # Fields
@@ -214,29 +202,29 @@ get_bus_lookup(M::ABA_Matrix) = M.lookup[1]
 """
     ABA_Matrix(sys::PSY.System; factorize::Bool = false, network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
 
-Construct an ABA_Matrix from a PowerSystems.System by computing A^T * B * A where A is the 
-incidence matrix and B is the branch susceptance matrix. The resulting matrix is fundamental 
+Construct an ABA_Matrix from a PowerSystems.System by computing A^T * B * A where A is the
+incidence matrix and B is the branch susceptance matrix. The resulting matrix is fundamental
 for DC power flow analysis and power system sensitivity studies.
 
 # Arguments
 - `sys::PSY.System`: The power system from which to construct the ABA matrix
 
 # Keyword Arguments
-- `factorize::Bool = false`: 
+- `factorize::Bool = false`:
         Whether to perform KLU factorization during construction for efficient linear system solving
-- `network_reductions::Vector{NetworkReduction} = NetworkReduction[]`: 
+- `network_reductions::Vector{NetworkReduction} = NetworkReduction[]`:
         Vector of network reduction algorithms to apply before matrix construction
-- `make_branch_admittance_matrices::Bool=false`: 
+- `make_branch_admittance_matrices::Bool=false`:
         Whether to construct branch admittance matrices for power flow calculations
-- `include_constant_impedance_loads::Bool=true`: 
+- `include_constant_impedance_loads::Bool=true`:
         Whether to include constant impedance loads as shunt admittances in the network model
-- `subnetwork_algorithm=iterative_union_find`: 
+- `subnetwork_algorithm=iterative_union_find`:
         Algorithm used for identifying electrical islands and connected components
 - Additional keyword arguments are passed to the underlying `Ybus` constructor
 
 # Returns
 - `ABA_Matrix`: The constructed ABA matrix structure containing:
-  - Bus susceptance matrix data (excluding reference buses)  
+  - Bus susceptance matrix data (excluding reference buses)
   - Network topology information and reference bus positions
   - Optional KLU factorization for efficient solving
 

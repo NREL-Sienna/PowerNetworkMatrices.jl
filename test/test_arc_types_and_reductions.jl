@@ -46,7 +46,11 @@ end
     Y = test_all_subtypes(sys, network_reductions)
     # test that the 3WT arc was actually reduced
     trf = first(get_components(PSY.Transformer3W, sys))
-    trf_arcs = Tuple{Int, Int}[PNM.get_arc_tuple((trf, i)) for i in 1:3]
+    trf_arcs = Tuple{Int, Int}[
+        PNM.get_arc_tuple(PSY.get_primary_star_arc(trf)),
+        PNM.get_arc_tuple(PSY.get_secondary_star_arc(trf)),
+        PNM.get_arc_tuple(PSY.get_tertiary_star_arc(trf)),
+    ]
     nrd = PNM.get_network_reduction_data(Y)
     @test any(arc in PNM.get_removed_arcs(nrd) for arc in trf_arcs) ||
           any(reverse(arc) in PNM.get_removed_arcs(nrd) for arc in trf_arcs)
@@ -58,7 +62,8 @@ end
     Y = test_all_subtypes(sys, network_reductions)
     # test that the 3WT arc was actually reduced
     nrd = PNM.get_network_reduction_data(Y)
-    @test Tuple{PSY.Transformer3W, Int} in types_in_series_reduction(nrd)
+    @test PNM.ThreeWindingTransformerWinding{Transformer3W} in
+          types_in_series_reduction(nrd)
 end
 
 @testset "Parallel lines + radial" begin
@@ -68,7 +73,7 @@ end
     # test that the parallel lines were reduced
     nrd = PNM.get_network_reduction_data(Y)
     parallel_arc = find_parallel_arc(sys)
-    @test parallel_arc in PNM.get_removed_arcs(nrd)
+    @test parallel_arc in keys(nrd.parallel_branch_map)
 end
 
 @testset "Parallel lines + degree-2" begin
@@ -77,5 +82,26 @@ end
     Y = test_all_subtypes(sys, network_reductions)
     # test that the parallel lines were reduced
     nrd = PNM.get_network_reduction_data(Y)
-    @test Set{PSY.ACTransmission} in types_in_series_reduction(nrd)
+    @test PNM.BranchesParallel{Line} in types_in_series_reduction(nrd)
+end
+
+@testset "Test Reductions with filters" begin
+    sys_rts_da = build_system(PSISystems, "modified_RTS_GMLC_DA_sys")
+
+    ptdf = VirtualPTDF(
+        sys_rts_da;
+        network_reductions = NetworkReduction[
+            RadialReduction(),
+            DegreeTwoReduction(),
+        ],
+    )
+    PowerNetworkMatrices.populate_branch_maps_by_type!(PNM.get_network_reduction_data(ptdf),
+        Dict(Line => x -> occursin("B", get_name(x)),
+            TapTransformer => x -> occursin("B", get_name(x))))
+    @test PNM.has_filtered_branches(PNM.get_network_reduction_data(ptdf))
+    for k in keys(PNM.get_network_reduction_data(ptdf).name_to_arc_map[Line])
+        @test occursin("B", k)
+    end
+    PNM.empty!(PNM.get_network_reduction_data(ptdf))
+    @test isempty(PNM.get_network_reduction_data(ptdf))
 end
