@@ -1885,6 +1885,13 @@ function get_reduction(
             study_buses,
         )
 
+    for arc_tuple in keys(added_branch_map)
+        if ybus.data[bus_lookup[arc_tuple[1]], bus_lookup[arc_tuple[2]]] != 0.0
+            @warn "Equivalent branch computed during Ward reduction is in parallel with existing system branch.\\
+                    Indexing into PTDF/LODF with branch names may give unexpected results for arc $arc_tuple"
+        end
+    end
+
     return NetworkReductionData(;
         bus_reduction_map = bus_reduction_map,
         reverse_bus_search_map = reverse_bus_search_map,
