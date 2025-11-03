@@ -80,10 +80,8 @@ function add_to_map(
         @debug "Parallel circuit branch names: $(vcat([PSY.get_name.(v) for (k , v) in double_circuit.branches]))"
         for branch in double_circuit.branches
             filter = get(filters, typeof(branch), x -> true)
-            for device in branch
-                if !filter(device)
-                    return false
-                end
+            if !filter(branch)
+                return false
             end
         end
         return true
