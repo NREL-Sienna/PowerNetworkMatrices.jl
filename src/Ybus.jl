@@ -398,6 +398,7 @@ function ybus_branch_entries(parallel_br::BranchesParallel)
     arc = get_arc_tuple(first(parallel_br))
     Y11 = Y12 = Y21 = Y22 = zero(ComplexF32)
     for br in parallel_br
+        # All branches in BranchesParallel are have the same orientation when constructed in add_to_branch_maps!
         (y11, y12, y21, y22) = ybus_branch_entries(br)
         Y11 += y11
         Y12 += y12
