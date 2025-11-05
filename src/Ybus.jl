@@ -1389,7 +1389,7 @@ function _add_series_branches_to_ybus!(
             _get_chain_data(equivalent_arc, series_map_entry, nrd)
         ordered_bus_indices = [bus_lookup[x] for x in ordered_bus_numbers]
         equivalent_arc_indices = (ordered_bus_indices[1], ordered_bus_indices[end])
-        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry, segment_orientations)
+        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry)
         ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
         _apply_d2_chain_ybus!(
             data,
@@ -1420,7 +1420,7 @@ function _add_series_branches_to_ybus!(
             _get_chain_data(equivalent_arc, series_map_entry, nrd)
         ordered_bus_indices = [bus_lookup[x] for x in ordered_bus_numbers]
         equivalent_arc_indices = (ordered_bus_indices[1], ordered_bus_indices[end])
-        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry, segment_orientations)
+        ybus_isolated_d2_chain = _build_chain_ybus(series_map_entry)
         ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
         _apply_d2_chain_ybus!(
             data,
@@ -1485,8 +1485,8 @@ end
 
 function _build_chain_ybus(
     series_chain::BranchesSeries,
-    segment_orientations::Vector{Symbol},
 )
+    segment_orientations = series_chain.segment_orientations
     fb = Vector{Int}()
     tb = Vector{Int}()
     y11 = Vector{ComplexF32}()
