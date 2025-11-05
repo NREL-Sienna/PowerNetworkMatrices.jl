@@ -18,7 +18,7 @@
         b = (from = 0.01, to = 0.01),  # susceptance
         g = (from = 0.01, to = 0.01),  # conductance
         rating = 100.0,  # rating
-        angle_limits = (min = -π/2, max = π/2),
+        angle_limits = (min = -π / 2, max = π / 2),
     )
 
     line2 = PSY.Line(;
@@ -32,7 +32,7 @@
         b = (from = 0.02, to = 0.02),  # susceptance
         g = (from = 0.02, to = 0.02),  # conductance
         rating = 150.0,  # rating
-        angle_limits = (min = -π/2, max = π/2),
+        angle_limits = (min = -π / 2, max = π / 2),
     )
 
     # Create BranchesParallel
@@ -102,7 +102,7 @@ end
         b = (from = 0.01, to = 0.0),  # susceptance
         g = (from = 0.01, to = 0.0),  # conductance
         rating = 100.0,  # rating
-        angle_limits = (min = -π/2, max = π/2),
+        angle_limits = (min = -π / 2, max = π / 2),
     )
 
     line2 = PSY.Line(;
@@ -116,7 +116,7 @@ end
         b = (from = 0.0, to = 0.02),  # susceptance
         g = (from = 0.0, to = 0.02),  # conductance
         rating = 80.0,  # rating
-        angle_limits = (min = -π/2, max = π/2),
+        angle_limits = (min = -π / 2, max = π / 2),
     )
 
     # Create BranchesSeries
@@ -183,7 +183,8 @@ end
 
         rating1 = PSY.get_rating(tw1)
         # Should return winding-specific rating if non-zero, else transformer rating
-        expected_rating1 = trf.rating_primary == 0.0 ? PSY.get_rating(trf) : trf.rating_primary
+        expected_rating1 =
+            trf.rating_primary == 0.0 ? PSY.get_rating(trf) : trf.rating_primary
         @test rating1 == expected_rating1
 
         # Test get_available for winding 1
@@ -212,7 +213,8 @@ end
 
         rating2 = PSY.get_rating(tw2)
         # Should return winding-specific rating if non-zero, else transformer rating
-        expected_rating2 = trf.rating_secondary == 0.0 ? PSY.get_rating(trf) : trf.rating_secondary
+        expected_rating2 =
+            trf.rating_secondary == 0.0 ? PSY.get_rating(trf) : trf.rating_secondary
         @test rating2 == expected_rating2
 
         # Test get_α for winding 2
@@ -238,7 +240,8 @@ end
 
         rating3 = PSY.get_rating(tw3)
         # Should return winding-specific rating if non-zero, else transformer rating
-        expected_rating3 = trf.rating_tertiary == 0.0 ? PSY.get_rating(trf) : trf.rating_tertiary
+        expected_rating3 =
+            trf.rating_tertiary == 0.0 ? PSY.get_rating(trf) : trf.rating_tertiary
         @test rating3 == expected_rating3
 
         # Test get_α for winding 3
@@ -273,7 +276,7 @@ end
         b = (from = 0.01, to = 0.01),
         g = (from = 0.01, to = 0.01),
         rating = 100.0,
-        angle_limits = (min = -π/2, max = π/2),
+        angle_limits = (min = -π / 2, max = π / 2),
     )
 
     bp_single = PNM.BranchesParallel([line_single])

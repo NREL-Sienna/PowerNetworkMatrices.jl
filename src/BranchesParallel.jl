@@ -67,7 +67,8 @@ where Z = R + jX. The equivalent resistance is the real part of Z_eq.
 """
 function get_equivalent_r(bp::BranchesParallel)
     # Calculate equivalent impedance: 1/Z_eq = sum(1/Z_i)
-    inv_z_sum = sum(inv(PSY.get_r(branch) + 1im * PSY.get_x(branch)) for branch in bp.branches)
+    inv_z_sum =
+        sum(inv(PSY.get_r(branch) + 1im * PSY.get_x(branch)) for branch in bp.branches)
     z_eq = inv(inv_z_sum)
     return real(z_eq)
 end
@@ -81,7 +82,8 @@ where Z = R + jX. The equivalent reactance is the imaginary part of Z_eq.
 """
 function get_equivalent_x(bp::BranchesParallel)
     # Calculate equivalent impedance: 1/Z_eq = sum(1/Z_i)
-    inv_z_sum = sum(inv(PSY.get_r(branch) + 1im * PSY.get_x(branch)) for branch in bp.branches)
+    inv_z_sum =
+        sum(inv(PSY.get_r(branch) + 1im * PSY.get_x(branch)) for branch in bp.branches)
     z_eq = inv(inv_z_sum)
     return imag(z_eq)
 end
