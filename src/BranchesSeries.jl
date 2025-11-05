@@ -2,14 +2,22 @@ mutable struct BranchesSeries <: PSY.ACTransmission
     branches::Dict{DataType, Vector{<:PSY.ACTransmission}}
     needs_insertion_order::Bool
     insertion_order::Vector{Tuple{DataType, Int}}
+    segment_orientations::Vector{Symbol}
 end
 
 BranchesSeries() = BranchesSeries(
     Dict{DataType, Vector{<:PSY.ACTransmission}}(),
     false,
-    Vector{Tuple{DataType, Int}}())
+    Vector{Tuple{DataType, Int}}(),
+    Vector{Symbol}(),
+)
 
-function add_branch!(bs::BranchesSeries, branch::T) where {T <: PSY.ACTransmission}
+function add_branch!(
+    bs::BranchesSeries,
+    branch::T,
+    orientation,
+) where {T <: PSY.ACTransmission}
+    push!(bs.segment_orientations, orientation)
     if isempty(bs.branches)
         # add the branch just once and return
         push!(get!(bs.branches, T, Vector{T}()), branch)
@@ -101,53 +109,31 @@ function get_series_susceptance(series_chain::BranchesSeries)
 end
 
 """
-    get_equivalent_r(bs::BranchesSeries)
+    get_equivalent_physical_branch_parameters(bs::BranchesSeries)
 
-Calculate the equivalent resistance for branches in series.
-For series circuits: R_total = R1 + R2 + ... + Rn
+Calculate the physical parameters for branches in series.
+This method computes an equivalent Ybus matrix for the, reduces the internal nodes, 
+    and then computes equivalent physical parameters for the equivalent ybus. 
 """
-function get_equivalent_r(bs::BranchesSeries)
-    # Direct sum for series resistances
-    return sum(PSY.get_r(branch) for branch in bs)
-end
-
-"""
-    get_equivalent_x(bs::BranchesSeries)
-
-Calculate the equivalent reactance for branches in series.
-For series circuits: X_total = X1 + X2 + ... + Xn
-"""
-function get_equivalent_x(bs::BranchesSeries)
-    # Direct sum for series reactances
-    return sum(PSY.get_series_susceptance(branch) for branch in bs)
-end
-
-"""
-    get_equivalent_b(bs::BranchesSeries)
-
-Calculate the equivalent susceptance for branches in series.
-For series circuits, we take the susceptance from the endpoints.
-Returns a NamedTuple with :from and :to fields.
-"""
-function get_equivalent_b(bs::BranchesSeries)
-    # For series branches, take susceptance from first branch's from side and last branch's to side
-    first_branch = first(bs)
-    last_branch = last(collect(bs))
-    return (from = PSY.get_b(first_branch).from, to = PSY.get_b(last_branch).to)
-end
-
-"""
-    get_equivalent_g(bs::BranchesSeries)
-
-Calculate the equivalent conductance for branches in series.
-For series circuits, we take the conductance from the endpoints.
-Returns a NamedTuple with :from and :to fields.
-"""
-function get_equivalent_g(bs::BranchesSeries)
-    # For series branches, take conductance from first branch's from side and last branch's to side
-    first_branch = first(bs)
-    last_branch = last(collect(bs))
-    return (from = PSY.get_g(first_branch).from, to = PSY.get_g(last_branch).to)
+function get_equivalent_physical_branch_parameters(bs::BranchesSeries)
+    ybus_isolated_d2_chain = _build_chain_ybus(bs)
+    ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
+    y_11, y_12, y_21, y_22 = ybus_boundary_isolated_d2_chain
+    if isapprox(y_12, y_21)
+        tap = 1.0
+        shift = 0.0
+    else
+        error("Non-symmetric components not yet implemented for BranchesSeries")
+    end
+    y_l = y_12 * -1
+    z_12 = 1 / y_l
+    r = real(z_12)
+    x = imag(z_12)
+    g_from = real(y_11 - y_l)
+    b_from = imag(y_11 - y_l)
+    g_to = real(y_22 - y_l)
+    b_to = imag(y_22 - y_l)
+    return r, x, g_from, b_from, g_to, b_to, tap, shift
 end
 
 """
