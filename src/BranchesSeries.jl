@@ -100,6 +100,89 @@ function get_series_susceptance(series_chain::BranchesSeries)
     return total_susceptance
 end
 
+"""
+    get_equivalent_r(bs::BranchesSeries)
+
+Calculate the equivalent resistance for branches in series.
+For series circuits: R_total = R1 + R2 + ... + Rn
+"""
+function get_equivalent_r(bs::BranchesSeries)
+    # Direct sum for series resistances
+    return sum(PSY.get_r(branch) for branch in bs)
+end
+
+"""
+    get_equivalent_x(bs::BranchesSeries)
+
+Calculate the equivalent reactance for branches in series.
+For series circuits: X_total = X1 + X2 + ... + Xn
+"""
+function get_equivalent_x(bs::BranchesSeries)
+    # Direct sum for series reactances
+    return sum(PSY.get_series_susceptance(branch) for branch in bs)
+end
+
+"""
+    get_equivalent_b(bs::BranchesSeries)
+
+Calculate the equivalent susceptance for branches in series.
+For series circuits, we take the susceptance from the endpoints.
+Returns a NamedTuple with :from and :to fields.
+"""
+function get_equivalent_b(bs::BranchesSeries)
+    # For series branches, take susceptance from first branch's from side and last branch's to side
+    first_branch = first(bs)
+    last_branch = last(collect(bs))
+    return (from = PSY.get_b(first_branch).from, to = PSY.get_b(last_branch).to)
+end
+
+"""
+    get_equivalent_g(bs::BranchesSeries)
+
+Calculate the equivalent conductance for branches in series.
+For series circuits, we take the conductance from the endpoints.
+Returns a NamedTuple with :from and :to fields.
+"""
+function get_equivalent_g(bs::BranchesSeries)
+    # For series branches, take conductance from first branch's from side and last branch's to side
+    first_branch = first(bs)
+    last_branch = last(collect(bs))
+    return (from = PSY.get_g(first_branch).from, to = PSY.get_g(last_branch).to)
+end
+
+"""
+    get_equivalent_rating(bs::BranchesSeries)
+
+Calculate the rating for branches in series.
+For series circuits, the rating is limited by the weakest link: Rating_total = min(Rating1, Rating2, ..., Ratingn)
+"""
+function get_equivalent_rating(bs::BranchesSeries)
+    # Minimum rating for series branches (weakest link)
+    return minimum(PSY.get_rating(branch) for branch in bs)
+end
+
+"""
+    get_equivalent_available(bs::BranchesSeries)
+
+Get the availability status for series branches.
+All branches in series must be available for the series circuit to be available.
+"""
+function get_equivalent_available(bs::BranchesSeries)
+    # All branches must be available
+    return all(PSY.get_available(branch) for branch in bs)
+end
+
+"""
+    get_equivalent_α(bs::BranchesSeries)
+
+Get the phase angle shift for series branches.
+Returns the sum of phase angle shifts across all series branches.
+Returns 0.0 if branches don't support phase angle shift (e.g., lines).
+"""
+function get_equivalent_α(bs::BranchesSeries)
+    # Need to check how to develop this one
+end
+
 function add_to_map(series_circuit::BranchesSeries, filters::Dict)
     if isempty(filters)
         return true

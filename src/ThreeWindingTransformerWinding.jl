@@ -34,6 +34,141 @@ function get_series_susceptance(segment::ThreeWindingTransformerWinding)
     return PSY.get_series_susceptances(tfw)[winding_int]
 end
 
+"""
+    get_equivalent_r(tw::ThreeWindingTransformerWinding)
+
+Get the resistance for a specific winding of a three-winding transformer.
+"""
+function get_equivalent_r(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+    if winding_num == 1
+        return PSY.get_r_primary(tfw)
+    elseif winding_num == 2
+        return PSY.get_r_secondary(tfw)
+    elseif winding_num == 3
+        return PSY.get_r_tertiary(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+end
+
+"""
+    get_equivalent_x(tw::ThreeWindingTransformerWinding)
+
+Get the reactance for a specific winding of a three-winding transformer.
+"""
+function get_equivalent_x(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+    if winding_num == 1
+        return PSY.get_x_primary(tfw)
+    elseif winding_num == 2
+        return PSY.get_x_secondary(tfw)
+    elseif winding_num == 3
+        return PSY.get_x_tertiary(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+end
+
+"""
+    get_equivalent_b(tw::ThreeWindingTransformerWinding)
+
+Get the susceptance for a specific winding of a three-winding transformer.
+For winding 1 (primary), this includes the shunt susceptance.
+Returns a NamedTuple with :from and :to fields.
+"""
+function get_equivalent_b(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+    if winding_num == 1
+        # Primary winding gets the shunt susceptance
+        return (from = imag(PSY.get_g(tfw)), to = 0.0)
+    else
+        # Secondary and tertiary windings have no shunt
+        return (from = 0.0, to = 0.0)
+    end
+end
+
+"""
+    get_equivalent_g(tw::ThreeWindingTransformerWinding)
+
+Get the conductance for a specific winding of a three-winding transformer.
+For winding 1 (primary), this includes the shunt conductance.
+Returns a NamedTuple with :from and :to fields.
+"""
+function get_equivalent_g(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+    if winding_num == 1
+        # Primary winding gets the shunt conductance
+        return (from = real(PSY.get_g(tfw)), to = 0.0)
+    else
+        # Secondary and tertiary windings have no shunt at from side
+        return (from = 0.0, to = 0.0)
+    end
+end
+
+"""
+    get_equivalent_rating(tw::ThreeWindingTransformerWinding)
+
+Get the rating for a specific winding of a three-winding transformer.
+Returns the winding-specific rating if non-zero, otherwise returns the parent transformer rating.
+"""
+function get_equivalent_rating(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+
+    winding_rating = if winding_num == 1
+        PSY.get_rating_primary(tfw)
+    elseif winding_num == 2
+        PSY.get_rating_secondary(tfw)
+    elseif winding_num == 3
+        PSY.get_rating_tertiary(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+
+    # If winding-specific rating is zero, use transformer rating
+    if winding_rating == 0.0 && !isnothing(PSY.get_rating(tfw))
+        return 0.0
+    else
+        return PSY.get_rating(tfw)
+    end
+end
+
+"""
+    get_equivalent_available(tw::ThreeWindingTransformerWinding)
+
+Get the availability status for a specific winding of a three-winding transformer.
+Returns the availability status of the parent transformer.
+"""
+function get_equivalent_available(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    return PSY.get_available(tfw)
+end
+
+"""
+    get_equivalent_α(tw::ThreeWindingTransformerWinding)
+
+Get the phase angle shift (α) for a specific winding of a three-winding transformer.
+Returns the winding-specific phase angle shift.
+"""
+function get_equivalent_α(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+    if winding_num == 1
+        return PSY.get_α_primary(tfw)
+    elseif winding_num == 2
+        return PSY.get_α_secondary(tfw)
+    elseif winding_num == 3
+        return PSY.get_α_tertiary(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+end
+
 function get_arc_tuple(tr::ThreeWindingTransformerWinding)
     t3W = get_transformer(tr)
     arc_number = get_winding_number(tr)

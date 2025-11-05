@@ -58,6 +58,96 @@ function get_series_susceptance(segment::BranchesParallel)
     return sum(get_series_susceptance(branch) for branch in segment.branches)
 end
 
+"""
+    get_equivalent_r(bp::BranchesParallel)
+
+Calculate the equivalent resistance for branches in parallel.
+For parallel circuits, the equivalent impedance is: 1/Z_eq = 1/Z1 + 1/Z2 + ... + 1/Zn
+where Z = R + jX. The equivalent resistance is the real part of Z_eq.
+"""
+function get_equivalent_r(bp::BranchesParallel)
+    # Calculate equivalent impedance: 1/Z_eq = sum(1/Z_i)
+    inv_z_sum = sum(inv(PSY.get_r(branch) + 1im * PSY.get_x(branch)) for branch in bp.branches)
+    z_eq = inv(inv_z_sum)
+    return real(z_eq)
+end
+
+"""
+    get_equivalent_x(bp::BranchesParallel)
+
+Calculate the equivalent reactance for branches in parallel.
+For parallel circuits, the equivalent impedance is: 1/Z_eq = 1/Z1 + 1/Z2 + ... + 1/Zn
+where Z = R + jX. The equivalent reactance is the imaginary part of Z_eq.
+"""
+function get_equivalent_x(bp::BranchesParallel)
+    # Calculate equivalent impedance: 1/Z_eq = sum(1/Z_i)
+    inv_z_sum = sum(inv(PSY.get_r(branch) + 1im * PSY.get_x(branch)) for branch in bp.branches)
+    z_eq = inv(inv_z_sum)
+    return imag(z_eq)
+end
+
+"""
+    get_equivalent_b(bp::BranchesParallel)
+
+Calculate the equivalent susceptance for branches in parallel.
+For parallel circuits: B_total = (from = B1_from + B2_from + ..., to = B1_to + B2_to + ...)
+Returns a NamedTuple with :from and :to fields.
+"""
+function get_equivalent_b(bp::BranchesParallel)
+    # Direct sum for parallel susceptances
+    b_from = sum(PSY.get_b(branch).from for branch in bp.branches)
+    b_to = sum(PSY.get_b(branch).to for branch in bp.branches)
+    return (from = b_from, to = b_to)
+end
+
+"""
+    get_equivalent_g(bp::BranchesParallel)
+
+Calculate the equivalent conductance for branches in parallel.
+For parallel circuits: G_total = (from = G1_from + G2_from + ..., to = G1_to + G2_to + ...)
+Returns a NamedTuple with :from and :to fields.
+"""
+function get_equivalent_g(bp::BranchesParallel)
+    # Direct sum for parallel conductances
+    g_from = sum(PSY.get_g(branch).from for branch in bp.branches)
+    g_to = sum(PSY.get_g(branch).to for branch in bp.branches)
+    return (from = g_from, to = g_to)
+end
+
+"""
+    get_equivalent_rating(bp::BranchesParallel)
+
+Calculate the total rating for branches in parallel.
+For parallel circuits, the rating is the sum of individual ratings divided by the number of circuits.
+This provides a conservative estimate that accounts for potential overestimation of total capacity.
+"""
+function get_equivalent_rating(bp::BranchesParallel)
+    # Sum of ratings divided by number of circuits
+    return sum(PSY.get_rating(branch) for branch in bp.branches) / length(bp.branches)
+end
+
+"""
+    get_equivalent_available(bp::BranchesParallel)
+
+Get the availability status for parallel branches.
+All branches in parallel must be available for the parallel circuit to be available.
+"""
+function get_equivalent_available(bp::BranchesParallel)
+    # All branches must be available
+    return all(PSY.get_available(branch) for branch in bp.branches)
+end
+
+"""
+    get_equivalent_α(bp::BranchesParallel)
+
+Get the phase angle shift for parallel branches.
+Returns the average phase angle shift across all parallel branches.
+Returns 0.0 if branches don't support phase angle shift (e.g., lines).
+"""
+function get_equivalent_α(bp::BranchesParallel)
+    # Need to check the PS books
+end
+
 function Base.iterate(bp::BranchesParallel)
     return iterate(bp.branches)
 end
