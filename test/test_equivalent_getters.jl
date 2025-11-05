@@ -304,3 +304,182 @@ end
     @test PSY.get_b(bs_single).to ≈ 0.01 atol = 1e-6
     @test PSY.get_rating(bs_single) ≈ 100.0 atol = 1e-6
 end
+@testset "Ybus correctness for BranchesParallel using equivalent getters" begin
+    sys = System(100.0)
+    bus1 = ACBus(;
+        number = 1,
+        name = "bus1",
+        available = true,
+        bustype = ACBusTypes.PQ,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.0, max = 1.0),
+        base_voltage = 1.0,
+        area = nothing,
+        load_zone = nothing)
+    bus2 = ACBus(;
+        number = 2,
+        name = "bus2",
+        available = true,
+        bustype = ACBusTypes.PQ,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.0, max = 1.0),
+        base_voltage = 1.0,
+        area = nothing,
+        load_zone = nothing)
+
+    line1 = PSY.Line(;
+        name = "parallel_line_1",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = PSY.Arc(; from = bus1, to = bus2),
+        r = 0.05,  # resistance
+        x = 0.1,   # reactance
+        b = (from = 0.01, to = 0.01),  # susceptance
+        g = (from = 0.01, to = 0.01),  # conductance
+        rating = 100.0,  # rating
+        angle_limits = (min = -π / 2, max = π / 2),
+    )
+
+    line2 = PSY.Line(;
+        name = "series_line_2",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = PSY.Arc(; from = bus1, to = bus2),
+        r = 0.15,  # resistance
+        x = 0.3,   # reactance
+        b = (from = 0.03, to = 0.02),  # susceptance
+        g = (from = 0.03, to = 0.02),  # conductance
+        rating = 80.0,  # rating
+        angle_limits = (min = -π / 2, max = π / 2),
+    )
+    add_component!(sys, bus1)
+    add_component!(sys, bus2)
+    add_component!(sys, line1)
+    add_component!(sys, line2)
+    ybus = Ybus(sys)
+    branches_parallel = ybus.network_reduction_data.parallel_branch_map[(1, 2)]
+    sys_equivalent = deepcopy(sys)
+    for l in get_components(Line, sys_equivalent)
+        remove_component!(sys_equivalent, l)
+    end
+    bus1 = get_component(ACBus, sys_equivalent, "bus1")
+    bus2 = get_component(ACBus, sys_equivalent, "bus2")
+    equivalent_line = PSY.Line(;
+        name = "equivalent_line",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = PSY.Arc(; from = bus1, to = bus2),
+        r = PNM.get_equivalent_r(branches_parallel),  # resistance
+        x = PNM.get_equivalent_x(branches_parallel),   # reactance
+        b = PNM.get_equivalent_b(branches_parallel),  # susceptance
+        g = PNM.get_equivalent_g(branches_parallel),  # conductance
+        rating = 80.0,  # rating
+        angle_limits = (min = -π / 2, max = π / 2),
+    )
+    add_component!(sys_equivalent, equivalent_line)
+    ybus_equivalent = Ybus(sys_equivalent)
+    @test all(isapprox.(ybus.data, ybus_equivalent.data; atol = 1e-6))
+end 
+
+@testset "Ybus correctness for BranchesSeries using equivalent getters" begin
+    sys = System(100.0)
+    bus1 = ACBus(;
+        number = 1,
+        name = "bus1",
+        available = true,
+        bustype = ACBusTypes.PQ,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.0, max = 1.0),
+        base_voltage = 1.0,
+        area = nothing,
+        load_zone = nothing)
+    bus2 = ACBus(;
+        number = 2,
+        name = "bus2",
+        available = true,
+        bustype = ACBusTypes.PQ,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.0, max = 1.0),
+        base_voltage = 1.0,
+        area = nothing,
+        load_zone = nothing)
+    bus3 = ACBus(;
+        number = 3,
+        name = "bus3",
+        available = true,
+        bustype = ACBusTypes.PQ,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.0, max = 1.0),
+        base_voltage = 1.0,
+        area = nothing,
+        load_zone = nothing)
+
+    line1 = PSY.Line(;
+        name = "series_line_1",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = PSY.Arc(; from = bus2, to = bus1),
+        r = 0.05,  # resistance
+        x = 0.1,   # reactance
+        b = (from = 0.01, to = 0.01),  # susceptance
+        g = (from = 0.01, to = 0.01),  # conductance
+        rating = 100.0,  # rating
+        angle_limits = (min = -π / 2, max = π / 2),
+    )
+
+    line2 = PSY.Line(;
+        name = "series_line_2",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = PSY.Arc(; from = bus3, to = bus2),
+        r = 0.15,  # resistance
+        x = 0.3,   # reactance
+        b = (from = 0.03, to = 0.02),  # susceptance
+        g = (from = 0.03, to = 0.02),  # conductance
+        rating = 80.0,  # rating
+        angle_limits = (min = -π / 2, max = π / 2),
+    )
+    add_component!(sys, bus1)
+    add_component!(sys, bus2)
+    add_component!(sys, bus3)
+    add_component!(sys, line1)
+    add_component!(sys, line2)
+    ybus = Ybus(sys; network_reductions = NetworkReduction[DegreeTwoReduction()])
+    branches_series = ybus.network_reduction_data.series_branch_map[(1, 3)]
+    sys_equivalent = deepcopy(sys)
+    for l in get_components(Line, sys_equivalent)
+        remove_component!(sys_equivalent, l)
+    end
+    bus1 = get_component(ACBus, sys_equivalent, "bus1")
+    bus2 = get_component(ACBus, sys_equivalent, "bus2")
+    bus3 = get_component(ACBus, sys_equivalent, "bus3")
+    remove_component!(sys_equivalent, bus3)
+    r, x, g_from, b_from, g_to, b_to, tap, shift =
+        PNM.get_equivalent_physical_branch_parameters(branches_series)
+    equivalent_line = PSY.Line(;
+        name = "equivalent_line",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = PSY.Arc(; from = bus1, to = bus2),
+        r = r,  # resistance
+        x = x,   # reactance
+        b = (from = b_from, to = b_to),  # susceptance
+        g = (from = g_from, to = g_to),  # conductance
+        rating = 80.0,  # rating
+        angle_limits = (min = -π / 2, max = π / 2),
+    )
+    add_component!(sys_equivalent, equivalent_line)
+    ybus_equivalent = Ybus(sys_equivalent)
+    @test all(isapprox.(ybus.data, ybus_equivalent.data; atol = 1e-6))
+end
