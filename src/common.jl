@@ -304,3 +304,47 @@ function sparsify(dense_array::Vector{Float64}, tol::Float64)
     end
     return sparse_array
 end
+
+"""
+    get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{ComplexF32})
+
+Takes as input a 2x2 Matrix{ComplexF32} representing the Ybus contribution of either a 
+BranchesParallel or BranchesSeries object. 
+Returns a dictionary of equivalent parameters, matching the PowerModels data format. 
+"""
+function _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{ComplexF32})
+    y_11, y_12, y_21, y_22 = equivalent_ybus
+    if isapprox(y_12, y_21)
+        tap = 1.0
+        shift = 0.0
+    else
+        tap = 1.0
+        ratio = log(y_21 / y_12) / 2
+        if !isapprox(0.0, real(ratio); atol = 1e-6)
+            error(
+                "Equivalent parameters for the series or parallel reduction of branches results \
+          in a real part of the phase shift angle. This indicates invalid data for the branches being reduced \
+          possible due to branches in parallel with different phase angles.",
+            )
+        end
+        shift = imag(ratio)
+    end
+    y_l = y_12 * -1 * exp(1 * shift * im)
+    z_12 = 1 / y_l
+    r = real(z_12)
+    x = imag(z_12)
+    g_from = real(y_11 - y_l)
+    b_from = imag(y_11 - y_l)
+    g_to = real(y_22 - y_l)
+    b_to = imag(y_22 - y_l)
+    return Dict{Symbol, Float64}(
+        :r => r,
+        :x => x,
+        :g_from => g_from,
+        :b_from => b_from,
+        :g_to => g_to,
+        :b_to => b_to,
+        :tap => tap,
+        :shift => shift,
+    )
+end

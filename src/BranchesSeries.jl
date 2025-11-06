@@ -3,6 +3,7 @@ mutable struct BranchesSeries <: PSY.ACTransmission
     needs_insertion_order::Bool
     insertion_order::Vector{Tuple{DataType, Int}}
     segment_orientations::Vector{Symbol}
+    equivalent_ybus::Union{Matrix{ComplexF32}, Nothing}
 end
 
 BranchesSeries() = BranchesSeries(
@@ -10,6 +11,7 @@ BranchesSeries() = BranchesSeries(
     false,
     Vector{Tuple{DataType, Int}}(),
     Vector{Symbol}(),
+    nothing,
 )
 
 function add_branch!(
@@ -108,32 +110,19 @@ function get_series_susceptance(series_chain::BranchesSeries)
     return total_susceptance
 end
 
-"""
-    get_equivalent_physical_branch_parameters(bs::BranchesSeries)
-
-Calculate the physical parameters for branches in series.
-This method computes an equivalent Ybus matrix for the, reduces the internal nodes, 
-    and then computes equivalent physical parameters for the equivalent ybus. 
-"""
 function get_equivalent_physical_branch_parameters(bs::BranchesSeries)
-    ybus_isolated_d2_chain = _build_chain_ybus(bs)
-    ybus_boundary_isolated_d2_chain = _reduce_internal_nodes(ybus_isolated_d2_chain)
-    y_11, y_12, y_21, y_22 = ybus_boundary_isolated_d2_chain
-    if isapprox(y_12, y_21)
-        tap = 1.0
-        shift = 0.0
-    else
-        error("Non-symmetric components not yet implemented for BranchesSeries")
+    if isnothing(bs.equivalent_ybus)
+        populate_equivalent_ybus!(bs)
     end
-    y_l = y_12 * -1
-    z_12 = 1 / y_l
-    r = real(z_12)
-    x = imag(z_12)
-    g_from = real(y_11 - y_l)
-    b_from = imag(y_11 - y_l)
-    g_to = real(y_22 - y_l)
-    b_to = imag(y_22 - y_l)
-    return r, x, g_from, b_from, g_to, b_to, tap, shift
+    equivalent_ybus = bs.equivalent_ybus
+    return _get_equivalent_physical_branch_parameters(equivalent_ybus)
+end
+
+function populate_equivalent_ybus!(bs::BranchesSeries)
+    ybus_series_chain = _build_chain_ybus(bs)
+    equivalent_ybus = _reduce_internal_nodes(ybus_series_chain)
+    bs.equivalent_ybus = equivalent_ybus
+    return
 end
 
 """

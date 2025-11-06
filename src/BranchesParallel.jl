@@ -1,10 +1,14 @@
-struct BranchesParallel{T <: PSY.ACTransmission} <: PSY.ACTransmission
+mutable struct BranchesParallel{T <: PSY.ACTransmission} <: PSY.ACTransmission
     branches::Vector{T}
+    equivalent_ybus::Union{Matrix{ComplexF32}, Nothing}
 end
 
+function BranchesParallel(branches::Vector{T}) where {T <: PSY.ACTransmission}
+    BranchesParallel(branches, nothing)
+end
 # Constructor for the mixed types
 function BranchesParallel(branches::Vector{PSY.ACTransmission})
-    return BranchesParallel{PSY.ACTransmission}(Vector{PSY.ACTransmission}(branches))
+    return BranchesParallel{PSY.ACTransmission}(branches, nothing)
 end
 
 function add_branch!(bp::BranchesParallel{T}, branch::T) where {T <: PSY.ACTransmission}
@@ -58,62 +62,18 @@ function get_series_susceptance(segment::BranchesParallel)
     return sum(get_series_susceptance(branch) for branch in segment.branches)
 end
 
-"""
-    get_equivalent_r(bp::BranchesParallel)
-
-Calculate the equivalent resistance for branches in parallel.
-For parallel circuits, the equivalent impedance is: 1/Z_eq = 1/Z1 + 1/Z2 + ... + 1/Zn
-where Z = R + jX. The equivalent resistance is the real part of Z_eq.
-"""
-function get_equivalent_r(bp::BranchesParallel)
-    # Calculate equivalent impedance: 1/Z_eq = sum(1/Z_i)
-    inv_z_sum =
-        sum(inv(PSY.get_r(branch) + 1im * PSY.get_x(branch)) for branch in bp.branches)
-    z_eq = inv(inv_z_sum)
-    return real(z_eq)
+function get_equivalent_physical_branch_parameters(bp::BranchesParallel)
+    if isnothing(bp.equivalent_ybus)
+        populate_equivalent_ybus!(bp)
+    end
+    equivalent_ybus = bp.equivalent_ybus
+    return _get_equivalent_physical_branch_parameters(equivalent_ybus)
 end
 
-"""
-    get_equivalent_x(bp::BranchesParallel)
-
-Calculate the equivalent reactance for branches in parallel.
-For parallel circuits, the equivalent impedance is: 1/Z_eq = 1/Z1 + 1/Z2 + ... + 1/Zn
-where Z = R + jX. The equivalent reactance is the imaginary part of Z_eq.
-"""
-function get_equivalent_x(bp::BranchesParallel)
-    # Calculate equivalent impedance: 1/Z_eq = sum(1/Z_i)
-    inv_z_sum =
-        sum(inv(PSY.get_r(branch) + 1im * PSY.get_x(branch)) for branch in bp.branches)
-    z_eq = inv(inv_z_sum)
-    return imag(z_eq)
-end
-
-"""
-    get_equivalent_b(bp::BranchesParallel)
-
-Calculate the equivalent susceptance for branches in parallel.
-For parallel circuits: B_total = (from = B1_from + B2_from + ..., to = B1_to + B2_to + ...)
-Returns a NamedTuple with :from and :to fields.
-"""
-function get_equivalent_b(bp::BranchesParallel)
-    # Direct sum for parallel susceptances
-    b_from = sum(PSY.get_b(branch).from for branch in bp.branches)
-    b_to = sum(PSY.get_b(branch).to for branch in bp.branches)
-    return (from = b_from, to = b_to)
-end
-
-"""
-    get_equivalent_g(bp::BranchesParallel)
-
-Calculate the equivalent conductance for branches in parallel.
-For parallel circuits: G_total = (from = G1_from + G2_from + ..., to = G1_to + G2_to + ...)
-Returns a NamedTuple with :from and :to fields.
-"""
-function get_equivalent_g(bp::BranchesParallel)
-    # Direct sum for parallel conductances
-    g_from = sum(PSY.get_g(branch).from for branch in bp.branches)
-    g_to = sum(PSY.get_g(branch).to for branch in bp.branches)
-    return (from = g_from, to = g_to)
+function populate_equivalent_ybus!(bp::BranchesParallel)
+    Y11, Y12, Y21, Y22 = ybus_branch_entries(bp)
+    bp.equivalent_ybus = ComplexF32[Y11 Y12; Y21 Y22]
+    return
 end
 
 """

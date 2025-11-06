@@ -9,3 +9,8 @@ const ZERO_IMPEDANCE_LINE_REACTANCE_THRESHOLD = 1e-3
 const LODF_ENTRY_TOLERANCE = 1e-6
 
 DEFAULT_LODF_CHUNK_SIZE = 18_000
+
+SKIP_PARALLEL_REDUCTION_TYPES = [
+    PSY.PhaseShiftingTransformer,
+    ThreeWindingTransformerWinding{PSY.PhaseShiftingTransformer3W},
+]

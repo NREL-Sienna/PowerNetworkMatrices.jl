@@ -206,10 +206,12 @@ function add_to_branch_maps!(
     parallel_branch_map = get_parallel_branch_map(nr)
     reverse_parallel_branch_map = get_reverse_parallel_branch_map(nr)
     arc_tuple = get_arc_tuple(arc, nr)
-    if haskey(parallel_branch_map, arc_tuple)
+    if haskey(parallel_branch_map, arc_tuple) && typeof(br) ∉ SKIP_PARALLEL_REDUCTION_TYPES
         _push_parallel_branch!(parallel_branch_map, arc_tuple, br)
         reverse_parallel_branch_map[br] = arc_tuple
-    elseif haskey(direct_branch_map, arc_tuple)
+    elseif haskey(direct_branch_map, arc_tuple) &&
+           typeof(direct_branch_map[arc_tuple]) ∉ SKIP_PARALLEL_REDUCTION_TYPES &&
+           typeof(br) ∉ SKIP_PARALLEL_REDUCTION_TYPES
         corresponding_branch = direct_branch_map[arc_tuple]
         delete!(direct_branch_map, arc_tuple)
         delete!(reverse_direct_branch_map, corresponding_branch)
