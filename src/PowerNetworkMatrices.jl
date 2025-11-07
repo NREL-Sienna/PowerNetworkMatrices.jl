@@ -73,8 +73,8 @@ import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 
 # network calculations
 include("PowerNetworkMatrix.jl")
-include("definitions.jl")
 include("ThreeWindingTransformerWinding.jl")
+include("definitions.jl")
 include("BranchesSeries.jl")
 include("BranchesParallel.jl")
 include("NetworkReduction.jl")

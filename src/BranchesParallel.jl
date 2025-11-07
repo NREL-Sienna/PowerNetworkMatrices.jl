@@ -1,10 +1,14 @@
-struct BranchesParallel{T <: PSY.ACTransmission} <: PSY.ACTransmission
+mutable struct BranchesParallel{T <: PSY.ACTransmission} <: PSY.ACTransmission
     branches::Vector{T}
+    equivalent_ybus::Union{Matrix{ComplexF32}, Nothing}
 end
 
+function BranchesParallel(branches::Vector{T}) where {T <: PSY.ACTransmission}
+    BranchesParallel(branches, nothing)
+end
 # Constructor for the mixed types
 function BranchesParallel(branches::Vector{PSY.ACTransmission})
-    return BranchesParallel{PSY.ACTransmission}(Vector{PSY.ACTransmission}(branches))
+    return BranchesParallel{PSY.ACTransmission}(branches, nothing)
 end
 
 function add_branch!(bp::BranchesParallel{T}, branch::T) where {T <: PSY.ACTransmission}
@@ -56,6 +60,54 @@ end
 
 function get_series_susceptance(segment::BranchesParallel)
     return sum(get_series_susceptance(branch) for branch in segment.branches)
+end
+
+function get_equivalent_physical_branch_parameters(bp::BranchesParallel)
+    if isnothing(bp.equivalent_ybus)
+        populate_equivalent_ybus!(bp)
+    end
+    equivalent_ybus = bp.equivalent_ybus
+    return _get_equivalent_physical_branch_parameters(equivalent_ybus)
+end
+
+function populate_equivalent_ybus!(bp::BranchesParallel)
+    Y11, Y12, Y21, Y22 = ybus_branch_entries(bp)
+    bp.equivalent_ybus = ComplexF32[Y11 Y12; Y21 Y22]
+    return
+end
+
+"""
+    get_equivalent_rating(bp::BranchesParallel)
+
+Calculate the total rating for branches in parallel.
+For parallel circuits, the rating is the sum of individual ratings divided by the number of circuits.
+This provides a conservative estimate that accounts for potential overestimation of total capacity.
+"""
+function get_equivalent_rating(bp::BranchesParallel)
+    # Sum of ratings divided by number of circuits
+    return sum(PSY.get_rating(branch) for branch in bp.branches) / length(bp.branches)
+end
+
+"""
+    get_equivalent_available(bp::BranchesParallel)
+
+Get the availability status for parallel branches.
+All branches in parallel must be available for the parallel circuit to be available.
+"""
+function get_equivalent_available(bp::BranchesParallel)
+    # All branches must be available
+    return all(PSY.get_available(branch) for branch in bp.branches)
+end
+
+"""
+    get_equivalent_α(bp::BranchesParallel)
+
+Get the phase angle shift for parallel branches.
+Returns the average phase angle shift across all parallel branches.
+Returns 0.0 if branches don't support phase angle shift (e.g., lines).
+"""
+function get_equivalent_α(bp::BranchesParallel)
+    # Need to check the PS books
 end
 
 function Base.iterate(bp::BranchesParallel)
