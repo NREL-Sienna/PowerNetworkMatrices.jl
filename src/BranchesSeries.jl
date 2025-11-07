@@ -2,14 +2,24 @@ mutable struct BranchesSeries <: PSY.ACTransmission
     branches::Dict{DataType, Vector{<:PSY.ACTransmission}}
     needs_insertion_order::Bool
     insertion_order::Vector{Tuple{DataType, Int}}
+    segment_orientations::Vector{Symbol}
+    equivalent_ybus::Union{Matrix{ComplexF32}, Nothing}
 end
 
 BranchesSeries() = BranchesSeries(
     Dict{DataType, Vector{<:PSY.ACTransmission}}(),
     false,
-    Vector{Tuple{DataType, Int}}())
+    Vector{Tuple{DataType, Int}}(),
+    Vector{Symbol}(),
+    nothing,
+)
 
-function add_branch!(bs::BranchesSeries, branch::T) where {T <: PSY.ACTransmission}
+function add_branch!(
+    bs::BranchesSeries,
+    branch::T,
+    orientation,
+) where {T <: PSY.ACTransmission}
+    push!(bs.segment_orientations, orientation)
     if isempty(bs.branches)
         # add the branch just once and return
         push!(get!(bs.branches, T, Vector{T}()), branch)
@@ -98,6 +108,54 @@ function get_series_susceptance(series_chain::BranchesSeries)
     series_susceptances_sum = sum(inv(get_series_susceptance(x)) for x in series_chain)
     total_susceptance = 1 / series_susceptances_sum
     return total_susceptance
+end
+
+function get_equivalent_physical_branch_parameters(bs::BranchesSeries)
+    if isnothing(bs.equivalent_ybus)
+        populate_equivalent_ybus!(bs)
+    end
+    equivalent_ybus = bs.equivalent_ybus
+    return _get_equivalent_physical_branch_parameters(equivalent_ybus)
+end
+
+function populate_equivalent_ybus!(bs::BranchesSeries)
+    ybus_series_chain = _build_chain_ybus(bs)
+    equivalent_ybus = _reduce_internal_nodes(ybus_series_chain)
+    bs.equivalent_ybus = equivalent_ybus
+    return
+end
+
+"""
+    get_equivalent_rating(bs::BranchesSeries)
+
+Calculate the rating for branches in series.
+For series circuits, the rating is limited by the weakest link: Rating_total = min(Rating1, Rating2, ..., Ratingn)
+"""
+function get_equivalent_rating(bs::BranchesSeries)
+    # Minimum rating for series branches (weakest link)
+    return minimum(PSY.get_rating(branch) for branch in bs)
+end
+
+"""
+    get_equivalent_available(bs::BranchesSeries)
+
+Get the availability status for series branches.
+All branches in series must be available for the series circuit to be available.
+"""
+function get_equivalent_available(bs::BranchesSeries)
+    # All branches must be available
+    return all(PSY.get_available(branch) for branch in bs)
+end
+
+"""
+    get_equivalent_α(bs::BranchesSeries)
+
+Get the phase angle shift for series branches.
+Returns the sum of phase angle shifts across all series branches.
+Returns 0.0 if branches don't support phase angle shift (e.g., lines).
+"""
+function get_equivalent_α(bs::BranchesSeries)
+    # Need to check how to develop this one
 end
 
 function add_to_map(series_circuit::BranchesSeries, filters::Dict)

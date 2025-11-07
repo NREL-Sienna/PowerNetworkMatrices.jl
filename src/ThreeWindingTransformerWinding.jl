@@ -34,6 +34,56 @@ function get_series_susceptance(segment::ThreeWindingTransformerWinding)
     return PSY.get_series_susceptances(tfw)[winding_int]
 end
 
+"""
+    get_equivalent_rating(tw::ThreeWindingTransformerWinding)
+
+Get the rating for a specific winding of a three-winding transformer.
+Returns the winding-specific rating if non-zero, otherwise returns the parent transformer rating.
+"""
+function get_equivalent_rating(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+
+    winding_rating = if winding_num == 1
+        PSY.get_rating_primary(tfw)
+    elseif winding_num == 2
+        PSY.get_rating_secondary(tfw)
+    elseif winding_num == 3
+        PSY.get_rating_tertiary(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+    if winding_rating != 0.0
+        return winding_rating
+    elseif isnothing(PSY.get_rating(tfw))
+        return 0.0
+    else
+        return PSY.get_rating(tfw)
+    end
+end
+
+"""
+    get_equivalent_available(tw::ThreeWindingTransformerWinding)
+
+Get the availability status for a specific winding of a three-winding transformer.
+Returns the availability status of the parent transformer.
+"""
+function get_equivalent_available(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+
+    winding_status = if winding_num == 1
+        PSY.get_available_primary(tfw)
+    elseif winding_num == 2
+        PSY.get_available_secondary(tfw)
+    elseif winding_num == 3
+        PSY.get_available_tertiary(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+    return winding_status
+end
+
 function get_arc_tuple(tr::ThreeWindingTransformerWinding)
     t3W = get_transformer(tr)
     arc_number = get_winding_number(tr)
