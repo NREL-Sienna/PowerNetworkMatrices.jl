@@ -177,7 +177,7 @@ end
 Get the tap (turns ratio) for a specific winding of a three-winding transformer.
 Returns the winding-specific turns ratio for phase shifting transformers.
 """
-function get_equivalent_tap(tw::ThreeWindingTransformerWinding{PhaseShiftingTransformer3W})
+function get_equivalent_tap(tw::ThreeWindingTransformerWinding{PSY.PhaseShiftingTransformer3W})
     tfw = get_transformer(tw)
     winding_num = get_winding_number(tw)
 
@@ -198,7 +198,7 @@ end
 Get the phase angle (α) for a specific winding of a three-winding transformer.
 Returns the winding-specific phase shift angle for phase shifting transformers.
 """
-function get_equivalent_α(tw::ThreeWindingTransformerWinding{PhaseShiftingTransformer3W})
+function get_equivalent_α(tw::ThreeWindingTransformerWinding{PSY.PhaseShiftingTransformer3W})
     tfw = get_transformer(tw)
     winding_num = get_winding_number(tw)
 
