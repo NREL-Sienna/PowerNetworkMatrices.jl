@@ -35,6 +35,70 @@ function get_series_susceptance(segment::ThreeWindingTransformerWinding)
 end
 
 """
+    get_equivalent_r(tw::ThreeWindingTransformerWinding)
+
+Get the resistance for a specific winding of a three-winding transformer.
+Returns the winding-specific series resistance.
+"""
+function get_equivalent_r(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+
+    if winding_num == 1
+        return PSY.get_r_primary(tfw)
+    elseif winding_num == 2
+        return PSY.get_r_secondary(tfw)
+    elseif winding_num == 3
+        return PSY.get_r_tertiary(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+end
+
+"""
+    get_equivalent_x(tw::ThreeWindingTransformerWinding)
+
+Get the reactance for a specific winding of a three-winding transformer.
+Returns the winding-specific series reactance.
+"""
+function get_equivalent_x(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+
+    if winding_num == 1
+        return PSY.get_x_primary(tfw)
+    elseif winding_num == 2
+        return PSY.get_x_secondary(tfw)
+    elseif winding_num == 3
+        return PSY.get_x_tertiary(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+end
+
+"""
+    get_equivalent_b(tw::ThreeWindingTransformerWinding)
+
+Get the susceptance for a specific winding of a three-winding transformer.
+For the primary winding (winding 1), returns the shunt susceptance from the transformer.
+For secondary and tertiary windings, returns 0.0 as the shunt is only on the primary side.
+"""
+function get_equivalent_b(tw::ThreeWindingTransformerWinding)
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+
+    if winding_num == 1
+        # Only the primary winding has the shunt susceptance
+        return PSY.get_b(tfw)
+    elseif winding_num == 2 || winding_num == 3
+        # Secondary and tertiary windings don't have shunt susceptance
+        return 0.0
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+end
+
+"""
     get_equivalent_rating(tw::ThreeWindingTransformerWinding)
 
 Get the rating for a specific winding of a three-winding transformer.
@@ -104,6 +168,48 @@ function get_arc_tuple(tr::ThreeWindingTransformerWinding)
         )
     else
         throw(error("Three-winding transformer arc number must be 1, 2, or 3"))
+    end
+end
+
+"""
+    get_equivalent_tap(tw::ThreeWindingTransformerWinding)
+
+Get the tap (turns ratio) for a specific winding of a three-winding transformer.
+Returns the winding-specific turns ratio for phase shifting transformers.
+"""
+function get_equivalent_tap(tw::ThreeWindingTransformerWinding{PhaseShiftingTransformer3W})
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+
+    if winding_num == 1
+        return PSY.get_primary_turns_ratio(tfw)
+    elseif winding_num == 2
+        return PSY.get_secondary_turns_ratio(tfw)
+    elseif winding_num == 3
+        return PSY.get_tertiary_turns_ratio(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
+    end
+end
+
+"""
+    get_equivalent_α(tw::ThreeWindingTransformerWinding)
+
+Get the phase angle (α) for a specific winding of a three-winding transformer.
+Returns the winding-specific phase shift angle for phase shifting transformers.
+"""
+function get_equivalent_α(tw::ThreeWindingTransformerWinding{PhaseShiftingTransformer3W})
+    tfw = get_transformer(tw)
+    winding_num = get_winding_number(tw)
+
+    if winding_num == 1
+        return PSY.get_α_primary(tfw)
+    elseif winding_num == 2
+        return PSY.get_α_secondary(tfw)
+    elseif winding_num == 3
+        return PSY.get_α_tertiary(tfw)
+    else
+        throw(ArgumentError("Invalid winding number: $winding_num"))
     end
 end
 
