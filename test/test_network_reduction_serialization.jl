@@ -1,10 +1,10 @@
 @testset failfast = true "Test serialization of PTDF with NetworkReductionData" begin
     # Test 1: Serialization with RadialReduction
-    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5_re")
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
     # Create PTDF with radial reduction
     radial_reduction = RadialReduction()
-    ptdf_radial = PTDF(sys5; network_reductions = [radial_reduction])
+    ptdf_radial = PTDF(sys5; network_reductions = NetworkReduction[radial_reduction])
 
     # Serialize and deserialize
     path = mktempdir()
@@ -39,7 +39,7 @@
     @test nrd_loaded.direct_branch_name_map == nrd_orig.direct_branch_name_map
 
     # Test 2: Serialization with DegreeTwoReduction
-    ptdf_d2 = PTDF(sys5; network_reductions = [DegreeTwoReduction()])
+    ptdf_d2 = PTDF(sys5; network_reductions = NetworkReduction[DegreeTwoReduction()])
 
     filename_d2 = joinpath(path, "ptdf_d2.h5")
     to_hdf5(ptdf_d2, filename_d2)
@@ -57,7 +57,7 @@
     # Test 3: Serialization with multiple reductions
     ptdf_multi = PTDF(
         sys5;
-        network_reductions = [RadialReduction(), DegreeTwoReduction()],
+        network_reductions = NetworkReduction[RadialReduction(), DegreeTwoReduction()],
     )
 
     filename_multi = joinpath(path, "ptdf_multi.h5")
@@ -99,10 +99,10 @@
 end
 
 @testset "Test serialization preserves network topology information" begin
-    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5_re")
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
     # Create PTDF with reductions
-    ptdf_orig = PTDF(sys5; network_reductions = [RadialReduction()])
+    ptdf_orig = PTDF(sys5; network_reductions = NetworkReduction[RadialReduction()])
 
     # Serialize and deserialize
     path = mktempdir()
