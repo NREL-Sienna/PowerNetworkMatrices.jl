@@ -6,7 +6,7 @@ Before diving into this tutorial we encourage the user to load `PowerNetworkMatr
 
 ## Understanding Degree-Two Buses
 
-Degree-two buses are nodes in the network topology that have exactly two connections. These intermediate buses can be eliminated by replacing the two incident branches with a single equivalent branch, simplifying the network while maintaining its electrical behavior.
+Degree-two buses are nodes in the network topology that have exactly two connections. These intermediate buses can be eliminated by replacing the two incident branches with a single equivalent branch, simplifying the network while maintaining its electrical behavior. The reduction is performed recursively, identifying and eliminating chains of degree-two nodes to maximize network simplification.
 
 ## Basic Usage of DegreeTwoReduction
 
