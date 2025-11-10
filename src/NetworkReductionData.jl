@@ -316,11 +316,14 @@ Get the reduction container from NetworkReductionData.
 """
 get_reductions(rb::NetworkReductionData) = rb.reductions
 
-
 get_name_to_arc_maps(rb::NetworkReductionData) = rb.name_to_arc_map
 
-get_name_to_arc_map(rb::NetworkReductionData, ::Type{T}) where T <: PSY.ACTransmission = rb.name_to_arc_map[T]
-get_name_to_arc_map(rb::NetworkReductionData, ::Type{ThreeWindingTransformerWinding{T}}) where T <: PSY.ThreeWindingTransformer = rb.name_to_arc_map[T]
+get_name_to_arc_map(rb::NetworkReductionData, ::Type{T}) where {T <: PSY.ACTransmission} =
+    rb.name_to_arc_map[T]
+get_name_to_arc_map(
+    rb::NetworkReductionData,
+    ::Type{ThreeWindingTransformerWinding{T}},
+) where {T <: PSY.ThreeWindingTransformer} = rb.name_to_arc_map[T]
 
 has_radial_reduction(rb::NetworkReductionData) = has_radial_reduction(rb.reductions)
 has_degree_two_reduction(rb::NetworkReductionData) = has_degree_two_reduction(rb.reductions)
@@ -383,7 +386,9 @@ function get_ac_transmission_types(network_reduction_data::NetworkReductionData)
     series_types =
         Set{DataType}(typeof.(keys(network_reduction_data.reverse_series_branch_map)))
     transformer_3W_types =
-        Set{DataType}(get_transformer_type.(keys(network_reduction_data.reverse_transformer3W_map)))
+        Set{DataType}(
+            get_transformer_type.(keys(network_reduction_data.reverse_transformer3W_map)),
+        )
     return union(direct_types, parallel_types, series_types, transformer_3W_types)
 end
 

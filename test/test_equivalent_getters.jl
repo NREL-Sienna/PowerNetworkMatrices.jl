@@ -110,18 +110,24 @@ function test_ybus_equivalence_branches_parallel(vector_branches)
     end
     bus1 = get_component(ACBus, sys_equivalent, "bus1")
     bus2 = get_component(ACBus, sys_equivalent, "bus2")
-    param_dict = PNM.get_equivalent_physical_branch_parameters(branches_parallel)
-    if param_dict[:shift] == 0.0
+    equivalent_pbranch = PNM.get_equivalent_physical_branch_parameters(branches_parallel)
+    if PNM.get_equivalent_shift(equivalent_pbranch) == 0.0
         equivalent_branch = PSY.Line(;
             name = "equivalent_line",
             available = true,
             active_power_flow = 0.0,
             reactive_power_flow = 0.0,
             arc = PSY.Arc(; from = bus1, to = bus2),
-            r = param_dict[:r],  # resistance
-            x = param_dict[:x],   # reactance
-            b = (from = param_dict[:b_from], to = param_dict[:b_to]),  # susceptance
-            g = (from = param_dict[:g_from], to = param_dict[:g_to]),  # conductance
+            r = PNM.get_equivalent_r(equivalent_pbranch),  # resistance
+            x = PNM.get_equivalent_x(equivalent_pbranch),   # reactance
+            b = (
+                from = PNM.get_equivalent_b_from(equivalent_pbranch),
+                to = PNM.get_equivalent_b_to(equivalent_pbranch),
+            ),  # susceptance
+            g = (
+                from = PNM.get_equivalent_g_from(equivalent_pbranch),
+                to = PNM.get_equivalent_g_to(equivalent_pbranch),
+            ),  # conductance
             rating = 80.0,  # rating
             angle_limits = (min = -π / 2, max = π / 2),
         )
@@ -133,11 +139,14 @@ function test_ybus_equivalence_branches_parallel(vector_branches)
             active_power_flow = 0.0,
             reactive_power_flow = 0.0,
             arc = PSY.Arc(; from = bus1, to = bus2),
-            r = param_dict[:r],  # resistance
-            x = param_dict[:x],   # reactance
-            primary_shunt = Complex(param_dict[:g_from], param_dict[:b_from]),
-            tap = param_dict[:tap],
-            α = param_dict[:shift],
+            r = PNM.get_equivalent_r(equivalent_pbranch),  # resistance
+            x = PNM.get_equivalent_x(equivalent_pbranch),   # reactance
+            primary_shunt = Complex(
+                PNM.get_equivalent_g_from(equivalent_pbranch),
+                PNM.get_equivalent_b_from(equivalent_pbranch),
+            ),
+            tap = PNM.get_equivalent_tap(equivalent_pbranch),
+            α = PNM.get_equivalent_shift(equivalent_pbranch),
             rating = 80.0,  # rating
             base_power = 100.0,
         )
@@ -145,14 +154,17 @@ function test_ybus_equivalence_branches_parallel(vector_branches)
             name = "equivalent_admittance",
             available = true,
             bus = bus2,
-            Y = Complex(param_dict[:g_to], param_dict[:b_to]),
+            Y = Complex(
+                PNM.get_equivalent_g_to(equivalent_pbranch),
+                PNM.get_equivalent_b_to(equivalent_pbranch),
+            ),
         )
         add_component!(sys_equivalent, equivalent_transformer)
         add_component!(sys_equivalent, equivalent_admittance)
     end
     ybus_equivalent = Ybus(sys_equivalent)
-    #display(Matrix(ybus.data)) - for debug 
-    #display(Matrix(ybus_equivalent.data)) - for debug 
+    #display(Matrix(ybus.data)) - for debug
+    #display(Matrix(ybus_equivalent.data)) - for debug
     @test all(isapprox.(ybus.data, ybus_equivalent.data; atol = 1e-5))
 end
 
@@ -196,18 +208,24 @@ function test_ybus_equivalence_branches_series(vector_branches)
     end
     bus1 = get_component(ACBus, sys_equivalent, "bus1")
     bus2 = get_component(ACBus, sys_equivalent, "bus2")
-    param_dict = PNM.get_equivalent_physical_branch_parameters(branches_series)
-    if param_dict[:shift] == 0.0
+    equivalent_pbranch = PNM.get_equivalent_physical_branch_parameters(branches_series)
+    if PNM.get_equivalent_shift(equivalent_pbranch) == 0.0
         equivalent_branch = PSY.Line(;
             name = "equivalent_line",
             available = true,
             active_power_flow = 0.0,
             reactive_power_flow = 0.0,
             arc = PSY.Arc(; from = bus1, to = bus2),
-            r = param_dict[:r],  # resistance
-            x = param_dict[:x],   # reactance
-            b = (from = param_dict[:b_from], to = param_dict[:b_to]),  # susceptance
-            g = (from = param_dict[:g_from], to = param_dict[:g_to]),  # conductance
+            r = PNM.get_equivalent_r(equivalent_pbranch),  # resistance
+            x = PNM.get_equivalent_x(equivalent_pbranch),   # reactance
+            b = (
+                from = PNM.get_equivalent_b_from(equivalent_pbranch),
+                to = PNM.get_equivalent_b_to(equivalent_pbranch),
+            ),  # susceptance
+            g = (
+                from = PNM.get_equivalent_g_from(equivalent_pbranch),
+                to = PNM.get_equivalent_g_to(equivalent_pbranch),
+            ),  # conductance
             rating = 80.0,  # rating
             angle_limits = (min = -π / 2, max = π / 2),
         )
@@ -219,11 +237,14 @@ function test_ybus_equivalence_branches_series(vector_branches)
             active_power_flow = 0.0,
             reactive_power_flow = 0.0,
             arc = PSY.Arc(; from = bus1, to = bus2),
-            r = param_dict[:r],  # resistance
-            x = param_dict[:x],   # reactance
-            primary_shunt = Complex(param_dict[:g_from], param_dict[:b_from]),
-            tap = param_dict[:tap],
-            α = param_dict[:shift],
+            r = PNM.get_equivalent_r(equivalent_pbranch),  # resistance
+            x = PNM.get_equivalent_x(equivalent_pbranch),   # reactance
+            primary_shunt = Complex(
+                PNM.get_equivalent_g_from(equivalent_pbranch),
+                PNM.get_equivalent_b_from(equivalent_pbranch),
+            ),
+            tap = PNM.get_equivalent_tap(equivalent_pbranch),
+            α = PNM.get_equivalent_shift(equivalent_pbranch),
             rating = 80.0,  # rating
             base_power = 100.0,
             #angle_limits = (min = -π / 2, max = π / 2),
@@ -232,14 +253,17 @@ function test_ybus_equivalence_branches_series(vector_branches)
             name = "equivalent_admittance",
             available = true,
             bus = bus2,
-            Y = Complex(param_dict[:g_to], param_dict[:b_to]),
+            Y = Complex(
+                PNM.get_equivalent_g_to(equivalent_pbranch),
+                PNM.get_equivalent_b_to(equivalent_pbranch),
+            ),
         )
         add_component!(sys_equivalent, equivalent_transformer)
         add_component!(sys_equivalent, equivalent_admittance)
     end
     ybus_equivalent = Ybus(sys_equivalent)
-    #display(Matrix(ybus.data)) - for debug 
-    #display(Matrix(ybus_equivalent.data)) - for debug 
+    #display(Matrix(ybus.data)) - for debug
+    #display(Matrix(ybus_equivalent.data)) - for debug
     @test all(isapprox.(ybus.data, ybus_equivalent.data; atol = 1e-5))
 end
 @testset "Ybus correctness for equivalent parameters of BranchesSeries and BranchesParallel" begin
@@ -326,15 +350,15 @@ end
     )
     # Two lines in parallel:
     test_ybus_equivalence_branches_parallel([l1, l2])
-    # Two lines in series: 
+    # Two lines in series:
     test_ybus_equivalence_branches_series([l1, l2])
     # Three lines in parallel:
     test_ybus_equivalence_branches_parallel([l1, l2, l3])
-    # Three lines in series: 
+    # Three lines in series:
     test_ybus_equivalence_branches_series([l1, l2, l3])
-    # Two transformers in parallel with the same phase angle (winding group): 
+    # Two transformers in parallel with the same phase angle (winding group):
     test_ybus_equivalence_branches_parallel([t1, t2])
-    # Two transformers in series with the same phase angle (winding group): 
+    # Two transformers in series with the same phase angle (winding group):
     test_ybus_equivalence_branches_series([t1, t2])
     # Two transformers in series with different phase angle
     test_ybus_equivalence_branches_series([t1, t3])
@@ -344,9 +368,15 @@ end
     sys = PSB.build_system(PSYTestSystems, "psse_240_parsing_sys"; runchecks = false)
     ybus = Ybus(sys; network_reductions = NetworkReduction[DegreeTwoReduction()])
     for branches_parallel in values(ybus.network_reduction_data.parallel_branch_map)
-        @test isa(PNM.get_equivalent_physical_branch_parameters(branches_parallel), Dict)
+        @test isa(
+            PNM.get_equivalent_physical_branch_parameters(branches_parallel),
+            PNM.EquivalentBranch,
+        )
     end
     for branches_series in values(ybus.network_reduction_data.series_branch_map)
-        @test isa(PNM.get_equivalent_physical_branch_parameters(branches_series), Dict)
+        @test isa(
+            PNM.get_equivalent_physical_branch_parameters(branches_series),
+            PNM.EquivalentBranch,
+        )
     end
 end
