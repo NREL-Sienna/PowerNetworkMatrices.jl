@@ -10,6 +10,8 @@ pages = OrderedDict(
         "VirtualPTDF matrix" => "tutorials/tutorial_VirtualPTDF_matrix.md",
         "LODF matrix" => "tutorials/tutorial_LODF_matrix.md",
         "VirtualLODF matrix" => "tutorials/tutorial_VirtualLODF_matrix.md",
+        "RadialReduction" => "tutorials/tutorial_RadialReduction.md",
+        "DegreeTwoReduction" => "tutorials/tutorial_DegreeTwoReduction.md",
     ],
     "Public API Reference" => "api/public.md",
     "Internal API Reference" => "api/internal.md",
