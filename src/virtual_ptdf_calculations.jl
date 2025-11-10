@@ -11,8 +11,8 @@ The VirtualPTDF is indexed using branch names and bus numbers as for the PTDF
 matrix.
 
 # Arguments
-- `K::KLU.KLUFactorization{Float64, Int}`:
-        LU factorization matrices of the ABA matrix, evaluated by means of KLU
+- `K::Union{KLU.KLUFactorization{Float64, Int}, AppleAccelerate.AAFactorization{Float64}}`:
+        LU factorization matrices of the ABA matrix, evaluated by means of KLU or AppleAccelerate
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix
 - `ref_bus_positions::Set{Int}`:
@@ -45,8 +45,8 @@ matrix.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 """
-struct VirtualPTDF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
-    K::KLU.KLUFactorization{Float64, Int}
+struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K} <: PowerNetworkMatrix{Float64}
+    K::K
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     dist_slack::Vector{Float64}
     axes::Ax
@@ -88,6 +88,8 @@ struct with an empty cache.
 - `dist_slack::Vector{Float64} = Float64[]`:
         Vector of weights to be used as distributed slack bus.
         The distributed slack vector has to be the same length as the number of buses.
+- `linear_solver::String = "KLU"`:
+        Linear solver to use for factorization. Options: "KLU", "AppleAccelerate"
 - `tol::Float64 = eps()`:
         Tolerance related to sparsification and values to drop.
 - `max_cache_size::Int`:
@@ -102,12 +104,14 @@ struct with an empty cache.
 function VirtualPTDF(
     sys::PSY.System;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
+    linear_solver::String = "KLU",
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
     kwargs...,
 )
+    validate_linear_solver(linear_solver)
     Ymatrix = Ybus(
         sys;
         network_reductions = network_reductions,
@@ -144,8 +148,22 @@ function VirtualPTDF(
             )
     end
 
+    # Create factorization based on solver choice
+    if linear_solver == "KLU"
+        K = klu(ABA)
+    elseif linear_solver == "AppleAccelerate"
+        if !USE_AA
+            error(
+                "AppleAccelerate is not available. This solver is only available on macOS systems.",
+            )
+        end
+        K = AppleAccelerate.AAFactorization(ABA)
+    else
+        error("Unsupported linear solver: $linear_solver")
+    end
+
     return VirtualPTDF(
-        klu(ABA),
+        K,
         BA.data,
         dist_slack_vector,
         axes,
@@ -192,6 +210,17 @@ if isdefined(Base, :print_array) # 0.7 and later
     Base.print_array(io::IO, X::VirtualPTDF) = "VirtualPTDF"
 end
 
+# Helper function to solve with different factorization types
+function _solve_factorization(K::KLU.KLUFactorization{Float64, Int}, b::Vector{Float64})
+    return KLU.solve!(K, b)
+end
+
+@static if USE_AA
+    function _solve_factorization(K::AppleAccelerate.AAFactorization{Float64}, b::Vector{Float64})
+        return AppleAccelerate.solve(K, b)
+    end
+end
+
 function _getindex(
     vptdf::VirtualPTDF,
     row::Int,
@@ -204,7 +233,7 @@ function _getindex(
         # evaluate the value for the PTDF column
         # Needs improvement
         valid_ix = vptdf.valid_ix
-        lin_solve = KLU.solve!(vptdf.K, collect(vptdf.BA[valid_ix, row]))
+        lin_solve = _solve_factorization(vptdf.K, collect(vptdf.BA[valid_ix, row]))
         buscount = size(vptdf, 1)
         ref_bus_positions = get_ref_bus_position(vptdf)
         if !isempty(vptdf.dist_slack) && length(ref_bus_positions) != 1
