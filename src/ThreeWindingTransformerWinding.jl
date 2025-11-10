@@ -89,10 +89,10 @@ function get_equivalent_b(tw::ThreeWindingTransformerWinding)
 
     if winding_num == 1
         # Only the primary winding has the shunt susceptance
-        return PSY.get_b(tfw)
+        return (from = PSY.get_b(tfw), to = 0.0)
     elseif winding_num == 2 || winding_num == 3
         # Secondary and tertiary windings don't have shunt susceptance
-        return 0.0
+        return (from = 0.0, to = 0.0)
     else
         throw(ArgumentError("Invalid winding number: $winding_num"))
     end
@@ -177,7 +177,9 @@ end
 Get the tap (turns ratio) for a specific winding of a three-winding transformer.
 Returns the winding-specific turns ratio for phase shifting transformers.
 """
-function get_equivalent_tap(tw::ThreeWindingTransformerWinding{PSY.PhaseShiftingTransformer3W})
+function get_equivalent_tap(
+    tw::ThreeWindingTransformerWinding{PSY.PhaseShiftingTransformer3W},
+)
     tfw = get_transformer(tw)
     winding_num = get_winding_number(tw)
 
@@ -198,7 +200,9 @@ end
 Get the phase angle (α) for a specific winding of a three-winding transformer.
 Returns the winding-specific phase shift angle for phase shifting transformers.
 """
-function get_equivalent_α(tw::ThreeWindingTransformerWinding{PSY.PhaseShiftingTransformer3W})
+function get_equivalent_α(
+    tw::ThreeWindingTransformerWinding{PSY.PhaseShiftingTransformer3W},
+)
     tfw = get_transformer(tw)
     winding_num = get_winding_number(tw)
 

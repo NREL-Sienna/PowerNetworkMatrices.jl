@@ -370,15 +370,15 @@ Gets the concrete types of all AC transmission branches included in an instance 
 - `Set{DataType}`: Vector of the retained branch types.
 """
 function get_ac_transmission_types(network_reduction_data::NetworkReductionData)
-    direct_types = Set(typeof.(keys(network_reduction_data.reverse_direct_branch_map)))
-    parallel_types =
+    @show direct_types =
+        Set(typeof.(keys(network_reduction_data.reverse_direct_branch_map)))
+    @show parallel_types =
         Set(typeof.(keys(network_reduction_data.reverse_parallel_branch_map)))
-    series_types = Set(typeof.(keys(network_reduction_data.reverse_series_branch_map)))
-    transformer_3w_devices =
-        Set(
-            first(tuple) for tuple in keys(network_reduction_data.reverse_transformer3W_map)
-        )
-    transformer_3W_types = typeof.(transformer_3w_devices)
+    @show series_types =
+        Set(typeof.(keys(network_reduction_data.reverse_series_branch_map)))
+    @show transformer_3w_devices =
+        typeof.(keys(network_reduction_data.reverse_transformer3W_map))
+    @show transformer_3W_types = typeof.(transformer_3w_devices)
     return union(direct_types, parallel_types, series_types, transformer_3W_types)
 end
 
