@@ -2,9 +2,14 @@
     "KLU",
     "Dense",
     "MKLPardiso",
+    "AppleAccelerate",
 )
     if PowerNetworkMatrices.USE_AA && solver == "MKLPardiso"
         @info "Skipped MKLPardiso tests on Apple"
+        continue
+    end
+    if !PowerNetworkMatrices.USE_AA && solver == "AppleAccelerate"
+        @info "Skipped AppleAccelerate tests on non-Apple systems"
         continue
     end
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
