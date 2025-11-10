@@ -301,8 +301,8 @@ get_removed_buses(rb::NetworkReductionData) = rb.removed_buses
 get_removed_arcs(rb::NetworkReductionData) = rb.removed_arcs
 get_added_admittance_map(rb::NetworkReductionData) = rb.added_admittance_map
 get_added_branch_map(rb::NetworkReductionData) = rb.added_branch_map
-get_name_to_arc_map(rb::NetworkReductionData) = rb.name_to_arc_map
 get_all_branch_maps_by_type(rb::NetworkReductionData) = rb.all_branch_maps_by_type
+
 """
     get_reductions(rb::NetworkReductionData)
 
@@ -315,6 +315,12 @@ Get the reduction container from NetworkReductionData.
 - `ReductionContainer`: Container with the applied network reductions
 """
 get_reductions(rb::NetworkReductionData) = rb.reductions
+
+
+get_name_to_arc_maps(rb::NetworkReductionData) = rb.name_to_arc_map
+
+get_name_to_arc_map(rb::NetworkReductionData, ::Type{T}) where T <: PSY.ACTransmission = rb.name_to_arc_map[T]
+get_name_to_arc_map(rb::NetworkReductionData, ::Type{ThreeWindingTransformerWinding{T}}) where T <: PSY.ThreeWindingTransformer = rb.name_to_arc_map[T]
 
 has_radial_reduction(rb::NetworkReductionData) = has_radial_reduction(rb.reductions)
 has_degree_two_reduction(rb::NetworkReductionData) = has_degree_two_reduction(rb.reductions)
@@ -370,15 +376,14 @@ Gets the concrete types of all AC transmission branches included in an instance 
 - `Set{DataType}`: Vector of the retained branch types.
 """
 function get_ac_transmission_types(network_reduction_data::NetworkReductionData)
-    @show direct_types =
+    direct_types =
         Set(typeof.(keys(network_reduction_data.reverse_direct_branch_map)))
-    @show parallel_types =
-        Set(typeof.(keys(network_reduction_data.reverse_parallel_branch_map)))
-    @show series_types =
-        Set(typeof.(keys(network_reduction_data.reverse_series_branch_map)))
-    @show transformer_3w_devices =
-        typeof.(keys(network_reduction_data.reverse_transformer3W_map))
-    @show transformer_3W_types = typeof.(transformer_3w_devices)
+    parallel_types =
+        Set{DataType}(typeof.(keys(network_reduction_data.reverse_parallel_branch_map)))
+    series_types =
+        Set{DataType}(typeof.(keys(network_reduction_data.reverse_series_branch_map)))
+    transformer_3W_types =
+        Set{DataType}(get_transformer_type.(keys(network_reduction_data.reverse_transformer3W_map)))
     return union(direct_types, parallel_types, series_types, transformer_3W_types)
 end
 

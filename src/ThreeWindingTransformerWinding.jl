@@ -21,6 +21,10 @@ end
 
 get_transformer(tw::ThreeWindingTransformerWinding) = tw.transformer
 get_winding_number(tw::ThreeWindingTransformerWinding) = tw.winding_number
+get_transformer_type(
+    ::ThreeWindingTransformerWinding{T},
+) where T <: PSY.ThreeWindingTransformer = T
+
 
 function get_name(three_wt_winding::ThreeWindingTransformerWinding)
     transformer = get_transformer(three_wt_winding)
