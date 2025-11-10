@@ -15,8 +15,8 @@
     ptdf_radial_loaded = PTDF(filename)
 
     # Check that network reduction data was preserved
-    nrd_orig = ptdf_radial.network_reduction_data
-    nrd_loaded = ptdf_radial_loaded.network_reduction_data
+    nrd_orig = get_network_reduction_data(ptdf_radial)
+    nrd_loaded = get_network_reduction_data(ptdf_radial_loaded)
 
     # Check bus mappings
     @test nrd_loaded.bus_reduction_map == nrd_orig.bus_reduction_map
@@ -45,8 +45,8 @@
     to_hdf5(ptdf_d2, filename_d2)
     ptdf_d2_loaded = PTDF(filename_d2)
 
-    nrd_d2_orig = ptdf_d2.network_reduction_data
-    nrd_d2_loaded = ptdf_d2_loaded.network_reduction_data
+    nrd_d2_orig = get_network_reduction_data(ptdf_d2)
+    nrd_d2_loaded = get_network_reduction_data(ptdf_d2_loaded)
 
     @test nrd_d2_loaded.bus_reduction_map == nrd_d2_orig.bus_reduction_map
     @test nrd_d2_loaded.reverse_bus_search_map == nrd_d2_orig.reverse_bus_search_map
@@ -64,8 +64,8 @@
     to_hdf5(ptdf_multi, filename_multi)
     ptdf_multi_loaded = PTDF(filename_multi)
 
-    nrd_multi_orig = ptdf_multi.network_reduction_data
-    nrd_multi_loaded = ptdf_multi_loaded.network_reduction_data
+    nrd_multi_orig = get_network_reduction_data(ptdf_multi)
+    nrd_multi_loaded = get_network_reduction_data(ptdf_multi_loaded)
 
     @test nrd_multi_loaded.bus_reduction_map == nrd_multi_orig.bus_reduction_map
     @test nrd_multi_loaded.reverse_bus_search_map == nrd_multi_orig.reverse_bus_search_map
@@ -82,7 +82,7 @@
     to_hdf5(ptdf_no_red, filename_no_red)
     ptdf_no_red_loaded = PTDF(filename_no_red)
 
-    @test isempty(ptdf_no_red_loaded.network_reduction_data)
+    @test isempty(get_network_reduction_data(ptdf_no_red_loaded))
     @test ptdf_no_red == ptdf_no_red_loaded
 
     # Test 5: Test compression works with network reduction data
@@ -91,10 +91,10 @@
         to_hdf5(ptdf_radial, filename_comp; compress = compress)
         ptdf_comp_loaded = PTDF(filename_comp)
 
-        @test ptdf_comp_loaded.network_reduction_data.bus_reduction_map ==
-              ptdf_radial.network_reduction_data.bus_reduction_map
-        @test ptdf_comp_loaded.network_reduction_data.reductions ==
-              ptdf_radial.network_reduction_data.reductions
+        @test get_network_reduction_data(ptdf_comp_loaded).bus_reduction_map ==
+              get_network_reduction_data(ptdf_radial).bus_reduction_map
+        @test get_network_reduction_data(ptdf_comp_loaded).reductions ==
+              get_network_reduction_data(ptdf_radial).reductions
     end
 end
 
@@ -111,8 +111,8 @@ end
     ptdf_loaded = PTDF(filename)
 
     # Verify that topology information is preserved
-    nrd_orig = ptdf_orig.network_reduction_data
-    nrd_loaded = ptdf_loaded.network_reduction_data
+    nrd_orig = get_network_reduction_data(ptdf_orig)
+    nrd_loaded = get_network_reduction_data(ptdf_loaded)
 
     # Check that we can still query which buses were removed
     @test nrd_loaded.removed_buses == nrd_orig.removed_buses
