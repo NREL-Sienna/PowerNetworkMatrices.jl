@@ -34,7 +34,7 @@ export ArcAdmittanceMatrix
 using DocStringExtensions
 import InfrastructureSystems
 import PowerSystems
-import PowerSystems: ACBusTypes
+import PowerSystems: ACBusTypes, get_arc
 
 const IS = InfrastructureSystems
 const PSY = PowerSystems
