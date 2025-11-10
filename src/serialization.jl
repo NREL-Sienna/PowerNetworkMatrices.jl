@@ -332,7 +332,9 @@ function _deserialize_bus_reduction_map(group::HDF5.Group)
 
     json_str = read(HDF5.attributes(group)["bus_reduction_map"])
     json_dict = JSON3.read(json_str)
-    return Dict{Int, Set{Int}}(parse(Int, k) => Set{Int}(v) for (k, v) in json_dict)
+    return Dict{Int, Set{Int}}(
+        parse(Int, k) => Set{Int}(collect(v)) for (k, v) in json_dict
+    )
 end
 
 function _serialize_dict_int_int(
@@ -463,7 +465,9 @@ function _deserialize_dict_string_tuple(group::HDF5.Group, name::String)
 
     json_str = read(HDF5.attributes(group)[name])
     json_dict = JSON3.read(json_str)
-    return Dict{String, Tuple{Int, Int}}(k => (v[1], v[2]) for (k, v) in json_dict)
+    return Dict{String, Tuple{Int, Int}}(
+        String(k) => (Int(v[1]), Int(v[2])) for (k, v) in json_dict
+    )
 end
 
 # Serialization for branch maps containing PSY objects
@@ -693,27 +697,28 @@ function _deserialize_reduction_container(group::HDF5.Group)
     end
 
     json_str = read(HDF5.attributes(group)["reduction_container"])
-    reduction_data = JSON3.read(json_str, Dict{String, Any})
+    reduction_data = JSON3.read(json_str)
 
     rc = ReductionContainer()
 
     if haskey(reduction_data, "radial_reduction")
         rd = reduction_data["radial_reduction"]
-        rc.radial_reduction =
-            RadialReduction(irreducible_buses = Vector{Int}(rd["irreducible_buses"]))
+        rc.radial_reduction = RadialReduction(
+            irreducible_buses = collect(Int, rd["irreducible_buses"]),
+        )
     end
 
     if haskey(reduction_data, "degree_two_reduction")
         d2d = reduction_data["degree_two_reduction"]
         rc.degree_two_reduction = DegreeTwoReduction(
-            irreducible_buses = Vector{Int}(d2d["irreducible_buses"]),
-            reduce_reactive_power_injectors = d2d["reduce_reactive_power_injectors"],
+            irreducible_buses = collect(Int, d2d["irreducible_buses"]),
+            reduce_reactive_power_injectors = Bool(d2d["reduce_reactive_power_injectors"]),
         )
     end
 
     if haskey(reduction_data, "ward_reduction")
         wd = reduction_data["ward_reduction"]
-        rc.ward_reduction = WardReduction(Vector{Int}(wd["study_buses"]))
+        rc.ward_reduction = WardReduction(collect(Int, wd["study_buses"]))
     end
 
     return rc
