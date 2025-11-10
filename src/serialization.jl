@@ -275,9 +275,6 @@ function _serialize_set(group::HDF5.Group, name::String, s::Set{Int})
 end
 
 function _deserialize_set(group::HDF5.Group, name::String)
-    if haskey(HDF5.attributes(group), name * "_empty")
-        return Set{Int}()
-    end
     if !haskey(group, name)
         return Set{Int}()
     end
@@ -298,9 +295,6 @@ function _serialize_set_of_tuples(
 end
 
 function _deserialize_set_of_tuples(group::HDF5.Group, name::String)
-    if haskey(HDF5.attributes(group), name * "_empty")
-        return Set{Tuple{Int, Int}}()
-    end
     if !haskey(group, name)
         return Set{Tuple{Int, Int}}()
     end
@@ -323,18 +317,16 @@ function _serialize_bus_reduction_map(
 end
 
 function _deserialize_bus_reduction_map(group::HDF5.Group)
-    if haskey(HDF5.attributes(group), "bus_reduction_map_empty")
+    # Try to read the attribute, return empty if it doesn't exist
+    try
+        json_str = read(HDF5.attributes(group)["bus_reduction_map"])
+        json_dict = JSON3.read(json_str)
+        return Dict{Int, Set{Int}}(
+            parse(Int, k) => Set{Int}(collect(v)) for (k, v) in json_dict
+        )
+    catch
         return Dict{Int, Set{Int}}()
     end
-    if !haskey(HDF5.attributes(group), "bus_reduction_map")
-        return Dict{Int, Set{Int}}()
-    end
-
-    json_str = read(HDF5.attributes(group)["bus_reduction_map"])
-    json_dict = JSON3.read(json_str)
-    return Dict{Int, Set{Int}}(
-        parse(Int, k) => Set{Int}(collect(v)) for (k, v) in json_dict
-    )
 end
 
 function _serialize_dict_int_int(
@@ -354,9 +346,6 @@ function _serialize_dict_int_int(
 end
 
 function _deserialize_dict_int_int(group::HDF5.Group, name::String)
-    if haskey(HDF5.attributes(group), name * "_empty")
-        return Dict{Int, Int}()
-    end
     if !haskey(group, name * "_keys")
         return Dict{Int, Int}()
     end
@@ -386,9 +375,6 @@ function _serialize_dict_tuple_complex(
 end
 
 function _deserialize_dict_tuple_complex(group::HDF5.Group, name::String)
-    if haskey(HDF5.attributes(group), name * "_empty")
-        return Dict{Tuple{Int, Int}, Complex{Float32}}()
-    end
     if !haskey(group, name * "_keys")
         return Dict{Tuple{Int, Int}, Complex{Float32}}()
     end
@@ -423,9 +409,6 @@ function _serialize_dict_int_complex(
 end
 
 function _deserialize_dict_int_complex(group::HDF5.Group, name::String)
-    if haskey(HDF5.attributes(group), name * "_empty")
-        return Dict{Int, Complex{Float32}}()
-    end
     if !haskey(group, name * "_keys")
         return Dict{Int, Complex{Float32}}()
     end
@@ -456,18 +439,16 @@ function _serialize_dict_string_tuple(
 end
 
 function _deserialize_dict_string_tuple(group::HDF5.Group, name::String)
-    if haskey(HDF5.attributes(group), name * "_empty")
+    # Try to read the attribute, return empty if it doesn't exist
+    try
+        json_str = read(HDF5.attributes(group)[name])
+        json_dict = JSON3.read(json_str)
+        return Dict{String, Tuple{Int, Int}}(
+            String(k) => (Int(v[1]), Int(v[2])) for (k, v) in json_dict
+        )
+    catch
         return Dict{String, Tuple{Int, Int}}()
     end
-    if !haskey(HDF5.attributes(group), name)
-        return Dict{String, Tuple{Int, Int}}()
-    end
-
-    json_str = read(HDF5.attributes(group)[name])
-    json_dict = JSON3.read(json_str)
-    return Dict{String, Tuple{Int, Int}}(
-        String(k) => (Int(v[1]), Int(v[2])) for (k, v) in json_dict
-    )
 end
 
 # Serialization for branch maps containing PSY objects
@@ -500,9 +481,6 @@ function _serialize_direct_branch_map(
 end
 
 function _deserialize_direct_branch_map(group::HDF5.Group)
-    if haskey(HDF5.attributes(group), "direct_branch_map_empty")
-        return Dict{Tuple{Int, Int}, PSY.ACTransmission}()
-    end
     if !haskey(group, "direct_branch_map_arcs")
         return Dict{Tuple{Int, Int}, PSY.ACTransmission}()
     end
@@ -551,9 +529,6 @@ function _serialize_parallel_branch_map(
 end
 
 function _deserialize_parallel_branch_map(group::HDF5.Group)
-    if haskey(HDF5.attributes(group), "parallel_branch_map_empty")
-        return Dict{Tuple{Int, Int}, BranchesParallel}()
-    end
     if !haskey(group, "parallel_branch_map_arcs")
         return Dict{Tuple{Int, Int}, BranchesParallel}()
     end
@@ -613,9 +588,6 @@ function _serialize_series_branch_map(
 end
 
 function _deserialize_series_branch_map(group::HDF5.Group)
-    if haskey(HDF5.attributes(group), "series_branch_map_empty")
-        return Dict{Tuple{Int, Int}, BranchesSeries}()
-    end
     if !haskey(group, "series_branch_map_arcs")
         return Dict{Tuple{Int, Int}, BranchesSeries}()
     end
@@ -655,9 +627,6 @@ function _serialize_transformer3W_map(
 end
 
 function _deserialize_transformer3W_map(group::HDF5.Group)
-    if haskey(HDF5.attributes(group), "transformer3W_map_empty")
-        return Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding}()
-    end
     if !haskey(group, "transformer3W_map_arcs")
         return Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding}()
     end
@@ -692,34 +661,35 @@ function _serialize_reduction_container(group::HDF5.Group, rc::ReductionContaine
 end
 
 function _deserialize_reduction_container(group::HDF5.Group)
-    if !haskey(HDF5.attributes(group), "reduction_container")
+    # Try to read the attribute, return empty if it doesn't exist
+    try
+        json_str = read(HDF5.attributes(group)["reduction_container"])
+        reduction_data = JSON3.read(json_str)
+
+        rc = ReductionContainer()
+
+        if haskey(reduction_data, "radial_reduction")
+            rd = reduction_data["radial_reduction"]
+            rc.radial_reduction = RadialReduction(
+                irreducible_buses = collect(Int, rd["irreducible_buses"]),
+            )
+        end
+
+        if haskey(reduction_data, "degree_two_reduction")
+            d2d = reduction_data["degree_two_reduction"]
+            rc.degree_two_reduction = DegreeTwoReduction(
+                irreducible_buses = collect(Int, d2d["irreducible_buses"]),
+                reduce_reactive_power_injectors = Bool(d2d["reduce_reactive_power_injectors"]),
+            )
+        end
+
+        if haskey(reduction_data, "ward_reduction")
+            wd = reduction_data["ward_reduction"]
+            rc.ward_reduction = WardReduction(collect(Int, wd["study_buses"]))
+        end
+
+        return rc
+    catch
         return ReductionContainer()
     end
-
-    json_str = read(HDF5.attributes(group)["reduction_container"])
-    reduction_data = JSON3.read(json_str)
-
-    rc = ReductionContainer()
-
-    if haskey(reduction_data, "radial_reduction")
-        rd = reduction_data["radial_reduction"]
-        rc.radial_reduction = RadialReduction(
-            irreducible_buses = collect(Int, rd["irreducible_buses"]),
-        )
-    end
-
-    if haskey(reduction_data, "degree_two_reduction")
-        d2d = reduction_data["degree_two_reduction"]
-        rc.degree_two_reduction = DegreeTwoReduction(
-            irreducible_buses = collect(Int, d2d["irreducible_buses"]),
-            reduce_reactive_power_injectors = Bool(d2d["reduce_reactive_power_injectors"]),
-        )
-    end
-
-    if haskey(reduction_data, "ward_reduction")
-        wd = reduction_data["ward_reduction"]
-        rc.ward_reduction = WardReduction(collect(Int, wd["study_buses"]))
-    end
-
-    return rc
 end
