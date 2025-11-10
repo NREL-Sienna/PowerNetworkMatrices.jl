@@ -56,6 +56,20 @@
         @test isapprox(sum(total_error3), 0.0, atol = 1e-3)
     end
 
+    if PowerNetworkMatrices.USE_AA
+        L5NS_from_ptdf4 = LODF(A, P5; linear_solver = "AppleAccelerate")
+        @test getindex(L5NS_from_ptdf4, "5", "6") - -0.3071 <= 1e-4
+        total_error4 = 0.0
+        for ix in 1:6, jx in 1:6
+            total_error4 +=
+                abs(
+                    L5NS_from_ptdf4[ix_to_tuple_map[ix], ix_to_tuple_map[jx]] .-
+                    Lodf_5[ix, jx],
+                )
+        end
+        @test isapprox(sum(total_error4), 0.0, atol = 1e-3)
+    end
+
     # A, ABA, and BA case
     ABA = ABA_Matrix(sys5; factorize = true)
     BA = BA_Matrix(sys5)
