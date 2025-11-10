@@ -216,7 +216,10 @@ function _solve_factorization(K::KLU.KLUFactorization{Float64, Int}, b::Vector{F
 end
 
 @static if USE_AA
-    function _solve_factorization(K::AppleAccelerate.AAFactorization{Float64}, b::Vector{Float64})
+    function _solve_factorization(
+        K::AppleAccelerate.AAFactorization{Float64},
+        b::Vector{Float64},
+    )
         return AppleAccelerate.solve(K, b)
     end
 end
