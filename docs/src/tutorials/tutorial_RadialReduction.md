@@ -40,10 +40,10 @@ get_bus_reduction_map(reduction_data)
 
 # View the reverse bus search mapping
 # This maps each reduced bus to its ultimate parent
-reduction_data.reverse_bus_search_map
+get_reverse_bus_search_map(reduction_data)
 
 # View the removed arcs (branches)
-reduction_data.removed_arcs
+get_removed_arcs(reduction_data)
 ```
 
 ## Protecting Specific Buses from Reduction

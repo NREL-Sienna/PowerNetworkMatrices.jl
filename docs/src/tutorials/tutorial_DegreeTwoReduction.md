@@ -36,13 +36,13 @@ reduction_data = get_network_reduction_data(ybus);
 
 # View the series branch mapping
 # This shows how multiple branches were combined into composite branches
-reduction_data.series_branch_map
+get_series_branch_map(reduction_data)
 
 # View the removed buses
-reduction_data.removed_buses
+get_removed_buses(reduction_data)
 
 # View the removed arcs (branches that were combined)
-reduction_data.removed_arcs
+get_removed_arcs(reduction_data)
 ```
 
 ## Configuration Options
