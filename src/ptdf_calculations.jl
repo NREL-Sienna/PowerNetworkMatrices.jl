@@ -317,6 +317,7 @@ function _calculate_PTDF_matrix_AppleAccelerate(
             "AppleAccelerate is not available. This solver is only available on macOS systems.",
         )
     end
+    @warn "AppleAccelerate solver is experimental and may produce unexpected results. If you need high confidence use KLU"
     linecount = size(BA, 2)
     buscount = size(BA, 1)
 
