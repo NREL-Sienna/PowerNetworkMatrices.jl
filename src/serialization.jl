@@ -156,11 +156,10 @@ function _serialize_network_reduction_data(
 )
     # Check if network reduction data is empty
     if isempty(nrd)
-        HDF5.attributes(file)["has_network_reduction_data"] = false
+        # Don't create the group if there's no data
         return
     end
 
-    HDF5.attributes(file)["has_network_reduction_data"] = true
     nrd_group = HDF5.create_group(file, "network_reduction_data")
 
     # Serialize simple sets and maps
@@ -204,9 +203,8 @@ function _serialize_network_reduction_data(
 end
 
 function _deserialize_network_reduction_data(file::HDF5.File)
-    # Check if network reduction data exists
-    has_nrd = get(HDF5.attributes(file), "has_network_reduction_data", false)
-    if !has_nrd
+    # Check if network reduction data group exists
+    if !haskey(file, "network_reduction_data")
         return NetworkReductionData()
     end
 
