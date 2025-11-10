@@ -73,6 +73,13 @@ function _buildlodf(
             )
         end
         lodf_t = _calculate_LODF_matrix_MKLPardiso(a, ptdf)
+    elseif linear_solver == "AppleAccelerate"
+        if !USE_AA
+            error(
+                "AppleAccelerate is not available. This solver is only available on macOS systems.",
+            )
+        end
+        lodf_t = _calculate_LODF_matrix_AppleAccelerate(a, ptdf)
     end
     return lodf_t
 end
@@ -284,6 +291,41 @@ function _calculate_LODF_matrix_MKLPardiso(
         _pardiso_single_LODF!(lodf_t, A, ptdf_denominator_t)
     end
     lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
+    return lodf_t
+end
+
+"""
+Function for internal use only.
+
+Computes the LODF matrix by means of AppleAccelerate for sparse matrices.
+
+# Arguments
+- `a::SparseArrays.SparseMatrixCSC{Int8, Int}`:
+        Incidence Matrix
+- `ptdf::Matrix{Float64}`:
+        PTDF matrix
+"""
+function _calculate_LODF_matrix_AppleAccelerate(
+    a::SparseArrays.SparseMatrixCSC{Int8, Int},
+    ptdf::Matrix{Float64},
+)
+    linecount = size(ptdf, 2)
+    ptdf_denominator_t = a * ptdf
+    m_I = Int[]
+    m_V = Float64[]
+    for iline in 1:linecount
+        if (1.0 - ptdf_denominator_t[iline, iline]) < LODF_ENTRY_TOLERANCE
+            push!(m_I, iline)
+            push!(m_V, 1.0)
+        else
+            push!(m_I, iline)
+            push!(m_V, 1 - ptdf_denominator_t[iline, iline])
+        end
+    end
+    Dem_LU = AppleAccelerate.AAFactorization(SparseArrays.sparse(m_I, m_I, m_V))
+    lodf_t = AppleAccelerate.solve(Dem_LU, ptdf_denominator_t)
+    lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
+
     return lodf_t
 end
 
