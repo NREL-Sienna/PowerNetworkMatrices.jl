@@ -275,7 +275,7 @@ function _serialize_set(group::HDF5.Group, name::String, s::Set{Int})
 end
 
 function _deserialize_set(group::HDF5.Group, name::String)
-    if get(HDF5.attributes(group), name * "_empty", false)
+    if haskey(HDF5.attributes(group), name * "_empty")
         return Set{Int}()
     end
     if !haskey(group, name)
@@ -298,7 +298,7 @@ function _serialize_set_of_tuples(
 end
 
 function _deserialize_set_of_tuples(group::HDF5.Group, name::String)
-    if get(HDF5.attributes(group), name * "_empty", false)
+    if haskey(HDF5.attributes(group), name * "_empty")
         return Set{Tuple{Int, Int}}()
     end
     if !haskey(group, name)
@@ -323,7 +323,7 @@ function _serialize_bus_reduction_map(
 end
 
 function _deserialize_bus_reduction_map(group::HDF5.Group)
-    if get(HDF5.attributes(group), "bus_reduction_map_empty", false)
+    if haskey(HDF5.attributes(group), "bus_reduction_map_empty")
         return Dict{Int, Set{Int}}()
     end
     if !haskey(HDF5.attributes(group), "bus_reduction_map")
@@ -354,7 +354,7 @@ function _serialize_dict_int_int(
 end
 
 function _deserialize_dict_int_int(group::HDF5.Group, name::String)
-    if get(HDF5.attributes(group), name * "_empty", false)
+    if haskey(HDF5.attributes(group), name * "_empty")
         return Dict{Int, Int}()
     end
     if !haskey(group, name * "_keys")
@@ -386,7 +386,7 @@ function _serialize_dict_tuple_complex(
 end
 
 function _deserialize_dict_tuple_complex(group::HDF5.Group, name::String)
-    if get(HDF5.attributes(group), name * "_empty", false)
+    if haskey(HDF5.attributes(group), name * "_empty")
         return Dict{Tuple{Int, Int}, Complex{Float32}}()
     end
     if !haskey(group, name * "_keys")
@@ -423,7 +423,7 @@ function _serialize_dict_int_complex(
 end
 
 function _deserialize_dict_int_complex(group::HDF5.Group, name::String)
-    if get(HDF5.attributes(group), name * "_empty", false)
+    if haskey(HDF5.attributes(group), name * "_empty")
         return Dict{Int, Complex{Float32}}()
     end
     if !haskey(group, name * "_keys")
@@ -456,7 +456,7 @@ function _serialize_dict_string_tuple(
 end
 
 function _deserialize_dict_string_tuple(group::HDF5.Group, name::String)
-    if get(HDF5.attributes(group), name * "_empty", false)
+    if haskey(HDF5.attributes(group), name * "_empty")
         return Dict{String, Tuple{Int, Int}}()
     end
     if !haskey(HDF5.attributes(group), name)
@@ -500,7 +500,7 @@ function _serialize_direct_branch_map(
 end
 
 function _deserialize_direct_branch_map(group::HDF5.Group)
-    if get(HDF5.attributes(group), "direct_branch_map_empty", false)
+    if haskey(HDF5.attributes(group), "direct_branch_map_empty")
         return Dict{Tuple{Int, Int}, PSY.ACTransmission}()
     end
     if !haskey(group, "direct_branch_map_arcs")
@@ -551,7 +551,7 @@ function _serialize_parallel_branch_map(
 end
 
 function _deserialize_parallel_branch_map(group::HDF5.Group)
-    if get(HDF5.attributes(group), "parallel_branch_map_empty", false)
+    if haskey(HDF5.attributes(group), "parallel_branch_map_empty")
         return Dict{Tuple{Int, Int}, BranchesParallel}()
     end
     if !haskey(group, "parallel_branch_map_arcs")
@@ -613,7 +613,7 @@ function _serialize_series_branch_map(
 end
 
 function _deserialize_series_branch_map(group::HDF5.Group)
-    if get(HDF5.attributes(group), "series_branch_map_empty", false)
+    if haskey(HDF5.attributes(group), "series_branch_map_empty")
         return Dict{Tuple{Int, Int}, BranchesSeries}()
     end
     if !haskey(group, "series_branch_map_arcs")
@@ -655,7 +655,7 @@ function _serialize_transformer3W_map(
 end
 
 function _deserialize_transformer3W_map(group::HDF5.Group)
-    if get(HDF5.attributes(group), "transformer3W_map_empty", false)
+    if haskey(HDF5.attributes(group), "transformer3W_map_empty")
         return Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding}()
     end
     if !haskey(group, "transformer3W_map_arcs")
