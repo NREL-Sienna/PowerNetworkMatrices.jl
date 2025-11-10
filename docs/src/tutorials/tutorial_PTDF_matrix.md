@@ -5,9 +5,10 @@ Before diving into this tutorial we encourage the user to load `PowerNetworkMatr
 
 ## Evaluation of the `PTDF` matrix
 
-The `PTDF` matrix can be evaluated according to two different approaches:
+The `PTDF` matrix can be evaluated according to three different approaches:
 - `Dense`: considers functions for dense matrix multiplication and inversion
 - `KLU`: considers functions for sparse matrix multiplication and inversion (**default**)
+- `MKLPardiso`: uses Intel's MKL Pardiso solver for sparse matrix operations (only available on Intel-based systems running Linux or Windows)
 
 The evaluation of the `PTDF` matrix can be easily performed starting from importing the system's data and then by simply calling the `PTDF` method.
 
@@ -48,10 +49,15 @@ get_ptdf_data(ptdf_dense)
 
 ptdf_klu = PTDF(sys, linear_solver="KLU");
 get_ptdf_data(ptdf_klu)
+
+ptdf_mkl = PTDF(sys, linear_solver="MKLPardiso");
+get_ptdf_data(ptdf_mkl)
 ```
 
 By default the "KLU" method is selected, which appeared to require significant less time and memory with respect to "Dense".
-Please note that either the `KLU` or `Dense` method is used, the resulting `PTDF` matrix is stored as a dense one.
+Please note that regardless of which method (`KLU`, `Dense`, or `MKLPardiso`) is used, the resulting `PTDF` matrix is stored as a dense one.
+
+**Note on MKLPardiso**: The `MKLPardiso` solver option is only available on Intel-based systems running Linux or Windows. On other platforms (e.g., ARM-based systems or macOS), use `KLU` or `Dense` instead.
 
 ## Evaluating the `PTDF` matrix considering distributed slack bus
 

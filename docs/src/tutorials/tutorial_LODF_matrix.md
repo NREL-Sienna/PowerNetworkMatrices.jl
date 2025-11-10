@@ -5,9 +5,10 @@ Before diving into this tutorial we encourage the user to load `PowerNetworkMatr
 
 ## Evaluation of the `LODF` matrix
 
-As for the `PTDF` matrix, the `LODF` one can be evaluated according to two different approaches:
+As for the `PTDF` matrix, the `LODF` one can be evaluated according to three different approaches:
 - `Dense`: considers functions for dense matrix multiplication and inversion
-- `KLU`: considers functions for sparse matrix multiplication  and inversion (**default**)
+- `KLU`: considers functions for sparse matrix multiplication and inversion (**default**)
+- `MKLPardiso`: uses Intel's MKL Pardiso solver for sparse matrix operations (only available on Intel-based systems running Linux or Windows)
 
 The evaluation of the `LODF` matrix can be easily performed starting from importing the system's data and then by simply calling the `LODF` method.
 
@@ -58,18 +59,22 @@ lodf_4 = LODF(a, aba, ba);
 
 ## Available methods for the computation of the `LODF` matrix
 
-For those methods that either require the evaluation of the `PTDF` matrix, or that execute this evaluation internally, two different approaches can be used.
+For those methods that either require the evaluation of the `PTDF` matrix, or that execute this evaluation internally, three different approaches can be used.
 
-As for the `PTDF` matrix, here too the optional argument `linear_solver` can be specified with either `KLU` (for sparse matrix calculation) or `Dense` (for sparse matrix calculation).
+As for the `PTDF` matrix, here too the optional argument `linear_solver` can be specified with either `KLU` (for sparse matrix calculation), `Dense` (for dense matrix calculation), or `MKLPardiso` (for Intel MKL Pardiso sparse solver).
 
 ``` @repl tutorial_PTDF_matrix
 lodf_dense = LODF(sys, linear_solver="Dense");
+
+lodf_mkl = LODF(sys, linear_solver="MKLPardiso");
 ```
 
 **NOTE (1):** by default the "KLU" method is selected, which appeared to require significant less time and memory with respect to "Dense".
-Please note that wether the `KLU` or `Dense` method is used, the resulting `LODF` matrix is stored as a dense one.
+Please note that regardless of which method (`KLU`, `Dense`, or `MKLPardiso`) is used, the resulting `LODF` matrix is stored as a dense one.
 
 **NOTE (2):** for the moment, the method `LODF(a::IncidenceMatrix, aba::ABA_Matrix, ba::BA_Matrix)` will take `KLU` as `linear_solver` option.
+
+**Note on MKLPardiso**: The `MKLPardiso` solver option is only available on Intel-based systems running Linux or Windows. On other platforms (e.g., ARM-based systems or macOS), use `KLU` or `Dense` instead.
 
 ## "Sparse" `LODF` matrix
 
