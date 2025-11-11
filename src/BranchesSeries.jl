@@ -181,7 +181,7 @@ function add_to_map(series_circuit::BranchesSeries, filters::Dict)
         end
         return true
     else
-        filter = filters[first(keys(series_circuit.branches))]
+        filter = get(filters, first(keys(series_circuit.branches)), x -> true)
         return all([filter(device) for device in first(values(series_circuit.branches))])
     end
     error("Invalid condition reached in add_to_map for BranchesSeries")
