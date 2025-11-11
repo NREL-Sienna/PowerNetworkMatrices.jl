@@ -1,11 +1,16 @@
 # if it fails, we don't want the terminal to be flooded with errors, therefore failfast=true
-@testset failfast = true "Test Virtual PTDF matrices" begin
+@testset failfast = true "Test Virtual PTDF matrices" for solver in
+                                                          ("KLU", "AppleAccelerate")
+    if !PowerNetworkMatrices.USE_AA && solver == "AppleAccelerate"
+        @info "Skipped AppleAccelerate tests on non-Apple systems"
+        continue
+    end
     sys = PSB.build_system(
         PSB.PSYTestSystems,
         "tamu_ACTIVSg2000_sys",
     )
-    ptdf_complete = PTDF(sys; linear_solver = "KLU")
-    ptdf_virtual = VirtualPTDF(sys)
+    ptdf_complete = PTDF(sys; linear_solver = solver)
+    ptdf_virtual = VirtualPTDF(sys; linear_solver = solver)
 
     for i in axes(ptdf_complete, 2)
         virtual = ptdf_virtual[i, :]
