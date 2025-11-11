@@ -75,6 +75,7 @@ import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 include("PowerNetworkMatrix.jl")
 include("ThreeWindingTransformerWinding.jl")
 include("definitions.jl")
+include("EquivalentBranch.jl")
 include("BranchesSeries.jl")
 include("BranchesParallel.jl")
 include("NetworkReduction.jl")

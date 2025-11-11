@@ -308,9 +308,9 @@ end
 """
     get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{ComplexF32})
 
-Takes as input a 2x2 Matrix{ComplexF32} representing the Ybus contribution of either a 
-BranchesParallel or BranchesSeries object. 
-Returns a dictionary of equivalent parameters, matching the PowerModels data format. 
+Takes as input a 2x2 Matrix{ComplexF32} representing the Ybus contribution of either a
+BranchesParallel or BranchesSeries object.
+Returns a dictionary of equivalent parameters, matching the PowerModels data format.
 """
 function _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{ComplexF32})
     y_11, y_12, y_21, y_22 = equivalent_ybus
@@ -337,14 +337,5 @@ function _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{Comp
     b_from = imag(y_11 - y_l)
     g_to = real(y_22 - y_l)
     b_to = imag(y_22 - y_l)
-    return Dict{Symbol, Float64}(
-        :r => r,
-        :x => x,
-        :g_from => g_from,
-        :b_from => b_from,
-        :g_to => g_to,
-        :b_to => b_to,
-        :tap => tap,
-        :shift => shift,
-    )
+    return EquivalentBranch(r, x, g_from, b_from, g_to, b_to, tap, shift)
 end
