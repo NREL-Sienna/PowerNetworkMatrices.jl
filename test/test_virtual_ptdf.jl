@@ -1,6 +1,6 @@
 # if it fails, we don't want the terminal to be flooded with errors, therefore failfast=true
-@testset failfast = true "Test Virtual PTDF matrices" for solver in
-                                                          ("KLU", "AppleAccelerate")
+@testset "Test Virtual PTDF matrices" for solver in
+                                          ("KLU", "AppleAccelerate")
     if !PowerNetworkMatrices.USE_AA && solver == "AppleAccelerate"
         @info "Skipped AppleAccelerate tests on non-Apple systems"
         continue
