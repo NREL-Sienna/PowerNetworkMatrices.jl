@@ -1,5 +1,4 @@
 using SparseArrays
-using Test
 
 include(joinpath(DATA_DIR, "psy_data", "data_5bus_pu.jl"))
 include(joinpath(DATA_DIR, "psy_data", "data_14bus_pu.jl"))
