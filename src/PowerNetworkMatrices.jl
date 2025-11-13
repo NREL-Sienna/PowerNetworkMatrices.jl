@@ -30,6 +30,12 @@ export VirtualLODF
 export VirtualPTDF
 export Ybus
 export ArcAdmittanceMatrix
+export DC_ABA_Matrix_Factorized
+export DC_ABA_Matrix_Unfactorized
+export DC_PTDF_Matrix
+export DC_vPTDF_Matrix
+export DC_BA_Matrix
+export AC_Ybus_Matrix
 
 using DocStringExtensions
 import InfrastructureSystems
@@ -95,6 +101,7 @@ include("BA_ABA_matrices.jl")
 include("ptdf_calculations.jl")
 include("row_cache.jl")
 include("virtual_ptdf_calculations.jl")
+include("PowerflowMatrixTypes.jl")
 include("lodf_calculations.jl")
 include("virtual_lodf_calculations.jl")
 include("system_utils.jl")
