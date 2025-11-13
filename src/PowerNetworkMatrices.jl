@@ -59,6 +59,7 @@ import DataStructures: SortedDict
 import SparseArrays
 import SparseArrays: rowvals, nzrange
 import HDF5
+import JSON3
 import KLU: klu
 import KLU
 import LinearAlgebra
