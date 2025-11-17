@@ -110,8 +110,8 @@ ybus_full = Ybus(sys);
 ybus_reduced = Ybus(sys; network_reductions=[DegreeTwoReduction()]);
 
 # Compare sizes
-size(get_ybus_data(ybus_full))
-size(get_ybus_data(ybus_reduced))
+size(ybus_full)
+size(ybus_reduced)
 ```
 
 ## Understanding Series Branch Chains
@@ -157,8 +157,8 @@ reductions2 = [DegreeTwoReduction(), RadialReduction()];
 ybus2 = Ybus(sys; network_reductions=reductions2);
 
 # Compare results
-size(get_ybus_data(ybus1))
-size(get_ybus_data(ybus2))
+size(ybus1)
+size(ybus2)
 ```
 
 In general, applying `RadialReduction` first is recommended, as it can create new degree-two buses that can then be eliminated by `DegreeTwoReduction`.
