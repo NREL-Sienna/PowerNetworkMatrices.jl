@@ -97,3 +97,74 @@ get_ptdf_data(ptdf_sparse)
 ```
 
 **NOTE:** 0.2 was used for the purpose of this tutorial. In practice much smaller values are used (e.g., 1e-5).
+
+## Network Reductions
+
+The `PTDF` matrix can be computed with network reductions applied to simplify the system topology. Network reductions eliminate certain buses and branches while preserving the electrical characteristics of the network. This can significantly reduce computation time and memory usage for large systems.
+
+Two types of network reductions are supported:
+- `RadialReduction`: Eliminates radial (leaf) buses that have only one connection
+- `DegreeTwoReduction`: Eliminates degree-two buses (buses with exactly two connections) by combining their incident branches
+
+For detailed information about these reductions, see the [RadialReduction tutorial](@ref) and [DegreeTwoReduction tutorial](@ref).
+
+### Using Network Reductions with PTDF
+
+To apply network reductions, pass a vector of `NetworkReduction` objects to the `network_reductions` keyword argument:
+
+``` @repl tutorial_PTDF_matrix
+# Apply radial reduction
+ptdf_radial = PTDF(sys, network_reductions=[RadialReduction()]);
+
+# Apply degree-two reduction
+ptdf_degree_two = PTDF(sys, network_reductions=[DegreeTwoReduction()]);
+
+# Combine multiple reductions (order matters - RadialReduction first is recommended)
+ptdf_combined = PTDF(sys, network_reductions=[RadialReduction(), DegreeTwoReduction()]);
+```
+
+### Protecting Specific Buses from Reduction
+
+Both reduction types allow you to specify buses that should not be eliminated using the `irreducible_buses` parameter:
+
+``` @repl tutorial_PTDF_matrix
+# Protect specific buses from radial reduction
+reduction = RadialReduction(irreducible_buses=[1, 2])
+ptdf_protected = PTDF(sys, network_reductions=[reduction]);
+```
+
+### DegreeTwoReduction Options
+
+The `DegreeTwoReduction` has an additional option to control whether buses with reactive power injections are reduced:
+
+``` @repl tutorial_PTDF_matrix
+# Preserve buses with reactive power injections
+reduction = DegreeTwoReduction(reduce_reactive_power_injectors=false)
+ptdf_preserve_reactive = PTDF(sys, network_reductions=[reduction]);
+```
+
+### Accessing Reduction Information
+
+After computing the PTDF matrix with reductions, you can access information about what was reduced:
+
+``` @repl tutorial_PTDF_matrix
+ptdf_reduced = PTDF(sys, network_reductions=[RadialReduction(), DegreeTwoReduction()]);
+
+# Get the reduction data
+reduction_data = get_network_reduction_data(ptdf_reduced)
+```
+
+### Combining Reductions with Other Options
+
+Network reductions can be combined with other PTDF options like distributed slack and sparsification:
+
+``` @repl tutorial_PTDF_matrix
+ptdf_full_options = PTDF(sys,
+    linear_solver="KLU",
+    dist_slack=dist_slack_array,
+    tol=1e-5,
+    network_reductions=[RadialReduction(), DegreeTwoReduction()]
+);
+```
+
+**NOTE**: The reference (slack) bus is automatically protected from elimination during reductions.
