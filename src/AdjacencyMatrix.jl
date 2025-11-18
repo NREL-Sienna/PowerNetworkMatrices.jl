@@ -76,13 +76,13 @@ function get_reduction(
         end
     end
 
-    for tw_hvdc in PSY.get_components(PSY.TwoTerminalHVDCLine, sys)
-        arc = PSY.get_ac_arc(tw_hvdc)
+    for tw_hvdc in PSY.get_components(PSY.TwoTerminalHVDC, sys)
+        arc = PSY.get_arc(tw_hvdc)
         if PSY.get_available(PSY.get_from(arc))
-            push!(irreducible_buses, PSY.get_from(arc))
+            push!(irreducible_buses, PSY.get_number(PSY.get_from(arc)))
         end
         if PSY.get_available(PSY.get_to(arc))
-            push!(irreducible_buses, PSY.get_to(arc))
+            push!(irreducible_buses, PSY.get_number(PSY.get_to(arc)))
         end
     end
 
