@@ -126,6 +126,7 @@ function add_to_map(
     double_circuit::BranchesParallel{T},
     filters::Dict,
 ) where {T <: PSY.ACTransmission}
+    isempty(filters) && return true
     if isabstracttype(T)
         @warn "Parallel circuit contains mixed branch types, filters might be applied to more components than intended. Use Logging.Debug for additional information."
         @debug "Parallel circuit branch types: $(keys(double_circuit.branches))"

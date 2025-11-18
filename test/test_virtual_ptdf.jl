@@ -183,3 +183,56 @@ end
     end
     @test test_value
 end
+
+@testset "Test Virtual PTDF with Apple Accelerate" begin
+    if !PowerNetworkMatrices.USE_AA
+        @info "Skipped AppleAccelerate tests on non-Apple systems"
+    else
+        # Test VirtualPTDF with Apple Accelerate solver
+        sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+
+        # Create VirtualPTDF with AppleAccelerate
+        vptdf_aa = VirtualPTDF(sys; linear_solver = "AppleAccelerate")
+
+        # Verify the factorization type is AAFactorization
+        @test contains(string(typeof(vptdf_aa.K)), "AAFactorization")
+
+        # Create reference VirtualPTDF with KLU
+        vptdf_klu = VirtualPTDF(sys; linear_solver = "KLU")
+
+        # Compare results between AppleAccelerate and KLU
+        for arc in PNM.get_arc_axis(vptdf_aa)[1:5]  # Test a subset of arcs
+            row_aa = vptdf_aa[arc, :]
+            row_klu = vptdf_klu[arc, :]
+            @test isapprox(row_aa, row_klu, atol = 1e-10)
+        end
+
+        # Test with tolerance
+        vptdf_aa_tol = VirtualPTDF(sys; linear_solver = "AppleAccelerate", tol = 1e-2)
+        @test contains(string(typeof(vptdf_aa_tol.K)), "AAFactorization")
+
+        # Test with distributed slack
+        buscount = length(PSY.get_available_components(PSY.ACBus, sys))
+        dist_slack_factor = 1 / buscount
+        dist_slack = Dict(i => dist_slack_factor for i in 1:buscount)
+        vptdf_aa_slack = VirtualPTDF(sys; linear_solver = "AppleAccelerate", dist_slack = dist_slack)
+        @test contains(string(typeof(vptdf_aa_slack.K)), "AAFactorization")
+
+        # Compare with KLU for distributed slack case
+        vptdf_klu_slack = VirtualPTDF(sys; linear_solver = "KLU", dist_slack = dist_slack)
+        test_arc = first(PNM.get_arc_axis(vptdf_aa_slack))
+        vptdf_aa_slack[test_arc, 1]  # Trigger computation
+        vptdf_klu_slack[test_arc, 1]  # Trigger computation
+        @test isapprox(vptdf_aa_slack.cache[1], vptdf_klu_slack.cache[1], atol = 1e-10)
+
+        # Test cache functionality with AppleAccelerate
+        arc_tuples = [PNM.get_arc_tuple(br) for br in get_components(ACTransmission, sys)]
+        persist_arcs = arc_tuples[1:min(5, length(arc_tuples))]
+        vptdf_aa_cache = VirtualPTDF(sys; linear_solver = "AppleAccelerate", max_cache_size = 1, persistent_arcs = persist_arcs)
+
+        for l in persist_arcs
+            @test size(vptdf_aa_cache[l, :]) == (length(PNM.get_bus_axis(vptdf_aa_cache)),)
+            @test vptdf_aa_cache.lookup[1][l] ∈ keys(vptdf_aa_cache.cache.temp_cache)
+        end
+    end
+end

@@ -221,5 +221,6 @@ function get_equivalent_α(
 end
 
 function add_to_map(device::ThreeWindingTransformerWinding, filters::Dict)
+    isempty(filters) && return true
     return add_to_map(get_transformer(device), filters)
 end

@@ -75,6 +75,17 @@ function get_reduction(
             push!(irreducible_buses, PSY.get_number(bus))
         end
     end
+
+    for tw_hvdc in PSY.get_components(PSY.TwoTerminalHVDC, sys)
+        arc = PSY.get_arc(tw_hvdc)
+        if PSY.get_available(PSY.get_from(arc))
+            push!(irreducible_buses, PSY.get_number(PSY.get_from(arc)))
+        end
+        if PSY.get_available(PSY.get_to(arc))
+            push!(irreducible_buses, PSY.get_number(PSY.get_to(arc)))
+        end
+    end
+
     exempt_bus_positions = Set(get_irreducible_indices(A, irreducible_buses))
     series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs =
         get_degree2_reduction(
