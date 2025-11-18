@@ -1,4 +1,4 @@
-@testset failfast = true "Test PTDF matrices, w/ and w/o tolerance" for solver in (
+@testset "Test PTDF matrices, w/ and w/o tolerance" for solver in (
     "KLU",
     "Dense",
     "MKLPardiso",
@@ -118,7 +118,7 @@ end
     end
 end
 
-@testset failfast = true "Test serialization of PTDF matrices to HDF5" begin
+@testset "Test serialization of PTDF matrices to HDF5" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     P5 = PTDF(sys5; linear_solver = "KLU")
     P5_sparse = PTDF(sys5; linear_solver = "KLU", tol = 1e-3)
