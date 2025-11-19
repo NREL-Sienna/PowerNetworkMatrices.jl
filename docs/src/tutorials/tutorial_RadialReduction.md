@@ -92,8 +92,8 @@ ybus_full = Ybus(sys);
 ybus_reduced = Ybus(sys; network_reductions=[RadialReduction()]);
 
 # Compare sizes
-size(get_ybus_data(ybus_full))
-size(get_ybus_data(ybus_reduced))
+size(ybus_full)
+size(ybus_reduced)
 ```
 
 ## Combining Multiple Reductions

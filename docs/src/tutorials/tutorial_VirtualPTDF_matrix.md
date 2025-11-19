@@ -119,3 +119,73 @@ Let's now evaluate the same row as before and compare the results:
 original_row = [v_ptdf_dense["1", j] for j in v_ptdf_dense.axes[2]]
 sparse_row = [v_ptdf_sparse["1", j] for j in v_ptdf_sparse.axes[2]]
 ```
+
+## Network Reductions
+
+The `VirtualPTDF` can be computed with network reductions applied to simplify the system topology. Network reductions eliminate certain buses and branches while preserving the electrical characteristics of the network. This can significantly reduce computation time and memory usage for large systems.
+
+Two types of network reductions are supported:
+- `RadialReduction`: Eliminates radial (leaf) buses that have only one connection
+- `DegreeTwoReduction`: Eliminates degree-two buses (buses with exactly two connections) by combining their incident branches
+
+For detailed information about these reductions, see the [RadialReduction tutorial](@ref) and [DegreeTwoReduction tutorial](@ref).
+
+### Using Network Reductions with VirtualPTDF
+
+To apply network reductions, pass a vector of `NetworkReduction` objects to the `network_reductions` keyword argument:
+
+``` @repl tutorial_VirtualPTDF_matrix
+# Apply radial reduction
+v_ptdf_radial = VirtualPTDF(sys_2, network_reductions=[RadialReduction()]);
+
+# Apply degree-two reduction
+v_ptdf_degree_two = VirtualPTDF(sys_2, network_reductions=[DegreeTwoReduction()]);
+
+# Combine multiple reductions (order matters - RadialReduction first is recommended)
+v_ptdf_combined = VirtualPTDF(sys_2, network_reductions=[RadialReduction(), DegreeTwoReduction()]);
+```
+
+### Protecting Specific Buses from Reduction
+
+Both reduction types allow you to specify buses that should not be eliminated using the `irreducible_buses` parameter:
+
+``` @repl tutorial_VirtualPTDF_matrix
+# Protect specific buses from radial reduction
+reduction = RadialReduction(irreducible_buses=[1, 2])
+v_ptdf_protected = VirtualPTDF(sys_2, network_reductions=[reduction]);
+```
+
+### DegreeTwoReduction Options
+
+The `DegreeTwoReduction` has an additional option to control whether buses with reactive power injections are reduced:
+
+``` @repl tutorial_VirtualPTDF_matrix
+# Preserve buses with reactive power injections
+reduction = DegreeTwoReduction(reduce_reactive_power_injectors=false)
+v_ptdf_preserve_reactive = VirtualPTDF(sys_2, network_reductions=[reduction]);
+```
+
+### Accessing Reduction Information
+
+After initializing the VirtualPTDF with reductions, you can access information about what was reduced:
+
+``` @repl tutorial_VirtualPTDF_matrix
+v_ptdf_reduced = VirtualPTDF(sys_2, network_reductions=[RadialReduction(), DegreeTwoReduction()]);
+
+# Get the reduction data
+reduction_data = get_network_reduction_data(v_ptdf_reduced)
+```
+
+### Combining Reductions with Other Options
+
+Network reductions can be combined with other VirtualPTDF options like distributed slack and sparsification:
+
+``` @repl tutorial_VirtualPTDF_matrix
+v_ptdf_full_options = VirtualPTDF(sys_2,
+    dist_slack=dis_slack_dict,
+    tol=1e-5,
+    network_reductions=[RadialReduction(), DegreeTwoReduction()]
+);
+```
+
+**NOTE**: The `VirtualPTDF` only supports `KLU` and `AppleAccelerate` linear solvers when using network reductions. The reference (slack) bus is automatically protected from elimination during reductions.
