@@ -58,6 +58,7 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
+    work_ba_col::Vector{Float64}
 end
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
@@ -74,23 +75,39 @@ function _get_PTDF_A_diag(
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     ref_bus_positions::Set{Int},
 )
-    # get inverse of ABA
-    Ix = SparseArrays.sparse(I, size(K, 1), size(K, 1))
-    ABA_inv = zeros(Float64, size(Ix))
-    ldiv!(ABA_inv, K, Ix)
-    # multiply the matrix just for some elements
-    diag_ = zeros(size(BA, 2))
-    for i in 1:size(BA, 2) # per each column
-        for j in BA.rowval[BA.colptr[i]:(BA.colptr[i + 1] - 1)]
-            check_1 = sum(j .> ref_bus_positions)
-            for k in BA.colptr[i]:(BA.colptr[i + 1] - 1)
-                if BA.rowval[k] ∉ ref_bus_positions && j ∉ ref_bus_positions
-                    check_2 = sum(BA.rowval[k] .> ref_bus_positions)
-                    diag_[i] +=
-                        A[i, j] *
-                        (BA.nzval[k] * ABA_inv[j - check_1, BA.rowval[k] - check_2])
-                end
-            end
+    n_branches = size(BA, 2)
+    n_buses = size(BA, 1)
+    diag_ = zeros(n_branches)
+
+    # Pre-compute valid indices (non-reference buses)
+    valid_ix = setdiff(1:n_buses, ref_bus_positions)
+    n_valid = length(valid_ix)
+
+    # Pre-allocate work arrays for efficiency
+    ba_col = zeros(n_valid)
+    ptdf_row = zeros(n_buses)
+
+    # For each branch, compute PTDF row and dot with incidence column
+    for i in 1:n_branches
+        # Extract BA column for valid indices
+        fill!(ba_col, 0.0)
+        for idx in 1:n_valid
+            bus_idx = valid_ix[idx]
+            ba_col[idx] = BA[bus_idx, i]
+        end
+
+        # Solve for PTDF row: ptdf_row_valid = ABA^(-1) * ba_col
+        ptdf_row_valid = K \ ba_col
+
+        # Map back to full bus indices
+        fill!(ptdf_row, 0.0)
+        for idx in 1:n_valid
+            ptdf_row[valid_ix[idx]] = ptdf_row_valid[idx]
+        end
+
+        # Compute diagonal element: sum of PTDF[i,j] * A[i,j] for all buses j
+        for j in 1:n_buses
+            diag_[i] += ptdf_row[j] * A[i, j]
         end
     end
     return diag_
@@ -162,6 +179,9 @@ function VirtualLODF(
             )
     end
 
+    # Pre-allocate work array for BA column extraction
+    work_ba_col = zeros(length(valid_ix))
+
     return VirtualLODF(
         K,
         BA.data,
@@ -176,6 +196,7 @@ function VirtualLODF(
         subnetwork_axes,
         Ref(tol),
         Ymatrix.network_reduction_data,
+        work_ba_col,
     )
 end
 
@@ -218,14 +239,15 @@ function _getindex(
     if haskey(vlodf.cache, row)
         return vlodf.cache.temp_cache[row][column]
     else
-
         # evaluate the value for the LODF column
+        # Use pre-allocated work array instead of collect() to reduce allocations
+        @inbounds for i in eachindex(vlodf.valid_ix)
+            vlodf.work_ba_col[i] = vlodf.BA[vlodf.valid_ix[i], row]
+        end
+        lin_solve = KLU.solve!(vlodf.K, vlodf.work_ba_col)
 
-        # TODO: needs improvement to speed up computation (not much found...)
-
-        lin_solve = KLU.solve!(vlodf.K, collect(vlodf.BA[vlodf.valid_ix, row]))
         # get full lodf row
-        for i in eachindex(vlodf.valid_ix)
+        @inbounds for i in eachindex(vlodf.valid_ix)
             vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
         end
 
@@ -234,9 +256,9 @@ function _getindex(
         lodf_row[row] = -1.0
 
         if get_tol(vlodf) > eps()
-            vlodf.cache[row] = deepcopy(sparsify(lodf_row, get_tol(vlodf)))
+            vlodf.cache[row] = sparsify(lodf_row, get_tol(vlodf))
         else
-            vlodf.cache[row] = deepcopy(lodf_row)
+            vlodf.cache[row] = copy(lodf_row)
         end
         return vlodf.cache[row][column]
     end

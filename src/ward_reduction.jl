@@ -31,12 +31,12 @@ function get_ward_reduction(
     ref_bus_numbers::Set{Int},
     study_buses::Vector{Int},
 )
-    Z_full = KLU.solve!(klu(data), Matrix{ComplexF64}(one(data)))       #TODO: change implementation for large systems (row by row)
     all_buses = bus_axis
     external_buses = setdiff(all_buses, study_buses)
     boundary_buses = unique(boundary_buses)
     n_external = length(external_buses)
     n_boundary = length(boundary_buses)
+    n_buses = length(bus_axis)
 
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
 
@@ -47,11 +47,22 @@ function get_ward_reduction(
         @error "no boundary buses found; cannot make bus_reduction_map based on impedance based criteria. mapping all external buses to the first reference bus ($first_ref_study_bus)"
         bus_reduction_map_index[first_ref_study_bus] = Set(external_buses)
     else
+        # Optimized: Only compute Z rows for external buses instead of full Z matrix
+        # This reduces complexity from O(n³) to O(n_external * n²)
+        K = klu(data)
+        boundary_bus_indices = [bus_lookup[x] for x in boundary_buses]
+        boundary_bus_numbers = collect(boundary_buses)
+        e = zeros(ComplexF64, n_buses)
+
         for b in external_buses
-            boundary_bus_indices = [bus_lookup[x] for x in boundary_buses]
-            boundary_bus_numbers = [x for x in boundary_buses]
             row_index = bus_lookup[b]
-            Z_row_boundary = abs.(Z_full[row_index, boundary_bus_indices])
+            # Compute only the row we need: Z[row_index, :] = e_row^T * Y^(-1)
+            # This is equivalent to solving Y^T * z = e_row, but since Y is symmetric, Y * z = e_row
+            fill!(e, zero(ComplexF64))
+            e[row_index] = one(ComplexF64)
+            Z_row = K \ e  # Single row solve instead of full inverse
+
+            Z_row_boundary = abs.(Z_row[boundary_bus_indices])
             closest_boundary_bus = boundary_bus_numbers[argmin(Z_row_boundary)]
             push!(bus_reduction_map_index[closest_boundary_bus], b)
         end

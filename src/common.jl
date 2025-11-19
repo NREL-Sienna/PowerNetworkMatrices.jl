@@ -262,46 +262,38 @@ function calculate_ABA_matrix(
 end
 
 """
-Return a sparse matrix given a dense one by dropping element whose absolute
-value is above a certain tolerance.
+Return a sparse matrix given a dense one by dropping elements whose absolute
+value is below a certain tolerance.
 
+Uses optimized `droptol!` for better performance compared to element-wise iteration.
 
 # Arguments
-- dense_array::Matrix{Float64}`:
+- `dense_array::Matrix{Float64}`:
         input matrix (e.g., PTDF matrix).
 - `tol::Float64`:
         tolerance.
 """
 function sparsify(dense_array::Matrix{Float64}, tol::Float64)
-    m, n = size(dense_array)
-    sparse_array = SparseArrays.spzeros(m, n)
-    for j in 1:n, i in 1:m
-        if abs(dense_array[i, j]) > tol
-            sparse_array[i, j] = dense_array[i, j]
-        end
-    end
+    sparse_array = SparseArrays.sparse(dense_array)
+    SparseArrays.droptol!(sparse_array, tol)
     return sparse_array
 end
 
 """
-Return a sparse vector given a dense one by dropping element whose absolute
-value is above a certain tolerance.
+Return a sparse vector given a dense one by dropping elements whose absolute
+value is below a certain tolerance.
 
+Uses optimized `droptol!` for better performance compared to element-wise iteration.
 
 # Arguments
-- dense_array::Vector{Float64}`:
+- `dense_array::Vector{Float64}`:
         input vector (e.g., PTDF row from VirtualPTDF).
 - `tol::Float64`:
         tolerance.
 """
 function sparsify(dense_array::Vector{Float64}, tol::Float64)
-    m = length(dense_array)
-    sparse_array = SparseArrays.spzeros(m)
-    for i in 1:m
-        if abs(dense_array[i]) > tol
-            sparse_array[i] = dense_array[i]
-        end
-    end
+    sparse_array = SparseArrays.sparsevec(dense_array)
+    SparseArrays.droptol!(sparse_array, tol)
     return sparse_array
 end
 

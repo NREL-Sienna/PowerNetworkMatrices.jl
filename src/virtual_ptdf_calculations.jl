@@ -49,6 +49,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K} <: PowerNetworkMatrix{Float64}
     K::K
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     dist_slack::Vector{Float64}
+    dist_slack_normalized::Vector{Float64}
     axes::Ax
     lookup::L
     temp_data::Vector{Float64}
@@ -57,6 +58,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K} <: PowerNetworkMatrix{Float64}
     subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
+    work_ba_col::Vector{Float64}
 end
 
 get_axes(M::VirtualPTDF) = M.axes
@@ -162,18 +164,31 @@ function VirtualPTDF(
         error("Unsupported linear solver: $linear_solver")
     end
 
+    # Pre-compute normalized distributed slack for efficiency
+    if !isempty(dist_slack_vector)
+        dist_slack_normalized = dist_slack_vector / sum(dist_slack_vector)
+    else
+        dist_slack_normalized = Float64[]
+    end
+
+    # Pre-allocate work array for BA column extraction
+    valid_ix = setdiff(1:length(temp_data), ref_bus_positions)
+    work_ba_col = zeros(length(valid_ix))
+
     return VirtualPTDF(
         K,
         BA.data,
         dist_slack_vector,
+        dist_slack_normalized,
         axes,
         look_up,
         temp_data,
-        setdiff(1:length(temp_data), ref_bus_positions),
+        valid_ix,
         empty_cache,
         subnetwork_axes,
         Ref(tol),
         Ymatrix.network_reduction_data,
+        work_ba_col,
     )
 end
 
@@ -234,9 +249,12 @@ function _getindex(
         return vptdf.cache.temp_cache[row][column]
     else
         # evaluate the value for the PTDF column
-        # Needs improvement
         valid_ix = vptdf.valid_ix
-        lin_solve = _solve_factorization(vptdf.K, collect(vptdf.BA[valid_ix, row]))
+        # Use pre-allocated work array instead of collect() to reduce allocations
+        @inbounds for i in eachindex(valid_ix)
+            vptdf.work_ba_col[i] = vptdf.BA[valid_ix[i], row]
+        end
+        lin_solve = _solve_factorization(vptdf.K, vptdf.work_ba_col)
         buscount = size(vptdf, 1)
         ref_bus_positions = get_ref_bus_position(vptdf)
         if !isempty(vptdf.dist_slack) && length(ref_bus_positions) != 1
@@ -244,24 +262,23 @@ function _getindex(
                 "Distributed slack is not supported for systems with multiple reference buses.",
             )
         elseif isempty(vptdf.dist_slack) && length(ref_bus_positions) < buscount
-            for i in eachindex(valid_ix)
+            @inbounds for i in eachindex(valid_ix)
                 vptdf.temp_data[valid_ix[i]] = lin_solve[i]
             end
-            vptdf.cache[row] = deepcopy(vptdf.temp_data)
+            vptdf.cache[row] = copy(vptdf.temp_data)
         elseif length(vptdf.dist_slack) == buscount
-            for i in eachindex(valid_ix)
+            @inbounds for i in eachindex(valid_ix)
                 vptdf.temp_data[valid_ix[i]] = lin_solve[i]
             end
-            slack_array = vptdf.dist_slack / sum(vptdf.dist_slack)
-            slack_array = reshape(slack_array, buscount)
-            vptdf.cache[row] =
-                deepcopy(vptdf.temp_data .- dot(vptdf.temp_data, slack_array))
+            # Use pre-computed normalized slack array for efficiency
+            adjustment = dot(vptdf.temp_data, vptdf.dist_slack_normalized)
+            vptdf.cache[row] = vptdf.temp_data .- adjustment
         else
             error("Distributed bus specification doesn't match the number of buses.")
         end
 
         if get_tol(vptdf) > eps()
-            vptdf.cache[row] = deepcopy(sparsify(vptdf.cache[row], get_tol(vptdf)))
+            vptdf.cache[row] = sparsify(vptdf.cache[row], get_tol(vptdf))
         end
 
         return vptdf.cache[row][column]

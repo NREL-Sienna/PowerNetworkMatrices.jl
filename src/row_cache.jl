@@ -3,19 +3,22 @@ Structure used for saving the rows of the Virtual PTDF and LODF matrix.
 
 # Arguments
 - `temp_cache::Dict{Int, Union{Vector{Float64}, SparseArrays.SparseVector{Float64}}}`:
-        Dictionay saving the row of the PTDF/LODF matrix
+        Dictionary saving the row of the PTDF/LODF matrix
 - `persistent_cache_keys::Set{Int}`:
         Set listing the rows to keep in `temp_cache`
 - `max_cache_size::Int`
         Defines the maximum allowed cache size (rows*row_size)
 - `max_num_keys::Int`
         Defines the maximum number of keys saved (rows of the matrix)
+- `access_order::Vector{Int}`:
+        Vector tracking access order for LRU eviction (most recent at end)
 """
 struct RowCache{T <: Union{Vector{Float64}, SparseArrays.SparseVector{Float64}}}
     temp_cache::Dict{Int, T}
     persistent_cache_keys::Set{Int}
     max_cache_size::Int
     max_num_keys::Int
+    access_order::Vector{Int}
 end
 
 """
@@ -47,6 +50,7 @@ function RowCache(max_cache_size::Int, persistent_rows::Set{Int}, row_size)
         persistent_rows,
         max_cache_size,
         max_num_keys,
+        sizehint!(Vector{Int}(), max_num_keys),
     )
 end
 
@@ -66,6 +70,7 @@ function Base.empty!(cache::RowCache)
         @warn("Calling empty! will delete entries for the persistent rows")
     end
     empty!(cache.temp_cache)
+    empty!(cache.access_order)
     return
 end
 
@@ -102,6 +107,8 @@ function Base.setindex!(
     # element not belonging to the `persistent_cache_keys` is removed.
     check_cache_size!(cache; new_add = true)
     cache.temp_cache[key] = val
+    # Update access order for LRU tracking
+    push!(cache.access_order, key)
     return
 end
 
@@ -130,9 +137,20 @@ end
 
 """
 Deletes a row from the stored matrix in cache not belonging to the
-persistent_cache_keys set.
+persistent_cache_keys set. Uses LRU (Least Recently Used) eviction strategy
+based on access_order tracking.
 """
 function purge_one!(cache::RowCache)
+    # Use LRU eviction: find oldest non-persistent key
+    for i in 1:length(cache.access_order)
+        k = cache.access_order[i]
+        if k ∉ cache.persistent_cache_keys && haskey(cache.temp_cache, k)
+            deleteat!(cache.access_order, i)
+            delete!(cache.temp_cache, k)
+            return
+        end
+    end
+    # Fallback: if access_order is out of sync, use old method
     for k in keys(cache.temp_cache)
         if k ∉ cache.persistent_cache_keys
             delete!(cache.temp_cache, k)
