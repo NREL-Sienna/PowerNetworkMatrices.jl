@@ -77,14 +77,14 @@ function _add_arc_buses_to_irreducible!(
     return
 end
 
-function _arc_conecting_two_areas(br::PSY.ACTransmision)
+function _arc_conecting_two_areas(br::PSY.ACTransmission)
     arc = get_arc(br)
     return _arc_conecting_two_areas(arc)
 end
 
 function _add_arc_buses_to_irreducible!(
     irreducible_buses::Set{Int},
-    br::PSY.ACTransmision,
+    br::PSY.ACTransmission,
 )
     arc = get_arc(br)
     _add_arc_buses_to_irreducible!(irreducible_buses, arc)
@@ -152,7 +152,7 @@ function get_reduction(
 
     # Keep buses connected by area interchange lines
     if PSY.has_component(sys, PSY.AreaInterchange)
-        for br in PSY.get_components(PSY.ACTransmision, sys)
+        for br in PSY.get_components(PSY.ACTransmission, sys)
             if _arc_conecting_two_areas(br)
                 _add_arc_buses_to_irreducible!(irreducible_buses, br)
             end
