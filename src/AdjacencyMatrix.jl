@@ -58,7 +58,7 @@ get_bus_axis(M::AdjacencyMatrix) = M.axes[1]
 get_bus_lookup(M::AdjacencyMatrix) = M.lookup[1]
 
 function _arc_conecting_two_areas(br::PSY.Arc)
-    arc = get_arc(br)
+    arc = PSY.get_arc(br)
     from_bus = PSY.get_from(arc)
     to_bus = PSY.get_to(arc)
     area_from = PSY.get_uuid(PSY.get_area(from_bus))
@@ -78,7 +78,7 @@ function _add_arc_buses_to_irreducible!(
 end
 
 function _arc_conecting_two_areas(br::PSY.ACTransmission)
-    arc = get_arc(br)
+    arc = PSY.get_arc(br)
     return _arc_conecting_two_areas(arc)
 end
 
@@ -86,7 +86,7 @@ function _add_arc_buses_to_irreducible!(
     irreducible_buses::Set{Int},
     br::PSY.ACTransmission,
 )
-    arc = get_arc(br)
+    arc = PSY.get_arc(br)
     _add_arc_buses_to_irreducible!(irreducible_buses, arc)
     return
 end
@@ -94,9 +94,9 @@ end
 function _arc_conecting_two_areas(br::PSY.ThreeWindingTransformer)
     # For the 3WT all the 4 buses are kept if any of the 3 arcs connect two areas
     arcs = [
-        get_primary_star_arc(br),
-        get_secondary_star_arc(br),
-        get_tertiary_star_arc(br),
+        PSY.get_primary_star_arc(br),
+        PSY.get_secondary_star_arc(br),
+        PSY.get_tertiary_star_arc(br),
     ]
     for arc in arcs
         if _arc_conecting_two_areas(arc)
@@ -111,9 +111,9 @@ function _add_arc_buses_to_irreducible!(
     br::PSY.ThreeWindingTransformer,
 )
     arcs = [
-        get_primary_star_arc(br),
-        get_secondary_star_arc(br),
-        get_tertiary_star_arc(br),
+        PSY.get_primary_star_arc(br),
+        PSY.get_secondary_star_arc(br),
+        PSY.get_tertiary_star_arc(br),
     ]
     for arc in arcs
         _add_arc_buses_to_irreducible!(irreducible_buses, arc)
