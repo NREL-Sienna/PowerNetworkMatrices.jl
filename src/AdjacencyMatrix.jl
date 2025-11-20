@@ -121,6 +121,9 @@ function _add_arc_buses_to_irreducible!(
     return
 end
 
+_is_not_nodal_branch(::PSY.ACTransmission) = false
+_is_not_nodal_branch(::PSY.AreaInterchange) = true
+
 function get_reduction(
     A::AdjacencyMatrix,
     sys::PSY.System,
@@ -151,10 +154,21 @@ function get_reduction(
     end
 
     # Keep buses connected by area interchange lines
-    if PSY.has_component(sys, PSY.AreaInterchange)
+    if PSY.has_components(sys, PSY.AreaInterchange)
         for br in PSY.get_components(PSY.ACTransmission, sys)
             if _arc_conecting_two_areas(br)
                 _add_arc_buses_to_irreducible!(irreducible_buses, br)
+            end
+        end
+    end
+
+    if PSY.has_components(sys, PSY.TransmissionInterface)
+        for interface in PSY.get_components(PSY.TransmissionInterface, sys)
+            for br in get_contributing_devices(sys, interface)
+                _is_not_nodal_branch(br) && continue
+                if _arc_conecting_two_areas(br)
+                    _add_arc_buses_to_irreducible!(irreducible_buses, br)
+                end
             end
         end
     end
