@@ -57,8 +57,7 @@ get_network_reduction_data(M::AdjacencyMatrix) = M.network_reduction_data
 get_bus_axis(M::AdjacencyMatrix) = M.axes[1]
 get_bus_lookup(M::AdjacencyMatrix) = M.lookup[1]
 
-function _arc_conecting_two_areas(br::PSY.Arc)
-    arc = PSY.get_arc(br)
+function _arc_conecting_two_areas(arc::PSY.Arc)
     from_bus = PSY.get_from(arc)
     to_bus = PSY.get_to(arc)
     area_from = PSY.get_uuid(PSY.get_area(from_bus))
