@@ -215,7 +215,8 @@ end
         buscount = length(PSY.get_available_components(PSY.ACBus, sys))
         dist_slack_factor = 1 / buscount
         dist_slack = Dict(i => dist_slack_factor for i in 1:buscount)
-        vptdf_aa_slack = VirtualPTDF(sys; linear_solver = "AppleAccelerate", dist_slack = dist_slack)
+        vptdf_aa_slack =
+            VirtualPTDF(sys; linear_solver = "AppleAccelerate", dist_slack = dist_slack)
         @test contains(string(typeof(vptdf_aa_slack.K)), "AAFactorization")
 
         # Compare with KLU for distributed slack case
@@ -228,7 +229,12 @@ end
         # Test cache functionality with AppleAccelerate
         arc_tuples = [PNM.get_arc_tuple(br) for br in get_components(ACTransmission, sys)]
         persist_arcs = arc_tuples[1:min(5, length(arc_tuples))]
-        vptdf_aa_cache = VirtualPTDF(sys; linear_solver = "AppleAccelerate", max_cache_size = 1, persistent_arcs = persist_arcs)
+        vptdf_aa_cache = VirtualPTDF(
+            sys;
+            linear_solver = "AppleAccelerate",
+            max_cache_size = 1,
+            persistent_arcs = persist_arcs,
+        )
 
         for l in persist_arcs
             @test size(vptdf_aa_cache[l, :]) == (length(PNM.get_bus_axis(vptdf_aa_cache)),)
