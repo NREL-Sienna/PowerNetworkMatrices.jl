@@ -151,7 +151,7 @@ function get_reduction(
     end
 
     # Keep buses connected by area interchange lines
-    if PSY.has_component(sys, PSY.AreaInterchange)
+    if PSY.has_components(sys, PSY.AreaInterchange)
         for br in PSY.get_components(PSY.ACTransmission, sys)
             if _arc_conecting_two_areas(br)
                 _add_arc_buses_to_irreducible!(irreducible_buses, br)
