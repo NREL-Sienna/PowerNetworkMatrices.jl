@@ -165,9 +165,7 @@ function get_reduction(
         for interface in PSY.get_components(PSY.TransmissionInterface, sys)
             for br in PSY.get_contributing_devices(sys, interface)
                 _is_not_nodal_branch(br) && continue
-                if _arc_conecting_two_areas(br)
-                    _add_arc_buses_to_irreducible!(irreducible_buses, br)
-                end
+                _add_arc_buses_to_irreducible!(irreducible_buses, br)
             end
         end
     end
