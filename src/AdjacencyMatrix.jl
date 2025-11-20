@@ -60,13 +60,13 @@ get_bus_lookup(M::AdjacencyMatrix) = M.lookup[1]
 function _arc_conecting_two_areas(arc::PSY.Arc)
     from_bus = PSY.get_from(arc)
     to_bus = PSY.get_to(arc)
-    area_from = PSY.get_uuid(PSY.get_area(from_bus))
-    area_to = PSY.get_uuid(PSY.get_area(to_bus))
+    area_from = IS.get_uuid(PSY.get_area(from_bus))
+    area_to = IS.get_uuid(PSY.get_area(to_bus))
     return area_from != area_to
 end
 
 function _add_arc_buses_to_irreducible!(
-    irreducible_buses::Set{Int},
+    irreducible_buses::Vector{Int},
     arc::PSY.Arc,
 )
     from_bus = PSY.get_from(arc)
@@ -82,7 +82,7 @@ function _arc_conecting_two_areas(br::PSY.ACTransmission)
 end
 
 function _add_arc_buses_to_irreducible!(
-    irreducible_buses::Set{Int},
+    irreducible_buses::Vector{Int},
     br::PSY.ACTransmission,
 )
     arc = PSY.get_arc(br)
@@ -106,7 +106,7 @@ function _arc_conecting_two_areas(br::PSY.ThreeWindingTransformer)
 end
 
 function _add_arc_buses_to_irreducible!(
-    irreducible_buses::Set{Int},
+    irreducible_buses::Vector{Int},
     br::PSY.ThreeWindingTransformer,
 )
     arcs = [
@@ -163,7 +163,7 @@ function get_reduction(
 
     if PSY.has_components(sys, PSY.TransmissionInterface)
         for interface in PSY.get_components(PSY.TransmissionInterface, sys)
-            for br in get_contributing_devices(sys, interface)
+            for br in PSY.get_contributing_devices(sys, interface)
                 _is_not_nodal_branch(br) && continue
                 if _arc_conecting_two_areas(br)
                     _add_arc_buses_to_irreducible!(irreducible_buses, br)
