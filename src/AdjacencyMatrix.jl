@@ -71,8 +71,12 @@ function _add_arc_buses_to_irreducible!(
 )
     from_bus = PSY.get_from(arc)
     to_bus = PSY.get_to(arc)
-    push!(irreducible_buses, PSY.get_number(from_bus))
-    push!(irreducible_buses, PSY.get_number(to_bus))
+    if PSY.get_available(from_bus)
+        push!(irreducible_buses, PSY.get_number(from_bus))
+    end
+    if PSY.get_available(to_bus)
+        push!(irreducible_buses, PSY.get_number(to_bus))
+    end
     return
 end
 
@@ -155,7 +159,7 @@ function get_reduction(
     # Keep buses connected by area interchange lines
     if PSY.has_components(sys, PSY.AreaInterchange)
         for br in PSY.get_components(PSY.ACTransmission, sys)
-            if _arc_conecting_two_areas(br)
+            if _arc_conecting_two_areas(br) && PSY.get_available(br)
                 _add_arc_buses_to_irreducible!(irreducible_buses, br)
             end
         end
@@ -164,7 +168,9 @@ function get_reduction(
     if PSY.has_components(sys, PSY.TransmissionInterface)
         for interface in PSY.get_components(PSY.TransmissionInterface, sys)
             for br in PSY.get_contributing_devices(sys, interface)
-                _is_not_nodal_branch(br) && continue
+                if _is_not_nodal_branch(br) || !PSY.get_available(br)
+                    continue
+                end
                 _add_arc_buses_to_irreducible!(irreducible_buses, br)
             end
         end

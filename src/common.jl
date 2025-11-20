@@ -233,9 +233,7 @@ function get_irreducible_indices(A::AdjacencyMatrix, irreducible_buses::Vector{I
     irreducible_indices = zeros(Int, length(irreducible_buses))
     for (ix, bus_no) in enumerate(irreducible_buses)
         reduced_bus_no = get(reverse_bus_search_map, bus_no, bus_no)
-        irreducible_indices[ix] = get(A.lookup[1], reduced_bus_no, error(
-            "Invalid bus entry found: Bus $bus_no. Check your input data; this bus was mapped to bus $reduced_bus_no in a prior reductions and not found in the admittance matrix.",
-        ))
+        irreducible_indices[ix] = A.lookup[1][reduced_bus_no]
     end
     return irreducible_indices
 end
