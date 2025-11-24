@@ -57,6 +57,76 @@ get_network_reduction_data(M::AdjacencyMatrix) = M.network_reduction_data
 get_bus_axis(M::AdjacencyMatrix) = M.axes[1]
 get_bus_lookup(M::AdjacencyMatrix) = M.lookup[1]
 
+function _arc_conecting_two_areas(arc::PSY.Arc)
+    from_bus = PSY.get_from(arc)
+    to_bus = PSY.get_to(arc)
+    area_from = IS.get_uuid(PSY.get_area(from_bus))
+    area_to = IS.get_uuid(PSY.get_area(to_bus))
+    return area_from != area_to
+end
+
+function _add_arc_buses_to_irreducible!(
+    irreducible_buses::Vector{Int},
+    arc::PSY.Arc,
+)
+    from_bus = PSY.get_from(arc)
+    to_bus = PSY.get_to(arc)
+    if PSY.get_available(from_bus)
+        push!(irreducible_buses, PSY.get_number(from_bus))
+    end
+    if PSY.get_available(to_bus)
+        push!(irreducible_buses, PSY.get_number(to_bus))
+    end
+    return
+end
+
+function _arc_conecting_two_areas(br::PSY.ACTransmission)
+    arc = PSY.get_arc(br)
+    return _arc_conecting_two_areas(arc)
+end
+
+function _add_arc_buses_to_irreducible!(
+    irreducible_buses::Vector{Int},
+    br::PSY.ACTransmission,
+)
+    arc = PSY.get_arc(br)
+    _add_arc_buses_to_irreducible!(irreducible_buses, arc)
+    return
+end
+
+function _arc_conecting_two_areas(br::PSY.ThreeWindingTransformer)
+    # For the 3WT all the 4 buses are kept if any of the 3 arcs connect two areas
+    arcs = [
+        PSY.get_primary_star_arc(br),
+        PSY.get_secondary_star_arc(br),
+        PSY.get_tertiary_star_arc(br),
+    ]
+    for arc in arcs
+        if _arc_conecting_two_areas(arc)
+            return true
+        end
+    end
+    return false
+end
+
+function _add_arc_buses_to_irreducible!(
+    irreducible_buses::Vector{Int},
+    br::PSY.ThreeWindingTransformer,
+)
+    arcs = [
+        PSY.get_primary_star_arc(br),
+        PSY.get_secondary_star_arc(br),
+        PSY.get_tertiary_star_arc(br),
+    ]
+    for arc in arcs
+        _add_arc_buses_to_irreducible!(irreducible_buses, arc)
+    end
+    return
+end
+
+_is_not_nodal_branch(::PSY.ACTransmission) = false
+_is_not_nodal_branch(::PSY.AreaInterchange) = true
+
 function get_reduction(
     A::AdjacencyMatrix,
     sys::PSY.System,
@@ -83,6 +153,26 @@ function get_reduction(
         end
         if PSY.get_available(PSY.get_to(arc))
             push!(irreducible_buses, PSY.get_number(PSY.get_to(arc)))
+        end
+    end
+
+    # Keep buses connected by area interchange lines
+    if PSY.has_components(sys, PSY.AreaInterchange)
+        for br in PSY.get_components(PSY.ACTransmission, sys)
+            if _arc_conecting_two_areas(br) && PSY.get_available(br)
+                _add_arc_buses_to_irreducible!(irreducible_buses, br)
+            end
+        end
+    end
+
+    if PSY.has_components(sys, PSY.TransmissionInterface)
+        for interface in PSY.get_components(PSY.TransmissionInterface, sys)
+            for br in PSY.get_contributing_devices(sys, interface)
+                if _is_not_nodal_branch(br) || !PSY.get_available(br)
+                    continue
+                end
+                _add_arc_buses_to_irreducible!(irreducible_buses, br)
+            end
         end
     end
 
