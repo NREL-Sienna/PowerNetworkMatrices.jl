@@ -323,6 +323,7 @@ function _calculate_PTDF_matrix_AppleAccelerate(
 
     ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
     K = AppleAccelerate.AAFactorization(ABA)
+    factor!(K, AppleAccelerate.SparseFactorizationLDLT)
 
     # initialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
