@@ -45,7 +45,8 @@ matrix.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 """
-struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K} <: PowerNetworkMatrix{Float64}
+struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K <: LinearAlgebra.Factorization} <:
+       PowerNetworkMatrix{Float64}
     K::K
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     dist_slack::Vector{Float64}
