@@ -9,14 +9,11 @@ const DC_ABA_Matrix_Unfactorized = ABA_Matrix{
     Nothing,
 }
 # TODO: what about MKLPardiso? switch to <:LinearAlgebra.Factorization instead?
-@static if USE_AA
+@static if USE_AA || USE_MKL
     const DC_vPTDF_Matrix = VirtualPTDF{
         Tuple{Vector{Tuple{Int, Int}}, Vector{Int64}},
         Tuple{Dict{Tuple{Int, Int}, Int64}, Dict{Int64, Int64}},
-        <:Union{
-            AppleAccelerate.AAFactorization{Float64},
-            KLU.KLUFactorization{Float64, Int64},
-        },
+        <:LinearAlgebra.Factorization,
     }
 else
     const DC_vPTDF_Matrix = VirtualPTDF{
