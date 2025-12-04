@@ -42,7 +42,7 @@
     @test isapprox(sum(total_error), 0.0, atol = 1e-3)
     @test isapprox(sum(total_error2), 0.0, atol = 1e-3)
 
-    if !PowerNetworkMatrices.USE_AA
+    if PowerNetworkMatrices._has_mkl_pardiso_ext()
         L5NS_from_ptdf3 = LODF(A, P5; linear_solver = "MKLPardiso")
         @test getindex(L5NS_from_ptdf3, "5", "6") - -0.3071 <= 1e-4
         total_error3 = 0.0
@@ -56,7 +56,7 @@
         @test isapprox(sum(total_error3), 0.0, atol = 1e-3)
     end
 
-    if PowerNetworkMatrices.USE_AA
+    if PowerNetworkMatrices._has_apple_accelerate_ext()
         L5NS_from_ptdf4 = LODF(A, P5; linear_solver = "AppleAccelerate")
         @test getindex(L5NS_from_ptdf4, "5", "6") - -0.3071 <= 1e-4
         total_error4 = 0.0

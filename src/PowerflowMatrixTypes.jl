@@ -8,20 +8,12 @@ const DC_ABA_Matrix_Unfactorized = ABA_Matrix{
     Tuple{Dict{Int64, Int64}, Dict{Int64, Int64}},
     Nothing,
 }
-# TODO: what about MKLPardiso? switch to <:LinearAlgebra.Factorization instead?
-@static if USE_AA || USE_MKL
-    const DC_vPTDF_Matrix = VirtualPTDF{
-        Tuple{Vector{Tuple{Int, Int}}, Vector{Int64}},
-        Tuple{Dict{Tuple{Int, Int}, Int64}, Dict{Int64, Int64}},
-        <:LinearAlgebra.Factorization,
-    }
-else
-    const DC_vPTDF_Matrix = VirtualPTDF{
-        Tuple{Vector{Tuple{Int, Int}}, Vector{Int64}},
-        Tuple{Dict{Tuple{Int, Int}, Int64}, Dict{Int64, Int64}},
-        KLU.KLUFactorization{Float64, Int64},
-    }
-end
+# VirtualPTDF can use various factorization types when extensions are loaded
+const DC_vPTDF_Matrix = VirtualPTDF{
+    Tuple{Vector{Tuple{Int, Int}}, Vector{Int64}},
+    Tuple{Dict{Tuple{Int, Int}, Int64}, Dict{Int64, Int64}},
+    <:LinearAlgebra.Factorization,
+}
 const DC_PTDF_Matrix = PTDF{
     Tuple{Vector{Int64}, Vector{Tuple{Int, Int}}},
     Tuple{Dict{Int64, Int64}, Dict{Tuple{Int, Int}, Int64}},

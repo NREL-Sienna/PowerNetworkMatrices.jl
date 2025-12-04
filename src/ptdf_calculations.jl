@@ -94,9 +94,19 @@ function _buildptdf_from_matrices(
             dist_slack,
         )
     elseif linear_solver == "MKLPardiso"
+        if !_has_mkl_pardiso_ext()
+            error(
+                "The MKL/Pardiso extension is not available. Install MKL and Pardiso packages: using Pkg; Pkg.add([\"MKL\", \"Pardiso\"])",
+            )
+        end
         PTDFm =
             _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     elseif linear_solver == "AppleAccelerate"
+        if !_has_apple_accelerate_ext()
+            error(
+                "AppleAccelerate extension is not available. This solver is only available on macOS. Install AppleAccelerate: using Pkg; Pkg.add(\"AppleAccelerate\")",
+            )
+        end
         PTDFm =
             _calculate_PTDF_matrix_AppleAccelerate(A, BA, ref_bus_positions, dist_slack)
     end
@@ -220,136 +230,11 @@ function _calculate_PTDF_matrix_DENSE(
     return
 end
 
-"""
-Function for internal use only.
+# _calculate_PTDF_matrix_MKLPardiso is defined in ext/MKLPardisoExt.jl
+# when MKL and Pardiso packages are loaded
 
-Computes the PTDF matrix by means of the MKL Pardiso for dense matrices.
-
-# Arguments
-- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
-        Incidence Matrix
-- `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        BA matrix
-- `ref_bus_positions::Set{Int}`:
-        vector containing the indexes of the reference slack buses.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function _calculate_PTDF_matrix_MKLPardiso(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int},
-    BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    ref_bus_positions::Set{Int},
-    dist_slack::Vector{Float64})
-    linecount = size(BA, 2)
-    buscount = size(BA, 1)
-
-    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-    @assert LinearAlgebra.issymmetric(ABA)
-    ps = Pardiso.MKLPardisoSolver()
-    Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM)
-    Pardiso.pardisoinit(ps)
-    # Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-    defaults = Pardiso.get_iparms(ps)
-    Pardiso.set_iparm!(ps, 1, 1)
-    for (ix, v) in enumerate(defaults[2:end])
-        Pardiso.set_iparm!(ps, ix + 1, v)
-    end
-    Pardiso.set_iparm!(ps, 2, 2)
-    Pardiso.set_iparm!(ps, 59, 2)
-    Pardiso.set_iparm!(ps, 6, 1)
-    Pardiso.set_iparm!(ps, 12, 1)
-    Pardiso.set_iparm!(ps, 11, 0)
-    Pardiso.set_iparm!(ps, 13, 0)
-    Pardiso.set_iparm!(ps, 32, 1)
-
-    # initialize matrices for evaluation
-    valid_ix = setdiff(1:buscount, ref_bus_positions)
-    PTDFm_t = zeros(buscount, linecount)
-
-    full_BA = Matrix(BA[valid_ix, :])
-    if !isempty(dist_slack) && length(ref_bus_positions) != 1
-        error(
-            "Distributed slack is not supported for systems with multiple reference buses.",
-        )
-    elseif isempty(dist_slack) && length(ref_bus_positions) != buscount
-        Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
-        PTDFm_t[valid_ix, :] = full_BA
-        Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-        Pardiso.pardiso(ps)
-        return PTDFm_t
-    elseif length(dist_slack) == buscount
-        @info "Distributed bus"
-        Pardiso.pardiso(ps, PTDFm_t[valid_ix, :], ABA, full_BA)
-        PTDFm_t[valid_ix, :] = full_BA
-        Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-        Pardiso.pardiso(ps)
-        slack_array = dist_slack / sum(dist_slack)
-        slack_array = reshape(slack_array, 1, buscount)
-        return PTDFm_t - ones(buscount, 1) * (slack_array * PTDFm_t)
-    else
-        error("Distributed bus specification doesn't match the number of buses.")
-    end
-    return
-end
-
-"""
-Function for internal use only.
-
-Computes the PTDF matrix by means of AppleAccelerate for sparse matrices.
-
-# Arguments
-- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
-        Incidence Matrix
-- `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
-        BA matrix
-- `ref_bus_positions::Set{Int}`:
-        vector containing the indexes of the reference slack buses.
-- `dist_slack::Vector{Float64}`:
-        vector containing the weights for the distributed slacks.
-"""
-function _calculate_PTDF_matrix_AppleAccelerate(
-    A::SparseArrays.SparseMatrixCSC{Int8, Int},
-    BA::SparseArrays.SparseMatrixCSC{Float64, Int},
-    ref_bus_positions::Set{Int},
-    dist_slack::Vector{Float64})
-    if !USE_AA
-        error(
-            "AppleAccelerate is not available. This solver is only available on macOS systems.",
-        )
-    end
-    @warn "AppleAccelerate solver is experimental and may produce unexpected results. If you need high confidence use KLU"
-    linecount = size(BA, 2)
-    buscount = size(BA, 1)
-
-    ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-    K = AppleAccelerate.AAFactorization(ABA)
-    factor!(K, AppleAccelerate.SparseFactorizationLDLT)
-
-    # initialize matrices for evaluation
-    valid_ix = setdiff(1:buscount, ref_bus_positions)
-    PTDFm_t = zeros(buscount, linecount)
-    copyto!(PTDFm_t, BA)
-    if !isempty(dist_slack) && length(ref_bus_positions) != 1
-        error(
-            "Distributed slack is not supported for systems with multiple reference buses.",
-        )
-    elseif isempty(dist_slack) && length(ref_bus_positions) < buscount
-        PTDFm_t[valid_ix, :] = AppleAccelerate.solve(K, PTDFm_t[valid_ix, :])
-        PTDFm_t[collect(ref_bus_positions), :] .= 0.0
-        return PTDFm_t
-    elseif length(dist_slack) == buscount
-        @info "Distributed bus"
-        PTDFm_t[valid_ix, :] = AppleAccelerate.solve(K, PTDFm_t[valid_ix, :])
-        PTDFm_t[collect(ref_bus_positions), :] .= 0.0
-        slack_array = dist_slack / sum(dist_slack)
-        slack_array = reshape(slack_array, 1, buscount)
-        return PTDFm_t .- (slack_array * PTDFm_t)
-    else
-        error("Distributed bus specification doesn't match the number of buses.")
-    end
-
-    return
-end
+# _calculate_PTDF_matrix_AppleAccelerate is defined in ext/AppleAccelerateExt.jl
+# when AppleAccelerate package is loaded
 
 """
     PTDF(sys::PSY.System; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)

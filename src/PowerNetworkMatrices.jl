@@ -45,20 +45,22 @@ import PowerSystems: ACBusTypes
 const IS = InfrastructureSystems
 const PSY = PowerSystems
 
-@static if (Sys.ARCH === :x86_64 || Sys.ARCH === :i686) && !Sys.isapple()
-    using MKL
-    using Pardiso
-    const USE_MKL = MKL.MKL_jll.is_available()
-else
-    const USE_MKL = false
+# TODO make public so users can check for solver availability?
+# Check if MKL/Pardiso extension is available at runtime
+# Extensions are loaded when the trigger packages (MKL, Pardiso) are loaded
+function _has_mkl_pardiso_ext()
+    ext = Base.get_extension(@__MODULE__, :MKLPardisoExt)
+    return !isnothing(ext)
 end
 
-@static if Sys.isapple()
-    using AppleAccelerate
-    const USE_AA = true
-else
-    const USE_AA = false
+# Check if AppleAccelerate extension is available at runtime  
+function _has_apple_accelerate_ext()
+    ext = Base.get_extension(@__MODULE__, :AppleAccelerateExt)
+    return !isnothing(ext)
 end
+
+# _create_apple_accelerate_factorization is defined in ext/AppleAccelerateExt.jl
+# when AppleAccelerate package is loaded
 
 import DataStructures
 import DataStructures: SortedDict
@@ -106,5 +108,15 @@ include("lodf_calculations.jl")
 include("virtual_lodf_calculations.jl")
 include("system_utils.jl")
 include("serialization.jl")
+
+# Declare functions that will be defined by extensions
+# These need to be declared so extensions can extend them
+function _calculate_PTDF_matrix_MKLPardiso end
+function _calculate_PTDF_matrix_AppleAccelerate end
+function _calculate_LODF_matrix_MKLPardiso end
+function _calculate_LODF_matrix_AppleAccelerate end
+function _pardiso_sequential_LODF! end
+function _pardiso_single_LODF! end
+function _create_apple_accelerate_factorization end
 
 end
