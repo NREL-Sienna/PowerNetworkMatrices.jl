@@ -45,7 +45,8 @@ matrix.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 """
-struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K} <: PowerNetworkMatrix{Float64}
+struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K <: LinearAlgebra.Factorization} <:
+       PowerNetworkMatrix{Float64}
     K::K
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     dist_slack::Vector{Float64}
@@ -154,12 +155,13 @@ function VirtualPTDF(
     if linear_solver == "KLU"
         K = klu(ABA)
     elseif linear_solver == "AppleAccelerate"
-        if !USE_AA
+        if !_has_apple_accelerate_ext()
             error(
-                "AppleAccelerate is not available. This solver is only available on macOS systems.",
+                "AppleAccelerate extension is not available. This solver is only available on macOS. Install AppleAccelerate: using Pkg; Pkg.add(\"AppleAccelerate\")",
             )
         end
-        K = AppleAccelerate.AAFactorization(ABA)
+        # This will use the AAFactorization type from the extension
+        K = _create_apple_accelerate_factorization(ABA)
     else
         error("Unsupported linear solver: $linear_solver")
     end
@@ -230,13 +232,9 @@ function _solve_factorization(K::KLU.KLUFactorization{Float64, Int}, b::Vector{F
     return KLU.solve!(K, b)
 end
 
-@static if USE_AA
-    function _solve_factorization(
-        K::AppleAccelerate.AAFactorization{Float64},
-        b::Vector{Float64},
-    )
-        return AppleAccelerate.solve(K, b)
-    end
+# Generic fallback for other factorization types (will be extended by extensions)
+function _solve_factorization(K::LinearAlgebra.Factorization, b::Vector{Float64})
+    return K \ b
 end
 
 function _getindex(

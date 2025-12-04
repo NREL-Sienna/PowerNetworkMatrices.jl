@@ -4,12 +4,12 @@
     "MKLPardiso",
     "AppleAccelerate",
 )
-    if PowerNetworkMatrices.USE_AA && solver == "MKLPardiso"
-        @info "Skipped MKLPardiso tests on Apple"
+    if !PowerNetworkMatrices._has_mkl_pardiso_ext() && solver == "MKLPardiso"
+        @info "Skipped MKLPardiso tests (extension not loaded)"
         continue
     end
-    if !PowerNetworkMatrices.USE_AA && solver == "AppleAccelerate"
-        @info "Skipped AppleAccelerate tests on non-Apple systems"
+    if !PowerNetworkMatrices._has_apple_accelerate_ext() && solver == "AppleAccelerate"
+        @info "Skipped AppleAccelerate tests (extension not loaded)"
         continue
     end
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
@@ -223,7 +223,7 @@ end
     P5_1 = PTDF(sys5; dist_slack = slack_array, linear_solver = "KLU")
     P5_2 = PTDF(sys5; dist_slack = slack_array, linear_solver = "Dense")
     @test isapprox(P5_1.data, P5_2.data, atol = 1e-5)
-    if !PowerNetworkMatrices.USE_AA
+    if PowerNetworkMatrices._has_mkl_pardiso_ext()
         P5_3 = PTDF(sys5; dist_slack = slack_array, linear_solver = "MKLPardiso")
         @test isapprox(P5_2.data, P5_3.data, atol = 1e-5)
         @test isapprox(P5_1.data, P5_3.data, atol = 1e-5)

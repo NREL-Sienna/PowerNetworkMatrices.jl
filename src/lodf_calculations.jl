@@ -67,16 +67,16 @@ function _buildlodf(
     elseif linear_solver == "Dense"
         lodf_t = _calculate_LODF_matrix_DENSE(a, ptdf)
     elseif linear_solver == "MKLPardiso"
-        if !USE_MKL
+        if !_has_mkl_pardiso_ext()
             error(
-                "The MKL library is not available. Check that your hardware and operating system support MKL.",
+                "The MKL/Pardiso extension is not available. Install MKL and Pardiso packages: using Pkg; Pkg.add([\"MKL\", \"Pardiso\"])",
             )
         end
         lodf_t = _calculate_LODF_matrix_MKLPardiso(a, ptdf)
     elseif linear_solver == "AppleAccelerate"
-        if !USE_AA
+        if !_has_apple_accelerate_ext()
             error(
-                "AppleAccelerate is not available. This solver is only available on macOS systems.",
+                "AppleAccelerate extension is not available. This solver is only available on macOS. Install AppleAccelerate: using Pkg; Pkg.add(\"AppleAccelerate\")",
             )
         end
         lodf_t = _calculate_LODF_matrix_AppleAccelerate(a, ptdf)
@@ -176,158 +176,11 @@ function _calculate_LODF_matrix_DENSE(
     return ptdf_denominator_t
 end
 
-function _pardiso_sequential_LODF!(
-    lodf_t::Matrix{Float64},
-    A::SparseArrays.SparseMatrixCSC{Float64, Int},
-    ptdf_denominator_t::Matrix{Float64},
-    chunk_size::Int = DEFAULT_LODF_CHUNK_SIZE,
-)
-    @info "Line Count too large for single compute using Pardiso. Employing Sequential Calculations using a chunk_size=$(chunk_size)"
-    linecount = size(lodf_t, 1)
-    @assert LinearAlgebra.ishermitian(A)
-    ps = Pardiso.MKLPardisoSolver()
-    Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM)
-    Pardiso.pardisoinit(ps)
-    # Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-    defaults = Pardiso.get_iparms(ps)
-    Pardiso.set_iparm!(ps, 1, 1)
-    for (ix, v) in enumerate(defaults[2:end])
-        Pardiso.set_iparm!(ps, ix + 1, v)
-    end
-    Pardiso.set_iparm!(ps, 2, 2)
-    Pardiso.set_iparm!(ps, 59, 2)
-    Pardiso.set_iparm!(ps, 12, 1)
-    Pardiso.set_iparm!(ps, 11, 0)
-    Pardiso.set_iparm!(ps, 13, 0)
-    Pardiso.set_iparm!(ps, 32, 1)
-    #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-    Pardiso.set_phase!(ps, Pardiso.ANALYSIS)
-    Pardiso.pardiso(
-        ps,
-        lodf_t,
-        A,
-        ptdf_denominator_t,
-    )
+# _pardiso_sequential_LODF!, _pardiso_single_LODF!, _calculate_LODF_matrix_MKLPardiso
+# are defined in ext/MKLPardisoExt.jl when MKL and Pardiso packages are loaded
 
-    Pardiso.set_phase!(ps, Pardiso.NUM_FACT)
-    Pardiso.pardiso(
-        ps,
-        A,
-        Float64[],
-    )
-    Pardiso.set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
-    i_count = 1
-    tmp = zeros(Float64, linecount, chunk_size)
-    while i_count <= linecount
-        edge = min(i_count + chunk_size - 1, linecount)
-        if linecount - edge <= 0
-            tmp = tmp[:, 1:(edge - i_count + 1)]
-        end
-        Pardiso.pardiso(
-            ps,
-            tmp,
-            A,
-            ptdf_denominator_t[:, i_count:edge],
-        )
-        lodf_t[:, i_count:edge] .= tmp
-        i_count = edge + 1
-    end
-    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-    Pardiso.pardiso(ps)
-    return
-end
-
-function _pardiso_single_LODF!(
-    lodf_t::Matrix{Float64},
-    A::SparseArrays.SparseMatrixCSC{Float64, Int},
-    ptdf_denominator_t::Matrix{Float64},
-)
-    @assert LinearAlgebra.ishermitian(A)
-    ps = Pardiso.MKLPardisoSolver()
-    Pardiso.set_matrixtype!(ps, Pardiso.REAL_SYM_POSDEF)
-    Pardiso.pardisoinit(ps)
-    Pardiso.set_iparm!(ps, 1, 1)
-    defaults = Pardiso.get_iparms(ps)
-    for (ix, v) in enumerate(defaults[2:end])
-        Pardiso.set_iparm!(ps, ix + 1, v)
-    end
-    Pardiso.set_iparm!(ps, 2, 2)
-    Pardiso.set_iparm!(ps, 59, 2)
-    Pardiso.set_iparm!(ps, 12, 1)
-    #Pardiso.set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-    Pardiso.pardiso(
-        ps,
-        lodf_t,
-        A,
-        ptdf_denominator_t,
-    )
-    Pardiso.set_phase!(ps, Pardiso.RELEASE_ALL)
-    Pardiso.pardiso(ps)
-    return
-end
-
-function _calculate_LODF_matrix_MKLPardiso(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int},
-    ptdf::Matrix{Float64},
-)
-    linecount = size(ptdf, 2)
-    ptdf_denominator_t = a * ptdf
-    m_I = Int[]
-    m_V = Float64[]
-    for iline in 1:linecount
-        if (1.0 - ptdf_denominator_t[iline, iline]) < LODF_ENTRY_TOLERANCE
-            push!(m_I, iline)
-            push!(m_V, 1.0)
-        else
-            push!(m_I, iline)
-            push!(m_V, 1 - ptdf_denominator_t[iline, iline])
-        end
-    end
-    lodf_t = zeros(linecount, linecount)
-    A = SparseArrays.sparse(m_I, m_I, m_V)
-    if linecount > DEFAULT_LODF_CHUNK_SIZE
-        _pardiso_sequential_LODF!(lodf_t, A, ptdf_denominator_t)
-    else
-        _pardiso_single_LODF!(lodf_t, A, ptdf_denominator_t)
-    end
-    lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
-    return lodf_t
-end
-
-"""
-Function for internal use only.
-
-Computes the LODF matrix by means of AppleAccelerate for sparse matrices.
-
-# Arguments
-- `a::SparseArrays.SparseMatrixCSC{Int8, Int}`:
-        Incidence Matrix
-- `ptdf::Matrix{Float64}`:
-        PTDF matrix
-"""
-function _calculate_LODF_matrix_AppleAccelerate(
-    a::SparseArrays.SparseMatrixCSC{Int8, Int},
-    ptdf::Matrix{Float64},
-)
-    linecount = size(ptdf, 2)
-    ptdf_denominator_t = a * ptdf
-    m_I = Int[]
-    m_V = Float64[]
-    for iline in 1:linecount
-        if (1.0 - ptdf_denominator_t[iline, iline]) < LODF_ENTRY_TOLERANCE
-            push!(m_I, iline)
-            push!(m_V, 1.0)
-        else
-            push!(m_I, iline)
-            push!(m_V, 1 - ptdf_denominator_t[iline, iline])
-        end
-    end
-    Dem_LU = AppleAccelerate.AAFactorization(SparseArrays.sparse(m_I, m_I, m_V))
-    lodf_t = AppleAccelerate.solve(Dem_LU, ptdf_denominator_t)
-    lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
-
-    return lodf_t
-end
+# _calculate_LODF_matrix_AppleAccelerate is defined in ext/AppleAccelerateExt.jl
+# when AppleAccelerate package is loaded
 
 """
     LODF(sys::PSY.System; linear_solver::String = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
