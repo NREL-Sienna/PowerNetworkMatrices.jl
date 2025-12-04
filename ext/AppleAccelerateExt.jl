@@ -10,7 +10,7 @@ const PNM = PowerNetworkMatrices
 # Extend the factorization creation function
 function PNM._create_apple_accelerate_factorization(ABA)
     K = AppleAccelerate.AAFactorization(ABA)
-    AppleAccelerate.factorize!(K, AppleAccelerate.SparseFactorizationLDLT)
+    AppleAccelerate.factor!(K, AppleAccelerate.SparseFactorizationLDLT)
     return K
 end
 
@@ -48,7 +48,7 @@ function PNM._calculate_PTDF_matrix_AppleAccelerate(
 
     ABA = PNM.calculate_ABA_matrix(A, BA, ref_bus_positions)
     K = AppleAccelerate.AAFactorization(ABA)
-    AppleAccelerate.factorize!(K, AppleAccelerate.SparseFactorizationLDLT)
+    AppleAccelerate.factor!(K, AppleAccelerate.SparseFactorizationLDLT)
 
     # initialize matrices for evaluation
     valid_ix = setdiff(1:buscount, ref_bus_positions)
