@@ -133,7 +133,7 @@ For series circuits, the rating is limited by the weakest link: Rating_total = m
 """
 function get_equivalent_rating(bs::BranchesSeries)
     # Minimum rating for series branches (weakest link)
-    return minimum(PSY.get_equivalent_rating(branch) for branch in bs)
+    return minimum(get_equivalent_rating(branch) for branch in bs)
 end
 
 """
@@ -162,7 +162,7 @@ function get_equivalent_emergency_rating(bs::BranchesSeries)
         rating_b = get_equivalent_emergency_rating(branch)
 
         if isnothing(rating_b)
-            push!(individual_ratings, PSY.get_equivalent_rating(branch))
+            push!(individual_ratings, get_equivalent_rating(branch))
             @warn "Branch $(PSY.get_name(branch)) has no 'rating_b' defined. Post-contingency limit will be set using the normal operation rating. Consider defining post-contingency limits using set_rating_b!()."
             continue
         end
