@@ -100,7 +100,7 @@ function get_equivalent_emergency_rating(bp::BranchesParallel)
     equivalent_rating = 0.0
     for branch in bp.branches
         rating_b = PSY.get_rating_b(branch)
-        
+
         if isnothing(rating_b)
             rating = PSY.get_rating(branch)
             equivalent_rating += rating
@@ -108,7 +108,7 @@ function get_equivalent_emergency_rating(bp::BranchesParallel)
             continue
         end
 
-        equivalent_rating += rating_b      
+        equivalent_rating += rating_b
     end
     return equivalent_rating / length(bp.branches)
 end

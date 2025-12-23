@@ -147,14 +147,14 @@ function get_equivalent_emergency_rating(bs::BranchesSeries)
     individual_ratings = Vector{Float64}()
     for branch in bp.branches
         rating_b = PSY.get_rating_b(branch)
-        
+
         if isnothing(rating_b)
             push!(individual_ratings, PSY.get_rating(branch))
             @warn "Branch $(PSY.get_name(branch)) has no 'rating_b' defined. Post-contingency limit will be set using the normal operation rating. Consider defining post-contingency limits using set_rating_b!()."
             continue
         end
 
-        push!(individual_ratings, rating_b)      
+        push!(individual_ratings, rating_b)
     end
     return minimum(individual_ratings)
 end
