@@ -137,6 +137,29 @@ function get_equivalent_rating(bs::BranchesSeries)
 end
 
 """
+    get_equivalent_emergency_rating(bs::BranchesSeries)
+
+Calculate the emergency rating for branches in series.
+For series circuits, the emergency rating is limited by the weakest link: Rating_total = min(Rating1, Rating2, ..., Ratingn)
+"""
+function get_equivalent_emergency_rating(bs::BranchesSeries)
+    # Minimum rating for series branches (weakest link)
+    individual_ratings = Vector{Float64}()
+    for branch in bp.branches
+        rating_b = PSY.get_rating_b(branch)
+        
+        if isnothing(rating_b)
+            push!(individual_ratings, PSY.get_rating(branch))
+            @warn "Branch $(PSY.get_name(branch)) has no 'rating_b' defined. Post-contingency limit will be set using the normal operation rating. Consider defining post-contingency limits using set_rating_b!()."
+            continue
+        end
+
+        push!(individual_ratings, rating_b)      
+    end
+    return minimum(individual_ratings)
+end
+
+"""
     get_equivalent_available(bs::BranchesSeries)
 
 Get the availability status for series branches.

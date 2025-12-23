@@ -89,6 +89,31 @@ function get_equivalent_rating(bp::BranchesParallel)
 end
 
 """
+    get_equivalent_emergency_rating(bp::BranchesParallel)
+
+Calculate the total emergency rating for branches in parallel.
+For parallel circuits, the emergency rating is the sum of individual emergency ratings divided by the number of circuits.
+This provides a conservative estimate that accounts for potential overestimation of total capacity.
+"""
+function get_equivalent_emergency_rating(bp::BranchesParallel)
+    # Sum of ratings divided by number of circuits
+    equivalent_rating = 0.0
+    for branch in bp.branches
+        rating_b = PSY.get_rating_b(branch)
+        
+        if isnothing(rating_b)
+            rating = PSY.get_rating(branch)
+            equivalent_rating += rating
+            @warn "Branch $(PSY.get_name(branch)) has no 'rating_b' defined. Post-contingency limit will be set using the normal operation rating. Consider defining post-contingency limits using set_rating_b!()."
+            continue
+        end
+
+        equivalent_rating += rating_b      
+    end
+    return equivalent_rating / length(bp.branches)
+end
+
+"""
     get_equivalent_available(bp::BranchesParallel)
 
 Get the availability status for parallel branches.
