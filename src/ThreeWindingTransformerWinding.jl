@@ -130,6 +130,17 @@ function get_equivalent_rating(tw::ThreeWindingTransformerWinding)
 end
 
 """
+    get_equivalent_emergency_rating(tw::ThreeWindingTransformerWinding)
+
+Get the rating for a specific winding of a three-winding transformer.
+Returns the winding-specific rating if non-zero, otherwise returns the parent transformer rating.
+"""
+function get_equivalent_emergency_rating(tw::ThreeWindingTransformerWinding)
+    #Currently there is no rating_b defined in PSY5 for the different windings of a 3WTransformer
+    get_equivalent_rating(tw)
+end
+
+"""
     get_equivalent_available(tw::ThreeWindingTransformerWinding)
 
 Get the availability status for a specific winding of a three-winding transformer.
