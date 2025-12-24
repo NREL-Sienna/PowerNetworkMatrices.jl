@@ -171,7 +171,7 @@ Series chains, can be composed of PSY.ACTransmission branches and PNM.BranchesPa
 """
 function get_equivalent_emergency_rating(branch::PSY.ACTransmission)
     # Minimum rating for series branches (weakest link)
-    if isnothing(PSY.get_rating_b(branch)) 
+    if isnothing(PSY.get_rating_b(branch))
         @warn "Branch $(get_name(branch)) has no 'rating_b' defined. Post-contingency limit is going to be set using normal-operation rating.
             \n Consider including post-contingency limits using set_rating_b!()."
         return PSY.get_rating(branch)
