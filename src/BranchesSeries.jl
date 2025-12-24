@@ -156,17 +156,8 @@ For series circuits, the emergency rating is limited by the weakest link: Rating
 function get_equivalent_emergency_rating(bs::BranchesSeries)
     # Minimum rating for series branches (weakest link)
     individual_ratings = Vector{Float64}()
-    for branch in bp.branches
-        #If branch is a BranchesParallel the function will never return 'nothing'
-        # THen the if condition can be only true when branch is a PSY.ACTransmission
+    for branch in bs.branches
         rating_b = get_equivalent_emergency_rating(branch)
-
-        if isnothing(rating_b)
-            push!(individual_ratings, get_equivalent_rating(branch))
-            @warn "Branch $(PSY.get_name(branch)) has no 'rating_b' defined. Post-contingency limit will be set using the normal operation rating. Consider defining post-contingency limits using set_rating_b!()."
-            continue
-        end
-
         push!(individual_ratings, rating_b)
     end
     return minimum(individual_ratings)
@@ -178,9 +169,14 @@ end
 Return the emergency rating for PSY.ACTransmission branches.
 Series chains, can be composed of PSY.ACTransmission branches and PNM.BranchesParallel.
 """
-function get_equivalent_emergency_rating(bs::PSY.ACTransmission)
+function get_equivalent_emergency_rating(branch::PSY.ACTransmission)
     # Minimum rating for series branches (weakest link)
-    return PSY.get_rating_b(bs)
+    if isnothing(PSY.get_rating_b(branch)) 
+        @warn "Branch $(get_name(branch)) has no 'rating_b' defined. Post-contingency limit is going to be set using normal-operation rating.
+            \n Consider including post-contingency limits using set_rating_b!()."
+        return PSY.get_rating(branch)
+    end
+    return PSY.get_rating_b(branch)
 end
 
 """
