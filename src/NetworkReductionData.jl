@@ -343,6 +343,19 @@ Get the reduction container from NetworkReductionData.
 """
 get_reductions(rb::NetworkReductionData) = rb.reductions
 
+get_component_to_reduction_name_map(rb::NetworkReductionData) =
+    rb.component_to_reduction_name_map
+
+get_component_to_reduction_name_map(
+    rb::NetworkReductionData,
+    ::Type{T},
+) where {T <: PSY.ACTransmission} =
+    rb.component_to_reduction_name_map[T]
+get_component_to_reduction_name_map(
+    rb::NetworkReductionData,
+    ::Type{ThreeWindingTransformerWinding{T}},
+) where {T <: PSY.ThreeWindingTransformer} = rb.component_to_reduction_name_map[T]
+
 get_name_to_arc_maps(rb::NetworkReductionData) = rb.name_to_arc_map
 
 get_name_to_arc_map(rb::NetworkReductionData, ::Type{T}) where {T <: PSY.ACTransmission} =
