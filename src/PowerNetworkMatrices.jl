@@ -119,4 +119,20 @@ function _pardiso_sequential_LODF! end
 function _pardiso_single_LODF! end
 function _create_apple_accelerate_factorization end
 
+function __init__()
+    # Suggest optimal BLAS backend.
+    blas_config = lowercase(string(LinearAlgebra.BLAS.get_config()))
+    if Sys.iswindows() && !contains(blas_config, "mkl")
+        @info """For faster dense matrix operations, consider using MKL:
+                   pkg> add MKL
+                   using MKL  # before any matrix operations
+                 Sparse factorization still uses KLU (recommended)."""
+    elseif Sys.isapple() && !contains(blas_config, "accelerate")
+        @info """For faster dense matrix operations, consider using AppleAccelerate:
+                   pkg> add AppleAccelerate
+                   using AppleAccelerate  # before any matrix operations
+                 Sparse factorization still uses KLU (recommended)."""
+    end
+end
+
 end
