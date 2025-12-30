@@ -63,6 +63,9 @@ network reduction algorithms.
         DataStructures.SortedDict{String, Tuple{Tuple{Int, Int}, String}},
     } =
         DataStructures.SortedDict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}()
+    component_to_reduction_name_map::Dict{
+        Type,
+        DataStructures.SortedDict{String, String}} = DataStructures.SortedDict{Type, Dict{String, String}}()
     filters_applied = Dict{Type, Function}() #Filters applied when populating branch maps by type
     direct_branch_name_map::Dict{String, Tuple{Int, Int}} =
         Dict{String, Tuple{Int, Int}}()
@@ -177,6 +180,12 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 Dict{_get_segment_type(k), Tuple{Int, Int}}(),
             )
             map_by_type[k] = v
+            component_name_map = get!(
+                nrd.component_to_reduction_name_map,
+                _get_segment_type(k),
+                Dict{String, String}(),
+            )
+            component_name_map[get_name(k)] = get_name(nrd.direct_branch_map[v])
         end
     end
     for (k, v) in nrd.parallel_branch_map
@@ -203,6 +212,12 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 Dict{BranchesParallel{_get_segment_type(k)}, Tuple{Int, Int}}(),
             )
             map_by_type[k] = v
+            component_name_map = get!(
+                nrd.component_to_reduction_name_map,
+                _get_segment_type(k),
+                Dict{String, String}(),
+            )
+            component_name_map[get_name(k)] = get_name(nrd.parallel_branch_map[v])
         end
     end
     for (k, v) in nrd.series_branch_map
@@ -234,6 +249,12 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 Dict{PSY.ACTransmission, Tuple{Int, Int}}(),
             )
             map_by_type[k] = v
+            component_name_map = get!(
+                nrd.component_to_reduction_name_map,
+                _get_segment_type(k),
+                Dict{String, String}(),
+            )
+            component_name_map[get_name(k)] = get_name(nrd.series_branch_map[v])
         end
     end
     for (k, v) in nrd.transformer3W_map
@@ -261,6 +282,12 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 Dict{Tuple{Int, Int}, Vector{eltype(v)}}(),
             )
             map_by_type[k] = v
+            component_name_map = get!(
+                nrd.component_to_reduction_name_map,
+                _get_segment_type(k),
+                Dict{String, String}(),
+            )
+            component_name_map[get_name(k)] = get_name(nrd.transformer3W_map[v])
         end
     end
     populate_direct_branch_name_map!(nrd)
