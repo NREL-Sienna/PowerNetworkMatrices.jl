@@ -254,7 +254,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 _get_segment_type(k),
                 Dict{String, String}(),
             )
-            component_name_map[get_name(k)] = get_name(nrd.series_branch_map[v])
+            #component_name_map[get_name(k)] = get_name(nrd.series_branch_map[v])
         end
     end
     for (k, v) in nrd.transformer3W_map
