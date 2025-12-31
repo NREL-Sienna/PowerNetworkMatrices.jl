@@ -1,10 +1,20 @@
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
+    node_count = size(ybus, 1)
+    if node_count >= GRAPHBLAS_CONNECTIVITY_THRESHOLD
+        return _goderya_graphblas(ybus)
+    else
+        return _goderya_sparse(ybus)
+    end
+end
+
+# Original SparseArrays implementation - faster for small/medium systems
+function _goderya_sparse(ybus::SparseArrays.SparseMatrixCSC)
     node_count = size(ybus)[1]
     max_I = node_count^2
     I, J, val = SparseArrays.findnz(ybus)
     T = SparseArrays.sparse(I, J, ones(Int, length(val)))
     T_ = T * T
-    for n in 1:(node_count - 1)
+    for _ in 1:(node_count - 1)
         I, _, _ = SparseArrays.findnz(T_)
         if length(I) == max_I
             @info "The System has no islands"
@@ -19,9 +29,48 @@ function _goderya(ybus::SparseArrays.SparseMatrixCSC)
         else
             @assert false
         end
-        #@assert n < node_count - 1
     end
     return I
+end
+
+# GraphBLAS implementation using boolean semiring - faster for large systems (1000+ buses).
+# PERF: more memory intensive than SparseArrays implementation.
+function _goderya_graphblas(ybus::SparseArrays.SparseMatrixCSC)
+    node_count = size(ybus, 1)
+    max_nnz = node_count^2
+
+    # Convert to GraphBLAS boolean matrix (adjacency)
+    I, J, _ = SparseArrays.findnz(ybus)
+    T = GrB.GBMatrix(I, J, fill(true, length(I)); nrows = node_count, ncols = node_count)
+
+    # Use LOR_LAND_BOOL semiring for boolean matrix multiplication (transitive closure)
+    semiring = GrB.Semirings.LOR_LAND_BOOL
+
+    # Compute T^2
+    T_power = GrB.GBMatrix{Bool}(node_count, node_count)
+    mul!(T_power, T, T, semiring)
+
+    for _ in 1:(node_count - 1)
+        current_nnz = GrB.nnz(T_power)
+        if current_nnz == max_nnz
+            @info "The System has no islands"
+            break
+        end
+
+        T_new = GrB.GBMatrix{Bool}(node_count, node_count)
+        mul!(T_new, T_power, T, semiring)
+        new_nnz = GrB.nnz(T_new)
+
+        if new_nnz == current_nnz
+            @warn "The system contains islands" maxlog = 1
+            break
+        end
+        T_power = T_new
+    end
+
+    # Extract row indices for compatibility with current API
+    I_out, _, _ = GrB.findnz(T_power)
+    return collect(Int, I_out)
 end
 
 function validate_connectivity(

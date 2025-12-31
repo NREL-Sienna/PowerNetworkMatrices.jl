@@ -73,6 +73,8 @@ import LinearAlgebra
 import LinearAlgebra: BLAS.gemm
 import LinearAlgebra: ldiv!, mul!, I, dot
 import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
+import SuiteSparseGraphBLAS
+const GrB = SuiteSparseGraphBLAS
 
 @template DEFAULT = """
                     $(SIGNATURES)

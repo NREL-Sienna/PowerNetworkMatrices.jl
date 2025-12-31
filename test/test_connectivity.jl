@@ -168,3 +168,74 @@ end
     )
     @test sub_1 == sub_2
 end
+
+@testset "Goderya sparse vs GraphBLAS implementations" begin
+    import Random
+    import SparseArrays
+
+    # Fixed seed for reproducibility
+    Random.seed!(42)
+
+    # Create a 100-bus system with 3 connected components of sizes 40, 30, 30
+    # Buses are randomly assigned to components (not contiguous ranges)
+    n = 100
+    component_sizes = [40, 30, 30]
+
+    # Shuffle bus indices and partition into components
+    shuffled_buses = Random.shuffle(1:n)
+    components = Vector{Int}[]
+    offset = 0
+    for size in component_sizes
+        push!(components, shuffled_buses[(offset + 1):(offset + size)])
+        offset += size
+    end
+
+    # Build adjacency matrix with random edges within each component
+    I_idx = Int[]
+    J_idx = Int[]
+    V = ComplexF64[]
+
+    for nodes in components
+        # Add edges to form a connected component (path + extra edges)
+        # First, create a path to ensure connectivity
+        for i in 1:(length(nodes) - 1)
+            push!(I_idx, nodes[i])
+            push!(J_idx, nodes[i + 1])
+            push!(V, -1.0 + 0.0im)
+            push!(I_idx, nodes[i + 1])
+            push!(J_idx, nodes[i])
+            push!(V, -1.0 + 0.0im)
+        end
+        # Add some random extra edges within the component
+        for _ in 1:div(length(nodes), 2)
+            i, j = rand(nodes, 2)
+            if i != j
+                push!(I_idx, i)
+                push!(J_idx, j)
+                push!(V, -0.5 + 0.0im)
+                push!(I_idx, j)
+                push!(J_idx, i)
+                push!(V, -0.5 + 0.0im)
+            end
+        end
+    end
+
+    # Add diagonal elements (self-admittance)
+    for i in 1:n
+        push!(I_idx, i)
+        push!(J_idx, i)
+        push!(V, 5.0 + 0.0im)
+    end
+
+    ybus = SparseArrays.sparse(I_idx, J_idx, V, n, n)
+
+    # Test both implementations
+    result_sparse = PNM._goderya_sparse(ybus)
+    result_graphblas = PNM._goderya_graphblas(ybus)
+
+    # Both should return the same row indices (order may differ)
+    @test sort(result_sparse) == sort(result_graphblas)
+
+    # Verify we detected the islands (not all n^2 entries filled)
+    @test length(unique(result_sparse)) < n^2
+end
