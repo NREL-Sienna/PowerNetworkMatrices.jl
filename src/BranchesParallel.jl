@@ -103,7 +103,7 @@ function get_equivalent_emergency_rating(bp::BranchesParallel)
         rating_b = get_equivalent_emergency_rating(branch)
         equivalent_rating += rating_b
     end
-    return equivalent_rating / length(bp.branches)
+    return equivalent_rating # In Emergency conditions, we should consider the full capacity
 end
 
 """
