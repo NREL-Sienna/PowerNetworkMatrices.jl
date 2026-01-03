@@ -154,13 +154,8 @@ Calculate the emergency rating for branches in series.
 For series circuits, the emergency rating is limited by the weakest link: Rating_total = min(Rating1, Rating2, ..., Ratingn)
 """
 function get_equivalent_emergency_rating(bs::BranchesSeries)
-    # Minimum rating for series branches (weakest link)
-    individual_ratings = Vector{Float64}()
-    for branch in bs
-        rating_b = get_equivalent_emergency_rating(branch)
-        push!(individual_ratings, rating_b)
-    end
-    return minimum(individual_ratings)
+    # Minimum emergency rating for series branches (weakest link)
+    return minimum(get_equivalent_emergency_rating(branch) for branch in bs )
 end
 
 """
