@@ -155,7 +155,7 @@ For series circuits, the emergency rating is limited by the weakest link: Rating
 """
 function get_equivalent_emergency_rating(bs::BranchesSeries)
     # Minimum emergency rating for series branches (weakest link)
-    return minimum(get_equivalent_emergency_rating(branch) for branch in bs )
+    return minimum(get_equivalent_emergency_rating(branch) for branch in bs)
 end
 
 """
