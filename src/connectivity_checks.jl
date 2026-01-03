@@ -1,28 +1,22 @@
 function _goderya(ybus::SparseArrays.SparseMatrixCSC)
     node_count = size(ybus)[1]
-    max_I = node_count^2
+    max_nnz = node_count^2
     I, J, val = SparseArrays.findnz(ybus)
-    T = SparseArrays.sparse(I, J, ones(Int, length(val)))
-    T_ = T * T
+    T_ = SparseArrays.sparse(I, J, ones(Int, length(val)))
+    T_ = T_ * T_
     for _ in 1:ceil(Int, log2(node_count))
-        I, _, _ = SparseArrays.findnz(T_)
-        if length(I) == max_I
+        if SparseArrays.nnz(T_) == max_nnz
             @info "The System has no islands"
             break
-        elseif length(I) < max_I
-            temp = T_ * T_  # compute T^(2^n) via repeated squaring
-            I_temp, _, _ = SparseArrays.findnz(temp)
-            if all(I_temp == I)
-                @warn "The system contains islands" maxlog = 1
-                break  # fixed point reached, no need to continue
-            end
-            T_ = temp
-        else
-            @assert false
         end
-        #@assert n < node_count - 1
+        temp = T_ * T_
+        if SparseArrays.nnz(temp) == SparseArrays.nnz(T_)
+            @warn "The system contains islands" maxlog = 1
+            break
+        end
+        T_ = temp
     end
-    return I
+    return SparseArrays.rowvals(T_)
 end
 
 function validate_connectivity(
