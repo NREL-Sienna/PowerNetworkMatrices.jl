@@ -4,16 +4,17 @@ function _goderya(ybus::SparseArrays.SparseMatrixCSC)
     I, J, val = SparseArrays.findnz(ybus)
     T = SparseArrays.sparse(I, J, ones(Int, length(val)))
     T_ = T * T
-    for n in 1:(node_count - 1)
+    for _ in 1:ceil(Int, log2(node_count))
         I, _, _ = SparseArrays.findnz(T_)
         if length(I) == max_I
             @info "The System has no islands"
             break
         elseif length(I) < max_I
-            temp = T_ * T
+            temp = T_ * T_  # compute T^(2^n) via repeated squaring
             I_temp, _, _ = SparseArrays.findnz(temp)
             if all(I_temp == I)
                 @warn "The system contains islands" maxlog = 1
+                break  # fixed point reached, no need to continue
             end
             T_ = temp
         else
