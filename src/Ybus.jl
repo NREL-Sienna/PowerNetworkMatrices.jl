@@ -410,6 +410,12 @@ function ybus_branch_entries(parallel_br::BranchesParallel)
     return (Y11, Y12, Y21, Y22)
 end
 
+function ybus_branch_entries(br::BranchesSeries)
+    ybus_chain = _build_chain_ybus(br)
+    ybus_reduced = _reduce_internal_nodes(ybus_chain)
+    return ybus_reduced[1, 1], ybus_reduced[1, 2], ybus_reduced[2, 1], ybus_reduced[2, 2]
+end
+
 _get_tap(::PSY.Transformer2W) = one(ComplexF32)
 _get_tap(br::PSY.TwoWindingTransformer) = PSY.get_tap(br)
 
@@ -1192,7 +1198,6 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     nr = get_network_reduction_data(ybus)
 
     bus_numbers_to_remove = _apply_bus_reductions!(nr, nr_new)
-    _remove_arcs_from_branch_maps!(nr, nr_new)
 
     # Add additional entries to the ybus corresponding to the equivalent series arcs
     new_y_ft, new_y_tf = _add_series_branches_to_ybus!(
@@ -1203,6 +1208,14 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         nr_new.series_branch_map,
         nr,
     )
+    _modify_radial_connections!(
+        ybus.data,
+        get_bus_lookup(ybus),
+        nr,
+        nr_new.radial_arc_to_surviving_bus,
+        nr_new.reductions,
+    )
+    _remove_arcs_from_branch_maps!(nr, nr_new)
     _apply_added_components!(nr, nr_new, data, bus_lookup)
     _apply_series_branch_maps!(nr, nr_new)
     add_reduction!(nr.reductions, nr_new.reductions)
@@ -1376,6 +1389,41 @@ function _make_subnetwork_axes(
         arc_subnetwork_axis[k] = setdiff(values, arcs_to_remove)
     end
     return subnetwork_axes, arc_subnetwork_axis
+end
+
+function _modify_radial_connections!(
+    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
+    bus_lookup::Dict{Int, Int},
+    nrd_old::NetworkReductionData,
+    radial_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int},
+    reductions::ReductionContainer,
+)
+    !has_radial_reduction(reductions) && return
+    for (arc, bus) in radial_arc_to_surviving_bus
+        arc_entry = _get_entry(arc, nrd_old)
+        y11, _, _, y22 = ybus_branch_entries(arc_entry)
+        if arc[1] == bus
+            data[bus_lookup[arc[1]], bus_lookup[arc[1]]] -= y11
+        elseif arc[2] == bus
+            data[bus_lookup[arc[2]], bus_lookup[arc[2]]] -= y22
+        else
+            error("Bad data in radial_arc_to_surviving_bus map")
+        end
+    end
+end
+
+function _get_entry(arc::Tuple{Int, Int}, nrd::NetworkReductionData)
+    if haskey(nrd.direct_branch_map, arc)
+        return nrd.direct_branch_map[arc]
+    elseif haskey(nrd.parallel_branch_map, arc)
+        return nrd.parallel_branch_map[arc]
+    elseif haskey(nrd.series_branch_map, arc)
+        return nrd.series_branch_map[arc]
+    elseif haskey(nrd.transformer3W_map, arc)
+        return nrd.transformer3W_map[arc]
+    else
+        error("Key $arc not found in any of the maps")
+    end
 end
 
 function _add_series_branches_to_ybus!(
