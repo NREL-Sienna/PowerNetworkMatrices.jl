@@ -280,6 +280,7 @@ function set_radial_removed_arcs_to_unavailable!(sys, radial_removed_arcs, rbsm)
             end
         end
     end
+    return
 end
 
 # This test is designed to test the Ybus modifications needed when removing radial branches

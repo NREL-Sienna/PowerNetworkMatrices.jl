@@ -1410,6 +1410,7 @@ function _modify_radial_connections!(
             error("Bad data in radial_arc_to_surviving_bus map")
         end
     end
+    return
 end
 
 function _get_entry(arc::Tuple{Int, Int}, nrd::NetworkReductionData)
