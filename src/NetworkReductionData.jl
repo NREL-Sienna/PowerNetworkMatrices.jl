@@ -19,7 +19,7 @@ network reduction algorithms.
 - `reverse_transformer3W_map::Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}`: Reverse transformer mappings
 - `removed_buses::Set{Int}`: Set of buses eliminated from the network
 - `removed_arcs::Set{Tuple{Int, Int}}`: Set of arcs eliminated from the network
-- `radial_arc_to_surviving_bus::Dict{Int, Tuple{Int, Int}}`: Maps surviving bus numbers to the final arc in their radial reduction chain
+- `radial_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int}`: Maps final arcs in radial reduction chains to their surviving bus numbers
 - `added_admittance_map::Dict{Int, Complex{Float32}}`: Admittances added to buses during reduction
 - `added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}}`: New branches created during reduction
 - `all_branch_maps_by_type::Dict{String, Any}`: Branch mappings organized by component type
@@ -54,7 +54,7 @@ network reduction algorithms.
     } = Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}()
     removed_buses::Set{Int} = Set{Int}()
     removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
-    radial_arc_to_surviving_bus::Dict{Int, Tuple{Int, Int}} = Dict{Int, Tuple{Int, Int}}()
+    radial_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int} = Dict{Tuple{Int, Int}, Int}()
     added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
     added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
         Dict{Tuple{Int, Int}, Complex{Float32}}()
