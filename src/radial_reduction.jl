@@ -39,8 +39,9 @@ function _find_upstream_bus(
         row_ix = A.rowval[A.colptr[j] + 1]
         parent = setdiff!(A[row_ix, :].nzind, j)[1]
     end
-    push!(radial_arcs, reverse_arc_map[row_ix])
-    return parent
+    arc = reverse_arc_map[row_ix]
+    push!(radial_arcs, arc)
+    return parent, arc
 end
 
 function _new_parent(
@@ -50,10 +51,11 @@ function _new_parent(
     reverse_arc_map::Dict{Int, Tuple{Int, Int}},
     radial_arcs::Set{Tuple{Int, Int}},
     reverse_bus_map::Dict{Int, Int},
+    final_arc_map::Dict{Int, Tuple{Int, Int}},
 )
     if length(SparseArrays.nzrange(A, parent)) == 2
         parent_bus_number = reverse_bus_map[parent]
-        new_parent_val = _find_upstream_bus(
+        new_parent_val, arc = _find_upstream_bus(
             A,
             parent,
             reverse_arc_map,
@@ -67,7 +69,12 @@ function _new_parent(
         if length(SparseArrays.nzrange(A, new_parent_val)) < 2
             @warn "Bus $parent_bus_number Parent $new_parent_bus_number is a leaf node, indicating there is an island."
             push!(bus_reduction_map_index[parent_bus_number], new_parent_bus_number)
+            final_arc_map[new_parent_bus_number] = arc
             return
+        end
+        # Check if chain terminates (new_parent survives with >2 connections)
+        if length(SparseArrays.nzrange(A, new_parent_val)) > 2
+            final_arc_map[new_parent_bus_number] = arc
         end
         new_set = push!(pop!(bus_reduction_map_index, parent_bus_number), parent_bus_number)
         union!(bus_reduction_map_index[new_parent_bus_number], new_set)
@@ -78,6 +85,7 @@ function _new_parent(
             reverse_arc_map,
             radial_arcs,
             reverse_bus_map,
+            final_arc_map,
         )
     end
     return
@@ -91,6 +99,7 @@ function _reverse_search(
     radial_arcs::Set{Tuple{Int, Int}},
     reverse_bus_map::Dict{Int, Int},
     ref_bus_positions::Set{Int},
+    final_arc_map::Dict{Int, Tuple{Int, Int}},
 )
     if j ∈ ref_bus_positions
         return
@@ -98,7 +107,7 @@ function _reverse_search(
     j_bus_number = reverse_bus_map[j]
     pop!(bus_reduction_map_index, j_bus_number)
     reduction_set = Set{Int}(j_bus_number)
-    parent = _find_upstream_bus(
+    parent, arc = _find_upstream_bus(
         A,
         j,
         reverse_arc_map,
@@ -109,7 +118,12 @@ function _reverse_search(
     parent_bus_number = reverse_bus_map[parent]
     union!(bus_reduction_map_index[parent_bus_number], reduction_set)
     if parent ∈ ref_bus_positions
+        final_arc_map[parent_bus_number] = arc
         return
+    end
+    # Check if chain terminates (parent survives with >2 connections)
+    if length(SparseArrays.nzrange(A, parent)) > 2
+        final_arc_map[parent_bus_number] = arc
     end
     _new_parent(
         A,
@@ -118,6 +132,7 @@ function _reverse_search(
         reverse_arc_map,
         radial_arcs,
         reverse_bus_map,
+        final_arc_map,
     )
     return
 end
@@ -157,6 +172,9 @@ with only one connection that do not affect the electrical behavior of the core 
         Dictionary mapping each bus number to its ultimate parent bus after all reductions
 - `radial_arcs::Set{Tuple{Int, Int}}`:
         Set of branch endpoint pairs representing radial branches that can be eliminated
+- `final_arc_map::Dict{Int, Tuple{Int, Int}}`:
+        Dictionary mapping each surviving bus number to the final arc in its reduction chain
+        (the arc connecting to the surviving bus whose admittance must be subtracted from the diagonal)
 
 # Algorithm Overview
 1. **Leaf Detection**: Identifies buses with exactly one connection (radial buses)
@@ -192,6 +210,7 @@ function calculate_radial_arcs(
     lk = ReentrantLock()
     buscount = length(bus_map)
     radial_arcs = Set{Tuple{Int, Int}}()
+    final_arc_map = Dict{Int, Tuple{Int, Int}}()
     reverse_arc_map = Dict(reverse(kv) for kv in arc_map)
     reverse_bus_map = Dict(reverse(kv) for kv in bus_map)
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in keys(bus_map))
@@ -206,6 +225,7 @@ function calculate_radial_arcs(
                     radial_arcs,
                     reverse_bus_map,
                     ref_bus_positions,
+                    final_arc_map,
                 )
             end
         end
@@ -213,5 +233,6 @@ function calculate_radial_arcs(
     reverse_bus_search_map = _make_reverse_bus_search_map(bus_reduction_map_index, buscount)
     return bus_reduction_map_index,
     reverse_bus_search_map,
-    radial_arcs
+    radial_arcs,
+    final_arc_map
 end
