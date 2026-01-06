@@ -237,6 +237,14 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                     Dict{String, Tuple{Int, Int}}(),
                 )
                 name_to_arc_map[get_name(segment)] = (k, "series_branch_map")
+                component_name_map = get!(
+                    nrd.component_to_reduction_name_map,
+                    _get_segment_type(segment),
+                    Dict{String, String}(),
+                )
+                for x in _get_segment_components(segment)
+                    component_name_map[get_name(x)] = get_name(segment)
+                end
             end
         end
     end
@@ -249,12 +257,6 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 Dict{PSY.ACTransmission, Tuple{Int, Int}}(),
             )
             map_by_type[k] = v
-            component_name_map = get!(
-                nrd.component_to_reduction_name_map,
-                _get_segment_type(k),
-                Dict{String, String}(),
-            )
-            #component_name_map[get_name(k)] = get_name(nrd.series_branch_map[v])
         end
     end
     for (k, v) in nrd.transformer3W_map
@@ -296,6 +298,8 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
     return
 end
 
+_get_segment_components(x::T) where {T <: PSY.ACBranch} = [x]
+_get_segment_components(x::BranchesParallel{T}) where {T <: PSY.ACTransmission} = x.branches
 _get_segment_type(::T) where {T <: PSY.ACBranch} = T
 _get_segment_type(::BranchesParallel{T}) where {T <: PSY.ACTransmission} = T
 _get_segment_type(
