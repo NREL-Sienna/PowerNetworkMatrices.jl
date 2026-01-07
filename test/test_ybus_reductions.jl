@@ -212,3 +212,96 @@ end
     @test ybus.network_reduction_data.irreducible_buses ==
           Set{Int}([112, 101, 114, 110, 105, 108, 103, 102, 111, 113, 117, 104, 106, 109])
 end
+
+function set_radial_removed_arcs_to_unavailable!(sys, radial_removed_arcs, rbsm)
+    for l in get_components(ACTransmission, sys)
+        if typeof(l) <: ThreeWindingTransformer
+            primary_star_arc = get_primary_star_arc(l)
+            if (
+                (primary_star_arc.from.number, primary_star_arc.to.number) ∈
+                radial_removed_arcs
+            ) ||
+               (
+                (primary_star_arc.to.number, primary_star_arc.from.number) ∈
+                radial_removed_arcs
+            )
+                set_available_primary!(l, false)
+                if primary_star_arc.from.number ∈ keys(rbsm)
+                    set_available!(primary_star_arc.from, false)
+                end
+                if primary_star_arc.to.number ∈ keys(rbsm)
+                    set_available!(primary_star_arc.to, false)
+                end
+            end
+            secondary_star_arc = get_secondary_star_arc(l)
+            if (
+                (secondary_star_arc.from.number, secondary_star_arc.to.number) ∈
+                radial_removed_arcs
+            ) ||
+               (
+                (secondary_star_arc.to.number, secondary_star_arc.from.number) ∈
+                radial_removed_arcs
+            )
+                set_available_secondary!(l, false)
+                if secondary_star_arc.from.number ∈ keys(rbsm)
+                    set_available!(secondary_star_arc.from, false)
+                end
+                if secondary_star_arc.to.number ∈ keys(rbsm)
+                    set_available!(secondary_star_arc.to, false)
+                end
+            end
+            tertiary_star_arc = get_tertiary_star_arc(l)
+            if (
+                (tertiary_star_arc.from.number, tertiary_star_arc.to.number) ∈
+                radial_removed_arcs
+            ) ||
+               (
+                (tertiary_star_arc.to.number, tertiary_star_arc.from.number) ∈
+                radial_removed_arcs
+            )
+                set_available_tertiary!(l, false)
+                if tertiary_star_arc.from.number ∈ keys(rbsm)
+                    set_available!(tertiary_star_arc.from, false)
+                end
+                if tertiary_star_arc.to.number ∈ keys(rbsm)
+                    set_available!(tertiary_star_arc.to, false)
+                end
+            end
+        else
+            arc = get_arc(l)
+            if (arc.from.number, arc.to.number) ∈ radial_removed_arcs
+                set_available!(l, false)
+                if arc.from.number ∈ keys(rbsm)
+                    set_available!(arc.from, false)
+                end
+                if arc.to.number ∈ keys(rbsm)
+                    set_available!(arc.to, false)
+                end
+            end
+        end
+    end
+    return
+end
+
+# This test is designed to test the Ybus modifications needed when removing radial branches
+@testset "Test compare Ybus matrices with radial reduction and manually removing radial components" begin
+    sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
+    ybus_1 = Ybus(
+        sys;
+        network_reductions = NetworkReduction[RadialReduction()],
+    )
+    # Take the setdiff to ignore removed_arcs from breaker/switch reduction:
+    radial_removed_arcs = setdiff(
+        ybus_1.network_reduction_data.removed_arcs,
+        Ybus(sys).network_reduction_data.removed_arcs,
+    )
+    rbsm = ybus_1.network_reduction_data.reverse_bus_search_map
+    set_radial_removed_arcs_to_unavailable!(sys, radial_removed_arcs, rbsm)
+    ybus_2 = Ybus(sys)
+
+    for ix in PNM.get_bus_axis(ybus_1)
+        for jx in PNM.get_bus_axis(ybus_1)
+            @test isapprox(ybus_1[ix, jx], ybus_2[ix, jx])
+        end
+    end
+end
