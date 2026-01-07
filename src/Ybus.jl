@@ -786,6 +786,11 @@ function Ybus(
     include_constant_impedance_loads = true,
     subnetwork_algorithm = iterative_union_find,
 )
+    units_base = PSY.get_units_base(sys)
+    if units_base != "SYSTEM_BASE"
+        @warn "Setting the system unit base from $units_base to SYSTEM_BASE for matrix construction"
+        PSY.set_units_base_system!(sys, "SYSTEM_BASE")
+    end
     ref_bus_numbers = Set{Int}()
     nr = NetworkReductionData()
     bus_reduction_map = get_bus_reduction_map(nr)
