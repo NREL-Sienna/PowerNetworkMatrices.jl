@@ -164,7 +164,7 @@ Return the emergency rating for PSY.ACTransmission branches.
 """
 function get_equivalent_emergency_rating(branch::PSY.ACTransmission)
     if isnothing(PSY.get_rating_b(branch))
-        @warn "Branch $(get_name(branch)) has no 'rating_b' defined. Post-contingency limit is going to be set using normal-operation rating.
+        @debug "Branch $(get_name(branch)) has no 'rating_b' defined. Post-contingency limit is going to be set using normal-operation rating.
             \n Consider including post-contingency limits using set_rating_b!()."
         return PSY.get_rating(branch)
     end
