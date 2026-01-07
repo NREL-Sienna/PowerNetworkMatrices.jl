@@ -76,7 +76,6 @@ function populate_equivalent_ybus!(bp::BranchesParallel)
     return
 end
 
-#TODO sm/further discuss this approach which will cause negligible capacity increasing when more than 2 circuits are in parallel
 """
     get_equivalent_rating(bp::BranchesParallel)
 
@@ -97,7 +96,6 @@ For parallel circuits, the emergency rating is the sum of individual emergency r
 This provides a conservative estimate that accounts for potential overestimation of total capacity.
 """
 function get_equivalent_emergency_rating(bp::BranchesParallel)
-    # Sum of ratings divided by number of circuits
     equivalent_rating = 0.0
     for branch in bp.branches
         rating_b = get_equivalent_emergency_rating(branch)
