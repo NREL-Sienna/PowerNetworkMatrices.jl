@@ -24,6 +24,7 @@ network reduction algorithms.
 - `all_branch_maps_by_type::Dict{String, Any}`: Branch mappings organized by component type
 - `reductions::ReductionContainer`: Container tracking applied reduction algorithms
 - `name_to_arc_map::Dict{Type, DataStructures.SortedDict{String, Tuple{Tuple{Int, Int}, String}}}`: Lazily filled with the call to [`populate_branch_maps_by_type!`](@ref), maps string names to their corresponding arcs and the map where the arc can be found. Used in optimization models or power flow reporting after reductions are applied. It is possible to have repeated arcs for some names if case of serial or parallel combinations.
+- `component_to_reduction_name_map::Dict{Type, Dict{String, String}}`: Lazily filled with the call to [`populate_branch_maps_by_type!`](@ref), maps component names to the names of the reduction entries used in name_to_arc_map. Used in optimization models for connecting component attributes (e.g. outages) to network reduction entries.
 - `filters_applied::Dict{Type, Function}`: Filters applied when populating branch maps by type
 - `direct_branch_name_map::Dict{String, Tuple{Int, Int}}`: Lazily filled, maps branch names to their corresponding arc tuples for direct branches
 """
@@ -62,10 +63,10 @@ network reduction algorithms.
         Type,
         DataStructures.SortedDict{String, Tuple{Tuple{Int, Int}, String}},
     } =
-        DataStructures.SortedDict{Type, Dict{String, Tuple{Tuple{Int, Int}, String}}}()
+        Dict{Type, DataStructures.SortedDict{String, Tuple{Tuple{Int, Int}, String}}}()
     component_to_reduction_name_map::Dict{
         Type,
-        DataStructures.SortedDict{String, String}} = DataStructures.SortedDict{Type, Dict{String, String}}()
+        Dict{String, String}} = Dict{Type, Dict{String, String}}()
     filters_applied = Dict{Type, Function}() #Filters applied when populating branch maps by type
     direct_branch_name_map::Dict{String, Tuple{Int, Int}} =
         Dict{String, Tuple{Int, Int}}()
@@ -167,7 +168,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             name_to_arc_map = get!(
                 nrd.name_to_arc_map,
                 _get_segment_type(v),
-                Dict{String, Tuple{Int, Int}}(),
+                DataStructures.SortedDict{String, Tuple{Int, Int}}(),
             )
             name_to_arc_map[get_name(v)] = (k, "direct_branch_map")
         end
@@ -199,7 +200,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             name_to_arc_map = get!(
                 nrd.name_to_arc_map,
                 _get_segment_type(v),
-                Dict{String, Tuple{Int, Int}}(),
+                DataStructures.SortedDict{String, Tuple{Int, Int}}(),
             )
             name_to_arc_map[get_name(v)] = (k, "parallel_branch_map")
         end
@@ -234,7 +235,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 name_to_arc_map = get!(
                     nrd.name_to_arc_map,
                     _get_segment_type(segment),
-                    Dict{String, Tuple{Int, Int}}(),
+                    DataStructures.SortedDict{String, Tuple{Int, Int}}(),
                 )
                 name_to_arc_map[get_name(segment)] = (k, "series_branch_map")
                 component_name_map = get!(
@@ -271,7 +272,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
             name_to_arc_map = get!(
                 nrd.name_to_arc_map,
                 _get_segment_type(v),
-                Dict{String, Tuple{Int, Int}}(),
+                DataStructures.SortedDict{String, Tuple{Int, Int}}(),
             )
             name_to_arc_map[get_name(v)] = (k, "transformer3W_map")
         end
