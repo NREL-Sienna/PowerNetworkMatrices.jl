@@ -121,6 +121,9 @@ function _create_apple_accelerate_factorization end
 
 function __init__()
     # Suggest optimal BLAS backend.
+    if ccall(:jl_generating_output, Cint, ()) == 1
+        return
+    end
     blas_config = lowercase(string(LinearAlgebra.BLAS.get_config()))
     if Sys.iswindows() && !contains(blas_config, "mkl")
         @info """For faster dense matrix operations, consider using MKL:
