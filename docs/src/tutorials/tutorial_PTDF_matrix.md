@@ -16,8 +16,8 @@ The evaluation of the `PTDF` matrix can be easily performed starting from import
 using PowerNetworkMatrices
 using PowerSystemCaseBuilder
 
-const PNM = PowerNetworkMatrices
-const PSB = PowerSystemCaseBuilder
+import PowerNetworkMatrices as PNM
+import PowerSystemCaseBuilder as PSB
 
 sys = PSB.build_system(PSB.PSITestSystems, "c_sys5");
 

@@ -16,8 +16,8 @@ The `DegreeTwoReduction` can be applied when constructing various network matric
 using PowerNetworkMatrices
 using PowerSystemCaseBuilder
 
-const PNM = PowerNetworkMatrices
-const PSB = PowerSystemCaseBuilder
+import PowerNetworkMatrices as PNM
+import PowerSystemCaseBuilder as PSB
 
 # Load a test system
 sys = PSB.build_system(PSB.PSITestSystems, "c_sys14");

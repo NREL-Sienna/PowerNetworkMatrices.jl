@@ -16,8 +16,8 @@ Data can be loaded from a pss/e raw file and a pss/e dyr file.
 using PowerNetworkMatrices
 using PowerSystemCaseBuilder
 
-const PNM = PowerNetworkMatrices
-const PSB = PowerSystemCaseBuilder
+import PowerNetworkMatrices as PNM
+import PowerSystemCaseBuilder as PSB
 
 sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 ```
