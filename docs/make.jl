@@ -3,18 +3,29 @@ import DataStructures: OrderedDict
 
 pages = OrderedDict(
     "Welcome Page" => "index.md",
-    "Quick Start Guide" => "quick_start_guide.md",
     "Tutorials" => Any[
+        "Getting Started" => "tutorials/getting_started.md",
         "Incidence, BA and ABA matrices" => "tutorials/tutorial_Incidence_BA_ABA_matrices.md",
         "PTDF matrix" => "tutorials/tutorial_PTDF_matrix.md",
         "VirtualPTDF matrix" => "tutorials/tutorial_VirtualPTDF_matrix.md",
         "LODF matrix" => "tutorials/tutorial_LODF_matrix.md",
         "VirtualLODF matrix" => "tutorials/tutorial_VirtualLODF_matrix.md",
-        "RadialReduction" => "tutorials/tutorial_RadialReduction.md",
-        "DegreeTwoReduction" => "tutorials/tutorial_DegreeTwoReduction.md",
+        "Radial Reduction" => "tutorials/tutorial_RadialReduction.md",
+        "Degree Two Reduction" => "tutorials/tutorial_DegreeTwoReduction.md",
     ],
-    "Public API Reference" => "api/public.md",
-    "Internal API Reference" => "api/internal.md",
+    "How-To Guides" => Any[
+        "Compute Network Matrices" => "how_to_guides/compute_network_matrices.md",
+        "Choose a Linear Solver" => "how_to_guides/choose_linear_solver.md",
+        "Apply Network Reduction" => "how_to_guides/apply_network_reduction.md",
+    ],
+    "Explanation" => Any[
+        "Network Matrices Overview" => "explanation/network_matrices_overview.md",
+        "Network Reduction Theory" => "explanation/network_reduction_theory.md",
+    ],
+    "Reference" => Any[
+        "Public API" => "reference/public.md",
+        "Internal API" => "reference/internal.md",
+    ],
 )
 
 makedocs(;
