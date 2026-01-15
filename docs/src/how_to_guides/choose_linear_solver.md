@@ -4,7 +4,7 @@ This guide helps you select the appropriate linear solver for your network matri
 
 ## Available Solvers
 
-PowerNetworkMatrices.jl supports three linear solver methods:
+`PowerNetworkMatrices.jl` supports three linear solver methods:
 
 1. **KLU** (default) - Sparse solver using KLU factorization
 2. **Dense** - Dense matrix operations
@@ -19,6 +19,7 @@ PowerNetworkMatrices.jl supports three linear solver methods:
 - You want good performance without special dependencies
 - Running on any platform (Linux, macOS, Windows)
 
+Use [`PTDF`](@ref) with the default KLU solver:
 ```julia
 ptdf_matrix = PTDF(sys)  # KLU is the default
 # or explicitly:
@@ -31,6 +32,7 @@ ptdf_matrix = PTDF(sys, linear_solver="KLU")
 - You're debugging or validating results
 - Matrix operations are simple and small-scale
 
+Specify the Dense solver explicitly:
 ```julia
 ptdf_matrix = PTDF(sys, linear_solver="Dense")
 ```
@@ -42,6 +44,7 @@ ptdf_matrix = PTDF(sys, linear_solver="Dense")
 - Maximum performance is critical
 - Working with very large systems (> 1000 buses)
 
+Specify the MKLPardiso solver:
 ```julia
 ptdf_matrix = PTDF(sys, linear_solver="MKLPardiso")
 ```

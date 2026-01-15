@@ -4,12 +4,12 @@ This guide shows you how to compute various network matrices for your power syst
 
 ## Prerequisites
 
-- PowerNetworkMatrices.jl installed
+- `PowerNetworkMatrices.jl` installed
 - A power system model loaded (see [Getting Started](@ref))
 
 ## Computing PTDF Matrix
 
-To compute the Power Transfer Distribution Factor (PTDF) matrix:
+To compute the Power Transfer Distribution Factor matrix using [`PTDF`](@ref):
 
 ```julia
 using PowerNetworkMatrices
@@ -19,54 +19,58 @@ const PNM = PowerNetworkMatrices
 ptdf_matrix = PNM.PTDF(sys)
 
 # Access the matrix data
-matrix_data = PNM.get_data(ptdf_matrix)
+matrix_data = PNM.get_ptdf_data(ptdf_matrix)
 ```
 
 ## Computing LODF Matrix
 
-To compute the Line Outage Distribution Factor (LODF) matrix:
+To compute the Line Outage Distribution Factor matrix using [`LODF`](@ref):
 
 ```julia
 lodf_matrix = PNM.LODF(sys)
-matrix_data = PNM.get_data(lodf_matrix)
+matrix_data = PNM.get_lodf_data(lodf_matrix)
 ```
 
 ## Computing Virtual PTDF Matrix
 
-For systems where you need virtual representation:
+For systems where you need virtual representation using [`VirtualPTDF`](@ref):
 
 ```julia
 vptdf_matrix = PNM.VirtualPTDF(sys)
-matrix_data = PNM.get_data(vptdf_matrix)
+matrix_data = PNM.get_ptdf_data(vptdf_matrix)
 ```
 
 ## Computing Virtual LODF Matrix
 
-Similarly for virtual LODF:
+Similarly for virtual LODF using [`VirtualLODF`](@ref):
 
 ```julia
 vlodf_matrix = PNM.VirtualLODF(sys)
-matrix_data = PNM.get_data(vlodf_matrix)
+matrix_data = PNM.get_lodf_data(vlodf_matrix)
 ```
 
 ## Computing Incidence and BA Matrices
 
 For the fundamental network topology matrices:
 
+Compute the incidence matrix using [`IncidenceMatrix`](@ref):
 ```julia
-# Incidence matrix
 incidence_matrix = PNM.IncidenceMatrix(sys)
+```
 
-# BA matrix (Bus-Admittance)
+Compute the BA matrix (Bus-Admittance) using [`BA_Matrix`](@ref):
+```julia
 ba_matrix = PNM.BA_Matrix(sys)
+```
 
-# ABA matrix
+Compute the ABA matrix using [`ABA_Matrix`](@ref):
+```julia
 aba_matrix = PNM.ABA_Matrix(sys)
 ```
 
 ## Working with Pre-computed Matrices
 
-If you have already computed the incidence and BA matrices, you can use them to compute PTDF:
+If you have already computed the incidence and BA matrices, you can use them to compute [`PTDF`](@ref):
 
 ```julia
 # Compute base matrices first
@@ -79,5 +83,5 @@ ptdf_matrix = PNM.PTDF(a_matrix, ba_matrix)
 
 ## Next Steps
 
-- Learn about [choosing linear solvers](@ref) for optimal performance
-- Understand the [theory behind network matrices](@ref) in the Explanation section
+- Learn about choosing linear solvers for optimal performance
+- Understand the theory behind network matrices in the Explanation section

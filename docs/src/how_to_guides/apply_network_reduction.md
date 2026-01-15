@@ -4,19 +4,19 @@ This guide shows you how to apply network reduction techniques to simplify your 
 
 ## Prerequisites
 
-- PowerNetworkMatrices.jl installed
+- `PowerNetworkMatrices.jl` installed
 - A power system model with reduction candidates
 
 ## Types of Network Reduction
 
-PowerNetworkMatrices.jl supports two main reduction techniques:
+`PowerNetworkMatrices.jl` supports two main reduction techniques:
 
 1. **Radial Branch Reduction** - Removes radial branches
 2. **Degree Two Reduction** - Reduces buses with degree two
 
 ## Applying Radial Reduction
 
-Radial branches can be reduced to simplify the network while preserving essential characteristics:
+Radial branches can be reduced to simplify the network while preserving essential characteristics using [`RadialReduction`](@ref):
 
 ```julia
 using PowerNetworkMatrices
@@ -34,7 +34,7 @@ reduced_sys = PNM.RadialReduction(sys)
 
 ## Applying Degree Two Reduction
 
-Buses with exactly two connections can be eliminated:
+Buses with exactly two connections can be eliminated using [`DegreeTwoReduction`](@ref):
 
 ```julia
 # Apply degree two reduction
@@ -61,7 +61,7 @@ fully_reduced_sys = PNM.DegreeTwoReduction(temp_sys)
 
 ## Computing Matrices on Reduced Systems
 
-After reduction, compute network matrices normally:
+After reduction, compute network matrices normally using [`PTDF`](@ref):
 
 ```julia
 # Reduce the system
