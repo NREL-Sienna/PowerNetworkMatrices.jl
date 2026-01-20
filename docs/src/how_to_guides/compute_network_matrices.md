@@ -5,7 +5,7 @@ This guide shows you how to compute various network matrices for your power syst
 ## Prerequisites
 
   - `PowerNetworkMatrices.jl` installed
-  - A power system model loaded (see [Getting Started](@ref))
+  - A power system model loaded (see [Quick Start Guide](@ref))
 
 ## Computing PTDF Matrix
 

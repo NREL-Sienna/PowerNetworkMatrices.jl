@@ -300,5 +300,5 @@ These guarantees hold exactly for the DC approximation and approximately for AC 
 For practical application, see:
 
   - [How to Apply Network Reduction](@ref) guide
-  - [Radial Reduction Tutorial](@ref)
-  - [Degree Two Reduction Tutorial](@ref)
+  - [RadialReduction](@ref)
+  - [DegreeTwoReduction](@ref)

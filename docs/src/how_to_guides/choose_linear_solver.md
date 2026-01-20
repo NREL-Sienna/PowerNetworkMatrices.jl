@@ -101,5 +101,5 @@ Fall back to KLU if MKLPardiso is unavailable.
 
 ## Related Topics
 
-  - [Computing Network Matrices](@ref) - Learn how to use these solvers
-  - [PTDF Tutorial](@ref) - Detailed walkthrough with solver comparisons
+  - [How to Compute Network Matrices](@ref) - Learn how to use these solvers
+  - [PTDF matrix](@ref) - Detailed walkthrough with solver comparisons

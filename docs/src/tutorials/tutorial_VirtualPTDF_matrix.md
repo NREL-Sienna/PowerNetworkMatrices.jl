@@ -131,7 +131,7 @@ Two types of network reductions are supported:
   - `RadialReduction`: Eliminates radial (leaf) buses that have only one connection
   - `DegreeTwoReduction`: Eliminates degree-two buses (buses with exactly two connections) by combining their incident branches
 
-For detailed information about these reductions, see the [RadialReduction tutorial](@ref) and [DegreeTwoReduction tutorial](@ref).
+For detailed information about these reductions, see the [RadialReduction](@ref) and [DegreeTwoReduction](@ref) tutorials.
 
 ### Using Network Reductions with VirtualPTDF
 
