@@ -4,15 +4,15 @@ This guide shows you how to apply network reduction techniques to simplify your 
 
 ## Prerequisites
 
-- `PowerNetworkMatrices.jl` installed
-- A power system model with reduction candidates
+  - `PowerNetworkMatrices.jl` installed
+  - A power system model with reduction candidates
 
 ## Types of Network Reduction
 
 `PowerNetworkMatrices.jl` supports two main reduction techniques:
 
-1. **Radial Branch Reduction** - Removes radial branches
-2. **Degree Two Reduction** - Reduces buses with degree two
+ 1. **Radial Branch Reduction** - Removes radial branches
+ 2. **Degree Two Reduction** - Reduces buses with degree two
 
 ## Applying Radial Reduction
 
@@ -28,9 +28,9 @@ reduced_sys = PNM.RadialReduction(sys)
 
 ### When to Use Radial Reduction
 
-- System has significant radial branches
-- You want to reduce computational complexity
-- Radial connections don't affect your analysis
+  - System has significant radial branches
+  - You want to reduce computational complexity
+  - Radial connections don't affect your analysis
 
 ## Applying Degree Two Reduction
 
@@ -43,9 +43,9 @@ reduced_sys = PNM.DegreeTwoReduction(sys)
 
 ### When to Use Degree Two Reduction
 
-- Many pass-through buses exist
-- You're focusing on key interconnection points
-- Computational efficiency is important
+  - Many pass-through buses exist
+  - You're focusing on key interconnection points
+  - Computational efficiency is important
 
 ## Combining Reductions
 
@@ -92,18 +92,18 @@ reduced_bus_count = length(get_components(Bus, reduced_sys))
 
 ### Radial Reduction
 
-- Only affects radial (single-connection) branches
-- Preserves power flow at non-radial buses
-- May not be suitable for all analysis types
+  - Only affects radial (single-connection) branches
+  - Preserves power flow at non-radial buses
+  - May not be suitable for all analysis types
 
 ### Degree Two Reduction
 
-- Only affects buses with exactly two connections
-- Assumes linear flow characteristics
-- Check if critical measurement points are preserved
+  - Only affects buses with exactly two connections
+  - Assumes linear flow characteristics
+  - Check if critical measurement points are preserved
 
 ## Related Topics
 
-- [Radial Reduction Tutorial](@ref) - Detailed walkthrough
-- [Degree Two Reduction Tutorial](@ref) - Detailed walkthrough
-- [Network Reduction Theory](@ref) - Understanding the mathematics
+  - [Radial Reduction Tutorial](@ref) - Detailed walkthrough
+  - [Degree Two Reduction Tutorial](@ref) - Detailed walkthrough
+  - [Network Reduction Theory](@ref) - Understanding the mathematics

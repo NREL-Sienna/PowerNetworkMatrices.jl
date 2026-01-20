@@ -4,8 +4,8 @@ This guide shows you how to compute various network matrices for your power syst
 
 ## Prerequisites
 
-- `PowerNetworkMatrices.jl` installed
-- A power system model loaded (see [Getting Started](@ref))
+  - `PowerNetworkMatrices.jl` installed
+  - A power system model loaded (see [Getting Started](@ref))
 
 ## Computing PTDF Matrix
 
@@ -54,16 +54,19 @@ matrix_data = PNM.get_lodf_data(vlodf_matrix)
 For the fundamental network topology matrices:
 
 Compute the incidence matrix using [`IncidenceMatrix`](@ref):
+
 ```julia
 incidence_matrix = PNM.IncidenceMatrix(sys)
 ```
 
 Compute the BA matrix (Bus-Admittance) using [`BA_Matrix`](@ref):
+
 ```julia
 ba_matrix = PNM.BA_Matrix(sys)
 ```
 
 Compute the ABA matrix using [`ABA_Matrix`](@ref):
+
 ```julia
 aba_matrix = PNM.ABA_Matrix(sys)
 ```
@@ -83,5 +86,5 @@ ptdf_matrix = PNM.PTDF(a_matrix, ba_matrix)
 
 ## Next Steps
 
-- Learn about choosing linear solvers for optimal performance
-- Understand the theory behind network matrices in the Explanation section
+  - Learn about choosing linear solvers for optimal performance
+  - Understand the theory behind network matrices in the Explanation section

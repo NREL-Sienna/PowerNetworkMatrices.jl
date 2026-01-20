@@ -26,9 +26,9 @@ structured into four main sections:
 Tutorials are hands-on lessons that take you through practical examples step-by-step.
 They are designed to help you learn by doing, building understanding through practical experience.
 
-- Start here if you're new to PowerNetworkMatrices.jl
-- Follow along with executable examples
-- Build foundational knowledge
+  - Start here if you're new to PowerNetworkMatrices.jl
+  - Follow along with executable examples
+  - Build foundational knowledge
 
 ### How-To Guides
 
@@ -37,9 +37,9 @@ They are designed to help you learn by doing, building understanding through pra
 How-to guides provide direct instructions for solving specific problems or completing
 particular tasks. They assume you have basic knowledge and want to accomplish something specific.
 
-- Use when you know what you want to do
-- Get straight to the solution
-- Focus on practical application
+  - Use when you know what you want to do
+  - Get straight to the solution
+  - Focus on practical application
 
 ### Explanation
 
@@ -48,9 +48,9 @@ particular tasks. They assume you have basic knowledge and want to accomplish so
 Explanations provide background, context, and deeper understanding of concepts, design
 decisions, and the theory behind the implementation.
 
-- Understand the "why" behind the features
-- Learn about the mathematical foundations
-- Explore conceptual relationships
+  - Understand the "why" behind the features
+  - Learn about the mathematical foundations
+  - Explore conceptual relationships
 
 ### Reference
 
@@ -59,33 +59,19 @@ decisions, and the theory behind the implementation.
 Reference documentation provides detailed, technical information about the API, functions,
 and data structures. It's organized for quick lookup of specific details.
 
-- Look up function signatures and parameters
-- Find available methods and options
-- Access complete API documentation
+  - Look up function signatures and parameters
+  - Find available methods and options
+  - Access complete API documentation
 
 ## User Categories
 
 The documentation and code are organized to serve three main user categories:
 
-- **Modeler**: Users that want to run a particular analysis or experiment and use `PowerNetworkMatrices.jl` to develop data sets. *Start with Tutorials and How-To Guides.*
+  - **Modeler**: Users that want to run a particular analysis or experiment and use `PowerNetworkMatrices.jl` to develop data sets.
 
-- **Model Developer**: Users that want to develop custom components and structs in order to exploit `PowerNetworkMatrices.jl` features to produce custom data sets. *Explore Explanation and Reference sections.*
+  - **Model Developer**: Users that want to develop custom components and structs in order to exploit `PowerNetworkMatrices.jl` features to produce custom data sets. *Explore Explanation and Reference sections.*
+  - **Code Base Developers**: Users that want to add new core functionalities or fix bugs in the core capabilities of `PowerNetworkMatrices.jl`. *Refer to Reference and internal API documentation.*
 
-- **Code Base Developers**: Users that want to add new core functionalities or fix bugs in the core capabilities of `PowerNetworkMatrices.jl`. *Refer to Reference and internal API documentation.*
+* * *
 
-## Installation
-
-The latest stable release of PowerNetworkMatrices can be installed using the Julia package manager with
-
-```julia
-] add PowerNetworkMatrices
-```
-
-For the current development version, "checkout" this package with
-
-```julia
-] add PowerNetworkMatrices#main
-```
-
-------------
 PowerNetworkMatrices has been developed as part of the Scalable Integrated Infrastructure Planning (SIIP) initiative at the U.S. Department of Energy's National Renewable Energy Laboratory ([NREL](https://www.nrel.gov/)).

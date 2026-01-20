@@ -8,18 +8,19 @@ Power system networks can be very large, with thousands of buses and branches. N
 
 ### Benefits of Reduction:
 
-1. **Computational Efficiency**: Smaller matrices are faster to compute and invert
-2. **Focus**: Reduces complexity to focus on areas of interest
-3. **Scalability**: Makes large-scale studies tractable
-4. **Clarity**: Simplifies visualization and understanding
+ 1. **Computational Efficiency**: Smaller matrices are faster to compute and invert
+ 2. **Focus**: Reduces complexity to focus on areas of interest
+ 3. **Scalability**: Makes large-scale studies tractable
+ 4. **Clarity**: Simplifies visualization and understanding
 
 ### Preservation Goals:
 
 Network reduction aims to preserve:
-- Power flow relationships at retained buses
-- Impedance relationships between key points
-- Stability characteristics (when applicable)
-- Essential topology features
+
+  - Power flow relationships at retained buses
+  - Impedance relationships between key points
+  - Stability characteristics (when applicable)
+  - Essential topology features
 
 ## Radial Branch Reduction
 
@@ -39,9 +40,9 @@ In this example, buses B and C are radial - they each connect to only one other 
 
 Radial buses can be reduced because power flow to/from them is uniquely determined by the connection bus. The reduction involves:
 
-1. **Identifying radial buses**: Buses with degree = 1
-2. **Transferring loads**: Moving load/generation to the connection point
-3. **Removing the branch**: Eliminating the radial connection
+ 1. **Identifying radial buses**: Buses with degree = 1
+ 2. **Transferring loads**: Moving load/generation to the connection point
+ 3. **Removing the branch**: Eliminating the radial connection
 
 ### Why Radial Reduction Works
 
@@ -62,24 +63,28 @@ The radial bus angle is completely determined by its parent bus, so it can be el
 ### Implications of Radial Reduction
 
 **Preserved:**
-- Power flow at non-radial buses
-- Voltage angles at non-radial buses
-- System topology at the core network
+
+  - Power flow at non-radial buses
+  - Voltage angles at non-radial buses
+  - System topology at the core network
 
 **Changed:**
-- Number of buses and branches (reduced)
-- Detailed behavior at radial locations
-- Local voltage profiles
+
+  - Number of buses and branches (reduced)
+  - Detailed behavior at radial locations
+  - Local voltage profiles
 
 **When to Use:**
-- Radial connections are not of interest for analysis
-- Focusing on transmission backbone
-- Computational efficiency is important
+
+  - Radial connections are not of interest for analysis
+  - Focusing on transmission backbone
+  - Computational efficiency is important
 
 **When to Avoid:**
-- Studying distribution feeders (often radial)
-- Detailed voltage analysis needed
-- Radial buses have critical measurements
+
+  - Studying distribution feeders (often radial)
+  - Detailed voltage analysis needed
+  - Radial buses have critical measurements
 
 ## Degree Two Reduction (Kron Reduction)
 
@@ -137,9 +142,10 @@ This is analogous to combining series impedances in circuit theory.
 ### Physical Interpretation
 
 Eliminating a degree two bus:
-- Combines the series impedances of the two connecting branches
-- Creates an equivalent direct connection
-- Preserves the overall impedance between endpoints
+
+  - Combines the series impedances of the two connecting branches
+  - Creates an equivalent direct connection
+  - Preserves the overall impedance between endpoints
 
 ### Why Degree Two Reduction Works
 
@@ -156,35 +162,39 @@ The angle is a weighted average of its neighbors, so eliminating it and creating
 ### Implications of Degree Two Reduction
 
 **Preserved:**
-- Power flows at retained buses
-- Voltage angles at retained buses
-- Overall impedance relationships
-- Equivalence for power flow studies
+
+  - Power flows at retained buses
+  - Voltage angles at retained buses
+  - Overall impedance relationships
+  - Equivalence for power flow studies
 
 **Changed:**
-- Number of buses (reduced)
-- Detailed behavior at eliminated bus
-- Branch topology (new equivalent branches created)
+
+  - Number of buses (reduced)
+  - Detailed behavior at eliminated bus
+  - Branch topology (new equivalent branches created)
 
 **When to Use:**
-- Pass-through buses are not of analytical interest
-- Focusing on injection/load buses
-- Simplifying large transmission systems
-- Reducing computational burden
+
+  - Pass-through buses are not of analytical interest
+  - Focusing on injection/load buses
+  - Simplifying large transmission systems
+  - Reducing computational burden
 
 **When to Avoid:**
-- The degree two bus has measurements or controls
-- Detailed branch flows needed at that location
-- Bus has significant shunt elements
-- Studying protection or relay settings
+
+  - The degree two bus has measurements or controls
+  - Detailed branch flows needed at that location
+  - Bus has significant shunt elements
+  - Studying protection or relay settings
 
 ## Combining Reductions
 
 Multiple reduction techniques can be applied sequentially:
 
-1. **Order matters**: Applying radial reduction first may expose new degree two buses
-2. **Iterative approach**: After each reduction, new candidates may appear
-3. **Convergence**: Process continues until no more reducible buses exist
+ 1. **Order matters**: Applying radial reduction first may expose new degree two buses
+ 2. **Iterative approach**: After each reduction, new candidates may appear
+ 3. **Convergence**: Process continues until no more reducible buses exist
 
 ### Example Sequence:
 
@@ -205,82 +215,90 @@ No more reducible buses
 ### Load and Generation
 
 When eliminating a bus:
-- **With load/generation**: Must be transferred to retained buses
-- **Zero injection**: Can be eliminated cleanly
-- **Load distribution**: May use weighted schemes based on impedances
+
+  - **With load/generation**: Must be transferred to retained buses
+  - **Zero injection**: Can be eliminated cleanly
+  - **Load distribution**: May use weighted schemes based on impedances
 
 ### Shunt Elements
 
 Buses with shunt admittances (capacitors, reactors):
-- Complicate degree two reduction
-- May need to be distributed to neighbors
-- Can affect the equivalent admittance calculation
+
+  - Complicate degree two reduction
+  - May need to be distributed to neighbors
+  - Can affect the equivalent admittance calculation
 
 ### Numerical Stability
 
-- Very small impedances can cause numerical issues
-- Parallel branches should be combined first
-- Check for near-zero denominators in calculations
+  - Very small impedances can cause numerical issues
+  - Parallel branches should be combined first
+  - Check for near-zero denominators in calculations
 
 ### Validation
 
 Always verify reductions:
-- Compare power flows before and after
-- Check that key quantities are preserved
-- Validate on a small test system first
+
+  - Compare power flows before and after
+  - Check that key quantities are preserved
+  - Validate on a small test system first
 
 ## Applications in PowerNetworkMatrices.jl
 
 ### Market Studies
 
 Reducing the network focuses analysis on:
-- Key trading hubs
-- Major transmission corridors
-- Critical generation centers
+
+  - Key trading hubs
+  - Major transmission corridors
+  - Critical generation centers
 
 ### Security Analysis
 
 Reduction helps:
-- Speed up contingency screening
-- Focus on critical elements
-- Enable larger study scope
+
+  - Speed up contingency screening
+  - Focus on critical elements
+  - Enable larger study scope
 
 ### Planning Studies
 
 Benefits include:
-- Simplifying future scenarios
-- Faster iteration on designs
-- Clearer visualization of key paths
+
+  - Simplifying future scenarios
+  - Faster iteration on designs
+  - Clearer visualization of key paths
 
 ## Limitations
 
 ### What Reduction Cannot Do:
 
-- Preserve detailed voltage profiles everywhere
-- Capture local dynamics at eliminated buses
-- Represent phenomena requiring those buses (e.g., local stability)
-- Maintain exact AC power flow at eliminated locations
+  - Preserve detailed voltage profiles everywhere
+  - Capture local dynamics at eliminated buses
+  - Represent phenomena requiring those buses (e.g., local stability)
+  - Maintain exact AC power flow at eliminated locations
 
 ### When Full Network is Required:
 
-- Detailed state estimation
-- Protection coordination
-- Local voltage studies
-- Distributed generation integration at eliminated buses
+  - Detailed state estimation
+  - Protection coordination
+  - Local voltage studies
+  - Distributed generation integration at eliminated buses
 
 ## Mathematical Guarantees
 
 Under DC power flow assumptions, network reduction:
-- **Preserves**: Impedance matrix (Schur complement)
-- **Preserves**: Power flows at retained buses
-- **Preserves**: Voltage angles at retained buses
-- **Maintains**: Linearity of the system
+
+  - **Preserves**: Impedance matrix (Schur complement)
+  - **Preserves**: Power flows at retained buses
+  - **Preserves**: Voltage angles at retained buses
+  - **Maintains**: Linearity of the system
 
 These guarantees hold exactly for the DC approximation and approximately for AC systems near the linearization point.
 
 ## Further Reading
 
 For practical application, see:
-- [How to Apply Network Reduction](@ref) guide
-- [Radial Reduction Tutorial](@ref)
-- [Degree Two Reduction Tutorial](@ref)
+
+  - [How to Apply Network Reduction](@ref) guide
+  - [Radial Reduction Tutorial](@ref)
+  - [Degree Two Reduction Tutorial](@ref)
