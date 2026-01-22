@@ -30,9 +30,9 @@ using PowerNetworkMatrices
 using PowerSystems
 using PowerSystemCaseBuilder
 
-const PSY = PowerSystems;
-const PNM = PowerNetworkMatrices;
-const PSB = PowerSystemCaseBuilder;
+import PowerSystems as PSY
+import PowerNetworkMatrices as PNM
+import PowerSystemCaseBuilder as PSB
 
 sys = PSB.build_system(PSB.PSISystems, "RTS_GMLC_DA_sys");
 ```

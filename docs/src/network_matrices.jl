@@ -14,7 +14,7 @@
 # The network matrices code implements the dfs algorithm to find islands.
 
 using PowerSystems
-const PSY = PowerSystems
+import PowerSystems as PSY
 DATA_DIR = "../../../data" #hide
 system_data = System(joinpath(DATA_DIR, "matpower/case14.m"))
 

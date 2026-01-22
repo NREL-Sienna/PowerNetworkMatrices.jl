@@ -4,14 +4,17 @@ using ReTest
 using Logging
 import LinearAlgebra: I
 using PowerNetworkMatrices
-using PowerSystems
-using InfrastructureSystems
-using PowerSystemCaseBuilder
 using TimeSeries
 using DelimitedFiles
 using InteractiveUtils
-
-import PowerNetworkMatrices
+using PowerSystemCaseBuilder
+using PowerNetworkMatrices
+import PowerNetworkMatrices as PNM
+import InfrastructureSystems as IS
+using PowerSystems
+import PowerSystems as PSY
+using PowerSystemCaseBuilder
+import PowerSystemCaseBuilder as PSB
 
 # Aqua tests
 import Aqua
@@ -20,11 +23,6 @@ Aqua.test_undefined_exports(PowerNetworkMatrices)
 Aqua.test_ambiguities(PowerNetworkMatrices)
 Aqua.test_stale_deps(PowerNetworkMatrices; ignore = [:AppleAccelerate, :MKL, :Pardiso])
 Aqua.test_deps_compat(PowerNetworkMatrices)
-
-const IS = InfrastructureSystems
-const PSY = PowerSystems
-const PSB = PowerSystemCaseBuilder
-const PNM = PowerNetworkMatrices
 
 const BASE_DIR = dirname(dirname(Base.find_package("PowerNetworkMatrices")))
 const TEST_DATA_DIR = joinpath(
