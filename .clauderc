@@ -173,6 +173,7 @@ core_abstractions:
 
 test_patterns:
   location: test/
+  dev_local: julia --project=test -e 'using Pkg; Pkg.develop(path=".")'
   runner: julia --project=test test/runtests.jl
   test_data: uses PowerSystemCaseBuilder.jl for standard IEEE/Matpower cases
   validation: results compared against PSS/E and Matpower reference implementations
@@ -205,6 +206,7 @@ documentation_practices:
     internals: docs/src/api/internals.md
 
 common_tasks:
+  dev_local: julia --project=test -e 'using Pkg; Pkg.develop(path=".")'
   run_tests: julia --project=test test/runtests.jl
   build_docs: julia --project=docs docs/make.jl
   format_code: julia -e 'include("scripts/formatter/formatter_code.jl")'
