@@ -1,155 +1,158 @@
-# NREL-Sienna Programming Practices
+# Sienna Programming Practices
 
-This document outlines general programming practices, conventions, and guidelines for all NREL-Sienna packages.
-
-## Julia Compatibility
-
-Sienna packages typically support Julia **^1.9** or later.
+This document describes general programming practices and conventions that apply across all Sienna packages (PowerSystems.jl, PowerSimulations.jl, PowerFlows.jl, PowerNetworkMatrices.jl, InfrastructureSystems.jl, etc.).
 
 ## Performance Requirements
 
-**Priority:** Critical
-**Reference:** [Julia Performance Tips](https://docs.julialang.org/en/v1/manual/performance-tips/)
+**Priority:** Critical. See the [Julia Performance Tips](https://docs.julialang.org/en/v1/manual/performance-tips/).
 
 ### Anti-Patterns to Avoid
 
-#### Type Instability
-Functions must return consistent concrete types.
-- ❌ Bad: `f(x) = x > 0 ? 1 : 1.0`
-- ✅ Good: `f(x) = x > 0 ? 1.0 : 1.0`
-- Check: Use `@code_warntype`
+#### Type instability
 
-#### Abstract Field Types
+Functions must return consistent concrete types. Check with `@code_warntype`.
+
+- Bad: `f(x) = x > 0 ? 1 : 1.0`
+- Good: `f(x) = x > 0 ? 1.0 : 1.0`
+
+#### Abstract field types
+
 Struct fields must have concrete types or be parameterized.
-- ❌ Bad: `struct Foo; data::AbstractVector; end`
-- ✅ Good: `struct Foo{T<:AbstractVector}; data::T; end`
 
-#### Untyped Containers
-- ❌ Bad: `Vector{Any}()`, `Vector{Real}()`
-- ✅ Good: `Vector{Float64}()`, `Vector{Int}()`
+- Bad: `struct Foo; data::AbstractVector; end`
+- Good: `struct Foo{T<:AbstractVector}; data::T; end`
 
-#### Non-const Globals
-- ❌ Bad: `THRESHOLD = 0.5`
-- ✅ Good: `const THRESHOLD = 0.5`
+#### Untyped containers
 
-#### Unnecessary Allocations
-Patterns to follow:
+- Bad: `Vector{Any}()`, `Vector{Real}()`
+- Good: `Vector{Float64}()`, `Vector{Int}()`
+
+#### Non-const globals
+
+- Bad: `THRESHOLD = 0.5`
+- Good: `const THRESHOLD = 0.5`
+
+#### Unnecessary allocations
+
 - Use views instead of copies (`@view`, `@views`)
 - Pre-allocate arrays instead of `push!` in loops
 - Use in-place operations (functions ending with `!`)
 
-#### Captured Variables
-Avoid closures that capture variables causing boxing. Solution: pass variables as function arguments instead.
+#### Captured variables
 
-#### Splatting Penalty
+Avoid closures that capture variables causing boxing. Pass variables as function arguments instead.
+
+#### Splatting penalty
+
 Avoid splatting (`...`) in performance-critical code.
 
-#### Abstract Return Types
-Avoid returning Union types or abstract types.
+#### Abstract return types
+
+Avoid returning `Union` types or abstract types.
 
 ### Best Practices
 
 - Use `@inbounds` when bounds are verified
 - Use broadcasting (dot syntax) for element-wise operations
-- Avoid try-catch in hot paths
+- Avoid `try-catch` in hot paths
 - Use function barriers to isolate type instability
-- Use sparse matrix operations throughout (`SparseMatrixCSC`)
-- Leverage specialized factorization methods for sparse linear solves
 
-**Note:** Apply these guidelines with judgment. Not every function is performance-critical. Focus optimization efforts on hot paths and frequently called code.
+> Apply these guidelines with judgment. Not every function is performance-critical. Focus optimization efforts on hot paths and frequently called code.
 
 ## Code Conventions
 
-**Style Guide:** [NREL-Sienna Style Guide](https://nrel-sienna.github.io/InfrastructureSystems.jl/stable/style/)
+Style guide: <https://nrel-sienna.github.io/InfrastructureSystems.jl/stable/style/>
 
-### Formatter
-- **Tool**: JuliaFormatter
-- **Command**: `julia -e 'include("scripts/formatter/formatter_code.jl")'`
+Formatter (JuliaFormatter): Use the formatter script provided in each package.
 
-### Key Rules
-- **Constructors**: use `function Foo()` not `Foo() = ...`
-- **Asserts**: prefer `InfrastructureSystems.@assert_op` over `@assert`
-- **Globals**: UPPER_CASE for constants
-- **Exports**: all exports in main module file
-- **Comments**: complete sentences, describe why not how
-- **Sparse matrices**: use `SparseMatrixCSC` throughout, avoid dense when possible
+Key rules:
 
-## Documentation Practices
+- Constructors: use `function Foo()` not `Foo() = ...`
+- Asserts: prefer `InfrastructureSystems.@assert_op` over `@assert`
+- Globals: `UPPER_CASE` for constants
+- Exports: all exports in main module file
+- Comments: complete sentences, describe why not how
 
-**Framework:** [Diataxis](https://diataxis.fr/)
-**Sienna Guide:** [Documentation Best Practices](https://nrel-sienna.github.io/InfrastructureSystems.jl/stable/docs_best_practices/explanation/)
+## Documentation Practices and Requirements
 
-### Docstring Requirements
-- **Scope**: all elements of public interface
-- **Include**: function signatures and arguments list
-- **Automation**: `DocStringExtensions.TYPEDSIGNATURES`
-- **See also**: add links for functions with same name (multiple dispatch)
+Framework: [Diataxis](https://diataxis.fr/)
 
-### API Docs
-- **Public**: `docs/src/api/public.md` using `@autodocs` with `Public=true, Private=false`
-- **Internals**: `docs/src/api/internals.md`
+Sienna guide: <https://nrel-sienna.github.io/InfrastructureSystems.jl/stable/docs_best_practices/explanation/>
 
-## Common Tasks
+Docstring requirements:
 
-```bash
-# Develop locally
-julia --project=test -e 'using Pkg; Pkg.develop(path=".")'
+- Scope: all elements of public interface (IS is selective about exports)
+- Include: function signatures and arguments list
+- Automation: `DocStringExtensions.TYPEDSIGNATURES` (`TYPEDFIELDS` used sparingly in IS)
+- See also: add links for functions with same name (multiple dispatch)
 
-# Run tests
-julia --project=test test/runtests.jl
+API docs:
 
-# Build documentation
-julia --project=docs docs/make.jl
+- Public: typically in `docs/src/api/public.md` using `@autodocs` with `Public=true, Private=false`
+- Internals: typically in `docs/src/api/internals.md`
 
-# Format code
-julia -e 'include("scripts/formatter/formatter_code.jl")'
+## Design Principles
 
-# Check formatting
-git diff --exit-code
-
-# Instantiate test environment
-julia --project=test -e 'using Pkg; Pkg.instantiate()'
-```
+- Elegance and concision in both interface and implementation
+- Fail fast with actionable error messages rather than hiding problems
+- Validate invariants explicitly in subtle cases
+- Avoid over-adherence to backwards compatibility for internal helpers
 
 ## Contribution Workflow
 
-- **Branch naming**: `feature/description` or `fix/description` (branches in main repo)
-- **Main branch**: `main`
+Branch naming: `feature/description` or `fix/description`
 
-### PR Process
-1. Create a feature branch in the main repo
-2. Make changes following the style guide
-3. Run formatter before committing
-4. Ensure tests pass
-5. Submit pull request
+1. Create feature branch
+2. Follow style guide and run formatter
+3. Ensure tests pass
+4. Submit pull request
 
-## General Troubleshooting
+## AI Agent Guidance
 
-### Type Instability
-- **Symptom**: Poor performance, many allocations
-- **Diagnosis**: Use `@code_warntype` on suspect function
-- **Solution**: See Performance Requirements → Anti-Patterns to Avoid
+**Key priorities:** Read existing patterns first, maintain consistency, use concrete types in hot paths, run formatter, add docstrings to public API, ensure tests pass.
 
-### Formatter Fails
-- **Symptom**: Formatter command returns error
-- **Solution**: `julia -e 'include("scripts/formatter/formatter_code.jl")'`
+**Critical rules:**
+- Always use `julia --project=<env>` (never bare `julia`)
+- Never edit auto-generated files directly
+- Verify type stability with `@code_warntype` for performance-critical code
+- Consider downstream package impact
 
-### Test Failures
-- **Symptom**: Tests fail unexpectedly
-- **Solution**: `julia --project=test -e 'using Pkg; Pkg.instantiate()'`
+## Julia Environment Best Practices
 
-## AI Agent Code Generation Guidelines
+**CRITICAL:** Always use `julia --project=<env>` when running Julia code in Sienna repositories. **NEVER** use bare `julia` or `julia --project` without specifying the environment. Each package typically defines dependencies in `test/Project.toml` for testing.
 
-### Priorities
-- Performance matters - use concrete types in hot paths
-- Use sparse matrices (`SparseMatrixCSC`) by default when appropriate
-- Apply anti-patterns list with judgment (not exhaustively everywhere)
-- Run formatter on all changes
-- Add docstrings to public interface elements
-- Consider type stability in performance-critical functions
+Common patterns:
 
-### When Modifying Code
-- Read existing code patterns before making changes
-- Maintain consistency with existing style
-- Prefer failing fast with clear errors over silent failures
-- Test with various input scenarios
+```sh
+# Run tests (using test environment)
+julia --project=test test/runtests.jl
+
+# Run specific test
+julia --project=test test/runtests.jl test_file_name
+
+# Run expression
+julia --project=test -e 'using PackageName; ...'
+
+# Instantiate environment
+julia --project=test -e 'using Pkg; Pkg.instantiate()'
+
+# Build docs (using docs environment)
+julia --project=docs docs/make.jl
+```
+
+**Why this matters:** Running without `--project=<env>` will fail because required packages won't be available in the default environment. The test/docs environments contain all necessary dependencies for their respective tasks.
+
+## Troubleshooting
+
+**Type instability**
+- Symptom: Poor performance, many allocations
+- Diagnosis: `@code_warntype` on suspect function
+- Solution: See performance anti-patterns above
+
+**Formatter fails**
+- Symptom: Formatter command returns error
+- Solution: Run the formatter script provided in the package (e.g., `julia -e 'include("scripts/formatter/formatter_code.jl")'`)
+
+**Test failures**
+- Symptom: Tests fail unexpectedly
+- Solution: `julia --project=test -e 'using Pkg; Pkg.instantiate()'`
