@@ -1,10 +1,10 @@
 # PowerNetworkMatrices.jl - Project Guide
 
+> **Note:** For general NREL-Sienna programming practices, conventions, and guidelines, see [Sienna.md](Sienna.md).
+
 ## Package Role
 
 PowerNetworkMatrices.jl constructs classic power systems network matrices (Ybus, PTDF, LODF) for power flow analysis, sensitivity analysis, and contingency studies. Part of the NREL-Sienna ecosystem, it provides computational building blocks for optimization and analysis packages.
-
-**Julia Compatibility:** ^1.9
 
 ## Design Objectives
 
@@ -12,72 +12,11 @@ PowerNetworkMatrices.jl constructs classic power systems network matrices (Ybus,
 
 Efficient computation of power network matrices for large-scale systems. Supports sparse and virtual (on-demand) matrix implementations for memory efficiency. Network reduction algorithms decrease computational complexity by 30-60%. **All code must be written with performance in mind.**
 
-### Design Principles
+### Package-Specific Design Principles
 
-- Elegance and concision in both interface and implementation
-- Fail fast with actionable error messages rather than hiding problems
-- Validate invariants explicitly in subtle cases
-- Avoid over-adherence to backwards compatibility for internal helpers
 - Support multiple electrical islands (subnetworks) transparently
 - Provide both dense and memory-efficient virtual matrix options
-
-## Performance Requirements
-
-**Priority:** Critical
-**Reference:** [Julia Performance Tips](https://docs.julialang.org/en/v1/manual/performance-tips/)
-
-### Anti-Patterns to Avoid
-
-#### Type Instability
-Functions must return consistent concrete types.
-- ❌ Bad: `f(x) = x > 0 ? 1 : 1.0`
-- ✅ Good: `f(x) = x > 0 ? 1.0 : 1.0`
-- Check: Use `@code_warntype`
-
-#### Abstract Field Types
-Struct fields must have concrete types or be parameterized.
-- ❌ Bad: `struct Foo; data::AbstractVector; end`
-- ✅ Good: `struct Foo{T<:AbstractVector}; data::T; end`
-
-#### Untyped Containers
-- ❌ Bad: `Vector{Any}()`, `Vector{Real}()`
-- ✅ Good: `Vector{Float64}()`, `Vector{Int}()`
-
-#### Non-const Globals
-- ❌ Bad: `THRESHOLD = 0.5`
-- ✅ Good: `const THRESHOLD = 0.5`
-
-#### Unnecessary Allocations
-Patterns to follow:
-- Use views instead of copies (`@view`, `@views`)
-- Pre-allocate arrays instead of `push!` in loops
-- Use in-place operations (functions ending with `!`)
-
-#### Captured Variables
-Avoid closures that capture variables causing boxing. Solution: pass variables as function arguments instead.
-
-#### Splatting Penalty
-Avoid splatting (`...`) in performance-critical code.
-
-#### Abstract Return Types
-Avoid returning Union types or abstract types.
-
-### Best Practices
-
-- Use `@inbounds` when bounds are verified
-- Use broadcasting (dot syntax) for element-wise operations
-- Avoid try-catch in hot paths
-- Use function barriers to isolate type instability
-- Use sparse matrix operations throughout (`SparseMatrixCSC`)
 - Leverage KLU factorization for sparse linear solves
-
-**Note:** Apply these guidelines with judgment. Not every function is performance-critical. Focus optimization efforts on hot paths and frequently called code.
-
-## File Structure
-
-### `src/`
-
-- **PowerNetworkMatrices.jl**: main module, exports, includes
 - **definitions.jl**: constants (solvers, cache limits, tolerances)
 - **common.jl**: shared utility functions and getters
 - **system_utils.jl**: PowerSystems integration helpers
@@ -260,20 +199,7 @@ julia --project=test -e 'using Pkg; Pkg.instantiate()'
 4. Ensure tests pass
 5. Submit pull request
 
-## Troubleshooting
-
-### Type Instability
-- **Symptom**: Poor performance, many allocations
-- **Diagnosis**: Use `@code_warntype` on suspect function
-- **Solution**: See Performance Requirements → Anti-Patterns to Avoid
-
-### Formatter Fails
-- **Symptom**: Formatter command returns error
-- **Solution**: `julia -e 'include("scripts/formatter/formatter_code.jl")'`
-
-### Test Failures
-- **Symptom**: Tests fail unexpectedly
-- **Solution**: `julia --project=test -e 'using Pkg; Pkg.instantiate()'`
+## Package-Specific Troubleshooting
 
 ### Subnetwork Errors
 - **Symptom**: Matrix construction fails with disconnected network
