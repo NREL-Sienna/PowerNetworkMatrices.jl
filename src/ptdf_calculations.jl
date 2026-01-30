@@ -307,12 +307,85 @@ function PTDF(sys::PSY.System;
     tol::Float64 = eps(),
     kwargs...,
 )
-    Ymatrix = Ybus(
+    ybus = Ybus(
         sys;
         kwargs...,
     )
-    A = IncidenceMatrix(Ymatrix)
-    BA = BA_Matrix(Ymatrix)
+    return PTDF(ybus; dist_slack = dist_slack, linear_solver = linear_solver, tol = tol)
+end
+
+"""
+    PTDF(ybus::Ybus; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
+
+Construct a Power Transfer Distribution Factor (PTDF) matrix from existing Ybus matrix.
+This constructor is more efficient when the prerequisite matrices are already available and provides
+direct control over the underlying matrix computations.
+
+# Arguments
+- `ybus::Ybus`: The power system Ybus matrix from which to construct the PTDF matrix 
+
+# Keyword Arguments
+- `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
+        Dictionary mapping bus numbers to distributed slack weights for realistic slack modeling.
+        Empty dictionary uses single slack bus (default behavior)
+- `linear_solver::String = "KLU"`:
+        Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
+- `tol::Float64 = eps()`:
+        Sparsification tolerance for dropping small matrix elements to reduce memory usage
+- `network_reductions::Vector{NetworkReduction} = NetworkReduction[]`:
+        Vector of network reduction algorithms to apply before matrix construction
+- `include_constant_impedance_loads::Bool=true`:
+        Whether to include constant impedance loads as shunt admittances in the network model
+- `subnetwork_algorithm=iterative_union_find`:
+        Algorithm used for identifying electrical islands and connected components
+- Additional keyword arguments are passed to the underlying matrix constructors
+
+# Returns
+- `PTDF`: The constructed PTDF matrix structure containing:
+  - Bus-to-impedance-arc injection sensitivity coefficients
+  - Network topology information and reference bus identification
+  - Sparsification tolerance and computational metadata
+
+# Construction Process
+1. **Ybus Construction**: Creates system admittance matrix with specified reductions
+2. **Incidence Matrix**: Builds bus-branch connectivity matrix A
+3. **BA Matrix**: Computes branch susceptance weighted incidence matrix
+4. **PTDF Computation**: Calculates power transfer distribution factors using A^T × B^(-1) × A
+5. **Distributed Slack**: Applies distributed slack correction if specified
+6. **Sparsification**: Removes small elements based on tolerance threshold
+
+# Distributed Slack Configuration
+- **Single Slack**: Empty `dist_slack` dictionary uses conventional single slack bus
+- **Distributed Slack**: Dictionary maps bus numbers to participation factors
+- **Normalization**: Participation factors automatically normalized to sum to 1.0
+- **Physical Meaning**: Distributed slack better represents generator response to load changes
+
+# Linear Solver Options
+- **"KLU"**: Sparse LU factorization (default, recommended for most cases)
+- **"Dense"**: Dense matrix operations (faster for small systems, higher memory usage)
+- **"MKLPardiso"**: Intel MKL Pardiso solver (requires MKL library, best for very large systems)
+
+# Mathematical Foundation
+The PTDF matrix is computed as:
+```
+PTDF = A^T × (A^T × B × A)^(-1) × A^T × B
+```
+where A is the incidence matrix and B is the susceptance matrix.
+
+# Notes
+- Results are valid under DC power flow assumptions (linear approximation)
+- Reference bus selection affects specific values but not relative sensitivities
+- Sparsification with `tol > eps()` can significantly reduce memory usage
+- Network reductions improve computational efficiency for large systems
+- Distributed slack provides more realistic representation of system response
+"""
+function PTDF(ybus::Ybus;
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
+    linear_solver = "KLU",
+    tol::Float64 = eps(),
+)
+    A = IncidenceMatrix(ybus)
+    BA = BA_Matrix(ybus)
     return PTDF(
         A,
         BA;

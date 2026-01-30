@@ -248,11 +248,50 @@ function ABA_Matrix(sys::PSY.System;
         network_reductions = network_reductions,
         kwargs...,
     )
-    ref_bus_positions = get_ref_bus_position(ymatrix)
-    A = IncidenceMatrix(ymatrix)
-    BA = BA_Matrix(ymatrix)
+    return ABA_Matrix(ymatrix; factorize = factorize)
+end
+
+"""
+    ABA_Matrix(ybus::Ybus; factorize::Bool = false)
+
+Construct an ABA_Matrix from a Ybus matrix by computing A^T * B * A where A is the
+incidence matrix and B is the branch susceptance matrix. The resulting matrix is fundamental
+for DC power flow analysis and power system sensitivity studies. Network reductions can be passed
+via the computed Ybus matrix.
+
+# Arguments
+- `ybus::Ybus: The power system Ybus matrix from which to construct the ABA matrix
+
+# Keyword Arguments
+- `factorize::Bool = false`:
+        Whether to perform KLU factorization during construction for efficient linear system solving
+
+# Returns
+- `ABA_Matrix`: The constructed ABA matrix structure containing:
+  - Bus susceptance matrix data (excluding reference buses)
+  - Network topology information and reference bus positions
+  - Optional KLU factorization for efficient solving
+
+# Mathematical Process
+1. **Ybus Construction**: Creates admittance matrix from system data
+2. **Incidence Matrix**: Computes bus-branch incidence matrix A
+3. **BA Matrix**: Forms branch susceptance weighted incidence matrix
+4. **ABA Computation**: Calculates A^T * B * A (bus susceptance matrix)
+5. **Reference Bus Removal**: Excludes reference buses for invertibility
+6. **Optional Factorization**: Performs KLU decomposition if requested
+
+# Notes
+- Reference buses are automatically detected and excluded from the final matrix
+- Factorization significantly improves performance for repeated linear system solves
+- Network reductions can dramatically improve computational efficiency for large systems
+- The resulting matrix supports PTDF, LODF, and other power system analysis calculations
+"""
+function ABA_Matrix(ybus::Ybus; factorize::Bool = false)
+    ref_bus_positions = get_ref_bus_position(ybus)
+    A = IncidenceMatrix(ybus)
+    BA = BA_Matrix(ybus)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    axes, subnetwork_axes = _remake_axes_without_ref(ymatrix.axes, ymatrix.subnetwork_axes)
+    axes, subnetwork_axes = _remake_axes_without_ref(ybus.axes, ybus.subnetwork_axes)
     bus_ax_ref = make_ax_ref(axes[1])
     lookup = (bus_ax_ref, bus_ax_ref)
     if factorize
@@ -267,7 +306,7 @@ function ABA_Matrix(sys::PSY.System;
         subnetwork_axes,
         ref_bus_positions,
         K,
-        ymatrix.network_reduction_data,
+        ybus.network_reduction_data,
     )
 end
 
