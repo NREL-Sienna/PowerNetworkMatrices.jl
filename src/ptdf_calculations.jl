@@ -290,7 +290,7 @@ for PTDF analysis starting from system data.
 # Mathematical Foundation
 The PTDF matrix is computed as:
 ```
-PTDF = A^T × (A^T × B × A)^(-1) × A^T × B
+PTDF = (A^T × B × A)^(-1) × A^T × B
 ```
 where A is the incidence matrix and B is the susceptance matrix.
 
@@ -332,13 +332,6 @@ direct control over the underlying matrix computations.
         Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
 - `tol::Float64 = eps()`:
         Sparsification tolerance for dropping small matrix elements to reduce memory usage
-- `network_reductions::Vector{NetworkReduction} = NetworkReduction[]`:
-        Vector of network reduction algorithms to apply before matrix construction
-- `include_constant_impedance_loads::Bool=true`:
-        Whether to include constant impedance loads as shunt admittances in the network model
-- `subnetwork_algorithm=iterative_union_find`:
-        Algorithm used for identifying electrical islands and connected components
-- Additional keyword arguments are passed to the underlying matrix constructors
 
 # Returns
 - `PTDF`: The constructed PTDF matrix structure containing:
@@ -347,12 +340,11 @@ direct control over the underlying matrix computations.
   - Sparsification tolerance and computational metadata
 
 # Construction Process
-1. **Ybus Construction**: Creates system admittance matrix with specified reductions
-2. **Incidence Matrix**: Builds bus-branch connectivity matrix A
-3. **BA Matrix**: Computes branch susceptance weighted incidence matrix
-4. **PTDF Computation**: Calculates power transfer distribution factors using A^T × B^(-1) × A
-5. **Distributed Slack**: Applies distributed slack correction if specified
-6. **Sparsification**: Removes small elements based on tolerance threshold
+1. **Incidence Matrix**: Builds bus-branch connectivity matrix A (from Ybus matrix)
+2. **BA Matrix**: Computes branch susceptance weighted incidence matrix
+3. **PTDF Computation**: Calculates power transfer distribution factors using A^T × B^(-1) × A
+4. **Distributed Slack**: Applies distributed slack correction if specified
+5. **Sparsification**: Removes small elements based on tolerance threshold
 
 # Distributed Slack Configuration
 - **Single Slack**: Empty `dist_slack` dictionary uses conventional single slack bus
@@ -368,7 +360,7 @@ direct control over the underlying matrix computations.
 # Mathematical Foundation
 The PTDF matrix is computed as:
 ```
-PTDF = A^T × (A^T × B × A)^(-1) × A^T × B
+PTDF = (A^T × B × A)^(-1) × A^T × B
 ```
 where A is the incidence matrix and B is the susceptance matrix.
 

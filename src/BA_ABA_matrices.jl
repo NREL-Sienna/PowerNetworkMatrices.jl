@@ -260,7 +260,7 @@ for DC power flow analysis and power system sensitivity studies. Network reducti
 via the computed Ybus matrix.
 
 # Arguments
-- `ybus::Ybus: The power system Ybus matrix from which to construct the ABA matrix
+- `ybus::Ybus`: The power system Ybus matrix from which to construct the ABA matrix
 
 # Keyword Arguments
 - `factorize::Bool = false`:
@@ -273,12 +273,11 @@ via the computed Ybus matrix.
   - Optional KLU factorization for efficient solving
 
 # Mathematical Process
-1. **Ybus Construction**: Creates admittance matrix from system data
-2. **Incidence Matrix**: Computes bus-branch incidence matrix A
-3. **BA Matrix**: Forms branch susceptance weighted incidence matrix
-4. **ABA Computation**: Calculates A^T * B * A (bus susceptance matrix)
-5. **Reference Bus Removal**: Excludes reference buses for invertibility
-6. **Optional Factorization**: Performs KLU decomposition if requested
+1. **Incidence Matrix**: Computes bus-branch incidence matrix A (from Ybus matrix)
+2. **BA Matrix**: Forms branch susceptance weighted incidence matrix
+3. **ABA Computation**: Calculates A^T * B * A (bus susceptance matrix)
+4. **Reference Bus Removal**: Excludes reference buses for invertibility
+5. **Optional Factorization**: Performs KLU decomposition if requested
 
 # Notes
 - Reference buses are automatically detected and excluded from the final matrix
