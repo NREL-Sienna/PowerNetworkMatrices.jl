@@ -66,7 +66,7 @@ As for the `PTDF` matrix, here too the optional argument `linear_solver` can be 
 ```@repl tutorial_PTDF_matrix
 lodf_dense = LODF(sys; linear_solver = "Dense");
 
-lodf_mkl = LODF(sys; linear_solver = "MKLPardiso");
+lodf_klu = LODF(sys; linear_solver = "KLU");
 ```
 
 **NOTE (1):** by default the "KLU" method is selected, which appeared to require significant less time and memory with respect to "Dense".
@@ -87,7 +87,7 @@ lodf_sparse = LODF(sys; tol = 0.4);
 get_lodf_data(lodf_sparse)
 ```
 
-Please consider that 0.4 was used for the purpose of this tutorial. In practice much smaller values are used (e.g., 1e-5).
+Note that in practice much smaller values of `tol` are typically used (e.g., 1e-5).
 
 **NOTE (1):** elements whose absolute values exceed the `tol` argument are removed from the `LODF` matrix *after* this has been computed.
 

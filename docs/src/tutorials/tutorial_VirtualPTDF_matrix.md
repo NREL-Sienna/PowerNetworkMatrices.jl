@@ -139,14 +139,18 @@ To apply network reductions, pass a vector of `NetworkReduction` objects to the 
 
 ```@repl tutorial_VirtualPTDF_matrix
 # Apply radial reduction
-v_ptdf_radial = VirtualPTDF(sys_2; network_reductions = [RadialReduction()]);
+v_ptdf_radial = VirtualPTDF(sys_2; network_reductions = NetworkReduction[RadialReduction()]);
 
 # Apply degree-two reduction
-v_ptdf_degree_two = VirtualPTDF(sys_2; network_reductions = [DegreeTwoReduction()]);
+v_ptdf_degree_two =
+    VirtualPTDF(sys_2; network_reductions = NetworkReduction[DegreeTwoReduction()]);
 
 # Combine multiple reductions (order matters - RadialReduction first is recommended)
 v_ptdf_combined =
-    VirtualPTDF(sys_2; network_reductions = [RadialReduction(), DegreeTwoReduction()]);
+    VirtualPTDF(
+        sys_2;
+        network_reductions = NetworkReduction[RadialReduction(), DegreeTwoReduction()],
+    );
 ```
 
 ### Protecting Specific Buses from Reduction
@@ -156,7 +160,7 @@ Both reduction types allow you to specify buses that should not be eliminated us
 ```@repl tutorial_VirtualPTDF_matrix
 # Protect specific buses from radial reduction
 reduction = RadialReduction(; irreducible_buses = [1, 2])
-v_ptdf_protected = VirtualPTDF(sys_2; network_reductions = [reduction]);
+v_ptdf_protected = VirtualPTDF(sys_2; network_reductions = NetworkReduction[reduction]);
 ```
 
 ### DegreeTwoReduction Options
@@ -166,7 +170,8 @@ The `DegreeTwoReduction` has an additional option to control whether buses with 
 ```@repl tutorial_VirtualPTDF_matrix
 # Preserve buses with reactive power injections
 reduction = DegreeTwoReduction(; reduce_reactive_power_injectors = false)
-v_ptdf_preserve_reactive = VirtualPTDF(sys_2; network_reductions = [reduction]);
+v_ptdf_preserve_reactive =
+    VirtualPTDF(sys_2; network_reductions = NetworkReduction[reduction]);
 ```
 
 ### Accessing Reduction Information
@@ -175,7 +180,10 @@ After initializing the VirtualPTDF with reductions, you can access information a
 
 ```@repl tutorial_VirtualPTDF_matrix
 v_ptdf_reduced =
-    VirtualPTDF(sys_2; network_reductions = [RadialReduction(), DegreeTwoReduction()]);
+    VirtualPTDF(
+        sys_2;
+        network_reductions = NetworkReduction[RadialReduction(), DegreeTwoReduction()],
+    );
 
 # Get the reduction data
 reduction_data = get_network_reduction_data(v_ptdf_reduced)
@@ -189,7 +197,7 @@ Network reductions can be combined with other VirtualPTDF options like distribut
 v_ptdf_full_options = VirtualPTDF(sys_2;
     dist_slack = dis_slack_dict,
     tol = 1e-5,
-    network_reductions = [RadialReduction(), DegreeTwoReduction()],
+    network_reductions = NetworkReduction[RadialReduction(), DegreeTwoReduction()],
 );
 ```
 

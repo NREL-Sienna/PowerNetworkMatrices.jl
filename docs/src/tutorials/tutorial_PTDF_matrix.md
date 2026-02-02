@@ -14,9 +14,11 @@ The `PTDF` matrix can be evaluated according to three different approaches:
 The evaluation of the `PTDF` matrix can be easily performed starting from importing the system's data and then by simply calling the `PTDF` method.
 
 ```@repl tutorial_PTDF_matrix
+using PowerSystems
 using PowerNetworkMatrices
 using PowerSystemCaseBuilder
 
+const PSY = PowerSystems
 const PNM = PowerNetworkMatrices
 const PSB = PowerSystemCaseBuilder
 
@@ -27,7 +29,9 @@ ptdf_1 = PTDF(sys);
 get_ptdf_data(ptdf_1)
 ```
 
-Advanced users might be interested in computing the `PTDF` matrix starting from either the data contained in the `IncidenceMatrix` and `BA_matrix` structures, or by the information related to the `branches` and `buses` of the system.
+Note that while the `PTDF` stores the transpose of the matrix data, the function `get_ptdf_data` returns the data in the standard orientation.
+
+Advanced users might be interested in computing the `PTDF` matrix starting from either the data contained in the `IncidenceMatrix` and `BA_matrix` structures.
 
 ```@repl tutorial_PTDF_matrix
 # evaluate the BA_matrix and Incidence_Matrix
@@ -51,8 +55,9 @@ get_ptdf_data(ptdf_dense)
 ptdf_klu = PTDF(sys; linear_solver = "KLU");
 get_ptdf_data(ptdf_klu)
 
-ptdf_mkl = PTDF(sys; linear_solver = "MKLPardiso");
-get_ptdf_data(ptdf_mkl)
+# For MKLPardiso (if available)
+# ptdf_mkl = PTDF(sys; linear_solver = "MKLPardiso");
+# get_ptdf_data(ptdf_mkl)
 ```
 
 By default the "KLU" method is selected, which appeared to require significant less time and memory with respect to "Dense".
@@ -62,19 +67,19 @@ Please note that regardless of which method (`KLU`, `Dense`, or `MKLPardiso`) is
 
 ## Evaluating the `PTDF` matrix considering distributed slack bus
 
-Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus. To do so, a vector of type `Vector{Float64}` needs to be defined, specifying the weights for each bus of the system. These weights identify how the load on the slack bus is redistributed accross the system.
+Whenever needed, the `PTDF` matrix can be computed with a distributed slack bus. To do so, a vector of type `Dict{Int64, Float64}` needs to be defined, specifying the weights for each bus of the system. These weights identify how the load on the slack bus is redistributed accross the system.
 
 ```@repl tutorial_PTDF_matrix
 # consider equal distribution accross each bus for this example
 buscount = length(PSY.get_available_components(PSY.ACBus, sys));
 dist_slack = 1 / buscount * ones(buscount);
-dist_slack_array = dist_slack / sum(dist_slack);
+dist_slack_dict = Dict(i => dist_slack[i] / sum(dist_slack) for i in 1:buscount);
 ```
 
-Once the vector of the weights is defined, the `PTDF` matrix can be computed by defining the input argument `dist_slack` (empty array `Float64[]` by default):
+Once the dictionary of the weights is defined, the `PTDF` matrix can be computed by defining the input argument `dist_slack` (empty array `Dict{Int64, Float64}()` by default):
 
 ```@repl tutorial_PTDF_matrix
-ptdf_distr = PTDF(sys; dist_slack = dist_slack_array);
+ptdf_distr = PTDF(sys; dist_slack = dist_slack_dict);
 ```
 
 The difference between a the matrix computed with and without the `dist_slack` field defined can be seen as follows:
@@ -97,7 +102,7 @@ ptdf_sparse = PTDF(sys; tol = 0.2);
 get_ptdf_data(ptdf_sparse)
 ```
 
-**NOTE:** 0.2 was used for the purpose of this tutorial. In practice much smaller values are used (e.g., 1e-5).
+**NOTE:** In practice, much smaller values are typically used for `tol`(e.g., 1e-5).
 
 ## Network Reductions
 
@@ -116,13 +121,16 @@ To apply network reductions, pass a vector of `NetworkReduction` objects to the 
 
 ```@repl tutorial_PTDF_matrix
 # Apply radial reduction
-ptdf_radial = PTDF(sys; network_reductions = [RadialReduction()]);
+ptdf_radial = PTDF(sys; network_reductions = NetworkReduction[RadialReduction()]);
 
 # Apply degree-two reduction
-ptdf_degree_two = PTDF(sys; network_reductions = [DegreeTwoReduction()]);
+ptdf_degree_two = PTDF(sys; network_reductions = NetworkReduction[DegreeTwoReduction()]);
 
 # Combine multiple reductions (order matters - RadialReduction first is recommended)
-ptdf_combined = PTDF(sys; network_reductions = [RadialReduction(), DegreeTwoReduction()]);
+ptdf_combined = PTDF(
+    sys;
+    network_reductions = NetworkReduction[RadialReduction(), DegreeTwoReduction()],
+);
 ```
 
 ### Protecting Specific Buses from Reduction
@@ -132,7 +140,7 @@ Both reduction types allow you to specify buses that should not be eliminated us
 ```@repl tutorial_PTDF_matrix
 # Protect specific buses from radial reduction
 reduction = RadialReduction(; irreducible_buses = [1, 2])
-ptdf_protected = PTDF(sys; network_reductions = [reduction]);
+ptdf_protected = PTDF(sys; network_reductions = NetworkReduction[reduction]);
 ```
 
 ### DegreeTwoReduction Options
@@ -142,7 +150,7 @@ The `DegreeTwoReduction` has an additional option to control whether buses with 
 ```@repl tutorial_PTDF_matrix
 # Preserve buses with reactive power injections
 reduction = DegreeTwoReduction(; reduce_reactive_power_injectors = false)
-ptdf_preserve_reactive = PTDF(sys; network_reductions = [reduction]);
+ptdf_preserve_reactive = PTDF(sys; network_reductions = NetworkReduction[reduction]);
 ```
 
 ### Accessing Reduction Information
@@ -163,7 +171,7 @@ Network reductions can be combined with other PTDF options like distributed slac
 ```@repl tutorial_PTDF_matrix
 ptdf_full_options = PTDF(sys;
     linear_solver = "KLU",
-    dist_slack = dist_slack_array,
+    dist_slack = dist_slack_dict,
     tol = 1e-5,
     network_reductions = [RadialReduction(), DegreeTwoReduction()],
 );

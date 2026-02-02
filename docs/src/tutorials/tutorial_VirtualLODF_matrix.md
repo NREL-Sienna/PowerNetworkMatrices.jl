@@ -40,7 +40,7 @@ sys = PSB.build_system(PSB.PSISystems, "RTS_GMLC_DA_sys");
 At this point the `VirtualLODF` is initialized with the following simple command:
 
 ```@repl tutorial_VirtualPTDF_matrix
-v_lodf = VirtualLODF(sys);
+v_lodf = VirtualLODF(sys)
 ```
 
 Now, an element of the matrix can be computed by using the arc tuples as indices:
@@ -51,11 +51,11 @@ el_v_lodf = v_lodf[(221, 222), (202, 206)]
 
 This element represent the portion flowing on arc (202, 206) now diverted on arc (221, 222) as a consequence of its outage.
 
-Alternatively, the value can be indexted by row and column numbers directly. In this case the row and column numbers are mapped by the dictonaries contained in the `lookup` field.
+Alternatively, the value can be indexed by row and column numbers directly. In this case the row and column numbers are mapped by the dictonaries contained in the `lookup` field.
 
 ```@repl tutorial_VirtualPTDF_matrix
-row_number = v_lodf.lookup[1][(202, 206)]
-col_number = v_lodf.lookup[2][(221, 222)]
+row_number = v_lodf.lookup[1][(221, 222)]
+col_number = v_lodf.lookup[2][(202, 206)]
 el_C31_2_105_bis = v_lodf[row_number, col_number]
 ```
 
@@ -90,9 +90,9 @@ v_lodf_dense = VirtualLODF(sys_2);
 v_lodf_sparse = VirtualLODF(sys_2; tol = 0.4);
 ```
 
-Let's now evaluate the same row as before and compare the results:
+Let's now evaluate a row and compare the results:
 
 ```@repl tutorial_VirtualPTDF_matrix
-original_row = [v_lodf_dense["1", j] for j in v_lodf_dense.axes[2]]
-sparse_row = [v_lodf_sparse["1", j] for j in v_lodf_sparse.axes[2]]
+original_row = [v_lodf_dense[(1, 2), j] for j in v_lodf_dense.axes[2]]
+sparse_row = [v_lodf_sparse[(1, 2), j] for j in v_lodf_sparse.axes[2]]
 ```

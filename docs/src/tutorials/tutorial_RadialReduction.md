@@ -6,7 +6,7 @@ Before diving into this tutorial we encourage the user to load `PowerNetworkMatr
 
 ## Understanding Radial Branches
 
-Radial buses are leaf nodes in the network topology with only one connection. These buses do not affect the electrical behavior of the rest of the network and can be safely eliminated to simplify network matrices and improve computational efficiency.
+Radial buses are leaf nodes in the network topology with only one connection. These buses do not affect the electrical behavior of the rest of the network and for certain applications can be safely eliminated to simplify network matrices and improve computational efficiency.
 
 ## Basic Usage of RadialReduction
 
@@ -23,7 +23,7 @@ const PSB = PowerSystemCaseBuilder
 sys = PSB.build_system(PSB.PSITestSystems, "c_sys14");
 
 # Create Ybus with radial reduction
-ybus = Ybus(sys; network_reductions = [RadialReduction()]);
+ybus = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
 ```
 
 ## Accessing Reduction Information
@@ -40,10 +40,10 @@ get_bus_reduction_map(reduction_data)
 
 # View the reverse bus search mapping
 # This maps each reduced bus to its ultimate parent
-get_reverse_bus_search_map(reduction_data)
+PNM.get_reverse_bus_search_map(reduction_data)
 
 # View the removed arcs (branches)
-get_removed_arcs(reduction_data)
+PNM.get_removed_arcs(reduction_data)
 ```
 
 ## Protecting Specific Buses from Reduction
@@ -51,11 +51,15 @@ get_removed_arcs(reduction_data)
 In some cases, you may want to preserve certain buses even if they are radial. This can be done using the `irreducible_buses` parameter:
 
 ```@repl tutorial_RadialReduction
-# Create radial reduction that protects buses 101 and 205
-reduction = RadialReduction(; irreducible_buses = [101, 205]);
+# Create radial reduction that protects buses 8 and 14
+reduction = RadialReduction(; irreducible_buses = [8, 14]);
 
-# Apply to system (if these buses exist in the system)
-# ybus_protected = Ybus(sys; network_reductions=[reduction]);
+# Apply to system (buses must exist in the system)
+ybus_protected = Ybus(sys; network_reductions = NetworkReduction[reduction]);
+
+# Bus 8 was radial, but preserved from reduction
+reduction_data = get_network_reduction_data(ybus_protected);
+get_bus_reduction_map(reduction_data)
 ```
 
 ## Combining with Other Network Matrices
@@ -64,13 +68,13 @@ The `RadialReduction` can be applied to other network matrix types as well:
 
 ```@repl tutorial_RadialReduction
 # Apply to PTDF matrix
-ptdf = PTDF(sys; network_reductions = [RadialReduction()]);
+ptdf = PTDF(sys; network_reductions = NetworkReduction[RadialReduction()]);
 
 # Apply to LODF matrix
-lodf = LODF(sys; network_reductions = [RadialReduction()]);
+lodf = LODF(sys; network_reductions = NetworkReduction[RadialReduction()]);
 
 # Apply to Incidence Matrix
-incidence = IncidenceMatrix(sys; network_reductions = [RadialReduction()]);
+incidence = IncidenceMatrix(sys; network_reductions = NetworkReduction[RadialReduction()]);
 ```
 
 ## Benefits of Radial Reduction
@@ -89,7 +93,7 @@ Using `RadialReduction` provides several advantages:
 ybus_full = Ybus(sys);
 
 # Create Ybus with radial reduction
-ybus_reduced = Ybus(sys; network_reductions = [RadialReduction()]);
+ybus_reduced = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()]);
 
 # Compare sizes
 size(ybus_full)

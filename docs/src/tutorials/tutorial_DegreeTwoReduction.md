@@ -20,10 +20,10 @@ const PNM = PowerNetworkMatrices
 const PSB = PowerSystemCaseBuilder
 
 # Load a test system
-sys = PSB.build_system(PSB.PSITestSystems, "c_sys14");
+sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
 
 # Create Ybus with degree-two reduction
-ybus = Ybus(sys; network_reductions = [DegreeTwoReduction()]);
+ybus = Ybus(sys; network_reductions = NetworkReduction[DegreeTwoReduction()]);
 ```
 
 ## Accessing Reduction Information
@@ -36,13 +36,13 @@ reduction_data = get_network_reduction_data(ybus);
 
 # View the series branch mapping
 # This shows how multiple branches were combined into composite branches
-get_series_branch_map(reduction_data)
+PNM.get_series_branch_map(reduction_data)
 
 # View the removed buses
-get_removed_buses(reduction_data)
+PNM.get_removed_buses(reduction_data)
 
-# View the removed arcs (branches that were combined)
-get_removed_arcs(reduction_data)
+# View the removed arcs (series branches that were combined)
+PNM.get_removed_arcs(reduction_data)
 ```
 
 ## Configuration Options
@@ -55,10 +55,14 @@ You can protect certain buses from reduction even if they have degree two:
 
 ```@repl tutorial_DegreeTwoReduction
 # Create degree-two reduction that protects specific buses
-reduction = DegreeTwoReduction(; irreducible_buses = [101, 205]);
+reduction = DegreeTwoReduction(; irreducible_buses = [115]);
 
 # Apply to system (if these buses exist in the system)
-# ybus_protected = Ybus(sys; network_reductions=[reduction]);
+ybus_protected = Ybus(sys; network_reductions = NetworkReduction[reduction]);
+reduction_data_protected = get_network_reduction_data(ybus_protected);
+# Compare with unprotected case: 
+PNM.get_removed_buses(reduction_data)
+PNM.get_removed_buses(reduction_data_protected)
 ```
 
 ### Handling Reactive Power Injectors
@@ -70,7 +74,7 @@ By default, `DegreeTwoReduction` reduces buses with reactive power injections. Y
 reduction = DegreeTwoReduction(; reduce_reactive_power_injectors = false);
 
 # Apply to system
-ybus_preserve_reactive = Ybus(sys; network_reductions = [reduction]);
+ybus_preserve_reactive = Ybus(sys; network_reductions = NetworkReduction[reduction]);
 ```
 
 ## Combining with Other Network Matrices
@@ -79,16 +83,16 @@ The `DegreeTwoReduction` can be applied to other network matrix types as well:
 
 ```@repl tutorial_DegreeTwoReduction
 # Apply to PTDF matrix
-ptdf = PTDF(sys; network_reductions = [DegreeTwoReduction()]);
+ptdf = PTDF(sys; network_reductions = NetworkReduction[DegreeTwoReduction()]);
 
 # Apply to LODF matrix
-lodf = LODF(sys; network_reductions = [DegreeTwoReduction()]);
+lodf = LODF(sys; network_reductions = NetworkReduction[DegreeTwoReduction()]);
 
 # Apply to BA Matrix
-ba_matrix = BA_Matrix(sys; network_reductions = [DegreeTwoReduction()]);
+ba_matrix = BA_Matrix(sys; network_reductions = NetworkReduction[DegreeTwoReduction()]);
 
 # Apply to ABA Matrix
-aba_matrix = ABA_Matrix(sys; network_reductions = [DegreeTwoReduction()]);
+aba_matrix = ABA_Matrix(sys; network_reductions = NetworkReduction[DegreeTwoReduction()]);
 ```
 
 ## Benefits of Degree-Two Reduction
@@ -107,7 +111,7 @@ Using `DegreeTwoReduction` provides several advantages:
 ybus_full = Ybus(sys);
 
 # Create Ybus with degree-two reduction
-ybus_reduced = Ybus(sys; network_reductions = [DegreeTwoReduction()]);
+ybus_reduced = Ybus(sys; network_reductions = NetworkReduction[DegreeTwoReduction()]);
 
 # Compare sizes
 size(ybus_full)
@@ -150,17 +154,18 @@ When combining multiple reductions, the order can affect the final result:
 ```@repl tutorial_DegreeTwoReduction
 # First apply radial, then degree-two
 reductions1 = [RadialReduction(), DegreeTwoReduction()];
-ybus1 = Ybus(sys; network_reductions = reductions1);
+ybus1 = Ybus(sys; network_reductions = reductions1)
 
 # First apply degree-two, then radial  
 reductions2 = [DegreeTwoReduction(), RadialReduction()];
-ybus2 = Ybus(sys; network_reductions = reductions2);
+ybus2 = Ybus(sys; network_reductions = reductions2)
 
 # Compare results
 size(ybus1)
 size(ybus2)
 ```
 
+In this case, the result is the same, however this is not guaranteed.
 In general, applying `RadialReduction` first is recommended, as it can create new degree-two buses that can then be eliminated by `DegreeTwoReduction`.
 
 ## Important Notes
