@@ -228,6 +228,5 @@ Always verify reductions:
 
 For practical application, see:
 
-  - [How to Apply Network Reduction](@ref) guide
   - [RadialReduction](@ref)
   - [DegreeTwoReduction](@ref)
