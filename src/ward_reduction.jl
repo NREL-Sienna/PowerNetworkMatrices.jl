@@ -1,3 +1,23 @@
+"""
+    WardReduction <: NetworkReduction
+Perform Ward reduction to create an equivalent network representation.
+
+Ward reduction is a network reduction technique that eliminates external buses while preserving 
+the electrical characteristics seen from the study buses. External buses are mapped to boundary 
+buses based on impedance criteria, and equivalent admittances are computed.
+
+# Fields
+- `study_buses::Vector{Int}`: List of internal bus numbers that are retained in the equivalent representation.
+
+# Examples
+```julia
+# Create ward reduction with internal bus numbers 101, 102, and 103
+reduction = WardReduction([101, 102, 103])
+
+# Apply to system
+ybus = Ybus(system; network_reductions=[reduction])
+```
+"""
 struct WardReduction <: NetworkReduction
     study_buses::Vector{Int}
 end
