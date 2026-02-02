@@ -104,6 +104,6 @@ reduced_bus_count = length(get_components(Bus, reduced_sys))
 
 ## Related Topics
 
-  - [RadialReduction](@ref) - Detailed walkthrough 
+  - [RadialReduction](@ref) - Detailed walkthrough
   - [DegreeTwoReduction](@ref) - Detailed walkthrough
   - [Network Reduction Theory](@ref) - Understanding the mathematics

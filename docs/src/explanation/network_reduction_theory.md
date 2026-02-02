@@ -22,6 +22,8 @@ Network reduction aims to preserve:
   - Stability characteristics (when applicable)
   - Essential topology features
 
+The type of reduction (e.g. `RadialReduction`, `DegreeTwoReduction`, `WardReduction`) determines the extent to which these characteristics are retained
+
 ## Radial Branch Reduction
 
 ### What is a Radial Branch?
@@ -100,7 +102,7 @@ Bus B has degree 2 - it connects A and C but has no other connections.
 
 ### Mathematical Basis: Kron Reduction
 
-Kron reduction is a systematic method to eliminate buses from the admittance matrix.
+Kron reduction is a systematic method to eliminate buses from the admittance matrix. Degree two reduction is a simple case of Kron reduction for eliminating degree two nodes.
 
 Given admittance matrix:
 
@@ -190,49 +192,13 @@ The angle is a weighted average of its neighbors, so eliminating it and creating
 
 ## Combining Reductions
 
-Multiple reduction techniques can be applied sequentially:
-
- 1. **Order matters**: Applying radial reduction first may expose new degree two buses
- 2. **Iterative approach**: After each reduction, new candidates may appear
- 3. **Convergence**: Process continues until no more reducible buses exist
-
-### Example Sequence:
-
-```
-Original Network (100 buses)
-    ↓
-Radial Reduction (→ 85 buses, new degree-2 buses exposed)
-    ↓
-Degree Two Reduction (→ 70 buses, new radial buses exposed)
-    ↓
-Radial Reduction (→ 65 buses)
-    ↓
-No more reducible buses
-```
+Multiple reductions can be applied sequentially. In these cases, the order of the reduction matters as after each reduction, new candidate buses may appear. In general, it is recommended that radial reduction is applied before degree two reduction as applying radial reduction first may expose new degree two buses.
 
 ## Practical Considerations
 
-### Load and Generation
+### Load and Generation at Reduced Buses
 
-When eliminating a bus:
-
-  - **With load/generation**: Must be transferred to retained buses
-  - **Zero injection**: Can be eliminated cleanly
-  - **Load distribution**: May use weighted schemes based on impedances
-
-### Shunt Elements
-
-Buses with shunt admittances (capacitors, reactors):
-
-  - Complicate degree two reduction
-  - May need to be distributed to neighbors
-  - Can affect the equivalent admittance calculation
-
-### Numerical Stability
-
-  - Very small impedances can cause numerical issues
-  - Parallel branches should be combined first
-  - Check for near-zero denominators in calculations
+Eliminating buses without any connected injection components can be done cleanly. For eliminated buses that have load or generation attached, those devices must be mapped to retained buses. For buses with shunt admittances, this mapping process can affect the equivalent admittance matrix. `RadialReduction` and `DegreeTwoReduction` have options for specifying buses that should not be eliminated (e.g. due to the presence of connected injectors).
 
 ### Validation
 
@@ -241,32 +207,6 @@ Always verify reductions:
   - Compare power flows before and after
   - Check that key quantities are preserved
   - Validate on a small test system first
-
-## Applications in PowerNetworkMatrices.jl
-
-### Market Studies
-
-Reducing the network focuses analysis on:
-
-  - Key trading hubs
-  - Major transmission corridors
-  - Critical generation centers
-
-### Security Analysis
-
-Reduction helps:
-
-  - Speed up contingency screening
-  - Focus on critical elements
-  - Enable larger study scope
-
-### Planning Studies
-
-Benefits include:
-
-  - Simplifying future scenarios
-  - Faster iteration on designs
-  - Clearer visualization of key paths
 
 ## Limitations
 
@@ -283,17 +223,6 @@ Benefits include:
   - Protection coordination
   - Local voltage studies
   - Distributed generation integration at eliminated buses
-
-## Mathematical Guarantees
-
-Under DC power flow assumptions, network reduction:
-
-  - **Preserves**: Impedance matrix (Schur complement)
-  - **Preserves**: Power flows at retained buses
-  - **Preserves**: Voltage angles at retained buses
-  - **Maintains**: Linearity of the system
-
-These guarantees hold exactly for the DC approximation and approximately for AC systems near the linearization point.
 
 ## Further Reading
 

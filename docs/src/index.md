@@ -63,15 +63,6 @@ and data structures. It's organized for quick lookup of specific details.
   - Find available methods and options
   - Access complete API documentation
 
-## User Categories
-
-The documentation and code are organized to serve three main user categories:
-
-  - **Modeler**: Users that want to run a particular analysis or experiment and use `PowerNetworkMatrices.jl` to develop data sets.
-
-  - **Model Developer**: Users that want to develop custom components and structs in order to exploit `PowerNetworkMatrices.jl` features to produce custom data sets. *Explore Explanation and Reference sections.*
-  - **Code Base Developers**: Users that want to add new core functionalities or fix bugs in the core capabilities of `PowerNetworkMatrices.jl`. *Refer to Reference and internal API documentation.*
-
 * * *
 
 PowerNetworkMatrices has been developed as part of the Scalable Integrated Infrastructure Planning (SIIP) initiative at the U.S. Department of Energy's National Renewable Energy Laboratory ([NREL](https://www.nrel.gov/)).
