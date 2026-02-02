@@ -38,12 +38,9 @@ export DC_BA_Matrix
 export AC_Ybus_Matrix
 
 using DocStringExtensions
-import InfrastructureSystems
-import PowerSystems
+import InfrastructureSystems as IS
+import PowerSystems as PSY
 import PowerSystems: ACBusTypes
-
-const IS = InfrastructureSystems
-const PSY = PowerSystems
 
 # TODO make public so users can check for solver availability?
 # Check if MKL/Pardiso extension is available at runtime

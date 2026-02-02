@@ -17,8 +17,8 @@ The evaluation of the `LODF` matrix can be easily performed starting from import
 using PowerNetworkMatrices
 using PowerSystemCaseBuilder
 
-const PNM = PowerNetworkMatrices
-const PSB = PowerSystemCaseBuilder
+import PowerNetworkMatrices as PNM
+import PowerSystemCaseBuilder as PSB
 
 # get the System data
 sys = PSB.build_system(PSB.PSITestSystems, "c_sys5");

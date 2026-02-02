@@ -31,8 +31,8 @@ As for the `LODF` matrix, at first the `System` data must be loaded. The "RTS-GM
 using PowerNetworkMatrices
 using PowerSystemCaseBuilder
 
-const PNM = PowerNetworkMatrices;
-const PSB = PowerSystemCaseBuilder;
+import PowerNetworkMatrices as PNM
+import PowerSystemCaseBuilder as PSB
 
 sys = PSB.build_system(PSB.PSISystems, "RTS_GMLC_DA_sys");
 ```

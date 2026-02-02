@@ -89,6 +89,22 @@ function get_equivalent_rating(bp::BranchesParallel)
 end
 
 """
+    get_equivalent_emergency_rating(bp::BranchesParallel)
+
+Calculate the total emergency rating for branches in parallel.
+For parallel circuits, the emergency rating is the sum of individual emergency ratings divided by the number of circuits.
+This provides a conservative estimate that accounts for potential overestimation of total capacity.
+"""
+function get_equivalent_emergency_rating(bp::BranchesParallel)
+    equivalent_rating = 0.0
+    for branch in bp.branches
+        rating_b = get_equivalent_emergency_rating(branch)
+        equivalent_rating += rating_b
+    end
+    return equivalent_rating # In Emergency conditions, we should consider the full capacity
+end
+
+"""
     get_equivalent_available(bp::BranchesParallel)
 
 Get the availability status for parallel branches.
