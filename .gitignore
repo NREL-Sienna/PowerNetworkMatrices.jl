@@ -38,6 +38,7 @@ docs/site/
 *.ipynb
 
 Manifest.toml
+LocalPreferences.toml
 .vscode
 *.h5
 

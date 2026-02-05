@@ -120,10 +120,10 @@ function _create_apple_accelerate_factorization end
 
 function __init__()
     # Check if user wants to see BLAS backend suggestions
-    # Default is "auto" which shows suggestions only if not explicitly disabled
-    show_suggestions = @load_preference("show_blas_suggestions", "auto")
+    # Default is true (show suggestions) if not explicitly set
+    show_suggestions = @load_preference("show_blas_suggestions", true)
     
-    if show_suggestions != "false"
+    if show_suggestions
         # Suggest optimal BLAS backend based on OS and current config
         blas_config = lowercase(string(LinearAlgebra.BLAS.get_config()))
         if Sys.iswindows() && !contains(blas_config, "mkl")
@@ -150,16 +150,22 @@ Control whether BLAS backend suggestions are displayed at module load time.
 # Arguments
 - `show::Bool`: If `true`, show BLAS suggestions. If `false`, suppress them.
 
-# Example
+# Examples
 ```julia
 using PowerNetworkMatrices
-PowerNetworkMatrices.set_blas_suggestions(false)  # Suppress BLAS suggestions
+
+# Suppress BLAS suggestions
+PowerNetworkMatrices.set_blas_suggestions(false)
+
+# Re-enable BLAS suggestions
+PowerNetworkMatrices.set_blas_suggestions(true)
 ```
 
 Note: This setting is stored in LocalPreferences.toml and persists across sessions.
+You must restart Julia for this change to take effect.
 """
 function set_blas_suggestions(show::Bool)
-    @set_preferences!("show_blas_suggestions" => show ? "true" : "false")
+    @set_preferences!("show_blas_suggestions" => show)
     @info "BLAS suggestions $(show ? "enabled" : "disabled"). Restart Julia for this change to take effect."
 end
 
