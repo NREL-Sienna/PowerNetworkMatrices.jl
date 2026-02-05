@@ -21,6 +21,7 @@ export NetworkReductionData
 export RadialReduction
 export DegreeTwoReduction
 export WardReduction
+export set_blas_suggestions
 
 export depth_first_search
 export iterative_union_find
@@ -38,6 +39,7 @@ export DC_BA_Matrix
 export AC_Ybus_Matrix
 
 using DocStringExtensions
+using Preferences
 import InfrastructureSystems as IS
 import PowerSystems as PSY
 import PowerSystems: ACBusTypes
@@ -117,19 +119,48 @@ function _pardiso_single_LODF! end
 function _create_apple_accelerate_factorization end
 
 function __init__()
-    # Suggest optimal BLAS backend.
-    blas_config = lowercase(string(LinearAlgebra.BLAS.get_config()))
-    if Sys.iswindows() && !contains(blas_config, "mkl")
-        @info """For faster dense matrix operations, consider using MKL:
-                   pkg> add MKL
-                   using MKL  # before any matrix operations
-                 Sparse factorization still uses KLU (recommended)."""
-    elseif Sys.isapple() && !contains(blas_config, "accelerate")
-        @info """For faster dense matrix operations, consider using AppleAccelerate:
-                   pkg> add AppleAccelerate
-                   using AppleAccelerate  # before any matrix operations
-                 Sparse factorization still uses KLU (recommended)."""
+    # Check if user wants to see BLAS backend suggestions
+    # Default is "auto" which shows suggestions only if not explicitly disabled
+    show_suggestions = @load_preference("show_blas_suggestions", "auto")
+    
+    if show_suggestions != "false"
+        # Suggest optimal BLAS backend based on OS and current config
+        blas_config = lowercase(string(LinearAlgebra.BLAS.get_config()))
+        if Sys.iswindows() && !contains(blas_config, "mkl")
+            @info """For faster dense matrix operations, consider using MKL:
+                       pkg> add MKL
+                       using MKL  # before any matrix operations
+                     Sparse factorization still uses KLU (recommended).
+                     To suppress this message, run: PowerNetworkMatrices.set_blas_suggestions(false)"""
+        elseif Sys.isapple() && !contains(blas_config, "accelerate")
+            @info """For faster dense matrix operations, consider using AppleAccelerate:
+                       pkg> add AppleAccelerate
+                       using AppleAccelerate  # before any matrix operations
+                     Sparse factorization still uses KLU (recommended).
+                     To suppress this message, run: PowerNetworkMatrices.set_blas_suggestions(false)"""
+        end
     end
+end
+
+"""
+    set_blas_suggestions(show::Bool)
+
+Control whether BLAS backend suggestions are displayed at module load time.
+
+# Arguments
+- `show::Bool`: If `true`, show BLAS suggestions. If `false`, suppress them.
+
+# Example
+```julia
+using PowerNetworkMatrices
+PowerNetworkMatrices.set_blas_suggestions(false)  # Suppress BLAS suggestions
+```
+
+Note: This setting is stored in LocalPreferences.toml and persists across sessions.
+"""
+function set_blas_suggestions(show::Bool)
+    @set_preferences!("show_blas_suggestions" => show ? "true" : "false")
+    @info "BLAS suggestions $(show ? "enabled" : "disabled"). Restart Julia for this change to take effect."
 end
 
 end
