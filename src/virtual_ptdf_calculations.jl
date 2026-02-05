@@ -88,17 +88,17 @@ struct with an empty cache.
         PSY system for which the matrix is constructed
 
 # Keyword Arguments
-- `dist_slack::Vector{Float64} = Float64[]`:
-        Vector of weights to be used as distributed slack bus.
-        The distributed slack vector has to be the same length as the number of buses.
+- `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
+        Dictionary of weights to be used as distributed slack bus.
+        The distributed slack dictionary must have the same number of entries as the number of buses.
 - `linear_solver::String = "KLU"`:
         Linear solver to use for factorization. Options: "KLU", "AppleAccelerate"
 - `tol::Float64 = eps()`:
         Tolerance related to sparsification and values to drop.
 - `max_cache_size::Int`:
         max cache size in MiB (initialized as MAX_CACHE_SIZE_MiB).
-- `persistent_lines::Vector{String}`:
-        line to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of strings).
+- `persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}()`:
+        arcs to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of tuples).
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
@@ -120,14 +120,54 @@ function VirtualPTDF(
         network_reductions = network_reductions,
         kwargs...,
     )
-    ref_bus_positions = get_ref_bus_position(Ymatrix)
-    A = IncidenceMatrix(Ymatrix)
+    VirtualPTDF(
+        Ymatrix;
+        dist_slack = dist_slack,
+        linear_solver = linear_solver,
+        tol = tol,
+        max_cache_size = max_cache_size,
+        persistent_arcs = persistent_arcs,
+    )
+end
+
+"""
+Builds the Virtual PTDF matrix from a Ybus matrix. This constructor is more efficient when the prerequisite Ybus
+matrix is already available and provides direct control over the underlying matrix computations (including network reductions).  
+The return is a VirtualPTDF struct with an empty cache. 
+
+# Arguments
+- `ybus::Ybus`: Ybus matrix from which the matrix is constructed
+
+# Keyword Arguments
+- `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
+        Dictionary of weights to be used as distributed slack bus.
+        The distributed slack dictionary must have the same number of entries as the number of buses.
+- `linear_solver::String = "KLU"`:
+        Linear solver to use for factorization. Options: "KLU", "AppleAccelerate"
+- `tol::Float64 = eps()`:
+        Tolerance related to sparsification and values to drop.
+- `max_cache_size::Int`:
+        max cache size in MiB (initialized as MAX_CACHE_SIZE_MiB).
+- `persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}()`:
+        arcs to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of tuples).
+"""
+function VirtualPTDF(
+    ybus::Ybus;
+    dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
+    linear_solver::String = "KLU",
+    tol::Float64 = eps(),
+    max_cache_size::Int = MAX_CACHE_SIZE_MiB,
+    persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
+)
+    validate_linear_solver(linear_solver)
+    ref_bus_positions = get_ref_bus_position(ybus)
+    A = IncidenceMatrix(ybus)
     if !(isempty(dist_slack))
         dist_slack_vector = redistribute_dist_slack(dist_slack, A, A.network_reduction_data)
     else
         dist_slack_vector = Float64[]
     end
-    BA = BA_Matrix(Ymatrix)
+    BA = BA_Matrix(ybus)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
     bus_ax = get_bus_axis(A)
     axes = A.axes
@@ -189,7 +229,7 @@ function VirtualPTDF(
         empty_cache,
         subnetwork_axes,
         Ref(tol),
-        Ymatrix.network_reduction_data,
+        ybus.network_reduction_data,
         work_ba_col,
     )
 end
