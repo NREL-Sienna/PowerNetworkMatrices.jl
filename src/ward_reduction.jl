@@ -1,3 +1,10 @@
+"""
+A [`NetworkReduction`](@ref) that eliminates external buses while preserving the
+electrical behavior at the study area boundary using Ward equivalencing.
+
+# Fields
+- `study_buses::Vector{Int}`: bus numbers to retain in the reduced network
+"""
 struct WardReduction <: NetworkReduction
     study_buses::Vector{Int}
 end
