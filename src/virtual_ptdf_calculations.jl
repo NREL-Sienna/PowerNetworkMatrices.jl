@@ -363,6 +363,20 @@ Base.setindex!(::VirtualPTDF, _, idx...) = error("Operation not supported by Vir
 Base.setindex!(::VirtualPTDF, _, ::CartesianIndex) =
     error("Operation not supported by VirtualPTDF")
 
+"""
+    get_ptdf_data(mat::VirtualPTDF) -> Dict{Int, Vector{Float64}}
+
+Get the cached PTDF row data from a [`VirtualPTDF`](@ref) matrix.
+
+Unlike [`get_ptdf_data(::PTDF)`](@ref), which returns a dense matrix, this returns
+a dictionary mapping row indices to lazily computed row vectors.
+
+# Arguments
+- `mat::VirtualPTDF`: The virtual PTDF matrix
+
+# Returns
+- `Dict{Int, Vector{Float64}}`: Cached row data keyed by row index
+"""
 get_ptdf_data(mat::VirtualPTDF) = mat.cache.temp_cache
 
 function get_arc_axis(ptdf::VirtualPTDF)
