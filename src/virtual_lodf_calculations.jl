@@ -298,6 +298,20 @@ Base.setindex!(::VirtualLODF, _, idx...) = error("Operation not supported by Vir
 Base.setindex!(::VirtualLODF, _, ::CartesianIndex) =
     error("Operation not supported by VirtualLODF")
 
+"""
+    get_lodf_data(mat::VirtualLODF) -> Dict{Int, Vector{Float64}}
+
+Get the cached LODF row data from a [`VirtualLODF`](@ref) matrix.
+
+Unlike [`get_lodf_data(::LODF)`](@ref), which returns a dense matrix, this returns
+a dictionary mapping row indices to lazily computed row vectors.
+
+# Arguments
+- `mat::VirtualLODF`: The virtual LODF matrix
+
+# Returns
+- `Dict{Int, Vector{Float64}}`: Cached row data keyed by row index
+"""
 get_lodf_data(mat::VirtualLODF) = mat.cache.temp_cache
 
 function get_arc_axis(mat::VirtualLODF)
