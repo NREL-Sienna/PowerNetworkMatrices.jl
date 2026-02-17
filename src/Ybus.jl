@@ -63,7 +63,7 @@ get_axes(M::Ybus) = M.axes
 get_lookup(M::Ybus) = M.lookup
 get_ref_bus(M::Ybus) = sort!(collect(keys(M.subnetwork_axes)))
 get_ref_bus_position(M::Ybus) = [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
-"""Get the [`NetworkReduction`](@ref) data applied to this matrix, or `nothing` if none."""
+"""Get the [`NetworkReduction`](@ref) data applied to this matrix."""
 get_network_reduction_data(M::Ybus) = M.network_reduction_data
 get_bus_axis(M::Ybus) = M.axes[1]
 get_bus_lookup(M::Ybus) = M.lookup[1]
