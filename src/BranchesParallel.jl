@@ -145,8 +145,8 @@ function add_to_map(
     isempty(filters) && return true
     if isabstracttype(T)
         @warn "Parallel circuit contains mixed branch types, filters might be applied to more components than intended. Use Logging.Debug for additional information."
-        @debug "Parallel circuit branch types: $(keys(double_circuit.branches))"
-        @debug "Parallel circuit branch names: $(vcat([PSY.get_name.(v) for (k , v) in double_circuit.branches]))"
+        @debug "Parallel circuit branch types: $(typeof.(double_circuit.branches))"
+        @debug "Parallel circuit branch names: $(PSY.get_name.(double_circuit.branches))"
         for branch in double_circuit.branches
             filter = get(filters, typeof(branch), x -> true)
             if !filter(branch)
