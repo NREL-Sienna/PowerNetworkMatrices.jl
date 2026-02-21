@@ -856,8 +856,7 @@ function Ybus(
             end
         end
     end
-    #@error reverse_bus_search_map
-    #@assert false 
+
     bus_ax = sort!([x for x in keys(bus_reduction_map)])
     axes = (bus_ax, bus_ax)
     bus_lookup = Dict{Int, Int}()
