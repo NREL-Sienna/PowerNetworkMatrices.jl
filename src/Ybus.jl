@@ -833,6 +833,9 @@ function Ybus(
                         get!(bus_reduction_map, reduced_from_bus_number, Set{Int}),
                         to_bus_number,
                     )
+                    for x in get(bus_reduction_map, to_bus_number, Set{Int}())
+                        reverse_bus_search_map[x] = reduced_from_bus_number
+                    end
                     delete!(bus_reduction_map, to_bus_number)
                     reverse_bus_search_map[to_bus_number] = reduced_from_bus_number
                 else
@@ -853,7 +856,8 @@ function Ybus(
             end
         end
     end
-
+    #@error reverse_bus_search_map
+    #@assert false 
     bus_ax = sort!([x for x in keys(bus_reduction_map)])
     axes = (bus_ax, bus_ax)
     bus_lookup = Dict{Int, Int}()
