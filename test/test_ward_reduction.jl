@@ -1,9 +1,17 @@
-function _basic_test_ward_reduction(sys, study_buses)
-    ybus = Ybus(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+function _basic_test_ward_reduction(sys, study_buses; injection_redistribution_limit = 10)
+    ybus = Ybus(
+        sys;
+        network_reductions = NetworkReduction[WardReduction(
+            study_buses,
+            injection_redistribution_limit,
+        )],
+    )
     wr = get_network_reduction_data(ybus)
     @test isa(wr, NetworkReductionData)
     @test get_reductions(wr) ==
-          PNM.ReductionContainer(; ward_reduction = WardReduction(study_buses))
+          PNM.ReductionContainer(;
+        ward_reduction = WardReduction(study_buses, injection_redistribution_limit),
+    )
     external_buses =
         setdiff([get_number(x) for x in get_components(ACBus, sys)], study_buses)
     @test !isempty(wr.added_admittance_map)
@@ -12,7 +20,15 @@ function _basic_test_ward_reduction(sys, study_buses)
         @test external_bus ∉ keys(wr.bus_reduction_map)
         @test external_bus ∈ keys(wr.reverse_bus_search_map)
     end
-end
+    #Note: setdiff(keys(wr.reverse_bus_search_map), keys(wr.reverse_injection_redistribution_map)) is not necessarily empty because there might be other reductions
+    @test setdiff(
+        keys(wr.reverse_injection_redistribution_map),
+        keys(wr.reverse_bus_search_map),
+    ) == Set{Int64}()
+    for injection_redistribution_dict in values(wr.reverse_injection_redistribution_map)
+        @test isapprox(sum(values(injection_redistribution_dict)), 1.0)
+    end
+end 
 
 function _check_for_repeated_arcs(matrix)
     nrd = get_network_reduction_data(matrix)
@@ -24,8 +40,18 @@ function _check_for_repeated_arcs(matrix)
     return
 end
 
-function _test_matrices_ward_reduction(sys, study_buses)
-    ybus = Ybus(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+function _test_matrices_ward_reduction(
+    sys,
+    study_buses;
+    injection_redistribution_limit = 10,
+)
+    ybus = Ybus(
+        sys;
+        network_reductions = NetworkReduction[WardReduction(
+            study_buses,
+            injection_redistribution_limit,
+        )],
+    )
     wr = get_network_reduction_data(ybus)
     added_branch_arcs = [x for x in keys(wr.added_branch_map)]
     direct_arcs = [x for x in keys(wr.direct_branch_map)]
@@ -33,7 +59,10 @@ function _test_matrices_ward_reduction(sys, study_buses)
     expected_arc_axis = union(Set(added_branch_arcs), Set(direct_arcs), Set(parallel_arcs))
     A = IncidenceMatrix(
         sys;
-        network_reductions = NetworkReduction[WardReduction(study_buses)],
+        network_reductions = NetworkReduction[WardReduction(
+            study_buses,
+            injection_redistribution_limit,
+        )],
     )
     _check_for_repeated_arcs(A)
     @test Set(A.axes[1]) == expected_arc_axis
@@ -41,38 +70,77 @@ function _test_matrices_ward_reduction(sys, study_buses)
 
     Adj = AdjacencyMatrix(
         sys;
-        network_reductions = NetworkReduction[WardReduction(study_buses)],
+        network_reductions = NetworkReduction[WardReduction(
+            study_buses,
+            injection_redistribution_limit,
+        )],
     )
     @test Set(Adj.axes[1]) == Set(study_buses)
     @test Set(Adj.axes[2]) == Set(study_buses)
 
-    BA = BA_Matrix(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    BA = BA_Matrix(
+        sys;
+        network_reductions = NetworkReduction[WardReduction(
+            study_buses,
+            injection_redistribution_limit,
+        )],
+    )
     _check_for_repeated_arcs(BA)
     @test Set(BA.axes[2]) == expected_arc_axis
     @test Set(BA.axes[1]) == Set(study_buses)
 
-    Y = Ybus(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    Y = Ybus(
+        sys;
+        network_reductions = NetworkReduction[WardReduction(
+            study_buses,
+            injection_redistribution_limit,
+        )],
+    )
     @test Set(Y.axes[1]) == Set(study_buses)
     @test Set(Y.axes[2]) == Set(study_buses)
 
-    PTDF_ = PTDF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    PTDF_ = PTDF(
+        sys;
+        network_reductions = NetworkReduction[WardReduction(
+            study_buses,
+            injection_redistribution_limit,
+        )],
+    )
     _check_for_repeated_arcs(PTDF_)
     @test Set(PNM.get_bus_axis(PTDF_)) == Set(study_buses)
     @test Set(PNM.get_arc_axis(PTDF_)) == expected_arc_axis
 
-    LODF_ = LODF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    LODF_ = LODF(
+        sys;
+        network_reductions = NetworkReduction[WardReduction(
+            study_buses,
+            injection_redistribution_limit,
+        )],
+    )
     _check_for_repeated_arcs(LODF_)
     @test Set(LODF_.axes[1]) == expected_arc_axis
     @test Set(LODF_.axes[2]) == expected_arc_axis
 
     vPTDF_ =
-        VirtualPTDF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+        VirtualPTDF(
+            sys;
+            network_reductions = NetworkReduction[WardReduction(
+                study_buses,
+                injection_redistribution_limit,
+            )],
+        )
     _check_for_repeated_arcs(vPTDF_)
     @test Set(PNM.get_bus_axis(vPTDF_)) == Set(study_buses)
     @test Set(PNM.get_arc_axis(vPTDF_)) == expected_arc_axis
 
     vLODF_ =
-        VirtualLODF(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+        VirtualLODF(
+            sys;
+            network_reductions = NetworkReduction[WardReduction(
+                study_buses,
+                injection_redistribution_limit,
+            )],
+        )
     _check_for_repeated_arcs(vLODF_)
     @test Set(vLODF_.axes[1]) == expected_arc_axis
     @test Set(vLODF_.axes[2]) == expected_arc_axis
@@ -109,7 +177,7 @@ end
         r"Equivalent branch computed during Ward reduction is in parallel with existing system branch",
     ) match_mode = :any PTDF(
         sys;
-        network_reductions = NetworkReduction[WardReduction([101, 102])],
+        network_reductions = NetworkReduction[WardReduction([101, 102], 1)],
     )
     existing_line_susceptance = PSY.get_series_susceptance(
         ptdf_2.network_reduction_data.direct_branch_map[(101, 102)],
@@ -124,14 +192,14 @@ end
 @testset "Ward corner cases" begin
     sys = build_hvdc_with_small_island()
     wr = get_network_reduction_data(
-        Ybus(sys; network_reductions = NetworkReduction[WardReduction([1, 2, 3])]),
+        Ybus(sys; network_reductions = NetworkReduction[WardReduction([1, 2, 3], 1)]),
     )
 
     @test isa(wr, NetworkReductionData)
     @test length(wr.bus_reduction_map) == 3
 
     wr = get_network_reduction_data(
-        Ybus(sys; network_reductions = NetworkReduction[WardReduction([1])]),
+        Ybus(sys; network_reductions = NetworkReduction[WardReduction([1], 1)]),
     )
     @test isa(wr, NetworkReductionData)
     @test length(wr.bus_reduction_map) == 1
@@ -140,7 +208,10 @@ end
 
     wr =
         @test_logs (:error, r"no boundary buses found") match_mode = :any get_network_reduction_data(
-            Ybus(sys; network_reductions = NetworkReduction[WardReduction([15, 16, 17])]),
+            Ybus(
+                sys;
+                network_reductions = NetworkReduction[WardReduction([15, 16, 17], 1)],
+            ),
         )
     @test isa(wr, NetworkReductionData)
     @test length(wr.added_branch_map) == 0
@@ -149,16 +220,16 @@ end
     @test_throws IS.DataFormatError get_network_reduction_data(
         Ybus(
             sys;
-            network_reductions = NetworkReduction[WardReduction([1, 2, 3, 4, 5, 17])],
+            network_reductions = NetworkReduction[WardReduction([1, 2, 3, 4, 5, 17], 1)],
         ),
     )
     @test_throws IS.DataFormatError get_network_reduction_data(
         Ybus(
             sys;
-            network_reductions = NetworkReduction[WardReduction([1, 2, 3, 4, 5, 100])],
+            network_reductions = NetworkReduction[WardReduction([1, 2, 3, 4, 5, 100], 1)],
         ),
     )
     @test_throws IS.DataFormatError get_network_reduction_data(
-        Ybus(sys; network_reductions = NetworkReduction[WardReduction([2, 3, 4])]),
+        Ybus(sys; network_reductions = NetworkReduction[WardReduction([2, 3, 4], 1)]),
     )
 end
