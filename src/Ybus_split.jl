@@ -1,12 +1,12 @@
 const TransformerRecord = NamedTuple{
     (:from, :to, :turns, :angle, :Y, :shunt),
-    Tuple{Int, Int, Float32, Float32, ComplexF32, ComplexF32},
+    Tuple{Int, Int, Float64, Float64, ComplexF64, ComplexF64},
 }
 
-struct YbusSplit{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
-    y_series::SparseArrays.SparseMatrixCSC{ComplexF32, Int}
-    y_shunt::Vector{ComplexF32}
-    y_lambda::SparseArrays.SparseMatrixCSC{ComplexF32, Int}
+struct YbusSplit{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF64}
+    y_series::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
+    y_shunt::Vector{ComplexF64}
+    y_lambda::SparseArrays.SparseMatrixCSC{ComplexF64, Int}
     adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
@@ -49,12 +49,12 @@ end
 # this covers phase shifting, tap transformers, and plain 2W (fixed winding number)
 """Structurally nonzero but numerically zero entries for two-winding transformers."""
 function ybus_split_branch_entries(::PSY.TwoWindingTransformer)
-    z = zero(ComplexF32)
+    z = zero(ComplexF64)
     return (z, z, z, z, z, z)
 end
 
 function ybus_split_branch_entries(parallel_br::BranchesParallel)
-    Y11 = Y12 = Y21 = Y22 = Yshunt_from = Yshunt_to = zero(ComplexF32)
+    Y11 = Y12 = Y21 = Y22 = Yshunt_from = Yshunt_to = zero(ComplexF64)
     for br in parallel_br
         # All branches in BranchesParallel have the same orientation when constructed in add_to_branch_maps!
         (y11, y12, y21, y22, yshunt_from, yshunt_to) = ybus_split_branch_entries(br)
@@ -77,13 +77,13 @@ end
 # --- Storing branch entries into COO vectors ---
 
 function add_branch_entries_to_ybus_split!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
     branch_ix::Int,
-    y_shunt_from::Vector{ComplexF32},
-    y_shunt_to::Vector{ComplexF32},
+    y_shunt_from::Vector{ComplexF64},
+    y_shunt_to::Vector{ComplexF64},
     br::PSY.ACTransmission,
 )
     Y11, Y12, Y21, Y22, Yshunt_from, Yshunt_to = ybus_split_branch_entries(br)
@@ -126,12 +126,12 @@ _add_to_transformer_records!(
 ) = nothing
 
 function _ybus_split!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
-    y_shunt_from::Vector{ComplexF32},
-    y_shunt_to::Vector{ComplexF32},
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
+    y_shunt_from::Vector{ComplexF64},
+    y_shunt_to::Vector{ComplexF64},
     br::PSY.ACTransmission,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -150,12 +150,12 @@ function _ybus_split!(
 end
 
 function _ybus_split!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
-    y_shunt_from::Vector{ComplexF32},
-    y_shunt_to::Vector{ComplexF32},
+    y11::Vector{ComplexF64},
+    y12::Vector{ComplexF64},
+    y21::Vector{ComplexF64},
+    y22::Vector{ComplexF64},
+    y_shunt_from::Vector{ComplexF64},
+    y_shunt_to::Vector{ComplexF64},
     br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -232,7 +232,7 @@ function _ybus_split!(
             turns = PSY.get_secondary_turns_ratio(br),
             angle = PSY.get_α_secondary(br),
             Y = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im),
-            shunt = zero(ComplexF32),
+            shunt = zero(ComplexF64),
         ),
     )
     # tertiary
@@ -251,7 +251,7 @@ function _ybus_split!(
             turns = PSY.get_tertiary_turns_ratio(br),
             angle = PSY.get_α_tertiary(br),
             Y = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im),
-            shunt = zero(ComplexF32),
+            shunt = zero(ComplexF64),
         ),
     )
     return n_entries
@@ -260,7 +260,7 @@ end
 # --- Shunt device handlers ---
 
 function _ybus_split_shunt!(
-    ysh::Vector{ComplexF32},
+    ysh::Vector{ComplexF64},
     fa::PSY.FixedAdmittance,
     num_bus::Dict{Int, Int},
     fa_ix::Int,
@@ -280,7 +280,7 @@ function _ybus_split_shunt!(
 end
 
 function _ybus_split_shunt!(
-    ysh::Vector{ComplexF32},
+    ysh::Vector{ComplexF64},
     fa::PSY.SwitchedAdmittance,
     num_bus::Dict{Int, Int},
     fa_ix::Int,
@@ -321,13 +321,13 @@ function _buildybus_split!(
     tb = zeros(Int, branchcount)
     sb = zeros(Int, fa_count + sa_count)
 
-    y11 = zeros(ComplexF32, branchcount)
-    y12 = zeros(ComplexF32, branchcount)
-    y21 = zeros(ComplexF32, branchcount)
-    y22 = zeros(ComplexF32, branchcount)
-    y_shunt_from = zeros(ComplexF32, branchcount)
-    y_shunt_to = zeros(ComplexF32, branchcount)
-    ysh = zeros(ComplexF32, fa_count + sa_count)
+    y11 = zeros(ComplexF64, branchcount)
+    y12 = zeros(ComplexF64, branchcount)
+    y21 = zeros(ComplexF64, branchcount)
+    y22 = zeros(ComplexF64, branchcount)
+    y_shunt_from = zeros(ComplexF64, branchcount)
+    y_shunt_to = zeros(ComplexF64, branchcount)
+    ysh = zeros(ComplexF64, fa_count + sa_count)
 
     for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
@@ -385,11 +385,6 @@ function YbusSplit(
     end
 
     # Prototype guards: error on unsupported component types
-    for b in PSY.get_available_components(PSY.ACBus, sys)
-        if PSY.get_bustype(b) == ACBusTypes.ISOLATED
-            error("YbusSplit does not support isolated buses. Found: $(PSY.get_name(b))")
-        end
-    end
     if !isempty(
         collect(
             PSY.get_available_components(PSY.DiscreteControlledACBranch, sys),
@@ -410,6 +405,11 @@ function YbusSplit(
     bus_reduction_map = get_bus_reduction_map(nr)
 
     for b in PSY.get_available_components(PSY.ACBus, sys)
+        if PSY.get_bustype(b) == ACBusTypes.ISOLATED
+            @debug "Found available isolated bus $(PSY.get_name(b)) with number $(PSY.get_number(b)). This is excluded from the YbusSplit build."
+            push!(nr.removed_buses, PSY.get_number(b))
+            continue
+        end
         bus_reduction_map[PSY.get_number(b)] = Set{Int}()
         if PSY.get_bustype(b) == ACBusTypes.REF
             push!(ref_bus_numbers, PSY.get_number(b))
@@ -442,11 +442,23 @@ function YbusSplit(
             PSY.get_available_components(PSY.ThreeWindingTransformer, sys),
         )
     fixed_admittances = collect(
-        PSY.get_available_components(PSY.FixedAdmittance, sys),
+        PSY.get_components(
+            x ->
+                PSY.get_available(x) &&
+                    PSY.get_bustype(PSY.get_bus(x)) != ACBusTypes.ISOLATED,
+            PSY.FixedAdmittance,
+            sys,
+        ),
     )
     switched_admittances =
         collect(
-            PSY.get_available_components(PSY.SwitchedAdmittance, sys),
+            PSY.get_components(
+                x ->
+                    PSY.get_available(x) &&
+                        PSY.get_bustype(PSY.get_bus(x)) != ACBusTypes.ISOLATED,
+                PSY.SwitchedAdmittance,
+                sys,
+            ),
         )
     n_2W_transformers = length(
         collect(
@@ -467,8 +479,6 @@ function YbusSplit(
             transformer_records,
         )
 
-    # Assemble series-only sparse matrix (no shunts folded into diagonal).
-    # Transformer entries are structurally present but numerically zero.
     y_series = SparseArrays.sparse(
         [fb; fb; tb; tb],
         [fb; tb; fb; tb],
@@ -489,11 +499,11 @@ function YbusSplit(
 
     I, J, V = SparseArrays.findnz(y_series)
     y_lambda = SparseArrays.sparse(
-        I, J, zeros(ComplexF32, length(V)),
+        I, J, zeros(ComplexF64, length(V)),
     )
 
     # Accumulate per-bus shunt vector: line charging from branches + device shunts.
-    y_shunt = zeros(ComplexF32, busnumber)
+    y_shunt = zeros(ComplexF64, busnumber)
     for i in eachindex(fb)
         y_shunt[fb[i]] += y_shunt_from[i]
         y_shunt[tb[i]] += y_shunt_to[i]
@@ -503,10 +513,12 @@ function YbusSplit(
     end
 
     if length(bus_lookup) > 1
-        # Use the combined matrix for connectivity detection
+        # Use the adjacency matrix for connectivity detection.
+        # y_series + spdiagm(y_shunt) would drop structural zeros (transformer
+        # entries that are zero at lambda != 0), incorrectly splitting the network.
         subnetworks = assign_reference_buses!(
             find_subnetworks(
-                y_series + SparseArrays.spdiagm(y_shunt),
+                adj,
                 bus_ax;
                 subnetwork_algorithm = subnetwork_algorithm,
             ),
@@ -544,13 +556,14 @@ function generic_transfomer_ybus_entries(turns::Number, angle::Number, Y::Comple
 end
 
 function update_y_lambda!(M::YbusSplit, lambda::Number, gamma::Number)
-    nonzeros(M.y_lambda) .= 0.0
+    SparseArrays.nonzeros(M.y_lambda) .= 0.0
     # transmission piece: (1 + λ γ) * Y_series + (1 - λ) * Diagonal(Y_shunt)
     # λ = 0 gives original, Y_series + Diagonal(Y_shunt)
     # λ = 1 gives (1 + γ) * Y_series, shunts removed and all series entries shorted.
-    @assert rowvals(M.y_lambda) == rowvals(M.y_series)
-    @assert colptr(M.y_lambda) == colptr(M.y_series)
-    nonzeros(M.y_lambda) .+= nonzeros(M.y_series) .* (1 + lambda * gamma)
+    @assert SparseArrays.rowvals(M.y_lambda) == SparseArrays.rowvals(M.y_series)
+    @assert M.y_lambda.colptr == M.y_series.colptr
+    SparseArrays.nonzeros(M.y_lambda) .+=
+        SparseArrays.nonzeros(M.y_series) .* (1 + lambda * gamma)
     for j in 1:size(M.y_lambda, 2)
         M.y_lambda[j, j] += M.y_shunt[j] * (1 - lambda)
     end

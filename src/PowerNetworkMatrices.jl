@@ -30,6 +30,7 @@ export VirtualLODF
 export VirtualPTDF
 export Ybus
 export YbusSplit
+export update_y_lambda!
 export ArcAdmittanceMatrix
 export DC_ABA_Matrix_Factorized
 export DC_ABA_Matrix_Unfactorized
