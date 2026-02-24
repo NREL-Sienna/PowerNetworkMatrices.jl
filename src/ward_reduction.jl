@@ -1,7 +1,9 @@
 struct WardReduction <: NetworkReduction
     study_buses::Vector{Int}
+    injection_redistribution_limit::Int
 end
 get_study_buses(nr::WardReduction) = nr.study_buses
+get_injection_redistribution_limit(nr::WardReduction) = nr.injection_redistribution_limit
 
 """
     get_ward_reduction(data, bus_lookup, bus_axis, boundary_buses, ref_bus_numbers, study_buses)
@@ -19,6 +21,7 @@ buses based on impedance criteria, and equivalent admittances are computed.
 - `boundary_buses::Set{Int}`: Set of boundary bus numbers between study and external areas
 - `ref_bus_numbers::Set{Int}`: Set of reference bus numbers
 - `study_buses::Vector{Int}`: Vector of study bus numbers to retain
+- `injection_redistribution_limit::Int`: Maximum number of buses to redistribute each external injection to
 
 # Returns
 - `Tuple`: Contains bus reduction map, reverse bus search map, added branch map, and added admittance map
@@ -30,6 +33,7 @@ function get_ward_reduction(
     boundary_buses::Set{Int},
     ref_bus_numbers::Set{Int},
     study_buses::Vector{Int},
+    injection_redistribution_limit::Int,
 )
     all_buses = bus_axis
     external_buses = setdiff(all_buses, study_buses)
@@ -39,6 +43,8 @@ function get_ward_reduction(
     n_buses = length(bus_axis)
 
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
+
+    injection_redistribution_map = Dict{Int, Dict{Int, Float64}}()
 
     added_branch_map = Dict{Tuple{Int, Int}, Complex{Float32}}()
     added_admittance_map = Dict{Int, Complex{Float32}}()
@@ -63,12 +69,38 @@ function get_ward_reduction(
             Z_row = K \ e  # Single row solve instead of full inverse
 
             Z_row_boundary = abs.(Z_row[boundary_bus_indices])
-            closest_boundary_bus = boundary_bus_numbers[argmin(Z_row_boundary)]
+            n_redistribution =
+                minimum([injection_redistribution_limit, length(boundary_buses)])
+            ix_Z_row_boundary_sorted =
+                partialsortperm(Z_row_boundary, 1:n_redistribution; rev = true)
+            boundary_redistribution_factors =
+                Z_row_boundary[ix_Z_row_boundary_sorted] ./
+                sum(Z_row_boundary[ix_Z_row_boundary_sorted])
+            closest_boundary_bus = boundary_bus_numbers[first(ix_Z_row_boundary_sorted)]
             push!(bus_reduction_map_index[closest_boundary_bus], b)
+            for (ix, redistribution_factor) in
+                zip(ix_Z_row_boundary_sorted, boundary_redistribution_factors)
+                boundary_bus_number = boundary_bus_numbers[ix]
+                inner_dict = get!(
+                    injection_redistribution_map,
+                    boundary_bus_number,
+                    Dict{Int, Float64}(),
+                )
+                inner_dict[b] = redistribution_factor
+            end
         end
     end
     reverse_bus_search_map =
         _make_reverse_bus_search_map(bus_reduction_map_index, length(all_buses))
+
+    reverse_injection_redistribution_map = Dict{Int, Dict{Int, Float64}}()
+    for (bus, inner_dict) in injection_redistribution_map
+        for (inner_bus, factor) in inner_dict
+            inner_reverse_map =
+                get!(reverse_injection_redistribution_map, inner_bus, Dict{Int, Float64}())
+            inner_reverse_map[bus] = factor
+        end
+    end
 
     #Populate matrices for computing external equivalent
     y_ee = SparseArrays.spzeros(ComplexF32, n_external, n_external)
@@ -115,6 +147,8 @@ function get_ward_reduction(
     end
     return bus_reduction_map_index,
     reverse_bus_search_map,
+    injection_redistribution_map,
+    reverse_injection_redistribution_map,
     added_branch_map,
     added_admittance_map
 end

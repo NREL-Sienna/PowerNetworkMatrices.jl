@@ -8,7 +8,10 @@
         "Ward reduction must be the last applied reduction",
     ) Ybus(
         sys;
-        network_reductions = NetworkReduction[WardReduction([1, 2, 4]), RadialReduction()],
+        network_reductions = NetworkReduction[
+            WardReduction([1, 2, 4], 1),
+            RadialReduction(),
+        ],
     )
     @test_logs (
         :warn,
@@ -161,13 +164,17 @@ end
 @testset "14 bus; Ward reduction" begin
     sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
     study_buses = [101, 114, 110, 111]
+    n_redistribution = 1
     boundary_buses = [101, 114, 110, 111]
     A = IncidenceMatrix(
         sys;
-        network_reductions = NetworkReduction[WardReduction(study_buses)],
+        network_reductions = NetworkReduction[WardReduction(study_buses, n_redistribution)],
     )
     check_bus_arc_axis_consistency(A)
-    ybus = Ybus(sys; network_reductions = NetworkReduction[WardReduction(study_buses)])
+    ybus = Ybus(
+        sys;
+        network_reductions = NetworkReduction[WardReduction(study_buses, n_redistribution)],
+    )
     nrd = get_network_reduction_data(ybus)
     @test Set(ybus.axes[1]) == Set(study_buses)
     @test length(nrd.added_admittance_map) == length(boundary_buses)
