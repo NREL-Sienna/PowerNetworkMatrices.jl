@@ -72,7 +72,7 @@ function get_ward_reduction(
             n_redistribution =
                 minimum([injection_redistribution_limit, length(boundary_buses)])
             ix_Z_row_boundary_sorted =
-                partialsortperm(Z_row_boundary, 1:n_redistribution; rev = true)
+                partialsortperm(Z_row_boundary, 1:n_redistribution)
             boundary_redistribution_factors =
                 Z_row_boundary[ix_Z_row_boundary_sorted] ./
                 sum(Z_row_boundary[ix_Z_row_boundary_sorted])
