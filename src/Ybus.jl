@@ -1213,11 +1213,11 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         nr_new.series_branch_map,
         nr,
     )
-    _modify_radial_connections!(
+    _modify_removed_arc_connections!(
         ybus.data,
         get_bus_lookup(ybus),
         nr,
-        nr_new.radial_arc_to_surviving_bus,
+        nr_new.removed_arc_to_surviving_bus,
         nr_new.reductions,
     )
     _remove_arcs_from_branch_maps!(nr, nr_new)
@@ -1350,8 +1350,8 @@ function _apply_added_components!(
     end
     for (bus_tuple, admittance) in nr.added_branch_map
         bus_from, bus_to = bus_tuple
-        data[bus_lookup[bus_from], bus_lookup[bus_to]] += admittance
-        data[bus_lookup[bus_to], bus_lookup[bus_from]] += admittance
+        data[bus_lookup[bus_from], bus_lookup[bus_to]] -= admittance
+        data[bus_lookup[bus_to], bus_lookup[bus_from]] -= admittance
     end
     return
 end
@@ -1396,15 +1396,14 @@ function _make_subnetwork_axes(
     return subnetwork_axes, arc_subnetwork_axis
 end
 
-function _modify_radial_connections!(
+function _modify_removed_arc_connections!(
     data::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
     bus_lookup::Dict{Int, Int},
     nrd_old::NetworkReductionData,
-    radial_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int},
+    removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int},
     reductions::ReductionContainer,
 )
-    !has_radial_reduction(reductions) && return
-    for (arc, bus) in radial_arc_to_surviving_bus
+    for (arc, bus) in removed_arc_to_surviving_bus
         arc_entry = _get_entry(arc, nrd_old)
         y11, _, _, y22 = ybus_branch_entries(arc_entry)
         if arc[1] == bus
@@ -1412,7 +1411,7 @@ function _modify_radial_connections!(
         elseif arc[2] == bus
             data[bus_lookup[arc[2]], bus_lookup[arc[2]]] -= y22
         else
-            error("Bad data in radial_arc_to_surviving_bus map")
+            error("Bad data in removed_arc_to_surviving_bus map")
         end
     end
     return
@@ -1919,12 +1918,15 @@ function get_reduction(
     A = IncidenceMatrix(ybus)
     boundary_buses = Set{Int}()
     removed_arcs = Set{Tuple{Int, Int}}()
+    removed_arc_to_surviving_bus = Dict{Tuple{Int, Int}, Int}()
     for arc in get_arc_axis(A)
         #Deterimine boundary buses:
         if (arc[1] ∈ study_buses) && (arc[2] ∉ study_buses)
             push!(boundary_buses, arc[1])
+            removed_arc_to_surviving_bus[arc] = arc[1]
         elseif (arc[1] ∉ study_buses) && (arc[2] ∈ study_buses)
             push!(boundary_buses, arc[2])
+            removed_arc_to_surviving_bus[arc] = arc[2]
         end
         #Determine arcs outside of study area
         if !(arc[1] ∈ study_buses && arc[2] ∈ study_buses)
@@ -1954,6 +1956,7 @@ function get_reduction(
         removed_arcs = removed_arcs,
         added_branch_map = added_branch_map,
         added_admittance_map = added_admittance_map,
+        removed_arc_to_surviving_bus = removed_arc_to_surviving_bus,
         reductions = ReductionContainer(; ward_reduction = reduction),
     )
 end
