@@ -205,7 +205,6 @@ function add_to_map(series_circuit::BranchesSeries, filters::Dict)
 
         @warn "Series circuit contains mixed branch types, filters might be applied to more components than intended. Use Logging.Debug for additional information."
         @debug "Series circuit branch types: $(keys(series_circuit.branches))"
-        @debug "Series circuit branch names: $(vcat([PSY.get_name.(v) for (k , v) in series_circuit.branches]))"
         for (branch_type, branch_list) in series_circuit.branches
             filter = get(filters, branch_type, x -> true)
             for device in branch_list
