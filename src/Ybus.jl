@@ -1204,6 +1204,10 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
 
     bus_numbers_to_remove = _apply_bus_reductions!(nr, nr_new)
 
+    # Assumes only Ward reduction defines the injection redistribution maps, and that Ward reduction is applied last:
+    nr.injection_redistribution_map = nr_new.injection_redistribution_map
+    nr.reverse_injection_redistribution_map = nr_new.reverse_injection_redistribution_map
+
     # Add additional entries to the ybus corresponding to the equivalent series arcs
     new_y_ft, new_y_tf = _add_series_branches_to_ybus!(
         ybus.data,
@@ -1912,6 +1916,7 @@ function get_reduction(
     reduction::WardReduction,
 )
     study_buses = get_study_buses(reduction)
+    injection_redistribution_limit = get_injection_redistribution_limit(reduction)
     _validate_study_buses(ybus, study_buses)
     bus_lookup = get_bus_lookup(ybus)
     bus_axis = get_bus_axis(ybus)
@@ -1933,7 +1938,12 @@ function get_reduction(
             push!(removed_arcs, arc)
         end
     end
-    bus_reduction_map, reverse_bus_search_map, added_branch_map, added_admittance_map =
+    bus_reduction_map,
+    reverse_bus_search_map,
+    injection_redistribution_map,
+    reverse_injection_redistribution_map,
+    added_branch_map,
+    added_admittance_map =
         get_ward_reduction(
             ybus.data,
             bus_lookup,
@@ -1941,6 +1951,7 @@ function get_reduction(
             boundary_buses,
             Set(get_ref_bus(ybus)),
             study_buses,
+            injection_redistribution_limit,
         )
 
     for arc_tuple in keys(added_branch_map)
@@ -1958,5 +1969,7 @@ function get_reduction(
         added_admittance_map = added_admittance_map,
         removed_arc_to_surviving_bus = removed_arc_to_surviving_bus,
         reductions = ReductionContainer(; ward_reduction = reduction),
+        injection_redistribution_map = injection_redistribution_map,
+        reverse_injection_redistribution_map = reverse_injection_redistribution_map,
     )
 end

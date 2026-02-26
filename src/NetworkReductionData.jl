@@ -9,6 +9,8 @@ network reduction algorithms.
 - `irreducible_buses::Set{Int}`: Buses that cannot be reduced
 - `bus_reduction_map::Dict{Int, Set{Int}}`: Maps retained buses to sets of eliminated buses
 - `reverse_bus_search_map::Dict{Int, Int}`: Maps eliminated buses to their parent buses
+- `injection_redistribution_map::Dict{Int, Dict{Int, Float64}}`: Maps buses to their redistributed injections
+- `reverse_injection_redistribution_map::Dict{Int, Dict{Int, Float64}}`: Maps redistributed injections back to their original buses
 - `direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission}`: One-to-one branch mappings
 - `reverse_direct_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}}`: Reverse direct mappings
 - `parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel}`: Parallel branch combinations
@@ -33,6 +35,10 @@ network reduction algorithms.
     irreducible_buses::Set{Int} = Set{Int}() # Buses that are not reduced in the network reduction
     bus_reduction_map::Dict{Int, Set{Int}} = Dict{Int, Set{Int}}() # Maps reduced bus to the set of buses it was reduced to
     reverse_bus_search_map::Dict{Int, Int} = Dict{Int, Int}()
+    injection_redistribution_map::Dict{Int, Dict{Int, Float64}} =
+        Dict{Int, Dict{Int, Float64}}()
+    reverse_injection_redistribution_map::Dict{Int, Dict{Int, Float64}} =
+        Dict{Int, Dict{Int, Float64}}()
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission} =
         Dict{Tuple{Int, Int}, PSY.ACTransmission}()
     reverse_direct_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}} =
@@ -325,6 +331,8 @@ get_bus_reduction_map(rb::NetworkReductionData) = rb.bus_reduction_map
 get_reverse_bus_search_map(rb::NetworkReductionData) = rb.reverse_bus_search_map
 get_direct_branch_map(rb::NetworkReductionData) = rb.direct_branch_map
 get_reverse_direct_branch_map(rb::NetworkReductionData) = rb.reverse_direct_branch_map
+get_injection_redistribution_map(rb::NetworkReductionData) = rb.injection_redistribution_map
+get_reverse_injection_redistribution_map(rb::NetworkReductionData) = rb.reverse_injection_redistribution_map
 get_parallel_branch_map(rb::NetworkReductionData) = rb.parallel_branch_map
 get_reverse_parallel_branch_map(rb::NetworkReductionData) = rb.reverse_parallel_branch_map
 get_series_branch_map(rb::NetworkReductionData) = rb.series_branch_map
