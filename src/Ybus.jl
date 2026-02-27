@@ -1920,7 +1920,7 @@ function get_reduction(
     removed_arcs = Set{Tuple{Int, Int}}()
     removed_arc_to_surviving_bus = Dict{Tuple{Int, Int}, Int}()
     for arc in get_arc_axis(A)
-        #Deterimine boundary buses:
+        #Determine boundary buses:
         if (arc[1] ∈ study_buses) && (arc[2] ∉ study_buses)
             push!(boundary_buses, arc[1])
             removed_arc_to_surviving_bus[arc] = arc[1]
