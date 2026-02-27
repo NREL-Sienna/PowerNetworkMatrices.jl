@@ -236,7 +236,7 @@ function add_to_map(device::ThreeWindingTransformerWinding, filters::Dict)
     return add_to_map(get_transformer(device), filters)
 end
 
-is_a_reduction(::PNM.ThreeWindingTransformerWinding) = true
+is_a_reduction(::ThreeWindingTransformerWinding) = true
 
 function has_time_series(
     device::ThreeWindingTransformerWinding,

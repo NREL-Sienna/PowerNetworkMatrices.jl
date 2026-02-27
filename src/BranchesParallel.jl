@@ -172,4 +172,4 @@ function Base.show(io::IO, x::MIME{Symbol("text/plain")}, y::BranchesParallel)
     show(io, x, y.branches)
 end
 
-is_a_reduction(::PNM.BranchesParallel) = true
+is_a_reduction(::BranchesParallel) = true

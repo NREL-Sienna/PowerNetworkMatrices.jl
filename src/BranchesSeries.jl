@@ -229,4 +229,4 @@ function Base.show(io::IO, x::MIME{Symbol("text/plain")}, y::BranchesSeries)
     show(io, x, y.branches)
 end
 
-is_a_reduction(::PNM.BranchesSeries) = true
+is_a_reduction(::BranchesSeries) = true
