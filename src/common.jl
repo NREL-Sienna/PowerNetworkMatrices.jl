@@ -342,7 +342,7 @@ function has_time_series(
     T <: PSY.TimeSeriesData,
 }
     has_time_series = false
-    for b in branch.branches
+    for b in branch
         if is_a_reduction(b) && has_time_series(b, ts_type, ts_name)
             return true
         else
