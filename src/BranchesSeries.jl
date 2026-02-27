@@ -229,14 +229,4 @@ function Base.show(io::IO, x::MIME{Symbol("text/plain")}, y::BranchesSeries)
     show(io, x, y.branches)
 end
 
-function has_time_series(
-    branch::BranchesSeries,
-    ts_type::Type{T},
-    ts_name::String,
-) where {
-    T <: PSY.TimeSeriesData,
-}
-    return any(
-        PSY.has_time_series(b, ts_type, ts_name) for b in branch.branches
-    )
-end
+is_a_reduction(::PNM.BranchesSeries) = true

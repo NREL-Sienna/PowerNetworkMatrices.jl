@@ -331,3 +331,25 @@ function _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{Comp
     b_to = imag(y_22 - y_l)
     return EquivalentBranch(r, x, g_from, b_from, g_to, b_to, tap, shift)
 end
+
+is_a_reduction(::PSY.ACTransmission) = false
+
+function has_time_series(
+    branch::Union{BranchesSeries, BranchesParallel}, #Union of two is fine in Julia
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    has_time_series = false
+    for b in branch.branches
+        if is_a_reduction(b) && has_time_series(b, ts_type, ts_name)
+            return true
+        else
+            if PSY.has_time_series(b, ts_type, ts_name)
+                return true
+            end
+        end
+    end
+    return false
+end
