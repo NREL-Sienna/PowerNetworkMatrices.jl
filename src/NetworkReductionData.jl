@@ -19,7 +19,7 @@ network reduction algorithms.
 - `reverse_transformer3W_map::Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}`: Reverse transformer mappings
 - `removed_buses::Set{Int}`: Set of buses eliminated from the network
 - `removed_arcs::Set{Tuple{Int, Int}}`: Set of arcs eliminated from the network
-- `radial_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int}`: Maps final arcs in radial reduction chains to their surviving bus numbers
+- `removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int}`: Maps removed arcs to the connected surviving bus number (occurs for radial reduction or Ward reduction)
 - `added_admittance_map::Dict{Int, Complex{Float32}}`: Admittances added to buses during reduction
 - `added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}}`: New branches created during reduction
 - `all_branch_maps_by_type::Dict{String, Any}`: Branch mappings organized by component type
@@ -55,7 +55,7 @@ network reduction algorithms.
     } = Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}()
     removed_buses::Set{Int} = Set{Int}()
     removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
-    radial_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int} = Dict{Tuple{Int, Int}, Int}()
+    removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int} = Dict{Tuple{Int, Int}, Int}()
     added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
     added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
         Dict{Tuple{Int, Int}, Complex{Float32}}()
@@ -333,7 +333,7 @@ get_transformer3W_map(rb::NetworkReductionData) = rb.transformer3W_map
 get_reverse_transformer3W_map(rb::NetworkReductionData) = rb.reverse_transformer3W_map
 get_removed_buses(rb::NetworkReductionData) = rb.removed_buses
 get_removed_arcs(rb::NetworkReductionData) = rb.removed_arcs
-get_radial_arc_to_surviving_bus(rb::NetworkReductionData) = rb.radial_arc_to_surviving_bus
+get_removed_arc_to_surviving_bus(rb::NetworkReductionData) = rb.removed_arc_to_surviving_bus
 get_added_admittance_map(rb::NetworkReductionData) = rb.added_admittance_map
 get_added_branch_map(rb::NetworkReductionData) = rb.added_branch_map
 get_all_branch_maps_by_type(rb::NetworkReductionData) = rb.all_branch_maps_by_type

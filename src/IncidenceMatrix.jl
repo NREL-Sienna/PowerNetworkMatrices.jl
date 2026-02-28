@@ -76,7 +76,7 @@ function get_reduction(
         bus_reduction_map = bus_reduction_map,
         reverse_bus_search_map = reverse_bus_search_map,
         removed_arcs = radial_arcs,
-        radial_arc_to_surviving_bus = final_arc_map,
+        removed_arc_to_surviving_bus = final_arc_map,
         reductions = ReductionContainer(; radial_reduction = reduction),
     )
 end
