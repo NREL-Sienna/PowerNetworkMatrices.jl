@@ -335,7 +335,7 @@ end
 is_a_reduction(::PSY.ACTransmission) = false
 
 function has_time_series(
-    branch::BranchesSeries, 
+    branch::BranchesSeries,
     ts_type::Type{T},
     ts_name::String,
 ) where {
@@ -348,11 +348,10 @@ function has_time_series(
             end
             continue
         end
-        
+
         if PSY.has_time_series(b, ts_type, ts_name)
             return true
         end
-        
     end
     return false
 end
