@@ -1266,7 +1266,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         arc_admittance_from_to = ybus.arc_admittance_from_to
         arc_admittance_to_from = ybus.arc_admittance_to_from
     end
-
+    nr.boundary_bus_to_surviving_arcs = nr_new.boundary_bus_to_surviving_arcs
     return Ybus(
         data,
         adjacency_data,
@@ -1923,6 +1923,7 @@ function get_reduction(
     boundary_buses = Set{Int}()
     removed_arcs = Set{Tuple{Int, Int}}()
     removed_arc_to_surviving_bus = Dict{Tuple{Int, Int}, Int}()
+    boundary_bus_to_surviving_arcs = Dict{Int, Set{Tuple{Int, Int}}}()
     for arc in get_arc_axis(A)
         #Determine boundary buses:
         if (arc[1] ∈ study_buses) && (arc[2] ∉ study_buses)
@@ -1935,6 +1936,16 @@ function get_reduction(
         #Determine arcs outside of study area
         if !(arc[1] ∈ study_buses && arc[2] ∈ study_buses)
             push!(removed_arcs, arc)
+        end
+    end
+    for arc in get_arc_axis(A)
+        if (arc[1] ∈ boundary_buses) && (arc[2] ∈ study_buses)
+            set = get!(boundary_bus_to_surviving_arcs, arc[1], Set{Tuple{Int, Int}}())
+            push!(set, arc)
+        end
+        if (arc[2] ∈ boundary_buses) && (arc[1] ∈ study_buses)
+            set = get!(boundary_bus_to_surviving_arcs, arc[2], Set{Tuple{Int, Int}}())
+            push!(set, arc)
         end
     end
     bus_reduction_map, reverse_bus_search_map, added_branch_map, added_admittance_map =
@@ -1961,6 +1972,8 @@ function get_reduction(
         added_branch_map = added_branch_map,
         added_admittance_map = added_admittance_map,
         removed_arc_to_surviving_bus = removed_arc_to_surviving_bus,
+        boundary_bus_to_surviving_arcs = boundary_bus_to_surviving_arcs,
+        arc_to_map_type = Dict{Tuple{Int, Int}, Symbol}(),
         reductions = ReductionContainer(; ward_reduction = reduction),
     )
 end
