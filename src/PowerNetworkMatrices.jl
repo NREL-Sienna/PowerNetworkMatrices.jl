@@ -42,23 +42,6 @@ import InfrastructureSystems as IS
 import PowerSystems as PSY
 import PowerSystems: ACBusTypes
 
-# TODO make public so users can check for solver availability?
-# Check if MKL/Pardiso extension is available at runtime
-# Extensions are loaded when the trigger packages (MKL, Pardiso) are loaded
-function _has_mkl_pardiso_ext()
-    ext = Base.get_extension(@__MODULE__, :MKLPardisoExt)
-    return !isnothing(ext)
-end
-
-# Check if AppleAccelerate extension is available at runtime
-function _has_apple_accelerate_ext()
-    ext = Base.get_extension(@__MODULE__, :AppleAccelerateExt)
-    return !isnothing(ext)
-end
-
-# _create_apple_accelerate_factorization is defined in ext/AppleAccelerateExt.jl
-# when AppleAccelerate package is loaded
-
 import DataStructures
 import DataStructures: SortedDict
 import SparseArrays
@@ -70,6 +53,13 @@ import LinearAlgebra
 import LinearAlgebra: BLAS.gemm
 import LinearAlgebra: ldiv!, mul!, I, dot
 import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
+import Preferences
+
+include("linalg_settings.jl")
+
+function __init__()
+    something(get_linalg_backend_check(), false) && check_linalg_backend()
+end
 
 @template DEFAULT = """
                     $(SIGNATURES)
