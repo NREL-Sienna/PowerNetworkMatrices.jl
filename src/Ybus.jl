@@ -1920,11 +1920,12 @@ function get_reduction(
     bus_lookup = get_bus_lookup(ybus)
     bus_axis = get_bus_axis(ybus)
     A = IncidenceMatrix(ybus)
+    arc_axis = get_arc_axis(A)
     boundary_buses = Set{Int}()
     removed_arcs = Set{Tuple{Int, Int}}()
     removed_arc_to_surviving_bus = Dict{Tuple{Int, Int}, Int}()
     boundary_bus_to_surviving_arcs = Dict{Int, Set{Tuple{Int, Int}}}()
-    for arc in get_arc_axis(A)
+    for arc in arc_axis
         #Determine boundary buses:
         if (arc[1] ∈ study_buses) && (arc[2] ∉ study_buses)
             push!(boundary_buses, arc[1])
@@ -1953,6 +1954,7 @@ function get_reduction(
             ybus.data,
             bus_lookup,
             bus_axis,
+            arc_axis,
             boundary_buses,
             Set(get_ref_bus(ybus)),
             study_buses,
