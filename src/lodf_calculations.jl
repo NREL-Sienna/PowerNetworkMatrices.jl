@@ -55,6 +55,13 @@ struct LODF{Ax, L <: NTuple{2, Dict}, M <: AbstractArray{Float64, 2}} <:
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
 end
+
+get_axes(M::LODF) = M.axes
+get_lookup(M::LODF) = M.lookup
+get_ref_bus(M::LODF) = sort!(collect(keys(M.subnetwork_axes)))
+get_ref_bus_position(M::LODF) = [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::LODF) = M.network_reduction_data
+get_arc_lookup(M::LODF) = M.lookup[1]
 stores_transpose(::LODF) = true
 
 function _buildlodf(
