@@ -1238,7 +1238,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     data = data[bus_ix, bus_ix]
 
     subnetwork_axes, arc_subnetwork_axis =
-        _make_subnetwork_axes(ybus, bus_numbers_to_remove, nr_new.removed_arcs)
+        _make_subnetwork_axes(ybus, bus_numbers_to_remove, nr_new.removed_arcs, Set(keys(nr_new.added_branch_map)))
 
     if new_y_ft !== nothing
         arc_ax = setdiff(get_arc_axis(new_y_ft), nr_new.removed_arcs)
@@ -1376,6 +1376,7 @@ function _make_subnetwork_axes(
     ybus::Ybus,
     bus_numbers_to_remove::Vector{Int},
     arcs_to_remove::Set{Tuple{Int, Int}},
+    arcs_to_add::Set{Tuple{Int, Int}},
 )
     subnetwork_axes = deepcopy(ybus.subnetwork_axes)
     arc_subnetwork_axis = deepcopy(ybus.arc_subnetwork_axis)
@@ -1395,7 +1396,7 @@ function _make_subnetwork_axes(
         subnetwork_axes[k] = (new_values, new_values)
     end
     for (k, values) in arc_subnetwork_axis
-        arc_subnetwork_axis[k] = setdiff(values, arcs_to_remove)
+        arc_subnetwork_axis[k] = union(setdiff(values, arcs_to_remove), arcs_to_add)
     end
     return subnetwork_axes, arc_subnetwork_axis
 end
