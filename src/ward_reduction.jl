@@ -11,7 +11,7 @@ end
 get_study_buses(nr::WardReduction) = nr.study_buses
 
 """
-    get_ward_reduction(data, bus_lookup, bus_axis, boundary_buses, ref_bus_numbers, study_buses)
+    get_ward_reduction(data, bus_lookup, bus_axis, arc_axis, boundary_buses, ref_bus_numbers, study_buses)
 
 Perform Ward reduction to create an equivalent network representation.
 
@@ -23,6 +23,7 @@ buses based on impedance criteria, and equivalent admittances are computed.
 - `data::SparseArrays.SparseMatrixCSC{ComplexF32, Int}`: Admittance matrix of the system
 - `bus_lookup::Dict{Int, Int}`: Dictionary mapping bus numbers to matrix indices
 - `bus_axis::Vector{Int}`: Vector of all bus numbers in the system
+- `arc_axis::Vector{Tuple{Int, Int}}`: Vector of all arc tuples in the system
 - `boundary_buses::Set{Int}`: Set of boundary bus numbers between study and external areas
 - `ref_bus_numbers::Set{Int}`: Set of reference bus numbers
 - `study_buses::Vector{Int}`: Vector of study bus numbers to retain
@@ -34,6 +35,7 @@ function get_ward_reduction(
     data::SparseArrays.SparseMatrixCSC{ComplexF32, Int},
     bus_lookup::Dict{Int, Int},
     bus_axis::Vector{Int},
+    arc_axis::Vector{Tuple{Int, Int}},
     boundary_buses::Set{Int},
     ref_bus_numbers::Set{Int},
     study_buses::Vector{Int},
@@ -110,7 +112,7 @@ function get_ward_reduction(
                     added_admittance_map[bus_ix] = y_eq[ix, jx]
                 else
                     #check if the arc of virtual line is already existing so we don't add an additional arc
-                    if (bus_ix, bus_jx) ∈ bus_axis
+                    if (bus_ix, bus_jx) ∈ arc_axis
                         arc_key = (bus_ix, bus_jx)
                     else
                         arc_key = (bus_jx, bus_ix)
