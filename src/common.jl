@@ -331,3 +331,42 @@ function _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{Comp
     b_to = imag(y_22 - y_l)
     return EquivalentBranch(r, x, g_from, b_from, g_to, b_to, tap, shift)
 end
+
+is_a_reduction(::PSY.ACTransmission) = false
+
+function has_time_series(
+    branch::BranchesSeries,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    for b in branch
+        if is_a_reduction(b)
+            if has_time_series(b, ts_type, ts_name)
+                return true
+            end
+            continue
+        end
+
+        if PSY.has_time_series(b, ts_type, ts_name)
+            return true
+        end
+    end
+    return false
+end
+
+function has_time_series(
+    branch::BranchesParallel,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    for b in branch
+        if PSY.has_time_series(b, ts_type, ts_name)
+            return true
+        end
+    end
+    return false
+end

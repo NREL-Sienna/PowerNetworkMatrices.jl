@@ -235,3 +235,15 @@ function add_to_map(device::ThreeWindingTransformerWinding, filters::Dict)
     isempty(filters) && return true
     return add_to_map(get_transformer(device), filters)
 end
+
+is_a_reduction(::ThreeWindingTransformerWinding) = true
+
+function has_time_series(
+    device::ThreeWindingTransformerWinding,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    return PSY.has_time_series(get_transformer(device), ts_type, ts_name)
+end
