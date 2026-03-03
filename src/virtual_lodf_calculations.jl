@@ -61,6 +61,14 @@ struct VirtualLODF{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{Float64}
     work_ba_col::Vector{Float64}
 end
 
+get_axes(M::VirtualLODF) = M.axes
+get_lookup(M::VirtualLODF) = M.lookup
+get_ref_bus(M::VirtualLODF) = sort!(collect(keys(M.subnetwork_axes)))
+get_ref_bus_position(M::VirtualLODF) =
+    [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
+get_network_reduction_data(M::VirtualLODF) = M.network_reduction_data
+get_arc_lookup(M::VirtualLODF) = M.lookup[1]
+
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
     summary(io, array)
     isempty(array) && return
