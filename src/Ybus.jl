@@ -1238,7 +1238,12 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     data = data[bus_ix, bus_ix]
 
     subnetwork_axes, arc_subnetwork_axis =
-        _make_subnetwork_axes(ybus, bus_numbers_to_remove, nr_new.removed_arcs, Set(keys(nr_new.added_branch_map)))
+        _make_subnetwork_axes(
+            ybus,
+            bus_numbers_to_remove,
+            nr_new.removed_arcs,
+            Set(keys(nr_new.added_branch_map)),
+        )
 
     if new_y_ft !== nothing
         arc_ax = setdiff(get_arc_axis(new_y_ft), nr_new.removed_arcs)
