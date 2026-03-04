@@ -95,17 +95,13 @@ function _buildptdf_from_matrices(
         )
     elseif linear_solver == "MKLPardiso"
         if !_has_mkl_pardiso_ext()
-            error(
-                "The MKL/Pardiso extension is not available. Install MKL and Pardiso packages: using Pkg; Pkg.add([\"MKL\", \"Pardiso\"])",
-            )
+            error(_mkl_pardiso_install_error())
         end
         PTDFm =
             _calculate_PTDF_matrix_MKLPardiso(A, BA, ref_bus_positions, dist_slack)
     elseif linear_solver == "AppleAccelerate"
         if !_has_apple_accelerate_ext()
-            error(
-                "AppleAccelerate extension is not available. This solver is only available on macOS. Install AppleAccelerate: using Pkg; Pkg.add(\"AppleAccelerate\")",
-            )
+            error(_apple_accelerate_install_error())
         end
         PTDFm =
             _calculate_PTDF_matrix_AppleAccelerate(A, BA, ref_bus_positions, dist_slack)
@@ -231,7 +227,7 @@ function _calculate_PTDF_matrix_DENSE(
 end
 
 # _calculate_PTDF_matrix_MKLPardiso is defined in ext/MKLPardisoExt.jl
-# when MKL and Pardiso packages are loaded
+# when Pardiso package is loaded
 
 # _calculate_PTDF_matrix_AppleAccelerate is defined in ext/AppleAccelerateExt.jl
 # when AppleAccelerate package is loaded
@@ -322,7 +318,7 @@ This constructor is more efficient when the prerequisite matrices are already av
 direct control over the underlying matrix computations.
 
 # Arguments
-- `ybus::Ybus`: The power system Ybus matrix from which to construct the PTDF matrix 
+- `ybus::Ybus`: The power system Ybus matrix from which to construct the PTDF matrix
 
 # Keyword Arguments
 - `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:

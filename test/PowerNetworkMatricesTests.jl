@@ -21,7 +21,7 @@ import Aqua
 Aqua.test_unbound_args(PowerNetworkMatrices)
 Aqua.test_undefined_exports(PowerNetworkMatrices)
 Aqua.test_ambiguities(PowerNetworkMatrices)
-Aqua.test_stale_deps(PowerNetworkMatrices; ignore = [:AppleAccelerate, :MKL, :Pardiso])
+Aqua.test_stale_deps(PowerNetworkMatrices; ignore = [:AppleAccelerate, :Pardiso])
 Aqua.test_deps_compat(PowerNetworkMatrices)
 Aqua.find_persistent_tasks_deps(PowerNetworkMatrices)
 Aqua.test_persistent_tasks(PowerNetworkMatrices)
