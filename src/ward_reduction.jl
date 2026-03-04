@@ -47,6 +47,17 @@ function get_ward_reduction(
     n_boundary = length(boundary_buses)
     n_buses = length(bus_axis)
 
+    boundary_bus_to_surviving_arcs = Dict{Int, Dict{Tuple{Int, Int}, Float64}}()
+    for arc in arc_axis
+        if (arc[1] ∈ boundary_buses) && (arc[2] ∈ study_buses)
+            set = get!(boundary_bus_to_surviving_arcs, arc[1], Dict{Tuple{Int, Int}, Float64}())
+            set[arc] = 1.0
+        end
+        if (arc[2] ∈ boundary_buses) && (arc[1] ∈ study_buses)
+            set = get!(boundary_bus_to_surviving_arcs, arc[2], Dict{Tuple{Int, Int}, Float64}())
+            set[arc] = 1.0
+        end
+    end
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
 
     added_branch_map = Dict{Tuple{Int, Int}, Complex{Float32}}()
@@ -114,9 +125,24 @@ function get_ward_reduction(
                     #check if the arc of virtual line is already existing so we don't add an additional arc
                     if (bus_ix, bus_jx) ∈ arc_axis
                         arc_key = (bus_ix, bus_jx)
-                    else
+                        repeated_arc = true 
+                    elseif (bus_jx, bus_ix) ∈ arc_axis
                         arc_key = (bus_jx, bus_ix)
+                        repeated_arc = true
+                    else 
+                        arc_key = (bus_ix, bus_jx)
+                        repeated_arc = false
                     end
+                    if repeated_arc
+                        ix_to_jx_admittance = -1.0 * data[bus_lookup[bus_ix], bus_lookup[bus_jx]]
+                        jx_to_ix_admittance = -1.0 * data[bus_lookup[bus_jx], bus_lookup[bus_ix]]
+                        ix_to_jx_susceptance = imag(ix_to_jx_admittance)
+                        jx_to_ix_susceptance = imag(jx_to_ix_admittance)
+                        virual_susceptance = imag(y_eq[ix, jx])
+                        # Update factor for determining the proportion of flow on the existing (real) arc taking into account the new virtual admittance. 
+                        boundary_bus_to_surviving_arcs[bus_ix][arc_key] = ix_to_jx_susceptance / (ix_to_jx_susceptance + virual_susceptance)
+                        boundary_bus_to_surviving_arcs[bus_jx][arc_key] = jx_to_ix_susceptance / (jx_to_ix_susceptance + virual_susceptance)
+                    end 
                     added_branch_map[arc_key] = y_eq[ix, jx]
                 end
             end
@@ -125,5 +151,6 @@ function get_ward_reduction(
     return bus_reduction_map_index,
     reverse_bus_search_map,
     added_branch_map,
-    added_admittance_map
+    added_admittance_map,
+    boundary_bus_to_surviving_arcs
 end

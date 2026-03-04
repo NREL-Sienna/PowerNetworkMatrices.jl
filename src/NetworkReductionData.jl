@@ -20,7 +20,7 @@ network reduction algorithms.
 - `removed_buses::Set{Int}`: Set of buses eliminated from the network
 - `removed_arcs::Set{Tuple{Int, Int}}`: Set of arcs eliminated from the network
 - `removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int}`: Maps removed arcs to the connected surviving bus number (occurs for radial reduction or Ward reduction)
-- `boundary_bus_to_surviving_arcs::Dict{Int, Set{Tuple{Int, Int}}}`: Maps boundary buses from Ward reduction to the set of surviving arcs connected to them, not including the virtual admittances added during the reduction.
+- `boundary_bus_to_surviving_arcs::Dict{Int, Dict{Tuple{Int, Int}, Float64}}`: Maps boundary buses from Ward reduction to a dictionary with keys of surviving arcs connected to them and values representing the proportion of the total flow for actual branches (as opposed to virtual branches)
 - `added_admittance_map::Dict{Int, Complex{Float32}}`: Admittances added to buses during reduction
 - `added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}}`: New branches created during reduction
 - `all_branch_maps_by_type::Dict{String, Any}`: Branch mappings organized by component type
@@ -58,8 +58,8 @@ network reduction algorithms.
     removed_buses::Set{Int} = Set{Int}()
     removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
     removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int} = Dict{Tuple{Int, Int}, Int}()
-    boundary_bus_to_surviving_arcs::Dict{Int, Set{Tuple{Int, Int}}} =
-        Dict{Int, Set{Tuple{Int, Int}}}()
+    boundary_bus_to_surviving_arcs::Dict{Int, Dict{Tuple{Int, Int}, Float64}} =
+        Dict{Int, Dict{Tuple{Int, Int}, Float64}}()
     added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
     added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
         Dict{Tuple{Int, Int}, Complex{Float32}}()

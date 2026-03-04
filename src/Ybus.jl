@@ -1930,7 +1930,6 @@ function get_reduction(
     boundary_buses = Set{Int}()
     removed_arcs = Set{Tuple{Int, Int}}()
     removed_arc_to_surviving_bus = Dict{Tuple{Int, Int}, Int}()
-    boundary_bus_to_surviving_arcs = Dict{Int, Set{Tuple{Int, Int}}}()
     for arc in arc_axis
         #Determine boundary buses:
         if (arc[1] ∈ study_buses) && (arc[2] ∉ study_buses)
@@ -1945,17 +1944,7 @@ function get_reduction(
             push!(removed_arcs, arc)
         end
     end
-    for arc in get_arc_axis(A)
-        if (arc[1] ∈ boundary_buses) && (arc[2] ∈ study_buses)
-            set = get!(boundary_bus_to_surviving_arcs, arc[1], Set{Tuple{Int, Int}}())
-            push!(set, arc)
-        end
-        if (arc[2] ∈ boundary_buses) && (arc[1] ∈ study_buses)
-            set = get!(boundary_bus_to_surviving_arcs, arc[2], Set{Tuple{Int, Int}}())
-            push!(set, arc)
-        end
-    end
-    bus_reduction_map, reverse_bus_search_map, added_branch_map, added_admittance_map =
+    bus_reduction_map, reverse_bus_search_map, added_branch_map, added_admittance_map, boundary_bus_to_surviving_arcs =
         get_ward_reduction(
             ybus.data,
             bus_lookup,
