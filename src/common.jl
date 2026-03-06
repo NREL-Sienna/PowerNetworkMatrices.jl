@@ -394,7 +394,7 @@ function get_device_with_time_series(
 ) where {
     T <: PSY.TimeSeriesData,
 }
-    for b in branch   
+    for b in branch
         if has_time_series(b, ts_type, ts_name)
             return get_device_with_time_series(b, ts_type, ts_name)
         end

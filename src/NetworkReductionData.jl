@@ -193,18 +193,20 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
     end
     for (k, v) in nrd.parallel_branch_map
         if add_to_map(v, filters)
-            map_by_type = get!(
-                all_branch_maps_by_type["parallel_branch_map"],
-                _get_segment_type(v),
-                Dict{Tuple{Int, Int}, BranchesParallel{_get_segment_type(v)}}(),
-            )
-            map_by_type[k] = v
-            name_to_arc_map = get!(
-                nrd.name_to_arc_map,
-                _get_segment_type(v),
-                DataStructures.SortedDict{String, Tuple{Int, Int}}(),
-            )
-            name_to_arc_map[get_name(v)] = (k, "parallel_branch_map")
+            for concrete_type in _get_concrete_types(v)
+                map_by_type = get!(
+                    all_branch_maps_by_type["parallel_branch_map"],
+                    concrete_type,
+                    Dict{Tuple{Int, Int}, BranchesParallel{_get_segment_type(v)}}(),
+                )
+                map_by_type[k] = v
+                name_to_arc_map = get!(
+                    nrd.name_to_arc_map,
+                    concrete_type,
+                    DataStructures.SortedDict{String, Tuple{Int, Int}}(),
+                )
+                name_to_arc_map[get_name(v)] = (k, "parallel_branch_map")
+            end
         end
     end
     for (k, v) in nrd.reverse_parallel_branch_map
@@ -227,26 +229,28 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
         #Repeated entry for each type in series chain
         if add_to_map(v, filters)
             for segment in v
-                map_by_type = get!(
-                    all_branch_maps_by_type["series_branch_map"],
-                    _get_segment_type(segment),
-                    Dict{Tuple{Int, Int}, BranchesSeries}(),
-                )
-                map_by_type[k] = v
+                for concrete_type in _get_concrete_types(segment)
+                    map_by_type = get!(
+                        all_branch_maps_by_type["series_branch_map"],
+                        concrete_type,
+                        Dict{Tuple{Int, Int}, BranchesSeries}(),
+                    )
+                    map_by_type[k] = v
 
-                name_to_arc_map = get!(
-                    nrd.name_to_arc_map,
-                    _get_segment_type(segment),
-                    DataStructures.SortedDict{String, Tuple{Int, Int}}(),
-                )
-                name_to_arc_map[get_name(segment)] = (k, "series_branch_map")
-                component_name_map = get!(
-                    nrd.component_to_reduction_name_map,
-                    _get_segment_type(segment),
-                    Dict{String, String}(),
-                )
-                for x in _get_segment_components(segment)
-                    component_name_map[get_name(x)] = get_name(segment)
+                    name_to_arc_map = get!(
+                        nrd.name_to_arc_map,
+                        concrete_type,
+                        DataStructures.SortedDict{String, Tuple{Int, Int}}(),
+                    )
+                    name_to_arc_map[get_name(segment)] = (k, "series_branch_map")
+                    component_name_map = get!(
+                        nrd.component_to_reduction_name_map,
+                        concrete_type,
+                        Dict{String, String}(),
+                    )
+                    for x in _get_segment_components(segment)
+                        component_name_map[get_name(x)] = get_name(segment)
+                    end
                 end
             end
         end
@@ -308,6 +312,10 @@ _get_segment_type(::BranchesParallel{T}) where {T <: PSY.ACTransmission} = T
 _get_segment_type(
     ::ThreeWindingTransformerWinding{T},
 ) where {T <: PSY.ThreeWindingTransformer} = T
+
+_get_concrete_types(x::T) where {T <: PSY.ACBranch} = [T]
+_get_concrete_types(x::BranchesParallel{T}) where {T <: PSY.ACTransmission} =
+    unique(typeof.(x.branches))
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
 """
