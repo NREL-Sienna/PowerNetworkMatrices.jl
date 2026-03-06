@@ -349,7 +349,7 @@ function has_time_series(
             continue
         end
 
-        if PSY.has_time_series(b, ts_type, ts_name)
+        if has_time_series(b, ts_type, ts_name)
             return true
         end
     end
@@ -367,6 +367,19 @@ function has_time_series(
         if PSY.has_time_series(b, ts_type, ts_name)
             return true
         end
+    end
+    return false
+end
+
+function has_time_series(
+    branch::PSY.ACTransmission,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    if PSY.has_time_series(branch, ts_type, ts_name)
+        return true
     end
     return false
 end
