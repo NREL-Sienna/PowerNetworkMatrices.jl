@@ -52,14 +52,26 @@ function get_ward_reduction(
     n_buses = length(bus_axis)
 
     boundary_bus_to_surviving_arcs = Dict{Int, Dict{Tuple{Int, Int}, Float64}}()
+    boundary_bus_to_removed_arcs = Dict{Int, Set{Tuple{Int, Int}}}()
+
     for arc in arc_axis
-        if (arc[1] ∈ boundary_buses) && (arc[2] ∈ study_buses)
-            set = get!(boundary_bus_to_surviving_arcs, arc[1], Dict{Tuple{Int, Int}, Float64}())
-            set[arc] = 1.0
+        if (arc[1] ∈ boundary_buses)
+            if (arc[2] ∈ study_buses)
+                set = get!(boundary_bus_to_surviving_arcs, arc[1], Dict{Tuple{Int, Int}, Float64}())
+                set[arc] = 1.0
+            else
+                set = get!(boundary_bus_to_removed_arcs, arc[1], Set{Tuple{Int, Int}}())
+                push!(set, arc)
+            end 
         end
-        if (arc[2] ∈ boundary_buses) && (arc[1] ∈ study_buses)
-            set = get!(boundary_bus_to_surviving_arcs, arc[2], Dict{Tuple{Int, Int}, Float64}())
-            set[arc] = 1.0
+        if (arc[2] ∈ boundary_buses) 
+            if (arc[1] ∈ study_buses)
+                set = get!(boundary_bus_to_surviving_arcs, arc[2], Dict{Tuple{Int, Int}, Float64}())
+                set[arc] = 1.0
+            else
+                set = get!(boundary_bus_to_removed_arcs, arc[2], Set{Tuple{Int, Int}}())
+                push!(set, arc)
+            end
         end
     end
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
@@ -186,5 +198,6 @@ function get_ward_reduction(
     reverse_injection_redistribution_map,
     added_branch_map,
     added_admittance_map,
-    boundary_bus_to_surviving_arcs
+    boundary_bus_to_surviving_arcs,
+    boundary_bus_to_removed_arcs
 end

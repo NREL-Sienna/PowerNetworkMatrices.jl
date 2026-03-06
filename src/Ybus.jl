@@ -1276,6 +1276,7 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         arc_admittance_to_from = ybus.arc_admittance_to_from
     end
     nr.boundary_bus_to_surviving_arcs = nr_new.boundary_bus_to_surviving_arcs
+    nr.boundary_bus_to_removed_arcs = nr_new.boundary_bus_to_removed_arcs
     return Ybus(
         data,
         adjacency_data,
@@ -1955,7 +1956,8 @@ function get_reduction(
     reverse_injection_redistribution_map,
     added_branch_map,
     added_admittance_map, 
-    boundary_bus_to_surviving_arcs =
+    boundary_bus_to_surviving_arcs,
+    boundary_bus_to_removed_arcs =
         get_ward_reduction(
             ybus.data,
             bus_lookup,
@@ -1982,6 +1984,7 @@ function get_reduction(
         added_admittance_map = added_admittance_map,
         removed_arc_to_surviving_bus = removed_arc_to_surviving_bus,
         boundary_bus_to_surviving_arcs = boundary_bus_to_surviving_arcs,
+        boundary_bus_to_removed_arcs = boundary_bus_to_removed_arcs,
         arc_to_map_type = Dict{Tuple{Int, Int}, Symbol}(),
         reductions = ReductionContainer(; ward_reduction = reduction),
         injection_redistribution_map = injection_redistribution_map,

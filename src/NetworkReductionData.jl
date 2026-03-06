@@ -64,6 +64,7 @@ network reduction algorithms.
     removed_buses::Set{Int} = Set{Int}()
     removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
     removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int} = Dict{Tuple{Int, Int}, Int}()
+    boundary_bus_to_removed_arcs::Dict{Int, Set{Tuple{Int, Int}}} = Dict{Int, Set{Tuple{Int, Int}}}()
     boundary_bus_to_surviving_arcs::Dict{Int, Dict{Tuple{Int, Int}, Float64}} =
         Dict{Int, Dict{Tuple{Int, Int}, Float64}}()
     added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
