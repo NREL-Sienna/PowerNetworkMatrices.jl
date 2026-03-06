@@ -349,7 +349,7 @@ function has_time_series(
             continue
         end
 
-        if PSY.has_time_series(b, ts_type, ts_name)
+        if has_time_series(b, ts_type, ts_name)
             return true
         end
     end
@@ -371,18 +371,35 @@ function has_time_series(
     return false
 end
 
-function get_device_with_time_series(
+function has_time_series(
     branch::PSY.ACTransmission,
     ts_type::Type{T},
     ts_name::String,
 ) where {
     T <: PSY.TimeSeriesData,
 }
-    if !PSY.has_time_series(branch, ts_type, ts_name)
-        throw(ArgumentError("Branch does not have the specified time series"))
-    else
-        return branch
+    if PSY.has_time_series(branch, ts_type, ts_name)
+        return true
     end
+    return false
+end
+
+#Currently we are not expecting any DLRs in BranchesSeries, 
+#since we are preventing the 2 Degree reduction in case the 
+#series element rating is more restrictive than the element with DLRs
+function get_device_with_time_series(
+    branch::BranchesSeries,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    for b in branch   
+        if has_time_series(b, ts_type, ts_name)
+            return get_device_with_time_series(b, ts_type, ts_name)
+        end
+    end
+    return nothing
 end
 
 function get_device_with_time_series(
@@ -392,40 +409,23 @@ function get_device_with_time_series(
 ) where {
     T <: PSY.TimeSeriesData,
 }
-    branch_found_without_time_series = false
     for b in branch
-        if PSY.has_time_series(b, ts_type, ts_name)
-            if branch_found_without_time_series
-                @warn "Branch $(PSY.get_name(b)) has time series but another branch in a double circuit does not. This time series will be applied to the equivalent double circuit representation."
-            end
-            return get_device_with_time_series(b, ts_type, ts_name)
-        else
-            branch_found_without_time_series = true
+        if has_time_series(b, ts_type, ts_name)
+            return b
         end
     end
-    throw(ArgumentError("No branches in the double circuit have the specified time series"))
+    return nothing
 end
 
 function get_device_with_time_series(
-    branch::BranchesSeries,
+    branch::PSY.ACTransmission,
     ts_type::Type{T},
     ts_name::String,
 ) where {
     T <: PSY.TimeSeriesData,
 }
-    throw(ArgumentError("Series reductions are not yet supported for time series"))
-end
-
-function get_device_with_time_series(
-    branch::ThreeWindingTransformerWinding,
-    ts_type::Type{T},
-    ts_name::String,
-) where {
-    T <: PSY.TimeSeriesData,
-}
-    throw(
-        ArgumentError(
-            "Three-winding transformer windings are not yet supported for time series",
-        ),
-    )
+    if PSY.has_time_series(branch, ts_type, ts_name)
+        return branch
+    end
+    return nothing
 end
