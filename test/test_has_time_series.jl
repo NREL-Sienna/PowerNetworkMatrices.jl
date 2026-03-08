@@ -55,3 +55,38 @@ end
     @test PNM.has_time_series(tww2, PSY.SingleTimeSeries, "rating") == true
     @test PNM.has_time_series(tww1, PSY.SingleTimeSeries, "nonexistent") == false
 end
+
+@testset "get_device_with_time_series" begin
+    sys = PSB.build_system(PSB.PSITestSystems, "case10_radial_series_reductions")
+    lines = collect(PSY.get_components(PSY.Line, sys))
+    line1, line2 = lines[1], lines[2]
+    trf = first(PSY.get_components(PSY.ThreeWindingTransformer, sys))
+
+    bp = PNM.BranchesParallel([line1, line2])
+    bs = PNM.BranchesSeries()
+    PNM.add_branch!(bs, line1, :FromTo)
+    PNM.add_branch!(bs, line2, :FromTo)
+    tww1 = PNM.ThreeWindingTransformerWinding(trf, 1)
+    tww2 = PNM.ThreeWindingTransformerWinding(trf, 2)
+
+    # No time series attached — should return nothing
+    @test PNM.get_device_with_time_series(bp, PSY.SingleTimeSeries, "rating") === nothing
+    @test PNM.get_device_with_time_series(bs, PSY.SingleTimeSeries, "rating") === nothing
+    @test PNM.get_device_with_time_series(tww1, PSY.SingleTimeSeries, "rating") === nothing
+
+    # Add time series to line1 in BranchesParallel
+    PSY.add_time_series!(sys, line1, _make_test_time_series("rating"))
+    @test PNM.get_device_with_time_series(bp, PSY.SingleTimeSeries, "rating") === line1
+    @test PNM.get_device_with_time_series(bp, PSY.SingleTimeSeries, "nonexistent") === nothing
+
+    # Add time series to line1 in BranchesSeries
+    @test PNM.get_device_with_time_series(bs, PSY.SingleTimeSeries, "rating") === line1
+    @test PNM.get_device_with_time_series(bs, PSY.SingleTimeSeries, "nonexistent") === nothing
+
+    # Add time series to transformer — ThreeWindingTransformerWinding should delegate to parent
+    PSY.add_time_series!(sys, trf, _make_test_time_series("rating"))
+    @test PNM.get_device_with_time_series(tww1, PSY.SingleTimeSeries, "rating") === trf
+    @test PNM.get_device_with_time_series(tww2, PSY.SingleTimeSeries, "rating") === trf
+    @test PNM.get_device_with_time_series(tww1, PSY.SingleTimeSeries, "nonexistent") === nothing
+    @test PNM.get_device_with_time_series(tww2, PSY.SingleTimeSeries, "nonexistent") === nothing
+end
