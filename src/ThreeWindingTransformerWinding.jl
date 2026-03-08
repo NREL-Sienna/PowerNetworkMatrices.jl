@@ -247,3 +247,17 @@ function has_time_series(
 }
     return PSY.has_time_series(get_transformer(device), ts_type, ts_name)
 end
+
+function get_device_with_time_series(
+    device::ThreeWindingTransformerWinding,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    transformer = get_transformer(device)
+    if PSY.has_time_series(transformer, ts_type, ts_name)
+        return transformer
+    end
+    return nothing
+end

@@ -349,7 +349,7 @@ function has_time_series(
             continue
         end
 
-        if PSY.has_time_series(b, ts_type, ts_name)
+        if has_time_series(b, ts_type, ts_name)
             return true
         end
     end
@@ -369,4 +369,63 @@ function has_time_series(
         end
     end
     return false
+end
+
+function has_time_series(
+    branch::PSY.ACTransmission,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    if PSY.has_time_series(branch, ts_type, ts_name)
+        return true
+    end
+    return false
+end
+
+#Currently we are not expecting any DLRs in BranchesSeries, 
+#since we are preventing the 2 Degree reduction in case the 
+#series element rating is more restrictive than the element with DLRs
+function get_device_with_time_series(
+    branch::BranchesSeries,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    for b in branch
+        if has_time_series(b, ts_type, ts_name)
+            return get_device_with_time_series(b, ts_type, ts_name)
+        end
+    end
+    return nothing
+end
+
+function get_device_with_time_series(
+    branch::BranchesParallel,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    for b in branch
+        if has_time_series(b, ts_type, ts_name)
+            return b
+        end
+    end
+    return nothing
+end
+
+function get_device_with_time_series(
+    branch::PSY.ACTransmission,
+    ts_type::Type{T},
+    ts_name::String,
+) where {
+    T <: PSY.TimeSeriesData,
+}
+    if has_time_series(branch, ts_type, ts_name)
+        return branch
+    end
+    return nothing
 end
