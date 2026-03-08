@@ -77,16 +77,20 @@ end
     # Add time series to line1 in BranchesParallel
     PSY.add_time_series!(sys, line1, _make_test_time_series("rating"))
     @test PNM.get_device_with_time_series(bp, PSY.SingleTimeSeries, "rating") === line1
-    @test PNM.get_device_with_time_series(bp, PSY.SingleTimeSeries, "nonexistent") === nothing
+    @test PNM.get_device_with_time_series(bp, PSY.SingleTimeSeries, "nonexistent") ===
+          nothing
 
     # Add time series to line1 in BranchesSeries
     @test PNM.get_device_with_time_series(bs, PSY.SingleTimeSeries, "rating") === line1
-    @test PNM.get_device_with_time_series(bs, PSY.SingleTimeSeries, "nonexistent") === nothing
+    @test PNM.get_device_with_time_series(bs, PSY.SingleTimeSeries, "nonexistent") ===
+          nothing
 
     # Add time series to transformer — ThreeWindingTransformerWinding should delegate to parent
     PSY.add_time_series!(sys, trf, _make_test_time_series("rating"))
     @test PNM.get_device_with_time_series(tww1, PSY.SingleTimeSeries, "rating") === trf
     @test PNM.get_device_with_time_series(tww2, PSY.SingleTimeSeries, "rating") === trf
-    @test PNM.get_device_with_time_series(tww1, PSY.SingleTimeSeries, "nonexistent") === nothing
-    @test PNM.get_device_with_time_series(tww2, PSY.SingleTimeSeries, "nonexistent") === nothing
+    @test PNM.get_device_with_time_series(tww1, PSY.SingleTimeSeries, "nonexistent") ===
+          nothing
+    @test PNM.get_device_with_time_series(tww2, PSY.SingleTimeSeries, "nonexistent") ===
+          nothing
 end
