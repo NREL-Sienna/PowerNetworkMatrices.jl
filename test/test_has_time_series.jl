@@ -3,7 +3,9 @@ import Dates
 function _make_test_time_series(name::String)
     resolution = Dates.Hour(1)
     dates = collect(
-        Dates.DateTime("2020-01-01T00:00:00"):resolution:Dates.DateTime("2020-01-01T23:00:00"),
+        Dates.DateTime("2020-01-01T00:00:00"):resolution:Dates.DateTime(
+            "2020-01-01T23:00:00",
+        ),
     )
     ta = TimeSeries.TimeArray(dates, ones(length(dates)))
     return PSY.SingleTimeSeries(; name = name, data = ta)

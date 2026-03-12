@@ -1,6 +1,6 @@
 mutable struct BranchesParallel{T <: PSY.ACTransmission} <: PSY.ACTransmission
     branches::Vector{T}
-    equivalent_ybus::Union{Matrix{ComplexF32}, Nothing}
+    equivalent_ybus::Union{Matrix{YBUS_ELTYPE}, Nothing}
 end
 
 function BranchesParallel(branches::Vector{T}) where {T <: PSY.ACTransmission}
@@ -72,7 +72,7 @@ end
 
 function populate_equivalent_ybus!(bp::BranchesParallel)
     Y11, Y12, Y21, Y22 = ybus_branch_entries(bp)
-    bp.equivalent_ybus = ComplexF32[Y11 Y12; Y21 Y22]
+    bp.equivalent_ybus = YBUS_ELTYPE[Y11 Y12; Y21 Y22]
     return
 end
 

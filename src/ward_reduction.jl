@@ -20,7 +20,7 @@ the electrical characteristics seen from the study buses. External buses are map
 buses based on impedance criteria, and equivalent admittances are computed.
 
 # Arguments
-- `data::SparseArrays.SparseMatrixCSC{ComplexF32, Int}`: Admittance matrix of the system
+- `data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int}`: Admittance matrix of the system
 - `bus_lookup::Dict{Int, Int}`: Dictionary mapping bus numbers to matrix indices
 - `bus_axis::Vector{Int}`: Vector of all bus numbers in the system
 - `arc_axis::Vector{Tuple{Int, Int}}`: Vector of all arc tuples in the system
@@ -32,7 +32,7 @@ buses based on impedance criteria, and equivalent admittances are computed.
 - `Tuple`: Contains bus reduction map, reverse bus search map, added branch map, and added admittance map
 """
 function get_ward_reduction(
-    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int},
+    data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int},
     bus_lookup::Dict{Int, Int},
     bus_axis::Vector{Int},
     arc_axis::Vector{Tuple{Int, Int}},
@@ -49,8 +49,8 @@ function get_ward_reduction(
 
     bus_reduction_map_index = Dict{Int, Set{Int}}(k => Set{Int}() for k in study_buses)
 
-    added_branch_map = Dict{Tuple{Int, Int}, Complex{Float32}}()
-    added_admittance_map = Dict{Int, Complex{Float32}}()
+    added_branch_map = Dict{Tuple{Int, Int}, YBUS_ELTYPE}()
+    added_admittance_map = Dict{Int, YBUS_ELTYPE}()
     if isempty(boundary_buses)
         first_ref_study_bus = findfirst(x -> x ∈ ref_bus_numbers, study_buses)
         @error "no boundary buses found; cannot make bus_reduction_map based on impedance based criteria. mapping all external buses to the first reference bus ($first_ref_study_bus)"
@@ -80,19 +80,19 @@ function get_ward_reduction(
         _make_reverse_bus_search_map(bus_reduction_map_index, length(all_buses))
 
     #Populate matrices for computing external equivalent
-    y_ee = SparseArrays.spzeros(ComplexF32, n_external, n_external)
+    y_ee = SparseArrays.spzeros(YBUS_ELTYPE, n_external, n_external)
     for (ix, i) in enumerate(external_buses)
         for (jx, j) in enumerate(external_buses)
             y_ee[ix, jx] = data[bus_lookup[i], bus_lookup[j]]
         end
     end
-    y_be = SparseArrays.spzeros(ComplexF32, n_boundary, n_external)
+    y_be = SparseArrays.spzeros(YBUS_ELTYPE, n_boundary, n_external)
     for (ix, i) in enumerate(boundary_buses)
         for (jx, j) in enumerate(external_buses)
             y_be[ix, jx] = data[bus_lookup[i], bus_lookup[j]]
         end
     end
-    y_eb = SparseArrays.spzeros(ComplexF32, n_external, n_boundary)
+    y_eb = SparseArrays.spzeros(YBUS_ELTYPE, n_external, n_boundary)
     for (ix, i) in enumerate(external_buses)
         for (jx, j) in enumerate(boundary_buses)
             y_eb[ix, jx] = data[bus_lookup[i], bus_lookup[j]]

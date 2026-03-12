@@ -36,6 +36,7 @@ export DC_PTDF_Matrix
 export DC_vPTDF_Matrix
 export DC_BA_Matrix
 export AC_Ybus_Matrix
+export YBUS_ELTYPE
 
 using DocStringExtensions
 import InfrastructureSystems as IS

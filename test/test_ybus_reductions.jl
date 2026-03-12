@@ -129,7 +129,11 @@ end
     )
     @test Set(A.axes[2]) == Set(keys(nrd.bus_reduction_map))
     ybus_full = Ybus(sys)
-    @test isapprox(ybus[108, 1001]^-1, (ybus_full[108, 107])^-1 + ybus_full[107, 1001]^-1)
+    @test isapprox(
+        ybus[108, 1001]^-1,
+        (ybus_full[108, 107])^-1 + ybus_full[107, 1001]^-1;
+        rtol = 2 * eps(Float32),
+    )
 end
 
 @testset "14 bus; radial + degree two reduction" begin

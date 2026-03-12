@@ -1,3 +1,5 @@
+const YBUS_ELTYPE = ComplexF32
+
 const SUPPORTED_LINEAR_SOLVERS = ["KLU", "MKLPardiso", "AppleAccelerate", "Dense"]
 
 const KiB = 1024
