@@ -384,9 +384,6 @@ function has_time_series(
     return false
 end
 
-#Currently we are not expecting any DLRs in BranchesSeries, 
-#since we are preventing the 2 Degree reduction in case the 
-#series element rating is more restrictive than the element with DLRs
 function get_device_with_time_series(
     branch::BranchesSeries,
     ts_type::Type{T},
