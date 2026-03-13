@@ -129,10 +129,12 @@ end
     )
     @test Set(A.axes[2]) == Set(keys(nrd.bus_reduction_map))
     ybus_full = Ybus(sys)
+    # sqrt(eps) tolerance: reduced Ybus goes through a dense solve, so composed
+    # numerical error is expected up to O(sqrt(eps)) for well-conditioned systems.
     @test isapprox(
         ybus[108, 1001]^-1,
         (ybus_full[108, 107])^-1 + ybus_full[107, 1001]^-1;
-        rtol = 2 * eps(Float32),
+        rtol = sqrt(eps(real(YBUS_ELTYPE))),
     )
 end
 

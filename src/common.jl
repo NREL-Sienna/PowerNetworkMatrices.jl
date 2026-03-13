@@ -298,9 +298,9 @@ function sparsify(dense_array::Vector{Float64}, tol::Float64)
 end
 
 """
-    get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{YBUS_ELTYPE})
+    _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{$YBUS_ELTYPE})
 
-Takes as input a 2x2 Matrix{YBUS_ELTYPE} representing the Ybus contribution of either a
+Takes as input a 2x2 Matrix{$YBUS_ELTYPE} representing the Ybus contribution of either a
 BranchesParallel or BranchesSeries object.
 Returns a dictionary of equivalent parameters, matching the PowerModels data format.
 """
