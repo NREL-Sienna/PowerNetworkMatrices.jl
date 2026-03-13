@@ -342,13 +342,6 @@ function has_time_series(
     T <: PSY.TimeSeriesData,
 }
     for b in branch
-        if is_a_reduction(b)
-            if has_time_series(b, ts_type, ts_name)
-                return true
-            end
-            continue
-        end
-
         if has_time_series(b, ts_type, ts_name)
             return true
         end
@@ -364,7 +357,7 @@ function has_time_series(
     T <: PSY.TimeSeriesData,
 }
     for b in branch
-        if PSY.has_time_series(b, ts_type, ts_name)
+        if has_time_series(b, ts_type, ts_name)
             return true
         end
     end
@@ -384,6 +377,9 @@ function has_time_series(
     return false
 end
 
+# Currently, we do not expect any dynamically rated branches (DLRs) in BranchesSeries,
+# because we prevent the 2-degree temperature reduction when a series element's rating
+# is more restrictive than any rating from an element with DLRs.
 function get_device_with_time_series(
     branch::BranchesSeries,
     ts_type::Type{T},
@@ -408,7 +404,7 @@ function get_device_with_time_series(
 }
     for b in branch
         if has_time_series(b, ts_type, ts_name)
-            return b
+            return get_device_with_time_series(b, ts_type, ts_name)
         end
     end
     return nothing

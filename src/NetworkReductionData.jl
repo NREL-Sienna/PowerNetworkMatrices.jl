@@ -307,6 +307,7 @@ end
 
 _get_segment_components(x::T) where {T <: PSY.ACBranch} = [x]
 _get_segment_components(x::BranchesParallel{T}) where {T <: PSY.ACTransmission} = x.branches
+_get_segment_components(x::ThreeWindingTransformerWinding) = [get_transformer(x)]
 _get_segment_type(::T) where {T <: PSY.ACBranch} = T
 _get_segment_type(::BranchesParallel{T}) where {T <: PSY.ACTransmission} = T
 _get_segment_type(
@@ -315,7 +316,9 @@ _get_segment_type(
 
 _get_concrete_types(x::T) where {T <: PSY.ACBranch} = [T]
 _get_concrete_types(x::BranchesParallel{T}) where {T <: PSY.ACTransmission} =
-    unique(typeof.(x.branches))
+    unique(_get_segment_type.(x.branches))
+_get_concrete_types(::ThreeWindingTransformerWinding{T}) where {T <: PSY.ThreeWindingTransformer} =
+    [T]
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
 """
