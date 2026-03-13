@@ -315,7 +315,7 @@ _get_segment_type(
 
 _get_concrete_types(x::T) where {T <: PSY.ACBranch} = [T]
 _get_concrete_types(x::BranchesParallel{T}) where {T <: PSY.ACTransmission} =
-    unique(typeof.(x.branches))
+    unique(_get_segment_type.(x.branches))
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
 """
