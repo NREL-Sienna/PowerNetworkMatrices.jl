@@ -20,8 +20,8 @@ network reduction algorithms.
 - `removed_buses::Set{Int}`: Set of buses eliminated from the network
 - `removed_arcs::Set{Tuple{Int, Int}}`: Set of arcs eliminated from the network
 - `removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int}`: Maps removed arcs to the connected surviving bus number (occurs for radial reduction or Ward reduction)
-- `added_admittance_map::Dict{Int, Complex{Float32}}`: Admittances added to buses during reduction
-- `added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}}`: New branches created during reduction
+- `added_admittance_map::Dict{Int, YBUS_ELTYPE}`: Admittances added to buses during reduction
+- `added_branch_map::Dict{Tuple{Int, Int}, YBUS_ELTYPE}`: New branches created during reduction
 - `all_branch_maps_by_type::Dict{String, Any}`: Branch mappings organized by component type
 - `reductions::ReductionContainer`: Container tracking applied reduction algorithms
 - `name_to_arc_map::Dict{Type, DataStructures.SortedDict{String, Tuple{Tuple{Int, Int}, String}}}`: Lazily filled with the call to [`populate_branch_maps_by_type!`](@ref), maps string names to their corresponding arcs and the map where the arc can be found. Used in optimization models or power flow reporting after reductions are applied. It is possible to have repeated arcs for some names if case of serial or parallel combinations.
@@ -56,9 +56,9 @@ network reduction algorithms.
     removed_buses::Set{Int} = Set{Int}()
     removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
     removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int} = Dict{Tuple{Int, Int}, Int}()
-    added_admittance_map::Dict{Int, Complex{Float32}} = Dict{Int, Complex{Float32}}()
-    added_branch_map::Dict{Tuple{Int, Int}, Complex{Float32}} =
-        Dict{Tuple{Int, Int}, Complex{Float32}}()
+    added_admittance_map::Dict{Int, YBUS_ELTYPE} = Dict{Int, YBUS_ELTYPE}()
+    added_branch_map::Dict{Tuple{Int, Int}, YBUS_ELTYPE} =
+        Dict{Tuple{Int, Int}, YBUS_ELTYPE}()
     all_branch_maps_by_type::Dict{String, Any} = Dict{String, Any}()
     reductions::ReductionContainer = ReductionContainer()
     name_to_arc_map::Dict{

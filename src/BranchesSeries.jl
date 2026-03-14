@@ -3,7 +3,7 @@ mutable struct BranchesSeries <: PSY.ACTransmission
     needs_insertion_order::Bool
     insertion_order::Vector{Tuple{DataType, Int}}
     segment_orientations::Vector{Symbol}
-    equivalent_ybus::Union{Matrix{ComplexF32}, Nothing}
+    equivalent_ybus::Union{Matrix{YBUS_ELTYPE}, Nothing}
 end
 
 BranchesSeries() = BranchesSeries(

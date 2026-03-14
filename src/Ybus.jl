@@ -1,12 +1,12 @@
 """
-    Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
+    Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{YBUS_ELTYPE}
 
 Nodal admittance matrix (Y-bus) representing the electrical admittance relationships between
 buses in a power system. This N×N sparse complex matrix encodes the network topology and
 electrical parameters needed for power flow calculations and network analysis.
 
 # Fields
-- `data::SparseArrays.SparseMatrixCSC{ComplexF32, Int}`: Sparse Y-bus matrix with complex admittance values
+- `data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int}`: Sparse Y-bus matrix with complex admittance values
 - `adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int}`: Network connectivity information
 - `axes::Ax`: Tuple of bus axis vectors for indexing (bus_numbers, bus_numbers)
 - `lookup::L`: Tuple of lookup dictionaries mapping bus numbers to matrix indices
@@ -47,8 +47,8 @@ ybus = Ybus(system; network_reductions=[RadialReduction(), DegreeTwoReduction()]
 - [`LODF`](@ref): Line Outage Distribution Factors
 - [`NetworkReduction`](@ref): Network reduction algorithms
 """
-struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{ComplexF32}
-    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int}
+struct Ybus{Ax, L <: NTuple{2, Dict}} <: PowerNetworkMatrix{YBUS_ELTYPE}
+    data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int}
     adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int}
     axes::Ax
     lookup::L
@@ -284,10 +284,10 @@ end
 
 """
     add_branch_entries_to_ybus!(
-        y11::Vector{ComplexF32},
-        y12::Vector{ComplexF32},
-        y21::Vector{ComplexF32},
-        y22::Vector{ComplexF32},
+        y11::Vector{YBUS_ELTYPE},
+        y12::Vector{YBUS_ELTYPE},
+        y21::Vector{YBUS_ELTYPE},
+        y22::Vector{YBUS_ELTYPE},
         branch_ix::Int,
         br::PSY.ACTransmission
     )
@@ -300,10 +300,10 @@ the Pi-model admittances: Y11 (from-bus self), Y12 (from-to mutual), Y21 (to-fro
 and Y22 (to-bus self).
 
 # Arguments
-- `y11::Vector{ComplexF32}`: Vector for from-bus self admittances
-- `y12::Vector{ComplexF32}`: Vector for from-to mutual admittances
-- `y21::Vector{ComplexF32}`: Vector for to-from mutual admittances
-- `y22::Vector{ComplexF32}`: Vector for to-bus self admittances
+- `y11::Vector{YBUS_ELTYPE}`: Vector for from-bus self admittances
+- `y12::Vector{YBUS_ELTYPE}`: Vector for from-to mutual admittances
+- `y21::Vector{YBUS_ELTYPE}`: Vector for to-from mutual admittances
+- `y22::Vector{YBUS_ELTYPE}`: Vector for to-bus self admittances
 - `branch_ix::Int`: Index where to store the branch entries
 - `br::PSY.ACTransmission`: AC transmission branch
 
@@ -313,10 +313,10 @@ and Y22 (to-bus self).
 - Used during Y-bus matrix assembly process
 """
 function add_branch_entries_to_ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
+    y11::Vector{YBUS_ELTYPE},
+    y12::Vector{YBUS_ELTYPE},
+    y21::Vector{YBUS_ELTYPE},
+    y22::Vector{YBUS_ELTYPE},
     branch_ix::Int,
     br::PSY.ACTransmission,
 )
@@ -380,7 +380,7 @@ end
 
 _get_shunt(br::PSY.ACTransmission, node::Symbol) =
     PSY.get_g(br)[node] + 1im * PSY.get_b(br)[node]
-_get_shunt(::PSY.DiscreteControlledACBranch, ::Symbol) = zero(ComplexF32)
+_get_shunt(::PSY.DiscreteControlledACBranch, ::Symbol) = zero(YBUS_ELTYPE)
 
 """Ybus entries for a `Line` or a `DiscreteControlledACBranch`."""
 function ybus_branch_entries(br::PSY.ACTransmission)
@@ -399,7 +399,7 @@ end
 
 function ybus_branch_entries(parallel_br::BranchesParallel)
     arc = get_arc_tuple(first(parallel_br))
-    Y11 = Y12 = Y21 = Y22 = zero(ComplexF32)
+    Y11 = Y12 = Y21 = Y22 = zero(YBUS_ELTYPE)
     for br in parallel_br
         # All branches in BranchesParallel are have the same orientation when constructed in add_to_branch_maps!
         (y11, y12, y21, y22) = ybus_branch_entries(br)
@@ -417,7 +417,7 @@ function ybus_branch_entries(br::BranchesSeries)
     return ybus_reduced[1, 1], ybus_reduced[1, 2], ybus_reduced[2, 1], ybus_reduced[2, 2]
 end
 
-_get_tap(::PSY.Transformer2W) = one(ComplexF32)
+_get_tap(::PSY.Transformer2W) = one(YBUS_ELTYPE)
 _get_tap(br::PSY.TwoWindingTransformer) = PSY.get_tap(br)
 
 """Ybus entries for a `Transformer2W`, `TapTransformer`, or `PhaseShiftingTransformer`."""
@@ -489,10 +489,10 @@ end
 `Line`, `DiscreteControlledACBranch`, `Transformer2W`, `TapTransformer`, and `PhaseShiftingTransformer`.
 """
 function _ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
+    y11::Vector{YBUS_ELTYPE},
+    y12::Vector{YBUS_ELTYPE},
+    y21::Vector{YBUS_ELTYPE},
+    y22::Vector{YBUS_ELTYPE},
     br::PSY.ACTransmission,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -507,10 +507,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
+    y11::Vector{YBUS_ELTYPE},
+    y12::Vector{YBUS_ELTYPE},
+    y21::Vector{YBUS_ELTYPE},
+    y22::Vector{YBUS_ELTYPE},
     br::PSY.DynamicBranch,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
@@ -536,10 +536,10 @@ function _ybus!(
 end
 
 function _ybus!(
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
+    y11::Vector{YBUS_ELTYPE},
+    y12::Vector{YBUS_ELTYPE},
+    y21::Vector{YBUS_ELTYPE},
+    y22::Vector{YBUS_ELTYPE},
     br::PSY.ThreeWindingTransformer,
     num_bus::Dict{Int, Int},
     offset_ix::Int,
@@ -600,7 +600,7 @@ function _ybus!(
 end
 
 function _ybus!(
-    ysh::Vector{ComplexF32},
+    ysh::Vector{YBUS_ELTYPE},
     fa::PSY.FixedAdmittance,
     num_bus::Dict{Int, Int},
     fa_ix::Int,
@@ -621,7 +621,7 @@ end
 
 #Note - PSSE does not include switched admittances in ymatrix
 function _ybus!(
-    ysh::Vector{ComplexF32},
+    ysh::Vector{YBUS_ELTYPE},
     fa::PSY.SwitchedAdmittance,
     num_bus::Dict{Int, Int},
     fa_ix::Int,
@@ -635,7 +635,7 @@ function _ybus!(
 end
 
 function _ybus!(
-    ysh::Vector{ComplexF32},
+    ysh::Vector{YBUS_ELTYPE},
     fa::PSY.StandardLoad,
     num_bus::Dict{Int, Int},
     fa_ix::Int,
@@ -681,11 +681,11 @@ function _buildybus!(
     tb = zeros(Int, branchcount)
     sb = zeros(Int, fa_count + sa_count + sl_count)
 
-    y11 = zeros(ComplexF32, branchcount)
-    y12 = zeros(ComplexF32, branchcount)
-    y21 = zeros(ComplexF32, branchcount)
-    y22 = zeros(ComplexF32, branchcount)
-    ysh = zeros(ComplexF32, fa_count + sa_count + sl_count)
+    y11 = zeros(YBUS_ELTYPE, branchcount)
+    y12 = zeros(YBUS_ELTYPE, branchcount)
+    y21 = zeros(YBUS_ELTYPE, branchcount)
+    y22 = zeros(YBUS_ELTYPE, branchcount)
+    ysh = zeros(YBUS_ELTYPE, fa_count + sa_count + sl_count)
 
     for (ix, b) in enumerate(branches)
         if PSY.get_name(b) == "init"
@@ -1343,7 +1343,7 @@ end
 function _apply_added_components!(
     nr::NetworkReductionData,
     nr_new::NetworkReductionData,
-    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int},
+    data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int},
     bus_lookup::Dict{Int, Int},
 )
     if !isempty(nr_new.added_branch_map) && !isempty(nr.added_branch_map) ||
@@ -1407,7 +1407,7 @@ function _make_subnetwork_axes(
 end
 
 function _modify_removed_arc_connections!(
-    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
+    data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int64},
     bus_lookup::Dict{Int, Int},
     nrd_old::NetworkReductionData,
     removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int},
@@ -1442,7 +1442,7 @@ function _get_entry(arc::Tuple{Int, Int}, nrd::NetworkReductionData)
 end
 
 function _add_series_branches_to_ybus!(
-    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
+    data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int64},
     bus_lookup::Dict{Int, Int},
     yft::Nothing,
     ytf::Nothing,
@@ -1467,7 +1467,7 @@ function _add_series_branches_to_ybus!(
 end
 
 function _add_series_branches_to_ybus!(
-    data::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
+    data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int64},
     bus_lookup::Dict{Int, Int},
     yft::ArcAdmittanceMatrix,
     ytf::ArcAdmittanceMatrix,
@@ -1530,9 +1530,9 @@ function _add_series_branches_to_ybus!(
 end
 
 function _apply_d2_chain_ybus!(
-    ybus_full::SparseArrays.SparseMatrixCSC{ComplexF32, Int64},
-    ybus_chain::Matrix{ComplexF32},
-    ybus_chain_reduced::Matrix{ComplexF32},
+    ybus_full::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int64},
+    ybus_chain::Matrix{YBUS_ELTYPE},
+    ybus_chain_reduced::Matrix{YBUS_ELTYPE},
     equivalent_arc_indices::Tuple{Int, Int},
 )
     equivalent_from_index, equivalent_to_index = equivalent_arc_indices
@@ -1554,10 +1554,10 @@ function _build_chain_ybus(
     segment_orientations = series_chain.segment_orientations
     fb = Vector{Int}()
     tb = Vector{Int}()
-    y11 = Vector{ComplexF32}()
-    y12 = Vector{ComplexF32}()
-    y21 = Vector{ComplexF32}()
-    y22 = Vector{ComplexF32}()
+    y11 = Vector{YBUS_ELTYPE}()
+    y12 = Vector{YBUS_ELTYPE}()
+    y21 = Vector{YBUS_ELTYPE}()
+    y22 = Vector{YBUS_ELTYPE}()
     for (ix, segment) in enumerate(series_chain)
         add_segment_to_ybus!(
             segment,
@@ -1583,10 +1583,10 @@ end
 """
     add_segment_to_ybus!(
         segment::PSY.ACTransmission
-        y11::Vector{ComplexF32},
-        y12::Vector{ComplexF32},
-        y21::Vector{ComplexF32},
-        y22::Vector{ComplexF32},
+        y11::Vector{YBUS_ELTYPE},
+        y12::Vector{YBUS_ELTYPE},
+        y21::Vector{YBUS_ELTYPE},
+        y22::Vector{YBUS_ELTYPE},
         fb::Vector{Int},
         tb::Vector{Int},
         ix::Int,
@@ -1601,10 +1601,10 @@ Y-bus entries for series chains of degree-two buses.
 
 # Arguments
 - `segment::Union{PSY.ACTransmission, Tuple{PSY.ThreeWindingTransformer, Int}}`: Branch segment to add
-- `y11::Vector{ComplexF32}`: Vector for from-bus self admittances
-- `y12::Vector{ComplexF32}`: Vector for from-to mutual admittances
-- `y21::Vector{ComplexF32}`: Vector for to-from mutual admittances
-- `y22::Vector{ComplexF32}`: Vector for to-bus self admittances
+- `y11::Vector{YBUS_ELTYPE}`: Vector for from-bus self admittances
+- `y12::Vector{YBUS_ELTYPE}`: Vector for from-to mutual admittances
+- `y21::Vector{YBUS_ELTYPE}`: Vector for to-from mutual admittances
+- `y22::Vector{YBUS_ELTYPE}`: Vector for to-bus self admittances
 - `fb::Vector{Int}`: Vector for from-bus indices
 - `tb::Vector{Int}`: Vector for to-bus indices
 - `ix::Int`: Index position for the segment
@@ -1622,10 +1622,10 @@ Y-bus entries for series chains of degree-two buses.
 """
 function add_segment_to_ybus!(
     segment::PSY.ACTransmission,
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
+    y11::Vector{YBUS_ELTYPE},
+    y12::Vector{YBUS_ELTYPE},
+    y21::Vector{YBUS_ELTYPE},
+    y22::Vector{YBUS_ELTYPE},
     fb::Vector{Int},
     tb::Vector{Int},
     ix::Int,
@@ -1652,10 +1652,10 @@ end
 """
     add_segment_to_ybus!(
         segment::BranchesParallel,
-        y11::Vector{ComplexF32},
-        y12::Vector{ComplexF32},
-        y21::Vector{ComplexF32},
-        y22::Vector{ComplexF32},
+        y11::Vector{YBUS_ELTYPE},
+        y12::Vector{YBUS_ELTYPE},
+        y21::Vector{YBUS_ELTYPE},
+        y22::Vector{YBUS_ELTYPE},
         fb::Vector{Int},
         tb::Vector{Int},
         ix::Int,
@@ -1670,10 +1670,10 @@ same Y-bus position, effectively combining their admittances.
 
 # Arguments
 - `segment::BranchesParallel`: Set of parallel AC transmission branches
-- `y11::Vector{ComplexF32}`: Vector for from-bus self admittances
-- `y12::Vector{ComplexF32}`: Vector for from-to mutual admittances
-- `y21::Vector{ComplexF32}`: Vector for to-from mutual admittances
-- `y22::Vector{ComplexF32}`: Vector for to-bus self admittances
+- `y11::Vector{YBUS_ELTYPE}`: Vector for from-bus self admittances
+- `y12::Vector{YBUS_ELTYPE}`: Vector for from-to mutual admittances
+- `y21::Vector{YBUS_ELTYPE}`: Vector for to-from mutual admittances
+- `y22::Vector{YBUS_ELTYPE}`: Vector for to-bus self admittances
 - `fb::Vector{Int}`: Vector for from-bus indices
 - `tb::Vector{Int}`: Vector for to-bus indices
 - `ix::Int`: Index position for the segment
@@ -1691,10 +1691,10 @@ same Y-bus position, effectively combining their admittances.
 """
 function add_segment_to_ybus!(
     segment::BranchesParallel,
-    y11::Vector{ComplexF32},
-    y12::Vector{ComplexF32},
-    y21::Vector{ComplexF32},
-    y22::Vector{ComplexF32},
+    y11::Vector{YBUS_ELTYPE},
+    y12::Vector{YBUS_ELTYPE},
+    y21::Vector{YBUS_ELTYPE},
+    y22::Vector{YBUS_ELTYPE},
     fb::Vector{Int},
     tb::Vector{Int},
     ix::Int,
@@ -1730,7 +1730,7 @@ function _get_chain_data(
     return ordered_bus_numbers, segment_orientation
 end
 
-function _reduce_internal_nodes(Y::Matrix{ComplexF32})
+function _reduce_internal_nodes(Y::Matrix{YBUS_ELTYPE})
     dim_Y = size(Y)[1]
     keep_ix = [1, dim_Y]
     eliminate_ix = collect(2:(dim_Y - 1))
