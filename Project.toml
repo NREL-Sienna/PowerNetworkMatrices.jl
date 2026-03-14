@@ -1,7 +1,7 @@
 name = "PowerNetworkMatrices"
 uuid = "bed98974-b02a-5e2f-9fe0-a103f5c450dd"
 version = "0.19.0"
-authors = ["Jose Daniel Lara", "Matt Bossart", "Alessandro Francesco Castelli"]
+authors = ["SIENNA TEAM"]
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
