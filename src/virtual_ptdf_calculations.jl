@@ -133,8 +133,10 @@ struct with an empty cache.
         Structure containing the details of the network reduction applied when computing the matrix
 - `nworkers::Int`:
         Number of parallel workers in the underlying KLU pool (KLU backend only).
-        Defaults to `max(1, Threads.nthreads() - 1)`. Ignored for the
-        AppleAccelerate backend.
+        Defaults to `_default_pool_workers()` — `max(1, Threads.nthreads() - 1)`
+        on Mac/Linux and `1` on Windows (where the KLU pool path is serialized
+        through `solver_lock` to work around a libklu thread-safety issue).
+        Ignored for the AppleAccelerate backend.
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
@@ -146,7 +148,7 @@ function VirtualPTDF(
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
-    nworkers::Int = max(1, Threads.nthreads() - 1),
+    nworkers::Int = _default_pool_workers(),
     kwargs...,
 )
     resolve_linear_solver(linear_solver)
@@ -224,8 +226,10 @@ The return is a VirtualPTDF struct with an empty cache.
         arcs to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of tuples).
 - `nworkers::Int`:
         Number of parallel workers in the underlying KLU pool (KLU backend only).
-        Defaults to `max(1, Threads.nthreads() - 1)`. Ignored for the
-        AppleAccelerate backend.
+        Defaults to `_default_pool_workers()` — `max(1, Threads.nthreads() - 1)`
+        on Mac/Linux and `1` on Windows (where the KLU pool path is serialized
+        through `solver_lock` to work around a libklu thread-safety issue).
+        Ignored for the AppleAccelerate backend.
 """
 function VirtualPTDF(
     ybus::Ybus;
@@ -234,7 +238,7 @@ function VirtualPTDF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
-    nworkers::Int = max(1, Threads.nthreads() - 1),
+    nworkers::Int = _default_pool_workers(),
     system_uuid::Union{Base.UUID, Nothing} = nothing,
 )
     solver = resolve_linear_solver(linear_solver)
@@ -361,13 +365,29 @@ Acquire exclusive access to a solver and a matched per-worker scratch pair
 (`work_ba_col`, `temp_data`), then invoke `f(solver, work_ba_col, temp_data)`.
 For the KLU pool path this routes through `with_worker`; for the
 AppleAccelerate path it serializes through `solver_lock`.
+
+On Windows the pool callback is additionally serialized through
+`solver_lock`. The Windows MinGW build of `SuiteSparse_jll`'s libklu has
+crashed with `EXCEPTION_ACCESS_VIOLATION` inside `klu_l_solve` and
+returned `KLU_INVALID` under the parallel path even with verified-distinct
+per-worker `Numeric`/`Symbolic`/`Common` pointers (see the diagnostic
+`@error` logs in `KLUWrapper/solve_dense.jl`). Mac and Linux do not
+reproduce. The serialization keeps Windows correct while Mac/Linux retain
+parallelism. Type stability is preserved because `@static if` resolves at
+compile time, so only one branch survives in the IR per platform.
 """
 function with_solver(
     f,
     vptdf::VirtualPTDF{Ax, L, KLULinSolvePool{Float64}},
 ) where {Ax, L <: NTuple{2, Dict}}
     return with_worker(vptdf.K) do cache, idx
-        f(cache, vptdf.work_ba_col[idx], vptdf.temp_data[idx])
+        @static if Sys.iswindows()
+            return @lock vptdf.solver_lock f(
+                cache, vptdf.work_ba_col[idx], vptdf.temp_data[idx],
+            )
+        else
+            return f(cache, vptdf.work_ba_col[idx], vptdf.temp_data[idx])
+        end
     end
 end
 

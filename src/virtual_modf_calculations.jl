@@ -210,7 +210,7 @@ function VirtualMODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
-    nworkers::Int = max(1, Threads.nthreads() - 1),
+    nworkers::Int = _default_pool_workers(),
     kwargs...,
 )
     if length(dist_slack) != 0

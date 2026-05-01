@@ -227,7 +227,9 @@ struct with an empty cache.
         Structure containing the details of the network reduction applied when computing the matrix
 - `nworkers::Int`:
         Number of parallel workers in the underlying KLU pool. Defaults to
-        `max(1, Threads.nthreads() - 1)`.
+        `_default_pool_workers()` — `max(1, Threads.nthreads() - 1)` on
+        Mac/Linux and `1` on Windows (where the KLU pool path is serialized
+        through `solver_lock` to work around a libklu thread-safety issue).
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
@@ -238,7 +240,7 @@ function VirtualLODF(
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
-    nworkers::Int = max(1, Threads.nthreads() - 1),
+    nworkers::Int = _default_pool_workers(),
     kwargs...,
 )
     if length(dist_slack) != 0

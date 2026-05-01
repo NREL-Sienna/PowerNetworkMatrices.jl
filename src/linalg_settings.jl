@@ -1,4 +1,26 @@
 
+"""
+    _default_pool_workers() -> Int
+
+Default `nworkers` for the KLU `KLULinSolvePool` used by `Virtual{PTDF, LODF, MODF}`.
+
+On Windows: returns `1`. The `with_solver` KLU-pool path is serialized
+through `solver_lock` on Windows because `SuiteSparse_jll`'s libklu has
+shown `EXCEPTION_ACCESS_VIOLATION` and `KLU_INVALID` returns even with
+verified-distinct per-worker `Numeric`/`Symbolic`/`Common` pointers. With
+solves serialized, additional workers would just pay for unused
+factorizations at build time — `nworkers = 1` keeps a single Numeric and
+matches the AppleAccelerate path's contract.
+
+On every other platform: returns `max(1, Threads.nthreads() - 1)`. Leaves
+one logical thread for the calling task; clamps to `1` if Julia is
+single-threaded. `Threads.nthreads()` is evaluated at call time, so the
+default tracks the active thread count rather than freezing at module
+load.
+"""
+@inline _default_pool_workers() =
+    @static Sys.iswindows() ? 1 : max(1, Threads.nthreads() - 1)
+
 # Extensions are loaded when trigger packages (Pardiso, AppleAccelerate) are loaded
 
 # Check if MKL/Pardiso extension is available at runtime
