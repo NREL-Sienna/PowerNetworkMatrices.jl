@@ -221,7 +221,9 @@ function _compute_woodbury_factors(
     mat::VirtualPTDF,
     modifications::Tuple{Vararg{ArcModification}},
 )::WoodburyFactors
-    return with_solver(mat) do K_solver, work_ba_col, temp_data
+    return with_solver(
+        mat.K, mat.work_ba_col, mat.temp_data, mat.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
         _compute_woodbury_factors_impl(
             K_solver, work_ba_col, temp_data,
             mat.BA, mat.arc_susceptances, mat.valid_ix, modifications,
@@ -234,7 +236,9 @@ function _apply_woodbury_correction(
     monitored_idx::Int,
     wf::WoodburyFactors,
 )::Vector{Float64}
-    return with_solver(mat) do K_solver, work_ba_col, temp_data
+    return with_solver(
+        mat.K, mat.work_ba_col, mat.temp_data, mat.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
         _apply_woodbury_correction_impl(
             K_solver, work_ba_col, temp_data,
             mat.BA, mat.arc_susceptances, mat.valid_ix, monitored_idx, wf,
