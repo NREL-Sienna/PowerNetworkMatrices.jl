@@ -93,6 +93,7 @@ import .KLUWrapper:
     is_factored
 
 include("linalg_settings.jl")
+include("solver_dispatch.jl")
 
 function __init__()
     something(get_linalg_backend_check(), false) && check_linalg_backend()
