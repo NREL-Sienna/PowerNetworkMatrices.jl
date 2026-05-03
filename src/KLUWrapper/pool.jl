@@ -93,7 +93,16 @@ function KLULinSolvePool(
     for w in 1:nworkers
         put!(available, w)
     end
-    in_use = [Threads.Atomic{Int}(0) for _ in 1:nworkers]
+    # Allocate the per-worker collision counters only when debug gating is on.
+    # `with_worker` reads/writes `in_use` exclusively under
+    # `@static if KLU_POOL_DEBUG`; in production the field is unused and an
+    # empty vector keeps the layout valid without paying for `nworkers`
+    # `Threads.Atomic{Int}` allocations.
+    in_use = @static if KLU_POOL_DEBUG
+        [Threads.Atomic{Int}(0) for _ in 1:nworkers]
+    else
+        Threads.Atomic{Int}[]
+    end
     pool = KLULinSolvePool{Tv}(workers, available, fill(true, nworkers),
         ReentrantLock(), ReentrantLock(), in_use)
     # Per-cache finalizers (registered in `klu_factorize`) free libklu
@@ -139,22 +148,33 @@ release!(pool::KLULinSolvePool, idx::Int) = put!(pool.available, idx)
 Acquire a worker from `pool`, invoke `f(cache, idx)`, and release the worker
 when `f` returns or throws.
 """
+# No lock: callers (the construction-time PTDF-diagonal precompute in
+# Virtual{LODF,MODF}) run before the matrix is exposed to parallel callers.
+with_worker(f, cache::KLULinSolveCache) = f(cache, 1)
+
 function with_worker(f, pool::KLULinSolvePool)
     cache, idx = acquire!(pool)
-    # Diagnostic: detect concurrent use of the same worker. The post-increment
-    # value should be 1 if exclusivity holds. Anything higher means another
-    # task acquired the same `idx` while this one still holds it, which would
-    # be a pool-level race and the most likely explanation for libklu memory
-    # corruption observed under parallel solves on Windows.
-    holders = Threads.atomic_add!(pool.in_use[idx], 1) + 1
-    if holders > 1
-        @error "KLULinSolvePool worker collision: idx held by multiple tasks" tid =
-            Threads.threadid() idx = idx holders = holders cache_id = objectid(cache)
+    # Diagnostic (gated by `KLU_POOL_DEBUG`): detect concurrent use of the
+    # same worker. The post-increment value should be 1 if exclusivity
+    # holds. Anything higher means another task acquired the same `idx`
+    # while this one still holds it — a pool-level race that would explain
+    # libklu memory corruption observed under parallel solves on Windows.
+    # Off in production (zero runtime cost via `@static if`); the
+    # `pool.in_use` field stays on the struct so the layout is stable
+    # regardless of the gate.
+    @static if KLU_POOL_DEBUG
+        holders = Threads.atomic_add!(pool.in_use[idx], 1) + 1
+        if holders > 1
+            @error "KLULinSolvePool worker collision: idx held by multiple tasks" tid =
+                Threads.threadid() idx = idx holders = holders cache_id = objectid(cache)
+        end
     end
     try
         return f(cache, idx)
     finally
-        Threads.atomic_sub!(pool.in_use[idx], 1)
+        @static if KLU_POOL_DEBUG
+            Threads.atomic_sub!(pool.in_use[idx], 1)
+        end
         release!(pool, idx)
     end
 end

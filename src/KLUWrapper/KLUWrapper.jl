@@ -21,6 +21,22 @@ import LinearAlgebra
 import SparseArrays
 import SparseArrays: SparseMatrixCSC, getcolptr, rowvals, nonzeros
 
+"""
+    KLU_POOL_DEBUG :: Bool
+
+Compile-time gate for the KLU wrapper's runtime diagnostics — the
+precondition snapshot in `solve!` and the per-worker collision detector
+in `with_worker`. When `false` (default), both are folded out by the
+compiler via `@static if` and contribute zero runtime cost. Flip to
+`true` when reproducing platform-specific failures (e.g. the Windows
+libklu KLU_INVALID + access violation thread).
+
+This is a `const` rather than a `Preferences.@load_preference` flag so
+that toggling it forces a precompile rebuild and the production binary
+never carries the diagnostic code.
+"""
+const KLU_POOL_DEBUG = false
+
 export KLULinSolveCache,
     KLULinSolvePool,
     klu_factorize,
