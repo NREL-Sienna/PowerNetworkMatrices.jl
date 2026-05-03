@@ -175,7 +175,7 @@ function _create_factorization(
     ABA::SparseArrays.SparseMatrixCSC{Float64, Int};
     nworkers::Int,
 )
-    return KLULinSolvePool(ABA; nworkers = nworkers)
+    return _create_klu_solver(ABA; nworkers = nworkers)
 end
 
 function _create_factorization(
@@ -347,58 +347,19 @@ if isdefined(Base, :print_array) # 0.7 and later
     Base.print_array(io::IO, X::VirtualPTDF) = "VirtualPTDF"
 end
 
-# Helper function to solve with different factorization types
+# Helper function to solve with different factorization types. The
+# `KLULinSolveCache` overload solves in place (zero-allocation hot path);
+# the generic fallback delegates to `\` and is extended by the
+# AppleAccelerate extension for `AAFactorization`.
 function _solve_factorization(K::KLULinSolveCache{Float64}, b::Vector{Float64})
     solve!(K, b)
     return b
 end
 
-# Generic fallback for other factorization types (will be extended by extensions)
 function _solve_factorization(K, b::Vector{Float64})
     return K \ b
 end
 
-"""
-    with_solver(f, vptdf) -> result
-
-Acquire exclusive access to a solver and a matched per-worker scratch pair
-(`work_ba_col`, `temp_data`), then invoke `f(solver, work_ba_col, temp_data)`.
-For the KLU pool path this routes through `with_worker`; for the
-AppleAccelerate path it serializes through `solver_lock`.
-
-On Windows the pool callback is additionally serialized through
-`solver_lock`. The Windows MinGW build of `SuiteSparse_jll`'s libklu has
-crashed with `EXCEPTION_ACCESS_VIOLATION` inside `klu_l_solve` and
-returned `KLU_INVALID` under the parallel path even with verified-distinct
-per-worker `Numeric`/`Symbolic`/`Common` pointers (see the diagnostic
-`@error` logs in `KLUWrapper/solve_dense.jl`). Mac and Linux do not
-reproduce. The serialization keeps Windows correct while Mac/Linux retain
-parallelism. Type stability is preserved because `@static if` resolves at
-compile time, so only one branch survives in the IR per platform.
-"""
-function with_solver(
-    f,
-    vptdf::VirtualPTDF{Ax, L, KLULinSolvePool{Float64}},
-) where {Ax, L <: NTuple{2, Dict}}
-    return with_worker(vptdf.K) do cache, idx
-        @static if Sys.iswindows()
-            return @lock vptdf.solver_lock f(
-                cache, vptdf.work_ba_col[idx], vptdf.temp_data[idx],
-            )
-        else
-            return f(cache, vptdf.work_ba_col[idx], vptdf.temp_data[idx])
-        end
-    end
-end
-
-function with_solver(
-    f,
-    vptdf::VirtualPTDF{Ax, L, K},
-) where {Ax, L <: NTuple{2, Dict}, K}
-    @lock vptdf.solver_lock f(vptdf.K, vptdf.work_ba_col[1], vptdf.temp_data[1])
-end
-
-# A/B test: revert to the closure-based path so we can quantify the impact.
 function _compute_ptdf_row(vptdf::VirtualPTDF, row::Int)::Vector{Float64}
     buscount = size(vptdf, 1)
     ref_bus_positions = get_ref_bus_position(vptdf)
@@ -412,7 +373,9 @@ function _compute_ptdf_row(vptdf::VirtualPTDF, row::Int)::Vector{Float64}
         error("Distributed bus specification doesn't match the number of buses.")
     end
 
-    return with_solver(vptdf) do K_solver, work_ba_col, temp_data
+    return with_solver(
+        vptdf.K, vptdf.work_ba_col, vptdf.temp_data, vptdf.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
         valid_ix = vptdf.valid_ix
         @inbounds for i in eachindex(valid_ix)
             work_ba_col[i] = vptdf.BA[valid_ix[i], row]

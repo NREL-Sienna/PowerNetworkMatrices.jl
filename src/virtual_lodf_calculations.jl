@@ -67,9 +67,9 @@ row cache is guarded by a `ReentrantLock`. The same applies to
 - `work_ba_col::Vector{Vector{Float64}}`:
         Per-worker BA-column scratch buffer (one per pool worker).
 """
-struct VirtualLODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}} <:
+struct VirtualLODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}, K} <:
        PowerNetworkMatrix{Float64}
-    K::KLULinSolvePool{Float64}
+    K::K
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     A::SparseArrays.SparseMatrixCSC{Int8, Int}
     inv_PTDF_A_diag::Vector{Float64}
@@ -87,6 +87,9 @@ struct VirtualLODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}} <:
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
     work_ba_col::Vector{Vector{Float64}}
+    # Used by `with_solver` for the AppleAccelerate / single-cache paths and
+    # for the Windows KLU-pool libklu workaround. See `solver_dispatch.jl`.
+    solver_lock::ReentrantLock
 end
 
 get_axes(M::VirtualLODF) = M.axes
@@ -260,7 +263,7 @@ function VirtualLODF(
     subnetwork_axes = make_arc_arc_subnetwork_axes(A)
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    K_pool = KLULinSolvePool(ABA; nworkers = nworkers)
+    K_pool = _create_klu_solver(ABA; nworkers = nworkers)
     bus_ax = get_bus_axis(A)
 
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
@@ -311,6 +314,7 @@ function VirtualLODF(
         Ref(tol),
         Ymatrix.network_reduction_data,
         work_ba_col,
+        ReentrantLock(),
     )
 end
 
@@ -347,17 +351,17 @@ end
 # Compute the LODF row for `row` using exclusive per-worker scratch. Pure
 # computation: no cache reads/writes, no tolerance application.
 function _compute_lodf_row(vlodf::VirtualLODF, row::Int)::Vector{Float64}
-    return with_worker(vlodf.K) do cache, idx
-        work_ba_col = vlodf.work_ba_col[idx]
-        temp_data = vlodf.temp_data[idx]
+    return with_solver(
+        vlodf.K, vlodf.work_ba_col, vlodf.temp_data, vlodf.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
         @inbounds for i in eachindex(vlodf.valid_ix)
             work_ba_col[i] = vlodf.BA[vlodf.valid_ix[i], row]
         end
-        solve!(cache, work_ba_col)
+        lin_solve = _solve_factorization(K_solver, work_ba_col)
 
         fill!(temp_data, 0.0)
         @inbounds for i in eachindex(vlodf.valid_ix)
-            temp_data[vlodf.valid_ix[i]] = work_ba_col[i]
+            temp_data[vlodf.valid_ix[i]] = lin_solve[i]
         end
 
         lodf_row = (vlodf.A * temp_data) .* vlodf.inv_PTDF_A_diag
@@ -479,20 +483,19 @@ function _getindex_partial(
         return zeros(n_arcs)
     end
 
-    return with_worker(vlodf.K) do cache, idx
-        work_ba_col = vlodf.work_ba_col[idx]
-        temp_data = vlodf.temp_data[idx]
-
+    return with_solver(
+        vlodf.K, vlodf.work_ba_col, vlodf.temp_data, vlodf.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
         # Steps 1-2: Compute B⁻¹(b_e · ν_e) via KLU solve.
         @inbounds for i in eachindex(vlodf.valid_ix)
             work_ba_col[i] = vlodf.BA[vlodf.valid_ix[i], arc_idx]
         end
-        solve!(cache, work_ba_col)
+        lin_solve = _solve_factorization(K_solver, work_ba_col)
 
         # Step 3: Map solution back to full bus space.
         fill!(temp_data, 0.0)
         @inbounds for i in eachindex(vlodf.valid_ix)
-            temp_data[vlodf.valid_ix[i]] = work_ba_col[i]
+            temp_data[vlodf.valid_ix[i]] = lin_solve[i]
         end
 
         # Step 4: H_col[ℓ] = b_e · C[e,ℓ] for all monitoring arcs ℓ.

@@ -78,9 +78,9 @@ Caching is two-tiered:
         UUID of the system used to construct the matrix, used to validate that
         modification operations are applied to the correct system.
 """
-struct VirtualMODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}} <:
+struct VirtualMODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}, K} <:
        PowerNetworkMatrix{Float64}
-    K::KLULinSolvePool{Float64}
+    K::K
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     A::SparseArrays.SparseMatrixCSC{Int8, Int}
     PTDF_A_diag::Vector{Float64}
@@ -105,6 +105,9 @@ struct VirtualMODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}} <:
     network_reduction_data::NetworkReductionData
     temp_data::Vector{Vector{Float64}}
     work_ba_col::Vector{Vector{Float64}}
+    # Used by `with_solver` for the AppleAccelerate / single-cache paths and
+    # for the Windows KLU-pool libklu workaround. See `solver_dispatch.jl`.
+    solver_lock::ReentrantLock
     system_uuid::Union{Base.UUID, Nothing}
 end
 
@@ -136,9 +139,11 @@ function _compute_woodbury_factors(
     mat::VirtualMODF,
     modifications::Tuple{Vararg{ArcModification}},
 )::WoodburyFactors
-    return with_worker(mat.K) do cache, idx
+    return with_solver(
+        mat.K, mat.work_ba_col, mat.temp_data, mat.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
         _compute_woodbury_factors_impl(
-            cache, mat.work_ba_col[idx], mat.temp_data[idx],
+            K_solver, work_ba_col, temp_data,
             mat.BA, mat.arc_susceptances, mat.valid_ix, modifications,
         )
     end
@@ -149,9 +154,11 @@ function _apply_woodbury_correction(
     monitored_idx::Int,
     wf::WoodburyFactors,
 )::Vector{Float64}
-    return with_worker(mat.K) do cache, idx
+    return with_solver(
+        mat.K, mat.work_ba_col, mat.temp_data, mat.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
         _apply_woodbury_correction_impl(
-            cache, mat.work_ba_col[idx], mat.temp_data[idx],
+            K_solver, work_ba_col, temp_data,
             mat.BA, mat.arc_susceptances, mat.valid_ix, monitored_idx, wf,
         )
     end
@@ -232,7 +239,7 @@ function VirtualMODF(
 
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    K_pool = KLULinSolvePool(ABA; nworkers = nworkers)
+    K_pool = _create_klu_solver(ABA; nworkers = nworkers)
 
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
 
@@ -272,6 +279,7 @@ function VirtualMODF(
         Ymatrix.network_reduction_data,
         temp_data,
         work_ba_col,
+        ReentrantLock(),
         IS.get_uuid(sys),
     )
 
