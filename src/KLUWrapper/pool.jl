@@ -143,13 +143,16 @@ end
 release!(pool::KLULinSolvePool, idx::Int) = put!(pool.available, idx)
 
 """
-    with_worker(f, pool) -> result
+    with_worker(f, pool::KLULinSolvePool) -> result
+    with_worker(f, cache::KLULinSolveCache) -> result
 
 Acquire a worker from `pool`, invoke `f(cache, idx)`, and release the worker
 when `f` returns or throws.
+
+The single-cache form is a lock-free adapter that invokes `f(cache, 1)`. It is
+used by construction-time precomputes (e.g. the PTDF-diagonal setup in
+`Virtual{LODF,MODF}`) that run before the matrix is exposed to parallel callers.
 """
-# No lock: callers (the construction-time PTDF-diagonal precompute in
-# Virtual{LODF,MODF}) run before the matrix is exposed to parallel callers.
 with_worker(f, cache::KLULinSolveCache) = f(cache, 1)
 
 function with_worker(f, pool::KLULinSolvePool)

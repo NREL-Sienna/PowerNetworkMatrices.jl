@@ -34,6 +34,15 @@ Base.size(cache::KLULinSolveCache) = (n = _dim(cache); (n, n))
 Base.size(cache::KLULinSolveCache, d::Integer) = d <= 2 ? _dim(cache) : 1
 Base.eltype(::Type{KLULinSolveCache{Tv}}) where {Tv} = Tv
 get_reuse_symbolic(cache::KLULinSolveCache) = cache.reuse_symbolic
+
+"""
+    is_factored(cache::KLULinSolveCache) -> Bool
+
+Return `true` when `cache` holds both a symbolic and a numeric factorization
+ready for `solve!` / `tsolve!` / `solve_sparse!`. Returns `false` after
+construction (before `full_factor!`) or after the libklu handles have been
+finalized.
+"""
 is_factored(cache::KLULinSolveCache) =
     cache.symbolic != C_NULL && cache.numeric != C_NULL
 
@@ -275,6 +284,14 @@ function numeric_refactor!(cache::KLULinSolveCache{Tv},
     return cache
 end
 
+"""
+    full_factor!(cache, A) -> cache
+
+Run a fresh symbolic analysis followed by a numeric factorization on `A`.
+Equivalent to `symbolic_factor!(cache, A); numeric_refactor!(cache, A)`. Use
+this on a freshly constructed cache, or after `_free_klu_handles!` has cleared
+the handles, to bring the cache to a factored state.
+"""
 function full_factor!(cache::KLULinSolveCache{Tv},
     A::SparseMatrixCSC{Tv, Int}) where {Tv}
     symbolic_factor!(cache, A)
@@ -282,6 +299,16 @@ function full_factor!(cache::KLULinSolveCache{Tv},
     return cache
 end
 
+"""
+    full_refactor!(cache, A) -> cache
+
+Refresh both the symbolic and numeric factorizations on `A`. Defers to
+`symbolic_refactor!` (which reuses the existing analysis when
+`cache.reuse_symbolic` is set) followed by `numeric_refactor!`. Use this when
+the matrix values have changed; if the structure has also changed and the
+cache was built with `reuse_symbolic = false`, the symbolic analysis is rerun
+as well.
+"""
 function full_refactor!(cache::KLULinSolveCache{Tv},
     A::SparseMatrixCSC{Tv, Int}) where {Tv}
     symbolic_refactor!(cache, A)
