@@ -1,9 +1,16 @@
+# Windows force-collapses the KLU pool to a single cache (libklu MinGW
+# thread-safety bug — see `_create_klu_solver` in src/solver_dispatch.jl). The
+# resulting cache exposes exactly one valid factorization, regardless of the
+# requested `nworkers`. Tests that assert the realized worker count must
+# mirror that platform contract.
+_expected_workers(requested::Int) = Sys.iswindows() ? 1 : requested
+
 @testset "VirtualMODF parallel getindex via @spawn" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     vlodf = VirtualLODF(sys5)
     nworkers = max(2, min(Threads.nthreads(), 4))
     vmodf = VirtualMODF(sys5; nworkers = nworkers)
-    @test PNM.nworkers(vmodf) == nworkers
+    @test PNM.nworkers(vmodf) == _expected_workers(nworkers)
 
     n_arcs = size(vlodf, 1)
     for e in 1:n_arcs
@@ -52,6 +59,7 @@ end
     rts = PSB.build_system(PSB.PSISystems, "RTS_GMLC_DA_sys")
     nworkers = max(2, min(Threads.nthreads(), 4))
     vptdf_serial = VirtualPTDF(rts; nworkers = nworkers)
+    @test PNM.nworkers(vptdf_serial) == _expected_workers(nworkers)
     arcs = collect(vptdf_serial.axes[1])
     n_query = min(length(arcs), 80)
     query_arcs = arcs[1:n_query]
@@ -179,7 +187,7 @@ end
     rts = PSB.build_system(PSB.PSISystems, "RTS_GMLC_DA_sys")
     nw = max(2, min(Threads.nthreads(), 4))
     vmodf = VirtualMODF(rts; nworkers = nw)
-    @test PNM.n_valid(vmodf.K) == nw
+    @test PNM.n_valid(vmodf.K) == _expected_workers(nw)
 
     bridge_arcs = Int[]
     for e in eachindex(vmodf.PTDF_A_diag)
@@ -208,7 +216,7 @@ end
         @test all(isfinite, r)
     end
 
-    @test PNM.n_valid(vmodf.K) == nw
+    @test PNM.n_valid(vmodf.K) == _expected_workers(nw)
 
     PNM.clear_caches!(vmodf)
     benign_arc = findfirst(d -> abs(d) < 0.5, vmodf.PTDF_A_diag)
@@ -220,7 +228,7 @@ end
     )
     benign_result = vmodf[1, benign_mod]
     @test all(isfinite, benign_result)
-    @test PNM.n_valid(vmodf.K) == nw
+    @test PNM.n_valid(vmodf.K) == _expected_workers(nw)
 end
 
 @testset "VirtualMODF concurrent getindex on RTS matches serial baseline" begin
@@ -261,7 +269,7 @@ end
     for i in eachindex(work)
         @test isapprox(parallel[i], serial[i], atol = 1e-9)
     end
-    @test PNM.n_valid(vmodf_par.K) == nw
+    @test PNM.n_valid(vmodf_par.K) == _expected_workers(nw)
 end
 
 @testset "VirtualMODF clear_caches! racing with getindex stays correct" begin
@@ -294,5 +302,5 @@ end
     stop[] = true
     fetch(clearer)
     @test queries > 0
-    @test PNM.n_valid(vmodf.K) == nw
+    @test PNM.n_valid(vmodf.K) == _expected_workers(nw)
 end

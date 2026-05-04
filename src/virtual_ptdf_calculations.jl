@@ -101,6 +101,11 @@ get_bus_lookup(M::VirtualPTDF) = M.lookup[2]
 get_arc_lookup(M::VirtualPTDF) = M.lookup[1]
 get_system_uuid(M::VirtualPTDF) = M.system_uuid
 
+"""
+Number of pool workers (= max concurrent solves) backing `vptdf`.
+"""
+nworkers(vptdf::VirtualPTDF) = nworkers(vptdf.K)
+
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
     summary(io, array)
     isempty(array) && return

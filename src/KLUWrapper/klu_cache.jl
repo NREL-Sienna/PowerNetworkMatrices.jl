@@ -37,6 +37,14 @@ get_reuse_symbolic(cache::KLULinSolveCache) = cache.reuse_symbolic
 is_factored(cache::KLULinSolveCache) =
     cache.symbolic != C_NULL && cache.numeric != C_NULL
 
+# A single-cache adapter is the lock-serialized degenerate of `KLULinSolvePool`
+# (see `_create_klu_solver` in src/solver_dispatch.jl). Mirroring the pool's
+# `nworkers` / `n_valid` API on the cache lets `Virtual{PTDF, LODF, MODF}`
+# accessors and their tests treat both solver shapes uniformly: a cache is
+# always 1 worker, with 1 valid factorization iff `is_factored`.
+nworkers(::KLULinSolveCache) = 1
+n_valid(cache::KLULinSolveCache) = is_factored(cache) ? 1 : 0
+
 @inline _factor_call(::Type{Float64}, ap, ai, ax, sym, common) =
     klu_l_factor(ap, ai, ax, sym, common)
 @inline _factor_call(::Type{ComplexF64}, ap, ai, ax, sym, common) =
