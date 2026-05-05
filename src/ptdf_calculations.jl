@@ -153,7 +153,7 @@ function _calculate_PTDF_matrix_KLU(
     cache = klu_factorize(ABA)
     valid_ix = setdiff(1:buscount, ref_bus_positions)
     PTDFm_t = zeros(buscount, linecount)
-    solve_sparse!(cache, BA[valid_ix, :]; out = view(PTDFm_t, valid_ix, :))
+    solve_sparse!(cache, BA[valid_ix, :], view(PTDFm_t, valid_ix, :))
     PTDFm_t[collect(ref_bus_positions), :] .= 0.0
 
     isempty(dist_slack) && return PTDFm_t

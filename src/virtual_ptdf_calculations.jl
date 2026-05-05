@@ -101,9 +101,10 @@ get_bus_lookup(M::VirtualPTDF) = M.lookup[2]
 get_arc_lookup(M::VirtualPTDF) = M.lookup[1]
 get_system_uuid(M::VirtualPTDF) = M.system_uuid
 
-"""
-Number of pool workers (= max concurrent solves) backing `vptdf`.
-"""
+# Internal: number of pool workers backing `vptdf.K`. Used by tests and the
+# Virtual{LODF,MODF} parallel-construction logic; not part of the public
+# API. Users should set pool size via the `nworkers` keyword argument on
+# the constructor, not by inspecting the result of this call.
 nworkers(vptdf::VirtualPTDF) = nworkers(vptdf.K)
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
@@ -137,11 +138,12 @@ struct with an empty cache.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 - `nworkers::Int`:
-        Number of parallel workers in the underlying KLU pool (KLU backend only).
-        Defaults to `_default_pool_workers()` — `max(1, Threads.nthreads() - 1)`
-        on Mac/Linux and `1` on Windows (where the KLU pool path is serialized
-        through `solver_lock` to work around a libklu thread-safety issue).
-        Ignored for the AppleAccelerate backend.
+        Number of parallel workers in the underlying KLU pool (KLU backend
+        only). Defaults to `_default_pool_workers()`, which returns
+        `max(1, Threads.nthreads() - 1)` on every platform. On Windows the
+        KLU pool path is serialized through `solver_lock` regardless of
+        `nworkers` (libklu thread-safety workaround), so the *effective*
+        worker count is 1 there. Ignored for the AppleAccelerate backend.
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
@@ -202,13 +204,6 @@ function _create_factorization(
     )
 end
 
-# How many per-worker scratch buffers to allocate. The KLU pool path has one
-# per worker so concurrent `with_worker` calls each see exclusive scratch;
-# the AppleAccelerate path serializes through `solver_lock` and uses a single
-# scratch buffer.
-_n_scratch(K::KLULinSolvePool) = nworkers(K)
-_n_scratch(_) = 1
-
 """
 Builds the Virtual PTDF matrix from a Ybus matrix. This constructor is more efficient when the prerequisite Ybus
 matrix is already available and provides direct control over the underlying matrix computations (including network reductions).
@@ -230,11 +225,12 @@ The return is a VirtualPTDF struct with an empty cache.
 - `persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}()`:
         arcs to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of tuples).
 - `nworkers::Int`:
-        Number of parallel workers in the underlying KLU pool (KLU backend only).
-        Defaults to `_default_pool_workers()` — `max(1, Threads.nthreads() - 1)`
-        on Mac/Linux and `1` on Windows (where the KLU pool path is serialized
-        through `solver_lock` to work around a libklu thread-safety issue).
-        Ignored for the AppleAccelerate backend.
+        Number of parallel workers in the underlying KLU pool (KLU backend
+        only). Defaults to `_default_pool_workers()`, which returns
+        `max(1, Threads.nthreads() - 1)` on every platform. On Windows the
+        KLU pool path is serialized through `solver_lock` regardless of
+        `nworkers` (libklu thread-safety workaround), so the *effective*
+        worker count is 1 there. Ignored for the AppleAccelerate backend.
 """
 function VirtualPTDF(
     ybus::Ybus;
@@ -287,9 +283,7 @@ function VirtualPTDF(
         dist_slack_normalized = Float64[]
     end
 
-    # Pre-allocate per-worker scratch. KLU pool: one set per worker so
-    # concurrent solves never collide; AA path: a single buffer guarded by
-    # `solver_lock`.
+    # Per-worker scratch (1 slot for non-pool solvers; see `_n_scratch`).
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
     n_scratch = _n_scratch(K)
     temp_data = [zeros(length(bus_ax)) for _ in 1:n_scratch]

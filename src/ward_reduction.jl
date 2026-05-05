@@ -89,7 +89,7 @@ function get_ward_reduction(
             n_buses, n_boundary,
         )
         Z_boundary_cols = Matrix{ComplexF64}(undef, n_buses, n_boundary)
-        solve_sparse!(K, E; out = Z_boundary_cols)
+        solve_sparse!(K, E, Z_boundary_cols)
 
         for b in external_buses
             row_index = subnetwork_bus_lookup[b]

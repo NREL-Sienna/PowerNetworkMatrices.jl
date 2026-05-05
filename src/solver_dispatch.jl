@@ -11,6 +11,16 @@
 # only `Sys.iswindows()` site — so the parallel-pool `with_solver` method
 # stays platform-agnostic.
 
+# How many per-worker scratch buffers to allocate alongside a solver. The
+# KLU pool path has one per worker so concurrent `with_worker` calls each
+# see exclusive scratch; single-cache and non-pool backends (Windows
+# fallback, AppleAccelerate) serialize through `solver_lock` and use a
+# single scratch buffer. Defined here alongside `with_solver` and
+# `_create_klu_solver` so all three Virtual{PTDF,LODF,MODF} constructors
+# pick up the same accounting.
+_n_scratch(K::KLULinSolvePool) = nworkers(K)
+_n_scratch(_) = 1
+
 """
     _default_pool_workers() -> Int
 
@@ -88,7 +98,10 @@ Factory used by `Virtual{PTDF, LODF, MODF}` constructors. Returns:
 This is the **only** `Sys.iswindows()` site in the package. On Windows
 with `nworkers > 1` the request is overridden to a single cache and a
 one-shot `@warn` informs the caller; passing `nworkers = 1` (or
-accepting the `_default_pool_workers()` default) suppresses the warning.
+running Julia single-threaded) suppresses the warning. The default
+`_default_pool_workers()` returns `max(1, Threads.nthreads() - 1)` on
+every platform, so accepting the default on Windows still triggers the
+warning whenever Julia runs with more than one thread.
 """
 function _create_klu_solver(
     ABA::SparseArrays.SparseMatrixCSC{Float64, Int};
