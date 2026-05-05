@@ -26,11 +26,9 @@ mutable struct KLULinSolveCache{Tv <: Union{Float64, ComplexF64}}
     # `KLULinSolvePool` worker is thread-safe by construction.
     scratch::Matrix{Tv}
     col_map::Vector{Int64}
-    # Reference to the matrix from the last successful factorization. Held so
-    # `_recover_factorization!` can re-run `numeric_refactor!` without the
-    # caller re-supplying `A`. Initialized to a `0×0` sentinel so the field is
-    # concretely typed (avoids the ~48 B `Union{Nothing, ...}` write-barrier
-    # cost on every refactor; recovery checks `size(last_A, 1) > 0`).
+    # Matrix from the last successful factorization, used by
+    # `_recover_factorization!` to refactor without the caller re-supplying `A`.
+    # Empty `0×0` sentinel before the first factor; recovery checks `size > 0`.
     last_A::SparseMatrixCSC{Tv, Int}
 end
 
@@ -138,7 +136,10 @@ end
 Ensure `cache.scratch` is at least `n × block` and `cache.col_map` length
 `block`. Grows in place; reuses across `solve_sparse!` calls.
 """
-@inline function _ensure_scratch!(cache::KLULinSolveCache{Tv}, block::Int) where {Tv}
+@inline function _ensure_scratch!(
+    cache::KLULinSolveCache{Tv},
+    block::Int,
+) where {Tv <: Union{Float64, ComplexF64}}
     n = _dim(cache)
     s = cache.scratch
     if size(s, 1) != n || size(s, 2) < block
@@ -344,16 +345,18 @@ function klu_factorize(A::SparseMatrixCSC{Tv, Int};
     return full_factor!(cache, A)
 end
 
-# Free the (possibly corrupted) numeric handle and re-factor from `cache.last_A`.
-# Used by `_solve_with_retry` to recover from a transient `KLU_INVALID` returned
-# by `klu_l_solve` (observed on Windows MinGW libklu builds). Freeing first
-# forces `numeric_refactor!` into the fresh-factor branch instead of feeding
-# the broken numeric handle back into `klu_l_refactor`.
+"""
+    _recover_factorization!(cache) -> cache
+
+Free the (possibly corrupted) numeric handle and re-run `numeric_refactor!`
+against `cache.last_A`. Free-first forces the fresh-factor branch instead
+of feeding a broken numeric handle back into `klu_l_refactor`.
+"""
 function _recover_factorization!(
     cache::KLULinSolveCache{Tv},
 ) where {Tv <: Union{Float64, ComplexF64}}
     size(cache.last_A, 1) > 0 || error(
-        "KLULinSolveCache: cannot recover — no prior factorization to refactor from.",
+        "KLULinSolveCache: cannot recover: no prior factorization to refactor from.",
     )
     if cache.numeric != C_NULL
         num_ref = Ref(cache.numeric)

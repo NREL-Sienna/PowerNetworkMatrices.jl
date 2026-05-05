@@ -209,7 +209,7 @@ operations (`numeric_refactor!` / `reset!`) are serialized internally via
   error instead of hanging. Recover by calling `reset!(pool, A_known_good)`.
 """
 function numeric_refactor!(pool::KLULinSolvePool{Tv},
-    A::SparseMatrixCSC{Tv, Int}) where {Tv}
+    A::SparseMatrixCSC{Tv, Int}) where {Tv <: Union{Float64, ComplexF64}}
     @lock pool.admin_lock begin
         n = nworkers(pool)
         @lock pool.state_lock begin
@@ -283,7 +283,7 @@ operations (`numeric_refactor!` / `reset!`) are serialized internally via
 `pool.admin_lock`.
 """
 function reset!(pool::KLULinSolvePool{Tv},
-    A::SparseMatrixCSC{Tv, Int}) where {Tv}
+    A::SparseMatrixCSC{Tv, Int}) where {Tv <: Union{Float64, ComplexF64}}
     @lock pool.admin_lock begin
         n = nworkers(pool)
         _drain_available!(pool)  # waits for in-flight valid workers
@@ -410,7 +410,7 @@ end
 # `pool.admin_lock`.
 function _auto_reset!(pool::KLULinSolvePool{Tv},
     A::SparseMatrixCSC{Tv, Int},
-    drained::Vector{Int}) where {Tv}
+    drained::Vector{Int}) where {Tv <: Union{Float64, ComplexF64}}
     reset_failed = Int[]
     reset_err = Ref{Any}(nothing)
     for idx in drained

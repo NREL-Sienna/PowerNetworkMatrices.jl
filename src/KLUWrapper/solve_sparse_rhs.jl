@@ -67,9 +67,9 @@ function solve_sparse!(
         end
 
         if npack > 0
-            # Retry-on-KLU_INVALID inlined here (rather than via
-            # `_solve_with_retry`) so the inner-loop closure doesn't capture
-            # `npack`, which Julia would box and allocate per chunk.
+            # Retry-on-KLU_INVALID is inlined here (mirrors `_solve_with_retry`
+            # in solve_dense.jl) to keep the inner-loop closure from capturing
+            # the per-chunk `npack`, which would force Julia to box it.
             ok = _solve_call(
                 Tv, cache.symbolic, cache.numeric, n, Int64(npack),
                 pointer(scratch), cache.common,
@@ -99,7 +99,7 @@ end
 function solve_sparse(cache::KLULinSolveCache{Tv},
     B::SparseMatrixCSC{<:Number, Int};
     block::Int = SPARSE_RHS_DEFAULT_BLOCK,
-) where {Tv}
+) where {Tv <: Union{Float64, ComplexF64}}
     return solve_sparse!(
         cache, B, Matrix{Tv}(undef, _dim(cache), size(B, 2));
         block = block,

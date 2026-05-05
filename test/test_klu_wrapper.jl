@@ -307,9 +307,6 @@ end
     A = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.0,
         1 => fill(0.1, n - 1), -1 => fill(0.1, n - 1))
     cache = PNM.klu_factorize(A)
-
-    @test cache.last_A === A
-
     x = randn(n)
     b = A * x
 
@@ -317,6 +314,11 @@ end
     PNM.solve!(cache, y_pre)
     @test isapprox(y_pre, x, atol = 1e-10)
 
+    # Recover once and confirm correctness; recover a second time to
+    # exercise the path that depends on the first recovery having
+    # re-stashed the factorization source.
+    PNM.KLUWrapper._recover_factorization!(cache)
+    @test PNM.is_factored(cache)
     PNM.KLUWrapper._recover_factorization!(cache)
     @test PNM.is_factored(cache)
 

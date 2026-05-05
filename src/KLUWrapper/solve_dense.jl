@@ -1,11 +1,12 @@
-# Wrap `_solve_call` (or `_tsolve_call`) with a single recovery attempt on
-# `KLU_INVALID`. Recovery: free the (possibly corrupted) numeric handle and
-# re-factor from `cache.last_A`, then retry the same solve. `KLU_SINGULAR` /
-# `KLU_OUT_OF_MEMORY` / other status codes are not recoverable and surface
-# immediately. Returns `true` on success, `false` if both attempts failed
-# (the caller surfaces the underlying KLU error). Exists primarily to keep
-# us alive in the face of the libklu MinGW transient-state bug observed on
-# Windows; on healthy platforms the second attempt is never reached.
+"""
+    _solve_with_retry(solve_fn, cache, op) -> Bool
+
+Run `solve_fn()` once; on `KLU_INVALID` return, free the numeric handle,
+re-factor via `_recover_factorization!`, and run `solve_fn()` again. Returns
+`true` on success, `false` if both attempts failed. Other failure statuses
+(`KLU_SINGULAR`, `KLU_OUT_OF_MEMORY`, etc.) are not recoverable and return
+`false` immediately so the caller surfaces them via `klu_throw`.
+"""
 @inline function _solve_with_retry(
     solve_fn::F,
     cache::KLULinSolveCache{Tv},
