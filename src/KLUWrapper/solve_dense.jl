@@ -1,3 +1,25 @@
+# Wrap `_solve_call` (or `_tsolve_call`) with a single recovery attempt on
+# `KLU_INVALID`. Recovery: free the (possibly corrupted) numeric handle and
+# re-factor from `cache.last_A`, then retry the same solve. `KLU_SINGULAR` /
+# `KLU_OUT_OF_MEMORY` / other status codes are not recoverable and surface
+# immediately. Returns `true` on success, `false` if both attempts failed
+# (the caller surfaces the underlying KLU error). Exists primarily to keep
+# us alive in the face of the libklu MinGW transient-state bug observed on
+# Windows; on healthy platforms the second attempt is never reached.
+@inline function _solve_with_retry(
+    solve_fn::F,
+    cache::KLULinSolveCache{Tv},
+    op::AbstractString,
+) where {F, Tv <: Union{Float64, ComplexF64}}
+    ok = solve_fn()
+    ok != 0 && return true
+    cache.common[].status == KLU_INVALID || return false
+    @warn "$op returned KLU_INVALID; freeing numeric handle and re-factoring" cache_id =
+        objectid(cache)
+    _recover_factorization!(cache)
+    return solve_fn() != 0
+end
+
 """
     solve!(cache, B) -> B
 
@@ -30,10 +52,12 @@ function solve!(cache::KLULinSolveCache{Tv},
         pre_symbolic = cache.symbolic
         pre_b_ptr = pointer(B)
     end
-    ok = _solve_call(
-        Tv, cache.symbolic, cache.numeric, n, nrhs, pointer(B), cache.common,
-    )
-    if ok == 0
+    success = _solve_with_retry(cache, "klu_solve") do
+        _solve_call(
+            Tv, cache.symbolic, cache.numeric, n, nrhs, pointer(B), cache.common,
+        )
+    end
+    if !success
         @static if KLU_POOL_DEBUG
             @error "KLU klu_solve precondition snapshot" tid =
                 Threads.threadid() cache_id = objectid(cache) common_addr =
@@ -70,11 +94,13 @@ function tsolve!(cache::KLULinSolveCache{Tv},
     ))
     nrhs = Int64(size(B, 2))
     nrhs == 0 && return B
-    ok = _tsolve_call(
-        Tv, cache.symbolic, cache.numeric, n, nrhs, pointer(B), cache.common;
-        conjugate = conjugate,
-    )
-    ok == 0 && klu_throw(cache.common[], "klu_tsolve")
+    success = _solve_with_retry(cache, "klu_tsolve") do
+        _tsolve_call(
+            Tv, cache.symbolic, cache.numeric, n, nrhs, pointer(B), cache.common;
+            conjugate = conjugate,
+        )
+    end
+    success || klu_throw(cache.common[], "klu_tsolve")
     return B
 end
 

@@ -26,6 +26,12 @@ mutable struct KLULinSolveCache{Tv <: Union{Float64, ComplexF64}}
     # `KLULinSolvePool` worker is thread-safe by construction.
     scratch::Matrix{Tv}
     col_map::Vector{Int64}
+    # Reference to the matrix from the last successful factorization. Held so
+    # `_recover_factorization!` can re-run `numeric_refactor!` without the
+    # caller re-supplying `A`. Initialized to a `0×0` sentinel so the field is
+    # concretely typed (avoids the ~48 B `Union{Nothing, ...}` write-barrier
+    # cost on every refactor; recovery checks `size(last_A, 1) > 0`).
+    last_A::SparseMatrixCSC{Tv, Int}
 end
 
 @inline _dim(cache::KLULinSolveCache) = Int64(length(cache.colptr) - 1)
@@ -120,6 +126,7 @@ function KLULinSolveCache(
         reuse_symbolic, check_pattern,
         Matrix{Tv}(undef, 0, 0),
         Int64[],
+        SparseArrays.spzeros(Tv, Int, 0, 0),
     )
     finalizer(_free_klu_handles!, cache)
     return cache
@@ -150,7 +157,9 @@ so the cache remains structurally valid and re-factorable. Idempotent: a
 second call hits the `C_NULL` guards. Used both by `symbolic_factor!`
 mid-life (drop old handles before re-analyzing) and by the GC finalizer.
 """
-function _free_klu_handles!(cache::KLULinSolveCache{Tv}) where {Tv}
+function _free_klu_handles!(
+    cache::KLULinSolveCache{Tv},
+) where {Tv <: Union{Float64, ComplexF64}}
     if cache.numeric != C_NULL
         num_ref = Ref(cache.numeric)
         _free_numeric!(Tv, num_ref, cache.common)
@@ -206,7 +215,7 @@ Free any cached symbolic/numeric factor, replace the structural arrays with
 `A`'s pattern, and run `klu_l_analyze`.
 """
 function symbolic_factor!(cache::KLULinSolveCache{Tv},
-    A::SparseMatrixCSC{Tv, Int}) where {Tv}
+    A::SparseMatrixCSC{Tv, Int}) where {Tv <: Union{Float64, ComplexF64}}
     n = _dim(cache)
     if size(A, 1) != n || size(A, 2) != n
         throw(DimensionMismatch(
@@ -239,7 +248,7 @@ If `cache.reuse_symbolic`, optionally verify the structure matches and reuse
 the existing analysis. Otherwise, rerun `symbolic_factor!`.
 """
 function symbolic_refactor!(cache::KLULinSolveCache{Tv},
-    A::SparseMatrixCSC{Tv, Int}) where {Tv}
+    A::SparseMatrixCSC{Tv, Int}) where {Tv <: Union{Float64, ComplexF64}}
     if !cache.reuse_symbolic
         return symbolic_factor!(cache, A)
     end
@@ -265,7 +274,7 @@ Compute (or refresh) the numeric factorization. The first call after
 `klu_*_refactor` and reuse the existing numeric struct.
 """
 function numeric_refactor!(cache::KLULinSolveCache{Tv},
-    A::SparseMatrixCSC{Tv, Int}) where {Tv}
+    A::SparseMatrixCSC{Tv, Int}) where {Tv <: Union{Float64, ComplexF64}}
     cache.symbolic == C_NULL && error(
         "KLULinSolveCache: call symbolic_factor! before numeric_refactor!.",
     )
@@ -284,6 +293,8 @@ function numeric_refactor!(cache::KLULinSolveCache{Tv},
         )
         ok != 1 && klu_throw(cache.common[], "klu_refactor")
     end
+    # Stash A so `_recover_factorization!` can re-factor without the caller.
+    cache.last_A = A
     return cache
 end
 
@@ -296,7 +307,7 @@ this on a freshly constructed cache, or after `_free_klu_handles!` has cleared
 the handles, to bring the cache to a factored state.
 """
 function full_factor!(cache::KLULinSolveCache{Tv},
-    A::SparseMatrixCSC{Tv, Int}) where {Tv}
+    A::SparseMatrixCSC{Tv, Int}) where {Tv <: Union{Float64, ComplexF64}}
     symbolic_factor!(cache, A)
     numeric_refactor!(cache, A)
     return cache
@@ -313,7 +324,7 @@ cache was built with `reuse_symbolic = false`, the symbolic analysis is rerun
 as well.
 """
 function full_refactor!(cache::KLULinSolveCache{Tv},
-    A::SparseMatrixCSC{Tv, Int}) where {Tv}
+    A::SparseMatrixCSC{Tv, Int}) where {Tv <: Union{Float64, ComplexF64}}
     symbolic_refactor!(cache, A)
     numeric_refactor!(cache, A)
     return cache
@@ -331,4 +342,23 @@ function klu_factorize(A::SparseMatrixCSC{Tv, Int};
     cache = KLULinSolveCache(A;
         reuse_symbolic = reuse_symbolic, check_pattern = check_pattern)
     return full_factor!(cache, A)
+end
+
+# Free the (possibly corrupted) numeric handle and re-factor from `cache.last_A`.
+# Used by `_solve_with_retry` to recover from a transient `KLU_INVALID` returned
+# by `klu_l_solve` (observed on Windows MinGW libklu builds). Freeing first
+# forces `numeric_refactor!` into the fresh-factor branch instead of feeding
+# the broken numeric handle back into `klu_l_refactor`.
+function _recover_factorization!(
+    cache::KLULinSolveCache{Tv},
+) where {Tv <: Union{Float64, ComplexF64}}
+    size(cache.last_A, 1) > 0 || error(
+        "KLULinSolveCache: cannot recover — no prior factorization to refactor from.",
+    )
+    if cache.numeric != C_NULL
+        num_ref = Ref(cache.numeric)
+        _free_numeric!(Tv, num_ref, cache.common)
+        cache.numeric = num_ref[]
+    end
+    return numeric_refactor!(cache, cache.last_A)
 end

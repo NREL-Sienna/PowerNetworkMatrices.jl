@@ -297,6 +297,35 @@ end
     @test alloc_warm < n * size(B, 2) * sizeof(Float64) ÷ 4
 end
 
+@testset "KLU wrapper: _recover_factorization! restores a usable cache" begin
+    # Tests the recovery path used by `_solve_with_retry` to survive a
+    # transient `KLU_INVALID` from libklu. We can't inject a real failure
+    # from Julia, so we drive `_recover_factorization!` directly and verify
+    # the cache solves correctly afterwards (and that `cache.last_A` was
+    # populated by the original factorization).
+    n = 30
+    A = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.0,
+        1 => fill(0.1, n - 1), -1 => fill(0.1, n - 1))
+    cache = PNM.klu_factorize(A)
+
+    @test cache.last_A === A
+
+    x = randn(n)
+    b = A * x
+
+    y_pre = copy(b)
+    PNM.solve!(cache, y_pre)
+    @test isapprox(y_pre, x, atol = 1e-10)
+
+    PNM.KLUWrapper._recover_factorization!(cache)
+    @test PNM.is_factored(cache)
+
+    y_post = copy(b)
+    PNM.solve!(cache, y_post)
+    @test isapprox(y_post, x, atol = 1e-10)
+    @test isapprox(y_pre, y_post, atol = 1e-12)
+end
+
 @testset "KLU wrapper: pool refactor round-trip preserves parallel correctness" begin
     n = 40
     A = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.0,

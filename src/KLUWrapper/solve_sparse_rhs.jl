@@ -67,10 +67,22 @@ function solve_sparse!(
         end
 
         if npack > 0
+            # Retry-on-KLU_INVALID inlined here (rather than via
+            # `_solve_with_retry`) so the inner-loop closure doesn't capture
+            # `npack`, which Julia would box and allocate per chunk.
             ok = _solve_call(
                 Tv, cache.symbolic, cache.numeric, n, Int64(npack),
                 pointer(scratch), cache.common,
             )
+            if ok == 0 && cache.common[].status == KLU_INVALID
+                @warn "klu_solve (sparse RHS) returned KLU_INVALID; freeing numeric handle and re-factoring" cache_id =
+                    objectid(cache)
+                _recover_factorization!(cache)
+                ok = _solve_call(
+                    Tv, cache.symbolic, cache.numeric, n, Int64(npack),
+                    pointer(scratch), cache.common,
+                )
+            end
             ok == 0 && klu_throw(cache.common[], "klu_solve (sparse RHS)")
 
             for k in 1:npack
