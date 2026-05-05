@@ -185,8 +185,18 @@ Shared cache-fast-path / compute / double-checked-insert pattern used by
 to test for a hit, runs `compute_row` outside the lock on a miss
 (KLU solves dominate the cost), then takes the lock again to insert. A
 concurrent producer that wins the insert race wins; the other side
-returns the winner's row. The signature places `compute_row` first so
-callers can use `do … end` block syntax.
+returns the winner's row.
+
+`compute_row` is the first positional argument so callers can pass the
+miss-path computation as a `do … end` block:
+
+```julia
+return cached_row_lookup(
+    vlodf.cache, vlodf.cache_lock, row, column, get_tol(vlodf),
+) do
+    _compute_lodf_row(vlodf, row)
+end
+```
 """
 function cached_row_lookup(
     compute_row,

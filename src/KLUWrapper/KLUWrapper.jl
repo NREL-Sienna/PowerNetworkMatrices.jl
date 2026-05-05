@@ -19,7 +19,7 @@ module KLUWrapper
 
 import LinearAlgebra
 import SparseArrays
-import SparseArrays: SparseMatrixCSC, getcolptr, rowvals, nonzeros
+import SparseArrays: SparseMatrixCSC, getcolptr, rowvals, nonzeros, nzrange
 
 """
     KLU_POOL_DEBUG :: Bool

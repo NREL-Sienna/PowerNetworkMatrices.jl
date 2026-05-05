@@ -100,9 +100,9 @@ get_ref_bus_position(M::VirtualLODF) =
 get_network_reduction_data(M::VirtualLODF) = M.network_reduction_data
 get_arc_lookup(M::VirtualLODF) = M.lookup[1]
 
-"""
-Number of pool workers (= max concurrent solves) backing `vlodf`.
-"""
+# Internal: number of pool workers backing `vlodf.K`. Not part of the public
+# API. Users should set pool size via the `nworkers` keyword argument on
+# the constructor.
 nworkers(vlodf::VirtualLODF) = nworkers(vlodf.K)
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
@@ -230,9 +230,10 @@ struct with an empty cache.
         Structure containing the details of the network reduction applied when computing the matrix
 - `nworkers::Int`:
         Number of parallel workers in the underlying KLU pool. Defaults to
-        `_default_pool_workers()` — `max(1, Threads.nthreads() - 1)` on
-        Mac/Linux and `1` on Windows (where the KLU pool path is serialized
-        through `solver_lock` to work around a libklu thread-safety issue).
+        `_default_pool_workers()`, which returns `max(1, Threads.nthreads() - 1)`
+        on every platform. On Windows the KLU pool path is serialized through
+        `solver_lock` regardless of `nworkers` (libklu thread-safety
+        workaround), so the *effective* worker count is 1 there.
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
@@ -291,7 +292,8 @@ function VirtualLODF(
             )
     end
 
-    n_scratch = nworkers
+    # Per-worker scratch (1 slot for non-pool solvers; see `_n_scratch`).
+    n_scratch = _n_scratch(K_pool)
     temp_data = [zeros(length(bus_ax)) for _ in 1:n_scratch]
     work_ba_col = [zeros(length(valid_ix)) for _ in 1:n_scratch]
 

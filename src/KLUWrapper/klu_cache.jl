@@ -164,10 +164,8 @@ function _free_klu_handles!(cache::KLULinSolveCache{Tv}) where {Tv}
     return nothing
 end
 
-# Public eager-release entry point. Overload of `Base.finalize` so callers can
-# trigger handle release without waiting for GC; delegates to the internal
-# helper to keep the GC-end-of-life semantics distinct from the in-method
-# "drop old handles before re-analyze" use inside `symbolic_factor!`.
+# Public eager-release alias for `_free_klu_handles!` (the internal helper
+# stays unexported per the KLUWrapper convention).
 Base.finalize(cache::KLULinSolveCache) = _free_klu_handles!(cache)
 
 @inline function _check_pattern_match(cache::KLULinSolveCache,
@@ -182,12 +180,17 @@ Base.finalize(cache::KLULinSolveCache) = _free_klu_handles!(cache)
             ),
         )
     end
-    # Increment-compare-decrement: avoids allocating a 1-indexed copy.
+    # Increment-compare-decrement: avoids allocating a 1-indexed copy. The
+    # `try/finally` restores `colptr`/`rowval` even on InterruptException so
+    # the cache is never left with off-by-one structural arrays.
     cache.colptr .+= 1
     cache.rowval .+= 1
-    bad = (cache.colptr != Acolptr) || (cache.rowval != Arowval)
-    cache.colptr .-= 1
-    cache.rowval .-= 1
+    bad = try
+        (cache.colptr != Acolptr) || (cache.rowval != Arowval)
+    finally
+        cache.colptr .-= 1
+        cache.rowval .-= 1
+    end
     if bad
         throw(ArgumentError(
             "Cannot $op: matrix has different sparsity structure.",

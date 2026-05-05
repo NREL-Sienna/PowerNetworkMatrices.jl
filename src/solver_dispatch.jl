@@ -51,7 +51,12 @@ Acquire exclusive access to a solver and a matched per-task scratch pair
   through `solver_lock` and uses scratch slot `1`.
 
 `work_ba_col` and `temp_data` are `Vector{Vector{Float64}}` whose length
-matches the pool's `nworkers` (or `1` for the lock-serialized paths).
+matches the pool's `nworkers` (or `1` for the lock-serialized paths). They
+stay as a vector-of-vectors rather than a `Matrix{Float64}` so that each
+slot is a concrete `Vector{Float64}` — `_solve_factorization` and the
+AppleAccelerate extension are typed on `Vector{Float64}`, and the two
+buffers have different lengths (`n_buses` vs. `n_buses - n_ref_buses`),
+so they could not share one matrix anyway.
 """
 function with_solver(
     f::F,

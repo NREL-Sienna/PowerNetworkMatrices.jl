@@ -12,6 +12,9 @@ function PNM._create_apple_accelerate_factorization(ABA)
     return K
 end
 
+# Lets `nworkers(vptdf)` resolve when `vptdf.K::AAFactorization`.
+PNM.nworkers(::AppleAccelerate.AAFactorization) = 1
+
 # Extend the solve function for AppleAccelerate factorizations
 function PNM._solve_factorization(
     K::AppleAccelerate.AAFactorization{Float64},

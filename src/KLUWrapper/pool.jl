@@ -254,10 +254,13 @@ function numeric_refactor!(pool::KLULinSolvePool{Tv},
         end
 
         # Degraded: minority failed. Keep survivors in rotation; held-out
-        # failed workers wait for `reset!` to recover.
+        # failed workers wait for `reset!` to recover. Empty `survivors`
+        # leaves the channel empty and every `pool.valid[i] == false`,
+        # so push sentinels to unblock any acquirer waiting on `take!`.
         survivors = filter(idx -> idx ∉ failed_idxs, drained)
         _set_validity!(pool, failed_idxs, false)
         _set_valid_and_return!(pool, survivors)
+        isempty(survivors) && _push_dead_sentinels!(pool)
         @warn "KLULinSolvePool degraded: $(n_failed)/$(n) workers failed " *
               "refactor; pool operating with $(n - n_failed) workers"
         throw(first_err[])
@@ -326,14 +329,10 @@ end
 
 # Drain every currently-valid worker from `available`, blocking on each
 # `take!` until the worker has been returned by its holder. Failed workers
-# (`pool.valid[i] == false`) are intentionally held out of the channel and
-# are already in the pool's exclusive ownership, so they are not part of
-# the drain count. Sentinels (`<= 0`) are not counted as valid; they live
-# in the channel only between a kill and the next `reset!`. The `pool.valid`
-# snapshot is taken under `state_lock` for consistency; the `take!` loop
-# blocks outside the lock so concurrent `release!` calls can land.
+# are held out of the channel and are not counted. Caller must hold
+# `pool.admin_lock`, which serializes against `pool.valid` mutations.
 function _drain_available!(pool::KLULinSolvePool)
-    n_to_drain = @lock pool.state_lock count(pool.valid)
+    n_to_drain = n_valid(pool)
     drained = Vector{Int}(undef, n_to_drain)
     for i in 1:n_to_drain
         drained[i] = take!(pool.available)
@@ -342,28 +341,29 @@ function _drain_available!(pool::KLULinSolvePool)
 end
 
 # Drain any leftover dead-pool sentinels from `pool.available`. Caller
-# must hold `pool.admin_lock` and have already drained valid workers, so
-# the channel contains only sentinels (admin_lock + drain-first guarantees
-# no valid index can land here).
+# must hold `pool.admin_lock` and have already drained valid workers; the
+# channel is exclusively ours under that contract.
 function _drain_sentinels!(pool::KLULinSolvePool)
-    @lock pool.state_lock begin
-        while isready(pool.available)
-            v = take!(pool.available)
-            v <= 0 || error(
-                "KLULinSolvePool internal invariant: positive worker index " *
-                "in channel during sentinel drain (got $(v)). admin_lock " *
-                "and prior _drain_available! should have made this impossible.",
-            )
-        end
+    while isready(pool.available)
+        v = take!(pool.available)
+        v <= 0 || error(
+            "KLULinSolvePool internal invariant: positive worker index " *
+            "in channel during sentinel drain (got $(v)). admin_lock " *
+            "and prior _drain_available! should have made this impossible.",
+        )
     end
     return nothing
 end
 
-# Push one sentinel per worker into `pool.available`. Channel capacity is
-# `nworkers`, and the channel is empty when this is called (the caller has
-# just drained it), so all puts succeed immediately.
+# Push one sentinel per worker into `pool.available`. Caller must have
+# drained the channel first; the invariant check guards against future
+# callers forgetting to (a stale element would block the put loop).
 function _push_dead_sentinels!(pool::KLULinSolvePool)
     @lock pool.state_lock begin
+        isempty(pool.available) || error(
+            "KLULinSolvePool internal invariant: _push_dead_sentinels! requires " *
+            "an empty `available` channel; caller must drain first.",
+        )
         for _ in 1:nworkers(pool)
             put!(pool.available, _POOL_DEAD_SENTINEL)
         end
@@ -453,7 +453,5 @@ function _free_klu_handles!(pool::KLULinSolvePool)
     return nothing
 end
 
-# Public eager-release entry point at the pool level. Delegates to the
-# internal helper for the same naming-vs-semantics reason as the cache
-# overload.
+# Public eager-release alias for `_free_klu_handles!` at the pool level.
 Base.finalize(pool::KLULinSolvePool) = _free_klu_handles!(pool)

@@ -130,9 +130,9 @@ _get_BA(m::VirtualMODF) = m.BA
 _get_arc_susceptances(m::VirtualMODF) = m.arc_susceptances
 _get_valid_ix(m::VirtualMODF) = m.valid_ix
 
-"""
-Return the number of pool workers (= max concurrent solves) for `vmodf`.
-"""
+# Internal: number of pool workers backing `vmodf.K`. Not part of the public
+# API. Users should set pool size via the `nworkers` keyword argument on
+# the constructor.
 nworkers(vmodf::VirtualMODF) = nworkers(vmodf.K)
 
 function _compute_woodbury_factors(
@@ -210,6 +210,12 @@ Outage supplemental attributes found in the system.
 - `tol::Float64`: Tolerance for row sparsification (default: eps())
 - `max_cache_size::Int`: Max cache size in MiB per contingency (default: MAX_CACHE_SIZE_MiB)
 - `network_reductions::Vector{NetworkReduction}`: Network reductions to apply
+- `nworkers::Int`:
+        Number of parallel workers in the underlying KLU pool. Defaults to
+        `_default_pool_workers()`, which returns `max(1, Threads.nthreads() - 1)`
+        on every platform. On Windows the KLU pool path is serialized through
+        `solver_lock` regardless of `nworkers` (libklu thread-safety
+        workaround), so the *effective* worker count is 1 there.
 """
 function VirtualMODF(
     sys::PSY.System;
@@ -252,8 +258,10 @@ function VirtualMODF(
     branch_susceptances_by_arc = _extract_branch_susceptances_by_arc(
         BA.data, arc_ax, Ymatrix.network_reduction_data)
 
-    temp_data = [zeros(length(bus_ax)) for _ in 1:nworkers]
-    work_ba_col = [zeros(length(valid_ix)) for _ in 1:nworkers]
+    # Per-worker scratch (1 slot for non-pool solvers; see `_n_scratch`).
+    n_scratch = _n_scratch(K_pool)
+    temp_data = [zeros(length(bus_ax)) for _ in 1:n_scratch]
+    work_ba_col = [zeros(length(valid_ix)) for _ in 1:n_scratch]
     max_cache_bytes = max_cache_size * MiB
 
     vmodf = VirtualMODF(
@@ -414,8 +422,9 @@ Gets or computes Woodbury factors, then applies the Woodbury correction.
 For N-1 contingencies, the result satisfies:
     post_ptdf[mon, :] = pre_ptdf[mon, :] + LODF[mon, e] * pre_ptdf[e, :]
 
-!!! warning
-    Not thread-safe. Mutates scratch vectors in `vmodf`.
+Thread-safe: `_get_woodbury_factors` is guarded by `woodbury_cache_lock`,
+and `_apply_woodbury_correction` acquires per-worker scratch via
+`with_solver` so concurrent callers do not collide.
 """
 function _compute_modf_entry(
     vmodf::VirtualMODF,
