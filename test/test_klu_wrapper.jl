@@ -32,6 +32,56 @@ import SparseArrays
     @test_throws ArgumentError PNM.numeric_refactor!(cache, A3)
 end
 
+@testset "KLU wrapper: tsolve! solves Aᵀ x = b" begin
+    n = 30
+    # Asymmetric matrix so transposing actually exercises the transpose path.
+    A = SparseArrays.spdiagm(
+        0 => collect(1.0:n) .+ 1.0,
+        1 => fill(0.5, n - 1),
+        -1 => fill(0.1, n - 1),
+    )
+    cache = PNM.klu_factorize(A)
+
+    # Single RHS.
+    x = randn(n)
+    b = transpose(A) * x
+    y = copy(b)
+    PNM.tsolve!(cache, y)
+    @test isapprox(y, x, atol = 1e-10)
+
+    # Multiple RHS, dense matrix path.
+    X = randn(n, 4)
+    B = transpose(A) * X
+    Y = copy(B)
+    PNM.tsolve!(cache, Y)
+    @test isapprox(Y, X, atol = 1e-10)
+end
+
+@testset "KLU wrapper: reuse_symbolic=false rebuilds analysis on refactor" begin
+    n = 25
+    A = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.0,
+        1 => fill(0.1, n - 1), -1 => fill(0.1, n - 1))
+    x = collect(1.0:n)
+    b = A * x
+
+    cache = PNM.klu_factorize(A; reuse_symbolic = false)
+    @test PNM.is_factored(cache)
+    y = copy(b)
+    PNM.solve!(cache, y)
+    @test isapprox(y, x, atol = 1e-10)
+
+    # A pattern change is allowed because each refactor reruns
+    # `symbolic_factor!` from scratch.
+    A2 = copy(A)
+    A2[1, n] = 0.25
+    x2 = randn(n)
+    b2 = A2 * x2
+    PNM.full_refactor!(cache, A2)
+    y2 = copy(b2)
+    PNM.solve!(cache, y2)
+    @test isapprox(y2, x2, atol = 1e-9)
+end
+
 @testset "KLU wrapper: solve_sparse matches dense path" begin
     n, m = 30, 40
     A = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.0,
@@ -181,7 +231,7 @@ end
     B = SparseArrays.sprand(n, nrhs, 0.2)
 
     full = zeros(n + 4, nrhs)
-    PNM.solve_sparse!(cache, B; out = view(full, 3:(n + 2), :))
+    PNM.solve_sparse!(cache, B, view(full, 3:(n + 2), :))
 
     Bdense = Matrix(B)
     PNM.solve!(cache, Bdense)
@@ -241,9 +291,9 @@ end
     B = SparseArrays.sprand(n, 100, 0.05)
     out = Matrix{Float64}(undef, n, 100)
 
-    PNM.solve_sparse!(cache, B; out = out, block = 32)
+    PNM.solve_sparse!(cache, B, out; block = 32)
     # Warm call must not scale with `n * nrhs`; bound is well below that.
-    alloc_warm = @allocated PNM.solve_sparse!(cache, B; out = out, block = 32)
+    alloc_warm = @allocated PNM.solve_sparse!(cache, B, out; block = 32)
     @test alloc_warm < n * size(B, 2) * sizeof(Float64) ÷ 4
 end
 
