@@ -45,7 +45,11 @@
 
     # method=:average, weighting=:admittance_weighted: susceptance-weighted average
     # (2/3)*100 + (1/3)*150 = 350/3 ≈ 116.667
-    @test PNM.get_equivalent_rating(bp; method = :average, weighting = :admittance_weighted) ≈
+    @test PNM.get_equivalent_rating(
+        bp;
+        method = :average,
+        weighting = :admittance_weighted,
+    ) ≈
           350.0 / 3.0 atol = 1e-6
 
     # method=:sum, weighting=:arithmetic: simple sum
