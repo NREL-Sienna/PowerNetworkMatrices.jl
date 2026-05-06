@@ -11,14 +11,14 @@ The VirtualLODF struct is indexed using branch names.
 
 # Thread-safety
 
-`VirtualLODF` is parallel-safe for concurrent `getindex`: the factorization
-is held in a `KLULinSolvePool`, scratch arrays are sized per-worker, and the
-row cache is guarded by a `ReentrantLock`. The same applies to
-`get_partial_lodf_row`.
+Concurrent `getindex` (and `get_partial_lodf_row`) is safe but serialized:
+every libklu solve runs under `_LIBKLU_LOCK` (process-wide) and the per-cache
+`solver_lock`, and the row cache is guarded by `cache_lock`. Multi-threaded
+callers can issue requests concurrently; the libklu work runs one at a time.
 
 # Arguments
-- `K::KLULinSolvePool{Float64}`:
-        Pool of independent ABA factorizations, one per worker.
+- `K::KLULinSolveCache{Float64}`:
+        ABA factorization (single cache; solves serialize via the locks above).
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix.
 - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
@@ -53,7 +53,8 @@ row cache is guarded by a `ReentrantLock`. The same applies to
         Vector containing the row/columns indices of matrices related the buses
         which are not slack ones.
 - `temp_data::Vector{Vector{Float64}}`:
-        Per-worker temporary vector for internal use (one per pool worker).
+        Single-element scratch vector kept as a `Vector{Vector{Float64}}` for
+        uniform `with_solver` callback signatures.
 - `cache::RowCache`:
         Cache where LODF rows are stored.
 - `cache_lock::ReentrantLock`:
@@ -65,7 +66,7 @@ row cache is guarded by a `ReentrantLock`. The same applies to
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 - `work_ba_col::Vector{Vector{Float64}}`:
-        Per-worker BA-column scratch buffer (one per pool worker).
+        Single-element BA-column scratch buffer.
 """
 struct VirtualLODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}, K} <:
        PowerNetworkMatrix{Float64}
@@ -87,8 +88,8 @@ struct VirtualLODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}, K} <:
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
     work_ba_col::Vector{Vector{Float64}}
-    # Used by `with_solver` for the AppleAccelerate / single-cache paths and
-    # for the Windows KLU-pool libklu workaround. See `solver_dispatch.jl`.
+    # Serializes solves on this cache. `with_solver` always acquires it,
+    # for both the KLU and AppleAccelerate backends.
     solver_lock::ReentrantLock
 end
 
@@ -99,11 +100,6 @@ get_ref_bus_position(M::VirtualLODF) =
     [get_bus_lookup(M)[x] for x in keys(M.subnetwork_axes)]
 get_network_reduction_data(M::VirtualLODF) = M.network_reduction_data
 get_arc_lookup(M::VirtualLODF) = M.lookup[1]
-
-# Internal: number of pool workers backing `vlodf.K`. Not part of the public
-# API. Users should set pool size via the `nworkers` keyword argument on
-# the constructor.
-nworkers(vlodf::VirtualLODF) = nworkers(vlodf.K)
 
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
     summary(io, array)
@@ -228,12 +224,6 @@ struct with an empty cache.
 # Keyword Arguments
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
-- `nworkers::Int`:
-        Number of parallel workers in the underlying KLU pool. Defaults to
-        `_default_pool_workers()`, which returns `max(1, Threads.nthreads() - 1)`
-        on every platform. On Windows the KLU pool path is serialized through
-        `solver_lock` regardless of `nworkers` (libklu thread-safety
-        workaround), so the *effective* worker count is 1 there.
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
@@ -244,7 +234,6 @@ function VirtualLODF(
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
-    nworkers::Int = _default_pool_workers(),
     kwargs...,
 )
     if length(dist_slack) != 0
@@ -264,15 +253,12 @@ function VirtualLODF(
     subnetwork_axes = make_arc_arc_subnetwork_axes(A)
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    K_pool = _create_klu_solver(ABA; nworkers = nworkers)
+    K = _create_klu_solver(ABA)
     bus_ax = get_bus_axis(A)
 
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
-    # PTDF diagonal precompute is single-threaded; route through one pool
-    # worker so the pool stays the only owner of the factorization.
-    PTDF_diag = with_worker(K_pool) do cache, _idx
-        _get_PTDF_A_diag(cache, BA.data, A.data, Set(ref_bus_positions))
-    end
+    # PTDF diagonal precompute runs serially on the dispatcher thread.
+    PTDF_diag = _get_PTDF_A_diag(K, BA.data, A.data, Set(ref_bus_positions))
     PTDF_A_diag_raw = copy(PTDF_diag)
     arc_susceptances = _extract_arc_susceptances(BA.data)
     branch_susceptances_by_arc = _extract_branch_susceptances_by_arc(
@@ -292,13 +278,12 @@ function VirtualLODF(
             )
     end
 
-    # Per-worker scratch (1 slot for non-pool solvers; see `_n_scratch`).
-    n_scratch = _n_scratch(K_pool)
-    temp_data = [zeros(length(bus_ax)) for _ in 1:n_scratch]
-    work_ba_col = [zeros(length(valid_ix)) for _ in 1:n_scratch]
+    # Single scratch slot — solves serialize via `solver_lock` + `_LIBKLU_LOCK`.
+    temp_data = [zeros(length(bus_ax))]
+    work_ba_col = [zeros(length(valid_ix))]
 
     return VirtualLODF(
-        K_pool,
+        K,
         BA.data,
         A.data,
         1.0 ./ (1.0 .- PTDF_diag),
@@ -448,8 +433,7 @@ end
 
 Compute the partial LODF column for a susceptance change `delta_b` on arc `arc_idx`.
 
-Parallel-safe: routes the solve through `with_worker(vlodf.K)` so each
-caller acquires exclusive per-worker scratch.
+Concurrent callers serialize on `vlodf.solver_lock` and `_LIBKLU_LOCK`.
 
 Uses the Sherman-Morrison (matrix inversion lemma) formula derived from DC power flow
 sensitivity analysis. For a change Δb in the susceptance of arc e, the change in flow

@@ -24,12 +24,11 @@ import SparseArrays: SparseMatrixCSC, getcolptr, rowvals, nonzeros, nzrange
 """
     KLU_POOL_DEBUG :: Bool
 
-Compile-time gate for the KLU wrapper's runtime diagnostics — the
-precondition snapshot in `solve!` and the per-worker collision detector
-in `with_worker`. When `false` (default), both are folded out by the
-compiler via `@static if` and contribute zero runtime cost. Flip to
-`true` when reproducing platform-specific failures (e.g. the Windows
-libklu KLU_INVALID + access violation thread).
+Compile-time gate for the KLU wrapper's runtime diagnostics — currently
+just the precondition snapshot in `solve!` that fires when `klu_l_solve`
+returns FALSE. When `false`, the snapshot is folded out by `@static if`
+and contributes zero runtime cost. Flip to `true` when reproducing the
+libklu cross-cache concurrency failure documented on `_LIBKLU_LOCK`.
 
 This is a `const` rather than a `Preferences.@load_preference` flag so
 that toggling it forces a precompile rebuild and the production binary
@@ -40,45 +39,34 @@ const KLU_POOL_DEBUG = true
 """
     _LIBKLU_LOCK :: ReentrantLock
 
-Process-wide lock that serializes every libklu ccall on Windows. The
-MinGW `libklu` shipped in `SuiteSparse_jll` corrupts internal state under
-parallel access even when the caller hands out distinct
-`Numeric`/`Symbolic`/`Common` triples per thread (e.g. one
-`KLULinSolveCache` per pool worker, or one per `Virtual{PTDF, MODF}` in
-the same process). The per-cache `solver_lock` only serializes calls
-*on a single cache*; this lock closes the cross-cache window where two
-pool workers (or two different virtual matrices) call into libklu
-concurrently and clobber its internals.
+Process-wide lock that serializes every libklu ccall. `libklu` corrupts
+internal state under concurrent access even when the caller hands out
+distinct `Numeric`/`Symbolic`/`Common` triples per thread (i.e. the
+access pattern KLU's user guide implies is supported). The corruption
+manifests two ways: an intermittent `KLU_INVALID` return with all input
+pointers still valid both pre- and post-call, and a `SIGSEGV` inside
+`klu_l_solve` (`klu_solve.c:118` in v7.8.3, the row-permutation read in
+the `nrhs == 1` chunk). The pre-call snapshot dump in `solve!` made
+both modes reproducible on macOS and confirmed the deterministic
+Windows-MinGW failure was the same bug.
 
-`KLU_POOL_DEBUG = true` reproduced the same failure mode as a
-low-frequency flake on macOS, so the underlying race likely exists on
-every platform; for now the gate stays Windows-only because that is where
-the failure is deterministic and where CI needs to validate the fix
-without sacrificing the pool's parallel-solve speedup elsewhere. Once
-Windows CI confirms scenario A, consider widening the gate.
-
-Used via `@klu_lock`, which folds out at parse time on every non-Windows
-platform — zero runtime cost there.
+This lock is the only mechanism we have evidence for that prevents
+both modes; the `_solve_with_retry` recovery wrapper we briefly
+maintained handles only the graceful-return mode, not the SEGV.
 """
 const _LIBKLU_LOCK = ReentrantLock()
 
 """
     @klu_lock expr
 
-Run `expr` under `_LIBKLU_LOCK` on Windows; expand to `expr` unchanged on
-every other platform. The platform check happens once at macro-expansion
-time, so non-Windows builds carry no lock-acquisition code at all.
+Evaluate `expr` while holding `_LIBKLU_LOCK`. Wrap every libklu ccall
+so that no two libklu entries can run concurrently in the process.
 """
 macro klu_lock(expr)
-    if Sys.iswindows()
-        return :(@lock _LIBKLU_LOCK $(esc(expr)))
-    else
-        return esc(expr)
-    end
+    return :(@lock _LIBKLU_LOCK $(esc(expr)))
 end
 
 export KLULinSolveCache,
-    KLULinSolvePool,
     klu_factorize,
     symbolic_factor!,
     symbolic_refactor!,
@@ -89,18 +77,12 @@ export KLULinSolveCache,
     tsolve!,
     solve_sparse!,
     solve_sparse,
-    with_worker,
-    acquire!,
-    release!,
-    nworkers,
     n_valid,
-    reset!,
     is_factored
 
 include("klu_jll_bindings.jl")
 include("klu_cache.jl")
 include("solve_dense.jl")
 include("solve_sparse_rhs.jl")
-include("pool.jl")
 
 end # module

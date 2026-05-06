@@ -394,17 +394,18 @@ end
     # Mirrors the access pattern PowerSimulations uses in
     # `add_post_contingency_flow_expressions!`: many concurrent tasks query
     # `vmodf[arc, contingency_spec]` across DIFFERENT contingencies, so each
-    # task's first query for its ctg races on `woodbury_inflight`. nworkers=4
-    # forces the per-worker scratch path even when CI happens to run on fewer
-    # OS threads. Skipped under JULIA_NUM_THREADS=1 because @threads :dynamic
-    # degenerates to serial there and the test reduces to a tautology.
+    # task's first query for its ctg races on `woodbury_inflight`. With the
+    # single-cache solver + `_LIBKLU_LOCK`, all libklu work serializes; this
+    # test confirms the result is still correct under that serialization.
+    # Skipped under JULIA_NUM_THREADS=1 because @threads :dynamic degenerates
+    # to serial there and the test reduces to a tautology.
     if Threads.nthreads() < 2
         @info "Skipping: requires Threads.nthreads() ≥ 2 to exercise concurrent getindex."
         return
     end
 
     sys, _ = _build_c_sys14_with_outages()
-    vmodf = PowerNetworkMatrices.VirtualMODF(sys; nworkers = 4)
+    vmodf = PowerNetworkMatrices.VirtualMODF(sys)
     registered = PowerNetworkMatrices.get_registered_contingencies(vmodf)
     @test !isempty(registered)
     ctgs = collect(values(registered))
@@ -449,7 +450,7 @@ end
     end
 
     sys, _ = _build_c_sys14_with_outages()
-    vmodf = PowerNetworkMatrices.VirtualMODF(sys; nworkers = 4)
+    vmodf = PowerNetworkMatrices.VirtualMODF(sys)
     registered = PowerNetworkMatrices.get_registered_contingencies(vmodf)
     arc_axis = PowerNetworkMatrices.get_arc_axis(vmodf)
     arc = first(arc_axis)
@@ -471,31 +472,3 @@ end
     end
 end
 
-@testset "VirtualMODF concurrent getindex with nworkers=1 is consistent" begin
-    # Boundary case: with a single pool worker, all parallel tasks serialize
-    # through one KLULinSolveCache. Verifies the channel-based mutex behaves
-    # correctly under contention even when the test is run on >1 OS thread,
-    # and that the test setup itself does not assume nworkers > 1.
-    if Threads.nthreads() < 2
-        @info "Skipping: requires Threads.nthreads() ≥ 2 to exercise concurrent getindex."
-        return
-    end
-
-    sys, _ = _build_c_sys14_with_outages()
-    vmodf = PowerNetworkMatrices.VirtualMODF(sys; nworkers = 1)
-    registered = PowerNetworkMatrices.get_registered_contingencies(vmodf)
-    ctgs = collect(values(registered))
-    arc_axis = PowerNetworkMatrices.get_arc_axis(vmodf)
-    work = [(arc, ctg) for arc in arc_axis[1:min(end, 10)] for ctg in ctgs]
-
-    serial = [copy(vmodf[a, c]) for (a, c) in work]
-    PowerNetworkMatrices.clear_caches!(vmodf)
-    parallel = Vector{Vector{Float64}}(undef, length(work))
-    Threads.@threads :dynamic for i in eachindex(work)
-        a, c = work[i]
-        parallel[i] = copy(vmodf[a, c])
-    end
-    for i in eachindex(work)
-        @test parallel[i] ≈ serial[i]
-    end
-end

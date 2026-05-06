@@ -12,9 +12,9 @@ arcs, making this the recommended path for optimization loops where
 factors are computed once per modification and many rows are queried.
 
 !!! note
-    Parallel-safe on the KLU backend: scratch is per-worker and the solve
-    is routed through `KLULinSolvePool`. The AppleAccelerate backend
-    serializes through an internal lock — safe but not parallel.
+    Concurrent callers serialize on the per-cache `solver_lock` and
+    `_LIBKLU_LOCK` (KLU backend) or just the per-cache `solver_lock`
+    (AppleAccelerate backend).
 
 $(TYPEDSIGNATURES)
 """
@@ -33,9 +33,9 @@ precomputed Woodbury factors. Accepts either an integer arc index
 or a `Tuple{Int, Int}` bus pair.
 
 !!! note
-    Parallel-safe on the KLU backend: scratch is per-worker and the solve
-    is routed through `KLULinSolvePool`. The AppleAccelerate backend
-    serializes through an internal lock — safe but not parallel.
+    Concurrent callers serialize on the per-cache `solver_lock` and
+    `_LIBKLU_LOCK` (KLU backend) or just the per-cache `solver_lock`
+    (AppleAccelerate backend).
 
 $(TYPEDSIGNATURES)
 """

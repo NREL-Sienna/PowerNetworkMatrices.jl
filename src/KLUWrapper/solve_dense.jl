@@ -1,27 +1,4 @@
 """
-    _solve_with_retry(solve_fn, cache, op) -> Bool
-
-Run `solve_fn()` once; on `KLU_INVALID` return, free the numeric handle,
-re-factor via `_recover_factorization!`, and run `solve_fn()` again. Returns
-`true` on success, `false` if both attempts failed. Other failure statuses
-(`KLU_SINGULAR`, `KLU_OUT_OF_MEMORY`, etc.) are not recoverable and return
-`false` immediately so the caller surfaces them via `klu_throw`.
-"""
-@inline function _solve_with_retry(
-    solve_fn::F,
-    cache::KLULinSolveCache{Tv},
-    op::AbstractString,
-) where {F, Tv <: Union{Float64, ComplexF64}}
-    ok = solve_fn()
-    ok != 0 && return true
-    cache.common[].status == KLU_INVALID || return false
-    @warn "$op returned KLU_INVALID; freeing numeric handle and re-factoring" cache_id =
-        objectid(cache)
-    _recover_factorization!(cache)
-    return solve_fn() != 0
-end
-
-"""
     solve!(cache, B) -> B
 
 Solve `A · X = B` in place. `B::StridedVecOrMat{Tv}` must have first-dimension
@@ -53,12 +30,10 @@ function solve!(cache::KLULinSolveCache{Tv},
         pre_symbolic = cache.symbolic
         pre_b_ptr = pointer(B)
     end
-    success = _solve_with_retry(cache, "klu_solve") do
-        _solve_call(
-            Tv, cache.symbolic, cache.numeric, n, nrhs, pointer(B), cache.common,
-        )
-    end
-    if !success
+    ok = _solve_call(
+        Tv, cache.symbolic, cache.numeric, n, nrhs, pointer(B), cache.common,
+    )
+    if ok == 0
         @static if KLU_POOL_DEBUG
             @error "KLU klu_solve precondition snapshot" tid =
                 Threads.threadid() cache_id = objectid(cache) common_addr =
@@ -95,13 +70,11 @@ function tsolve!(cache::KLULinSolveCache{Tv},
     ))
     nrhs = Int64(size(B, 2))
     nrhs == 0 && return B
-    success = _solve_with_retry(cache, "klu_tsolve") do
-        _tsolve_call(
-            Tv, cache.symbolic, cache.numeric, n, nrhs, pointer(B), cache.common;
-            conjugate = conjugate,
-        )
-    end
-    success || klu_throw(cache.common[], "klu_tsolve")
+    ok = _tsolve_call(
+        Tv, cache.symbolic, cache.numeric, n, nrhs, pointer(B), cache.common;
+        conjugate = conjugate,
+    )
+    ok == 0 && klu_throw(cache.common[], "klu_tsolve")
     return B
 end
 

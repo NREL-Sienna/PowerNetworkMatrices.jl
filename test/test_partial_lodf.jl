@@ -107,12 +107,12 @@ end
     # Extract the BA column for arc e at non-reference bus indices.
     ba_col_e = [vlodf.BA[vlodf.valid_ix[i], e] for i in 1:n_valid]
 
-    # Solve ABA x = ba_col_e using one of the pool's factorizations
-    # (fresh copy to avoid aliasing).
-    lin_solve = PNM.with_worker(vlodf.K) do cache, _idx
+    # Solve ABA x = ba_col_e using the cache's factorization (fresh copy
+    # to avoid aliasing).
+    lin_solve = let
         b = copy(ba_col_e)
-        PNM.solve!(cache, b)
-        return b
+        PNM.solve!(vlodf.K, b)
+        b
     end
 
     # Map the solution back to full bus space.

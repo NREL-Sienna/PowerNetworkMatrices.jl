@@ -41,13 +41,12 @@ const SymbolicPtr = Ptr{KluLSymbolic}
 const NumericPtr = Ptr{KluLNumeric}
 
 # Each ccall is wrapped in `@klu_lock` so that all libklu activity in the
-# process serializes through `_LIBKLU_LOCK` on Windows. On every other
-# platform the macro folds out at parse time and the bare ccall remains.
-# This includes finalizer paths (`klu_l_free_*`, `klu_zl_free_*`), which
-# can fire on any thread at any safepoint and would otherwise race against
-# in-flight `solve!` calls on a different cache. See `_LIBKLU_LOCK` in
-# `KLUWrapper.jl` for the rationale and the open question on widening the
-# gate.
+# process serializes through `_LIBKLU_LOCK`. This includes finalizer paths
+# (`klu_l_free_*`, `klu_zl_free_*`), which can fire on any thread at any
+# safepoint and would otherwise race against in-flight `solve!` calls on a
+# different cache. See `_LIBKLU_LOCK` in `KLUWrapper.jl` for the
+# empirical evidence (intermittent `KLU_INVALID` return; SEGV at
+# `klu_solve.c:118`).
 
 klu_l_defaults!(common::Ref{KluLCommon}) =
     @klu_lock ccall((:klu_l_defaults, libklu), Cint, (Ptr{KluLCommon},), common)

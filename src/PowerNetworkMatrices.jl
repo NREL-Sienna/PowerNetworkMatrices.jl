@@ -73,7 +73,6 @@ import Preferences
 include("KLUWrapper/KLUWrapper.jl")
 import .KLUWrapper:
     KLULinSolveCache,
-    KLULinSolvePool,
     klu_factorize,
     symbolic_factor!,
     symbolic_refactor!,
@@ -84,12 +83,7 @@ import .KLUWrapper:
     tsolve!,
     solve_sparse!,
     solve_sparse,
-    with_worker,
-    acquire!,
-    release!,
-    nworkers,
     n_valid,
-    reset!,
     is_factored
 
 include("linalg_settings.jl")

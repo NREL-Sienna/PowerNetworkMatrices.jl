@@ -73,8 +73,8 @@ _get_valid_ix(m::VirtualPTDF) = m.valid_ix
 
 Pure-data Woodbury factor computation. Mutates `work_ba_col` and
 `temp_data`. The caller is responsible for exclusive access to those
-buffers (single-threaded callers can pass shared scratch; parallel
-callers acquire per-worker scratch from a `KLULinSolvePool`).
+buffers; in `Virtual{PTDF, MODF}` this is provided by holding
+`solver_lock` via `with_solver` for the duration of the call.
 """
 function _compute_woodbury_factors_impl(
     K,

@@ -12,19 +12,17 @@ matrix.
 
 # Thread-safety
 
-The KLU-backed `VirtualPTDF` is parallel-safe for concurrent `getindex`: the
-factorization is held in a `KLULinSolvePool`, scratch arrays are sized
-per-worker, and the row cache is guarded by a `ReentrantLock`. The
-AppleAccelerate-backed path serializes solves through a single lock and is
-therefore safe for concurrent calls but with no parallel speedup; for parallel
-workloads on Apple silicon prefer the KLU backend.
+Concurrent `getindex` is safe but serialized: every libklu solve is wrapped
+by `_LIBKLU_LOCK` (process-wide) and the per-cache `solver_lock` here, and
+the row cache is guarded by `cache_lock`. Multiple threads can call
+`getindex` simultaneously; their libklu work runs one at a time, while the
+JuMP-side work (in callers) parallelizes freely.
 
 # Arguments
 - `K`:
-        LU factorization of the ABA matrix. A `KLULinSolvePool{Float64}` for the
-        default KLU solver (one factorization per worker), or an
-        `AppleAccelerate.AAFactorization{Float64}` when the AppleAccelerate
-        extension is loaded (single shared factorization).
+        LU factorization of the ABA matrix. A `KLULinSolveCache{Float64}` for
+        the default KLU solver, or an `AppleAccelerate.AAFactorization{Float64}`
+        when the AppleAccelerate extension is loaded.
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix
 - `ref_bus_positions::Set{Int}`:
@@ -44,8 +42,9 @@ workloads on Apple silicon prefer the KLU backend.
         the key of the cache dictionary. The bus indexes refer to the position
         of the elements in the PTDF row stored.
 - `temp_data::Vector{Vector{Float64}}`:
-        Per-worker temporary vector for internal use. Size matches the number
-        of pool workers (KLU) or 1 (AppleAccelerate).
+        Single-element vector holding a temporary buffer for internal use.
+        Kept as `Vector{Vector{Float64}}` so the dispatch on
+        `_solve_factorization` stays uniform across backends.
 - `valid_ix::Vector{Int}`:
         Vector containing the row/columns indices of matrices related the buses
         which are not slack ones.
@@ -60,10 +59,10 @@ workloads on Apple silicon prefer the KLU backend.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 - `work_ba_col::Vector{Vector{Float64}}`:
-        Per-worker BA-column scratch buffer (one per pool worker; length 1 for AA).
+        Single-element BA-column scratch buffer.
 - `solver_lock::ReentrantLock`:
-        Serializes solves for the AppleAccelerate path. Unused on the KLU path
-        (the pool already ensures one solve per worker at a time).
+        Serializes solves on this cache. Combined with `_LIBKLU_LOCK` at the
+        libklu boundary, ensures one solve at a time per cache.
 - `system_uuid::Union{Base.UUID, Nothing}`:
         UUID of the system used to construct the matrix, used to validate that
         modification operations are applied to the correct system. `nothing` when
@@ -101,12 +100,6 @@ get_bus_lookup(M::VirtualPTDF) = M.lookup[2]
 get_arc_lookup(M::VirtualPTDF) = M.lookup[1]
 get_system_uuid(M::VirtualPTDF) = M.system_uuid
 
-# Internal: number of pool workers backing `vptdf.K`. Used by tests and the
-# Virtual{LODF,MODF} parallel-construction logic; not part of the public
-# API. Users should set pool size via the `nworkers` keyword argument on
-# the constructor, not by inspecting the result of this call.
-nworkers(vptdf::VirtualPTDF) = nworkers(vptdf.K)
-
 function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualPTDF)
     summary(io, array)
     isempty(array) && return
@@ -137,13 +130,6 @@ struct with an empty cache.
         arcs to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of tuples).
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
-- `nworkers::Int`:
-        Number of parallel workers in the underlying KLU pool (KLU backend
-        only). Defaults to `_default_pool_workers()`, which returns
-        `max(1, Threads.nthreads() - 1)` on every platform. On Windows the
-        KLU pool path is serialized through `solver_lock` regardless of
-        `nworkers` (libklu thread-safety workaround), so the *effective*
-        worker count is 1 there. Ignored for the AppleAccelerate backend.
 - `kwargs...`:
         other keyword arguments used by VirtualPTDF
 """
@@ -155,7 +141,6 @@ function VirtualPTDF(
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
-    nworkers::Int = _default_pool_workers(),
     kwargs...,
 )
     resolve_linear_solver(linear_solver)
@@ -171,7 +156,6 @@ function VirtualPTDF(
         tol = tol,
         max_cache_size = max_cache_size,
         persistent_arcs = persistent_arcs,
-        nworkers = nworkers,
         system_uuid = IS.get_uuid(sys),
     )
 end
@@ -179,16 +163,14 @@ end
 # Factorization dispatch methods for VirtualPTDF solver selection.
 function _create_factorization(
     ::KLUSolver,
-    ABA::SparseArrays.SparseMatrixCSC{Float64, Int};
-    nworkers::Int,
+    ABA::SparseArrays.SparseMatrixCSC{Float64, Int},
 )
-    return _create_klu_solver(ABA; nworkers = nworkers)
+    return _create_klu_solver(ABA)
 end
 
 function _create_factorization(
     ::AppleAccelerateSolver,
-    ABA::SparseArrays.SparseMatrixCSC{Float64, Int};
-    nworkers::Int,
+    ABA::SparseArrays.SparseMatrixCSC{Float64, Int},
 )
     _has_apple_accelerate_ext() || error(_apple_accelerate_install_error())
     return _create_apple_accelerate_factorization(ABA)
@@ -196,8 +178,7 @@ end
 
 function _create_factorization(
     ::LinearSolverType,
-    ::SparseArrays.SparseMatrixCSC{Float64, Int};
-    nworkers::Int,
+    ::SparseArrays.SparseMatrixCSC{Float64, Int},
 )
     return error(
         "Only KLU and AppleAccelerate solvers are supported for VirtualPTDF factorization.",
@@ -224,13 +205,6 @@ The return is a VirtualPTDF struct with an empty cache.
         max cache size in MiB (initialized as MAX_CACHE_SIZE_MiB).
 - `persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}()`:
         arcs to be evaluated as soon as the VirtualPTDF is created (initialized as empty vector of tuples).
-- `nworkers::Int`:
-        Number of parallel workers in the underlying KLU pool (KLU backend
-        only). Defaults to `_default_pool_workers()`, which returns
-        `max(1, Threads.nthreads() - 1)` on every platform. On Windows the
-        KLU pool path is serialized through `solver_lock` regardless of
-        `nworkers` (libklu thread-safety workaround), so the *effective*
-        worker count is 1 there. Ignored for the AppleAccelerate backend.
 """
 function VirtualPTDF(
     ybus::Ybus;
@@ -239,7 +213,6 @@ function VirtualPTDF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
-    nworkers::Int = _default_pool_workers(),
     system_uuid::Union{Base.UUID, Nothing} = nothing,
 )
     solver = resolve_linear_solver(linear_solver)
@@ -274,7 +247,7 @@ function VirtualPTDF(
     end
 
     # Create factorization based on solver type dispatch.
-    K = _create_factorization(solver, ABA; nworkers = nworkers)
+    K = _create_factorization(solver, ABA)
 
     # Pre-compute normalized distributed slack for efficiency
     if !isempty(dist_slack_vector)
@@ -283,11 +256,13 @@ function VirtualPTDF(
         dist_slack_normalized = Float64[]
     end
 
-    # Per-worker scratch (1 slot for non-pool solvers; see `_n_scratch`).
+    # Single scratch slot — solves serialize through `solver_lock` +
+    # `_LIBKLU_LOCK`, so per-worker scratch is unnecessary. Kept as a
+    # `Vector{Vector{Float64}}` so `with_solver`'s callback signature
+    # stays uniform across solver backends.
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
-    n_scratch = _n_scratch(K)
-    temp_data = [zeros(length(bus_ax)) for _ in 1:n_scratch]
-    work_ba_col = [zeros(length(valid_ix)) for _ in 1:n_scratch]
+    temp_data = [zeros(length(bus_ax))]
+    work_ba_col = [zeros(length(valid_ix))]
 
     arc_susceptances = _extract_arc_susceptances(BA.data)
 

@@ -16,8 +16,8 @@ The `block` chunk size bounds the working set so that processing an
 `nrhs`. The cache reuses its packing buffer across calls; warm calls
 allocate nothing in the solver.
 
-Not thread-safe (mutates per-cache scratch). For parallel queries use
-`KLULinSolvePool`, where each worker owns an independent cache.
+Not thread-safe (mutates per-cache scratch). Callers should serialize
+access through a per-cache lock if invoked from multiple threads.
 """
 function solve_sparse!(
     cache::KLULinSolveCache{Tv},

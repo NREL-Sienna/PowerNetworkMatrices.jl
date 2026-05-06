@@ -22,14 +22,9 @@ mutable struct KLULinSolveCache{Tv <: Union{Float64, ComplexF64}}
     check_pattern::Bool
     # Bounded reusable scratch for `solve_sparse!`. Lazy-grown on first call so
     # the wrapper's working set stays O(n*block) instead of O(n*nrhs); see
-    # `solve_sparse_rhs.jl`. Each cache owns its own buffer, so a
-    # `KLULinSolvePool` worker is thread-safe by construction.
+    # `solve_sparse_rhs.jl`.
     scratch::Matrix{Tv}
     col_map::Vector{Int64}
-    # Matrix from the last successful factorization, used by
-    # `_recover_factorization!` to refactor without the caller re-supplying `A`.
-    # Empty `0×0` sentinel before the first factor; recovery checks `size > 0`.
-    last_A::SparseMatrixCSC{Tv, Int}
 end
 
 @inline _dim(cache::KLULinSolveCache) = Int64(length(cache.colptr) - 1)
@@ -50,12 +45,8 @@ finalized.
 is_factored(cache::KLULinSolveCache) =
     cache.symbolic != C_NULL && cache.numeric != C_NULL
 
-# A single-cache adapter is the lock-serialized degenerate of `KLULinSolvePool`
-# (see `_create_klu_solver` in src/solver_dispatch.jl). Mirroring the pool's
-# `nworkers` / `n_valid` API on the cache lets `Virtual{PTDF, LODF, MODF}`
-# accessors and their tests treat both solver shapes uniformly: a cache is
-# always 1 worker, with 1 valid factorization iff `is_factored`.
-nworkers(::KLULinSolveCache) = 1
+# A cache holds at most one valid factorization; `is_factored` is the
+# truthy form. Kept around for tests that want a uniform numeric reading.
 n_valid(cache::KLULinSolveCache) = is_factored(cache) ? 1 : 0
 
 @inline _factor_call(::Type{Float64}, ap, ai, ax, sym, common) =
@@ -124,7 +115,6 @@ function KLULinSolveCache(
         reuse_symbolic, check_pattern,
         Matrix{Tv}(undef, 0, 0),
         Int64[],
-        SparseArrays.spzeros(Tv, Int, 0, 0),
     )
     finalizer(_free_klu_handles!, cache)
     return cache
@@ -294,8 +284,6 @@ function numeric_refactor!(cache::KLULinSolveCache{Tv},
         )
         ok != 1 && klu_throw(cache.common[], "klu_refactor")
     end
-    # Stash A so `_recover_factorization!` can re-factor without the caller.
-    cache.last_A = A
     return cache
 end
 
@@ -345,23 +333,3 @@ function klu_factorize(A::SparseMatrixCSC{Tv, Int};
     return full_factor!(cache, A)
 end
 
-"""
-    _recover_factorization!(cache) -> cache
-
-Free the (possibly corrupted) numeric handle and re-run `numeric_refactor!`
-against `cache.last_A`. Free-first forces the fresh-factor branch instead
-of feeding a broken numeric handle back into `klu_l_refactor`.
-"""
-function _recover_factorization!(
-    cache::KLULinSolveCache{Tv},
-) where {Tv <: Union{Float64, ComplexF64}}
-    size(cache.last_A, 1) > 0 || error(
-        "KLULinSolveCache: cannot recover: no prior factorization to refactor from.",
-    )
-    if cache.numeric != C_NULL
-        num_ref = Ref(cache.numeric)
-        _free_numeric!(Tv, num_ref, cache.common)
-        cache.numeric = num_ref[]
-    end
-    return numeric_refactor!(cache, cache.last_A)
-end

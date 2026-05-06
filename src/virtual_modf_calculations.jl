@@ -23,9 +23,9 @@ Caching is two-tiered:
   one RowCache per contingency
 
 # Arguments
-- `K::KLULinSolvePool{Float64}`:
-        Pool of independent ABA factorizations sized to `nworkers`. With
-        `nworkers > 1`, multiple threads may call `getindex` concurrently.
+- `K::KLULinSolveCache{Float64}`:
+        ABA factorization (single cache; concurrent `getindex` callers
+        serialize through `solver_lock` and `_LIBKLU_LOCK`).
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix.
 - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
@@ -71,9 +71,9 @@ Caching is two-tiered:
 - `network_reduction_data::NetworkReductionData`:
         Network reduction mappings for branch resolution.
 - `temp_data::Vector{Vector{Float64}}`:
-        Per-worker scratch vector of size n_buses (one per pool worker).
+        Single-element scratch vector of size n_buses.
 - `work_ba_col::Vector{Vector{Float64}}`:
-        Per-worker work array for BA column extraction (one per pool worker).
+        Single-element work array for BA column extraction.
 - `system_uuid::Union{Base.UUID, Nothing}`:
         UUID of the system used to construct the matrix, used to validate that
         modification operations are applied to the correct system.
@@ -105,8 +105,8 @@ struct VirtualMODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}, K} <:
     network_reduction_data::NetworkReductionData
     temp_data::Vector{Vector{Float64}}
     work_ba_col::Vector{Vector{Float64}}
-    # Used by `with_solver` for the AppleAccelerate / single-cache paths and
-    # for the Windows KLU-pool libklu workaround. See `solver_dispatch.jl`.
+    # Serializes solves on this cache; combined with `_LIBKLU_LOCK` at the
+    # libklu boundary ensures one libklu call at a time per cache.
     solver_lock::ReentrantLock
     system_uuid::Union{Base.UUID, Nothing}
 end
@@ -124,16 +124,11 @@ get_bus_axis(mat::VirtualMODF) = mat.axes[2]
 get_tol(mat::VirtualMODF) = mat.tol[]
 get_system_uuid(M::VirtualMODF) = M.system_uuid
 
-# Woodbury kernel accessors. VirtualMODF holds per-worker scratch and a pool;
-# use with_worker(K) and the matching scratch index for thread safety.
+# Woodbury kernel accessors. The Woodbury kernel always goes through
+# `with_solver` so it picks up the `solver_lock` + `_LIBKLU_LOCK` chain.
 _get_BA(m::VirtualMODF) = m.BA
 _get_arc_susceptances(m::VirtualMODF) = m.arc_susceptances
 _get_valid_ix(m::VirtualMODF) = m.valid_ix
-
-# Internal: number of pool workers backing `vmodf.K`. Not part of the public
-# API. Users should set pool size via the `nworkers` keyword argument on
-# the constructor.
-nworkers(vmodf::VirtualMODF) = nworkers(vmodf.K)
 
 function _compute_woodbury_factors(
     mat::VirtualMODF,
@@ -210,12 +205,6 @@ Outage supplemental attributes found in the system.
 - `tol::Float64`: Tolerance for row sparsification (default: eps())
 - `max_cache_size::Int`: Max cache size in MiB per contingency (default: MAX_CACHE_SIZE_MiB)
 - `network_reductions::Vector{NetworkReduction}`: Network reductions to apply
-- `nworkers::Int`:
-        Number of parallel workers in the underlying KLU pool. Defaults to
-        `_default_pool_workers()`, which returns `max(1, Threads.nthreads() - 1)`
-        on every platform. On Windows the KLU pool path is serialized through
-        `solver_lock` regardless of `nworkers` (libklu thread-safety
-        workaround), so the *effective* worker count is 1 there.
 """
 function VirtualMODF(
     sys::PSY.System;
@@ -223,7 +212,6 @@ function VirtualMODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
-    nworkers::Int = _default_pool_workers(),
     kwargs...,
 )
     if length(dist_slack) != 0
@@ -245,27 +233,23 @@ function VirtualMODF(
 
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    K_pool = _create_klu_solver(ABA; nworkers = nworkers)
+    K = _create_klu_solver(ABA)
 
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
 
-    # Use one worker for the diagonal precomputation; the pool is sized to
-    # `nworkers` solves, so a serial precompute is fine.
-    PTDF_A_diag = with_worker(K_pool) do cache, _idx
-        _get_PTDF_A_diag(cache, BA.data, A.data, Set(ref_bus_positions))
-    end
+    # PTDF diagonal precompute runs serially on the dispatcher thread.
+    PTDF_A_diag = _get_PTDF_A_diag(K, BA.data, A.data, Set(ref_bus_positions))
     arc_susceptances = _extract_arc_susceptances(BA.data)
     branch_susceptances_by_arc = _extract_branch_susceptances_by_arc(
         BA.data, arc_ax, Ymatrix.network_reduction_data)
 
-    # Per-worker scratch (1 slot for non-pool solvers; see `_n_scratch`).
-    n_scratch = _n_scratch(K_pool)
-    temp_data = [zeros(length(bus_ax)) for _ in 1:n_scratch]
-    work_ba_col = [zeros(length(valid_ix)) for _ in 1:n_scratch]
+    # Single scratch slot — solves serialize via `solver_lock` + `_LIBKLU_LOCK`.
+    temp_data = [zeros(length(bus_ax))]
+    work_ba_col = [zeros(length(valid_ix))]
     max_cache_bytes = max_cache_size * MiB
 
     vmodf = VirtualMODF(
-        K_pool,
+        K,
         BA.data,
         A.data,
         PTDF_A_diag,
