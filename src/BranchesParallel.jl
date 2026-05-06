@@ -77,16 +77,93 @@ function populate_equivalent_ybus!(bp::BranchesParallel)
 end
 
 """
-    get_equivalent_rating(bp::BranchesParallel)
+    get_equivalent_rating(
+        bp::BranchesParallel; 
+        method::Symbol = :sum, 
+        weighting::Symbol = :admittance_weighted
+        )
 
-Calculate the total rating for branches in parallel.
-For parallel circuits, the rating is the sum of individual ratings divided by the number of circuits.
-This provides a conservative estimate that accounts for potential overestimation of total capacity.
+Calculate the equivalent rating for a group of parallel branches.
+
+Two orthogonal keyword arguments control the calculation:
+
+## `weighting` — how flow is distributed across parallel branches
+
+- `:admittance_weighted` (default): Each branch carries a fraction of the total flow
+  proportional to its series susceptance ``f_i = b_i / \\sum_k b_k``
+  (see [`compute_parallel_multiplier`](@ref)). Reflects actual DC power-flow physics.
+
+- `:arithmetic`: All branches are treated as carrying equal fractions of total flow
+  (uniform weighting).
+
+## `method` — how individual branch limits are aggregated
+
+- `:sum` (default): For `:admittance_weighted`, returns the total interface capacity
+  limited by the first branch to reach its thermal limit (bottleneck formula):
+
+  ``S_{\\max} = \\min_i \\left( \\frac{S_{\\text{limit},i}}{f_i} \\right)``
+
+  For `:arithmetic`, returns the simple sum of individual ratings.
+
+- `:average`: For `:admittance_weighted`, returns the susceptance-weighted average
+  of individual ratings ``\\sum_i f_i \\cdot S_{\\text{limit},i}``.
+  For `:arithmetic`, returns the arithmetic mean of individual ratings.
+
+# Arguments
+- `bp::BranchesParallel`: The parallel branch group.
+
+# Keywords
+- `method::Symbol = :sum`: Aggregation method. Valid values: `:sum`, `:average`.
+- `weighting::Symbol = :admittance_weighted`: Flow weighting scheme. Valid values:
+  `:admittance_weighted`, `:arithmetic`.
 """
-function get_equivalent_rating(bp::BranchesParallel)
-    # Sum of ratings divided by number of circuits
-    return sum(get_equivalent_rating(branch) for branch in bp.branches) /
-           length(bp.branches)
+function get_equivalent_rating(
+    bp::BranchesParallel;
+    method::Symbol = :sum,
+    weighting::Symbol = :admittance_weighted,
+)
+    if weighting === :admittance_weighted
+        if method === :sum
+            # Total interface capacity limited by the first branch to reach its thermal limit.
+            return minimum(
+                get_equivalent_rating(br) /
+                compute_parallel_multiplier(bp, PSY.get_name(br))
+                for br in bp.branches
+            )
+        elseif method === :average
+            # Susceptance-weighted average of individual ratings.
+            return sum(
+                compute_parallel_multiplier(bp, PSY.get_name(br)) *
+                get_equivalent_rating(br)
+                for br in bp.branches
+            )
+        else
+            throw(
+                ArgumentError(
+                    "Unknown method: $(method). Valid options are :sum, :average.",
+                ),
+            )
+        end
+    elseif weighting === :arithmetic
+        if method === :sum
+            return sum(get_equivalent_rating(branch) for branch in bp.branches)
+        elseif method === :average
+            return sum(get_equivalent_rating(branch) for branch in bp.branches) /
+                   length(bp.branches)
+        else
+            throw(
+                ArgumentError(
+                    "Unknown method: $(method). Valid options are :sum, :average.",
+                ),
+            )
+        end
+    else
+        throw(
+            ArgumentError(
+                "Unknown weighting: $(weighting). Valid options are :admittance_weighted, :arithmetic.",
+            ),
+        )
+    end
 end
 
 """
