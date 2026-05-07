@@ -225,7 +225,7 @@ end
     row2 = vmodf[2, ctg]
     # Both rows should be cached now
     @test !isempty(vmodf.row_caches)
-    cache = vmodf.row_caches[ctg.modification].cache
+    cache = vmodf.row_caches[ctg.modification]
     @test haskey(cache, 1)
     @test haskey(cache, 2)
 
@@ -362,9 +362,7 @@ end
         )
         add_supplemental_attribute!(sys, branch, outage)
     end
-    vmodf = VirtualMODF(sys; network_reductions = NetworkReduction[
-        DegreeTwoReduction()
-    ])
+    vmodf = VirtualMODF(sys; network_reductions = NetworkReduction[DegreeTwoReduction()])
     for branch in get_components(ACTransmission, sys)
         !has_supplemental_attributes(branch) && continue
         outage = get_supplemental_attributes(branch)[1]
@@ -393,10 +391,11 @@ end
 @testset "VirtualMODF concurrent getindex across different contingencies matches serial baseline" begin
     # Mirrors the access pattern PowerSimulations uses in
     # `add_post_contingency_flow_expressions!`: many concurrent tasks query
-    # `vmodf[arc, contingency_spec]` across DIFFERENT contingencies, so each
-    # task's first query for its ctg races on `woodbury_inflight`. With the
+    # `vmodf[arc, contingency_spec]` across DIFFERENT contingencies. With the
     # single-cache solver + `_LIBKLU_LOCK`, all libklu work serializes; this
-    # test confirms the result is still correct under that serialization.
+    # test confirms the result is still correct under that serialization,
+    # including the double-checked-insert path on `woodbury_cache` /
+    # `row_caches` when two threads race on a first-time query.
     # Skipped under JULIA_NUM_THREADS=1 because @threads :dynamic degenerates
     # to serial there and the test reduces to a tautology.
     if Threads.nthreads() < 2
@@ -439,11 +438,9 @@ end
 
 @testset "VirtualMODF concurrent getindex on the SAME (arc, ctg) is consistent" begin
     # Complements the previous testset: there, each (arc, ctg) pair appears
-    # once in the work list, so only `_get_woodbury_factors`' first-call race
-    # is exercised. Here, many tasks race on the SAME (arc, ctg), which
-    # exercises the row-cache double-insert path: after Woodbury is in cache,
-    # N tasks all reach `_get_or_create_row_cache` and `_compute_modf_entry`
-    # for an empty row cache, racing the cache_lock + cache-population path.
+    # once in the work list, so only the `woodbury_cache` first-call race is
+    # exercised. Here, many tasks race on the SAME (arc, ctg), which
+    # exercises the row-cache population path serialized by `solver_lock`.
     if Threads.nthreads() < 2
         @info "Skipping: requires Threads.nthreads() ≥ 2 to exercise concurrent getindex."
         return
@@ -471,4 +468,3 @@ end
         end
     end
 end
-
