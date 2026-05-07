@@ -33,3 +33,49 @@ const SUPPORTED_LINEAR_SOLVERS = ("KLU", "MKLPardiso", "AppleAccelerate", "Dense
     s == "AppleAccelerate" && return AppleAccelerateSolver()
     error("Unsupported linear solver: $s. Supported: $SUPPORTED_LINEAR_SOLVERS")
 end
+
+"""
+Abstract supertype for rating aggregation strategies applied to groups of parallel branches.
+
+See also: [`SumRating`](@ref), [`AverageRating`](@ref).
+"""
+abstract type RatingMethod end
+
+"""
+    SumRating()
+
+Rating aggregation strategy for parallel branches: returns the sum 
+    of individual branch capacities.
+"""
+struct SumRating <: RatingMethod end
+
+"""
+    AverageRating()
+
+Rating aggregation strategy for parallel branches: returns the arithmetic mean 
+    of individual branch ratings.
+"""
+struct AverageRating <: RatingMethod end
+
+"""
+Abstract supertype for flow weighting schemes applied to groups of parallel branches.
+
+See also: [`AdmittanceWeighted`](@ref), [`ArithmeticWeighting`](@ref).
+"""
+abstract type RatingWeighting end
+
+"""
+    AdmittanceWeighted()
+
+Flow weighting scheme for parallel branches: each branch carries a fraction of total potential 
+    flow proportional to series susceptance, reflecting physical behaviour of parallel circuits.
+"""
+struct AdmittanceWeighted <: RatingWeighting end
+
+"""
+    ArithmeticWeighting()
+
+Flow weighting scheme for parallel branches: each branch is treated as carrying an equal
+    fraction of total potential flow (uniform weighting).
+"""
+struct ArithmeticWeighting <: RatingWeighting end
