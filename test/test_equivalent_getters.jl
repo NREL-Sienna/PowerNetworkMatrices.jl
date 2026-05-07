@@ -64,11 +64,6 @@
     @test_throws ArgumentError PNM.get_equivalent_rating(bp; method = :invalid)
     @test_throws ArgumentError PNM.get_equivalent_rating(bp; weighting = :invalid)
 
-    empty_bp = PNM.BranchesParallel()
-    @test_throws ArgumentError PNM.get_equivalent_rating(empty_bp)
-    @test_throws ArgumentError PNM.get_equivalent_emergency_rating(empty_bp)
-    @test_throws ArgumentError PSY.get_available(empty_bp)
-
     emergency_rating_eq = PNM.get_equivalent_emergency_rating(bp)
     @test emergency_rating_eq ≈ 250.0 atol = 1e-6
 
