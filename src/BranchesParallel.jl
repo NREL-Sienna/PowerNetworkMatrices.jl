@@ -138,13 +138,13 @@ function get_equivalent_rating(
             br in bp.branches
         )
 
-         if any(!isfinite(multiplier) for multiplier in values(multipliers))
-             throw(
-                 ArgumentError(
-                     "Cannot compute admittance-weighted equivalent rating: total series susceptance across the parallel group must be finite and non-zero.",
-                 ),
-             )
-         end
+        if any(!isfinite(multiplier) for multiplier in values(multipliers))
+            throw(
+                ArgumentError(
+                    "Cannot compute admittance-weighted equivalent rating: total series susceptance across the parallel group must be finite and non-zero.",
+                ),
+            )
+        end
 
         if method === :sum
              if any(iszero(multiplier) for multiplier in values(multipliers))
