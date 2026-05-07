@@ -77,7 +77,7 @@
     emergency_rating_eq = PNM.get_equivalent_emergency_rating(bs)
     @test emergency_rating_eq ≈ 100.0 atol = 1e-6
 
-    #Add test parallel circuit + line1
+    # Add test parallel circuit + line2
     bs = PNM.BranchesSeries()
     PNM.add_branch!(bs, bp, :FromTo)
     PNM.add_branch!(bs, line2, :FromTo)
