@@ -37,32 +37,29 @@
     # Create BranchesParallel
     bp = PNM.BranchesParallel([line1, line2])
 
-    # Default (method=:sum, weighting=:admittance_weighted)
+    # Default (SumRating + AdmittanceWeighted)
     # b1 = x1/(r1²+x1²) = 0.2/0.05 = 4.0,  b2 = 0.4/0.20 = 2.0,  b_total = 6.0
     # f1 = 2/3,  f2 = 1/3
     # min(100/(2/3), 150/(1/3)) = min(150, 450) = 150.0
-    @test PNM.get_equivalent_rating(bp) ≈ 150.0 atol = 1e-6
+    @test PNM.get_equivalent_rating(
+        bp,
+    ) ≈ 150.0 atol = 1e-6
 
-    # method=:average, weighting=:admittance_weighted: susceptance-weighted average
+    # AverageRating + AdmittanceWeighted
     # (2/3)*100 + (1/3)*150 = 350/3 ≈ 116.667
     @test PNM.get_equivalent_rating(
-        bp;
-        method = :average,
-        weighting = :admittance_weighted,
-    ) ≈
-          350.0 / 3.0 atol = 1e-6
+        bp, PNM.AverageRating(), PNM.AdmittanceWeighted(),
+    ) ≈ 350.0 / 3.0 atol = 1e-6
 
-    # method=:sum, weighting=:arithmetic: simple sum
-    @test PNM.get_equivalent_rating(bp; method = :sum, weighting = :arithmetic) ≈ 250.0 atol =
-        1e-6
+    # SumRating + ArithmeticWeighting
+    @test PNM.get_equivalent_rating(
+        bp, PNM.SumRating(), PNM.ArithmeticWeighting(),
+    ) ≈ 250.0 atol = 1e-6
 
-    # method=:average, weighting=:arithmetic: arithmetic mean
-    @test PNM.get_equivalent_rating(bp; method = :average, weighting = :arithmetic) ≈ 125.0 atol =
-        1e-6
-
-    # invalid kwarg values → ArgumentError
-    @test_throws ArgumentError PNM.get_equivalent_rating(bp; method = :invalid)
-    @test_throws ArgumentError PNM.get_equivalent_rating(bp; weighting = :invalid)
+    # AverageRating + ArithmeticWeighting
+    @test PNM.get_equivalent_rating(
+        bp, PNM.AverageRating(), PNM.ArithmeticWeighting(),
+    ) ≈ 125.0 atol = 1e-6
 
     emergency_rating_eq = PNM.get_equivalent_emergency_rating(bp)
     @test emergency_rating_eq ≈ 250.0 atol = 1e-6
