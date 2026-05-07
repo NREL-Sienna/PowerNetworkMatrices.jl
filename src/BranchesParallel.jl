@@ -81,123 +81,117 @@ function populate_equivalent_ybus!(bp::BranchesParallel)
 end
 
 """
-    get_equivalent_rating(
-        bp::BranchesParallel; 
-        method::Symbol = :sum, 
-        weighting::Symbol = :admittance_weighted
-        )
+    get_equivalent_rating(bp::BranchesParallel)
 
-Calculate the equivalent rating for a group of parallel branches.
+Calculate the equivalent rating for a group of parallel branches using the default strategy:
+sum with admittance-weighted flow distribution.
 
-Two orthogonal keyword arguments control the calculation:
+Equivalent to `get_equivalent_rating(bp, SumRating(), AdmittanceWeighted())`.
 
-## `weighting` — how flow is distributed across parallel branches
+See also: 
+[`get_equivalent_rating(::BranchesParallel, ::SumRating, ::AdmittanceWeighted)`](@ref),
+[`get_equivalent_rating(::BranchesParallel, ::AverageRating, ::AdmittanceWeighted)`](@ref),
+[`get_equivalent_rating(::BranchesParallel, ::SumRating, ::ArithmeticWeighting)`](@ref),
+[`get_equivalent_rating(::BranchesParallel, ::AverageRating, ::ArithmeticWeighting)`](@ref).
+"""
+function get_equivalent_rating(bp::BranchesParallel)
+    return get_equivalent_rating(bp, SumRating(), AdmittanceWeighted())
+end
 
-- `:admittance_weighted` (default): Each branch carries a fraction of the total flow
-  proportional to its series susceptance ``f_i = b_i / \\sum_k b_k``, 
-  where ``b_i`` is the series susceptance of branch i.
-  This reflects the physical behavior of parallel circuits, where flow 
-  distributes according to branch admittances.
+"""
+    get_equivalent_rating(bp::BranchesParallel, ::SumRating, ::AdmittanceWeighted)
 
-- `:arithmetic`: All branches are treated as carrying equal fractions of total flow
-  (uniform weighting).
+Calculate the equivalent rating using the sum with admittance-weighted flow distribution.
 
-## `method` — how individual branch limits are aggregated
+Each branch carries a fraction of total flow proportional to its series susceptance
+``f_i = b_i / \\sum_k b_k``. The total capacity is limited by the first branch
+to reach its thermal limit:
 
-- `:sum` (default): For `:admittance_weighted`, returns the total interface capacity
-  limited by the first branch to reach its thermal limit (bottleneck formula):
-
-  ``S_{\\max} = \\min_i \\left( \\frac{S_{\\text{limit},i}}{f_i} \\right)``
-
-  For `:arithmetic`, returns the simple sum of individual ratings.
-
-- `:average`: For `:admittance_weighted`, returns the susceptance-weighted average
-  of individual ratings ``\\sum_i f_i \\cdot S_{\\text{limit},i}``.
-  For `:arithmetic`, returns the arithmetic mean of individual ratings.
-
-# Arguments
-- `bp::BranchesParallel`: The parallel branch group.
-
-# Keywords
-- `method::Symbol = :sum`: Aggregation method. Valid values: `:sum`, `:average`.
-- `weighting::Symbol = :admittance_weighted`: Flow weighting scheme. Valid values:
-  `:admittance_weighted`, `:arithmetic`.
+``S_{\\max} = \\min_i \\left( \\frac{S_{\\text{limit},i}}{f_i} \\right)``
 """
 function get_equivalent_rating(
-    bp::BranchesParallel;
-    method::Symbol = :sum,
-    weighting::Symbol = :admittance_weighted,
+    bp::BranchesParallel,
+    ::SumRating,
+    ::AdmittanceWeighted,
 )
-    if isempty(bp.branches)
+    multipliers = _admittance_multipliers(bp)
+    if any(iszero, values(multipliers)) || any(!isfinite, values(multipliers))
         throw(
             ArgumentError(
                 "Cannot compute admittance-weighted equivalent rating: total series susceptance across the parallel group must be finite and non-zero.",
             ),
         )
     end
+    # Total interface capacity limited by the first branch to reach its thermal limit.
+    return minimum(
+        get_equivalent_rating(br) / multipliers[PSY.get_name(br)] for br in bp.branches
+    )
+end
 
-    if weighting === :admittance_weighted
-        multipliers = Dict(
-            PSY.get_name(br) => compute_parallel_multiplier(bp, PSY.get_name(br)) for
-            br in bp.branches
-        )
+"""
+    get_equivalent_rating(bp::BranchesParallel, ::AverageRating, ::AdmittanceWeighted)
 
-        if any(!isfinite(multiplier) for multiplier in values(multipliers))
-            throw(
-                ArgumentError(
-                    "Cannot compute admittance-weighted equivalent rating: total series susceptance across the parallel group must be finite and non-zero.",
-                ),
-            )
-        end
+Calculate the susceptance-weighted average of individual branch ratings.
 
-        if method === :sum
-            if any(iszero(multiplier) for multiplier in values(multipliers))
-                throw(
-                    ArgumentError(
-                        "Cannot compute admittance-weighted equivalent rating with method :sum: total series susceptance across the parallel group must be finite and non-zero.",
-                    ),
-                )
-            end
-
-            # Total interface capacity limited by the first branch to reach its thermal limit.
-            return minimum(
-                get_equivalent_rating(br) /
-                multipliers[PSY.get_name(br)] for br in bp.branches
-            )
-        elseif method === :average
-            # Susceptance-weighted average of individual ratings.
-            return sum(
-                multipliers[PSY.get_name(br)] *
-                get_equivalent_rating(br)
-                for br in bp.branches
-            )
-        else
-            throw(
-                ArgumentError(
-                    "Unknown method: $(method). Valid options are :sum, :average.",
-                ),
-            )
-        end
-    elseif weighting === :arithmetic
-        if method === :sum
-            return sum(get_equivalent_rating(branch) for branch in bp.branches)
-        elseif method === :average
-            return sum(get_equivalent_rating(branch) for branch in bp.branches) /
-                   length(bp.branches)
-        else
-            throw(
-                ArgumentError(
-                    "Unknown method: $(method). Valid options are :sum, :average.",
-                ),
-            )
-        end
-    else
+Each branch carries a fraction of total flow proportional to its series susceptance
+``f_i = b_i / \\sum_k b_k``. Returns ``\\sum_i f_i \\cdot S_{\\text{limit},i}``.
+"""
+function get_equivalent_rating(
+    bp::BranchesParallel,
+    ::AverageRating,
+    ::AdmittanceWeighted,
+)
+    multipliers = _admittance_multipliers(bp)
+    if any(!isfinite, values(multipliers))
         throw(
             ArgumentError(
-                "Unknown weighting: $(weighting). Valid options are :admittance_weighted, :arithmetic.",
+                "Cannot compute admittance-weighted equivalent rating: total series susceptance across the parallel group must be finite and non-zero.",
             ),
         )
     end
+    # Susceptance-weighted average of individual ratings.
+    return sum(
+        multipliers[PSY.get_name(br)] * get_equivalent_rating(br) for br in bp.branches
+    )
+end
+
+"""
+    get_equivalent_rating(bp::BranchesParallel, ::SumRating, ::ArithmeticWeighting)
+
+Calculate the equivalent rating as the simple sum of individual branch ratings.
+
+All branches are treated as carrying equal fractions of total flow.
+"""
+function get_equivalent_rating(
+    bp::BranchesParallel,
+    ::SumRating,
+    ::ArithmeticWeighting,
+)
+    return sum(get_equivalent_rating(branch) for branch in bp.branches)
+end
+
+"""
+    get_equivalent_rating(bp::BranchesParallel, ::AverageRating, ::ArithmeticWeighting)
+
+Calculate the equivalent rating as the arithmetic mean of individual branch ratings.
+
+All branches are treated as carrying equal fractions of total flow.
+"""
+function get_equivalent_rating(
+    bp::BranchesParallel,
+    ::AverageRating,
+    ::ArithmeticWeighting,
+)
+    return sum(get_equivalent_rating(branch) for branch in bp.branches) /
+           length(bp.branches)
+end
+
+# Internal helper: compute per-branch admittance multipliers for a parallel group.
+function _admittance_multipliers(bp::BranchesParallel)
+    return Dict(
+        PSY.get_name(br) => compute_parallel_multiplier(bp, PSY.get_name(br))
+        for br in bp.branches
+    )
 end
 
 """
