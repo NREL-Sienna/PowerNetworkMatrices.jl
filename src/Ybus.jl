@@ -496,17 +496,21 @@ function _get_impedance_correction_factor(tp::ThreeWindingTransformerWinding)
         curve = PSY.get_impedance_correction_curve(attr)
         mode = PSY.get_transformer_control_mode(attr)
         x = if mode == PSY.ImpedanceCorrectionTransformerControlMode.TAP_RATIO
-            abs((
-                PSY.get_primary_turns_ratio(br),
-                PSY.get_secondary_turns_ratio(br),
-                PSY.get_tertiary_turns_ratio(br),
-            )[winding_num])
+            abs(
+                (
+                    PSY.get_primary_turns_ratio(br),
+                    PSY.get_secondary_turns_ratio(br),
+                    PSY.get_tertiary_turns_ratio(br),
+                )[winding_num],
+            )
         else  # PHASE_SHIFT_ANGLE — table x-values are in degrees; angles stored in radians
-            rad2deg((
-                PSY.get_α_primary(br),
-                PSY.get_α_secondary(br),
-                PSY.get_α_tertiary(br),
-            )[winding_num])
+            rad2deg(
+                (
+                    PSY.get_α_primary(br),
+                    PSY.get_α_secondary(br),
+                    PSY.get_α_tertiary(br),
+                )[winding_num],
+            )
         end
         return _interpolate_correction_factor(curve, x)
     end

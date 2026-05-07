@@ -85,7 +85,7 @@ end
         if col_bus ∈ keys(nr.reverse_bus_search_map)
             col_bus = nr.reverse_bus_search_map[col_bus]
         end
-        @test isapprox(Ybus_pnm[row_bus, col_bus], val, atol = 1e-3)
+        @test isapprox(Ybus_pnm[row_bus, col_bus], val, rtol = 2 * eps(Float32), atol = 0.0)
     end
 end
 
@@ -118,7 +118,7 @@ end
         if col_bus ∈ keys(nr.reverse_bus_search_map)
             col_bus = nr.reverse_bus_search_map[col_bus]
         end
-        @test isapprox(Ybus_pnm[row_bus, col_bus], val, atol = 2e-3)
+        @test isapprox(Ybus_pnm[row_bus, col_bus], val, rtol = 4 * eps(Float32), atol = 0.0)
     end
 end
 
@@ -202,7 +202,7 @@ end
         if col_bus ∈ keys(nr.reverse_bus_search_map)
             col_bus = nr.reverse_bus_search_map[col_bus]
         end
-        @test isapprox(Ybus_pnm[row_bus, col_bus], val; atol = 1e-1)
+        @test isapprox(Ybus_pnm[row_bus, col_bus], val; rtol = 9 * eps(Float32), atol = 0.0)
     end
 end
 
@@ -238,7 +238,7 @@ end
         if col_bus ∈ keys(nr.reverse_bus_search_map)
             col_bus = nr.reverse_bus_search_map[col_bus]
         end
-        @test isapprox(Ybus_pnm[row_bus, col_bus], val; atol = 1e-5)
+        @test isapprox(Ybus_pnm[row_bus, col_bus], val; rtol = 2 * eps(Float32), atol = 0.0)
     end
 end
 
@@ -274,7 +274,7 @@ end
         if col_bus ∈ keys(nr.reverse_bus_search_map)
             col_bus = nr.reverse_bus_search_map[col_bus]
         end
-        @test isapprox(Ybus_pnm[row_bus, col_bus], val; rtol = 2*eps(Float32), atol = 0.0)
+        @test isapprox(Ybus_pnm[row_bus, col_bus], val; rtol = 2 * eps(Float32), atol = 0.0)
     end
 end
 
@@ -309,6 +309,6 @@ end
         if col_bus ∈ keys(nr.reverse_bus_search_map)
             col_bus = nr.reverse_bus_search_map[col_bus]
         end
-        @test isapprox(Ybus_pnm[row_bus, col_bus], val; rtol = 2*eps(Float32), atol = 0.0)
+        @test isapprox(Ybus_pnm[row_bus, col_bus], val; rtol = 2 * eps(Float32), atol = 0.0)
     end
 end
