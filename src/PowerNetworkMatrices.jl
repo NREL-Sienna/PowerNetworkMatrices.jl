@@ -29,6 +29,14 @@ export DC_vPTDF_Matrix
 export DC_BA_Matrix
 export AC_Ybus_Matrix
 export YBUS_ELTYPE
+export BranchesParallel
+export RatingMethod
+export SumRating
+export AverageRating
+export RatingWeighting
+export AdmittanceWeighted
+export ArithmeticWeighting
+export get_equivalent_rating
 
 export apply_woodbury_correction
 export clear_all_caches!
