@@ -133,17 +133,38 @@ function get_equivalent_rating(
      end
      
     if weighting === :admittance_weighted
+
+        multipliers = Dict(
+             PSY.get_name(br) => compute_parallel_multiplier(bp, PSY.get_name(br)) for
+             br in bp.branches
+        )
+
+         if any(!isfinite(multiplier) for multiplier in values(multipliers))
+             throw(
+                 ArgumentError(
+                     "Cannot compute admittance-weighted equivalent rating: total series susceptance across the parallel group must be finite and non-zero.",
+                 ),
+             )
+         end
+
         if method === :sum
+             if any(iszero(multiplier) for multiplier in values(multipliers))
+                 throw(
+                     ArgumentError(
+                         "Cannot compute admittance-weighted equivalent rating with method :sum: total series susceptance across the parallel group must be finite and non-zero.",
+                     ),
+                 )
+             end
+
             # Total interface capacity limited by the first branch to reach its thermal limit.
             return minimum(
-                get_equivalent_rating(br) /
-                compute_parallel_multiplier(bp, PSY.get_name(br))
-                for br in bp.branches
+                get_equivalent_rating(br) / 
+                multipliers[PSY.get_name(br)] for br in bp.branches
             )
         elseif method === :average
             # Susceptance-weighted average of individual ratings.
             return sum(
-                compute_parallel_multiplier(bp, PSY.get_name(br)) *
+                multipliers[PSY.get_name(br)] *
                 get_equivalent_rating(br)
                 for br in bp.branches
             )
