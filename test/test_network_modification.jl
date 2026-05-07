@@ -31,7 +31,7 @@
                 break
             end
         end
-        @test outaged_line !== nothing
+        @test !isnothing(outaged_line)
         PSY.set_available!(outaged_line, false)
         ptdf_rebuilt = PTDF(sys_mod)
         rebuilt_arc_ax = PNM.get_arc_axis(ptdf_rebuilt)

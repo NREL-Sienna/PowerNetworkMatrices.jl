@@ -72,6 +72,10 @@ Key rules:
   - Globals: `UPPER_CASE` for constants
   - Exports: all exports in main module file
   - Comments: complete sentences, describe why not how
+  - Nothing checks: use `isnothing(x)` / `!isnothing(x)`. Do **not** use the older `x === nothing` / `x !== nothing` patterns.
+  - Type checks: prefer multiple dispatch over `isa` (the only acceptable use of `isa` is filtering inside a `catch` block, where dispatch is unavailable).
+  - Conditionals: prefer `if/else` over the ternary `? :` operator for readability, especially in multi-line expressions.
+  - Cache lookups: `get!(dict, key) do ... end` (the closure form is **lazy** — only evaluates on a miss). Never use the 3-arg `get!(dict, key, default)` when `default` is expensive: Julia evaluates function arguments eagerly, so `default` runs on every call (including cache hits) and silently defeats the cache.
 
 ## Documentation Practices and Requirements
 
