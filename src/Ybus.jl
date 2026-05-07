@@ -435,9 +435,38 @@ end
 _get_tap(::PSY.Transformer2W) = one(YBUS_ELTYPE)
 _get_tap(br::PSY.TwoWindingTransformer) = PSY.get_tap(br)
 
+function _interpolate_correction_factor(curve::IS.PiecewiseLinearData, x::Real)
+    points = IS.get_points(curve)
+    x = clamp(x, points[1].x, points[end].x)
+    for i in 1:(length(points) - 1)
+        if x <= points[i + 1].x
+            dx = points[i + 1].x - points[i].x
+            iszero(dx) && return points[i].y
+            t = (x - points[i].x) / dx
+            return points[i].y + t * (points[i + 1].y - points[i].y)
+        end
+    end
+    return points[end].y
+end
+
+function _get_impedance_correction_factor(br::PSY.TwoWindingTransformer)
+    attrs = PSY.get_supplemental_attributes(PSY.ImpedanceCorrectionData, br)
+    isempty(attrs) && return one(Float64)
+    ict = only(attrs)
+    curve = PSY.get_impedance_correction_curve(ict)
+    mode = PSY.get_transformer_control_mode(ict)
+    x = if mode == PSY.ImpedanceCorrectionTransformerControlMode.TAP_RATIO
+        abs(_get_tap(br))
+    else  # PHASE_SHIFT_ANGLE — table x-values are in degrees; α is stored in radians
+        rad2deg(PSY.get_α(br))
+    end
+    return _interpolate_correction_factor(curve, x)
+end
+
 """Ybus entries for a `Transformer2W`, `TapTransformer`, or `PhaseShiftingTransformer`."""
 function ybus_branch_entries(br::PSY.TwoWindingTransformer)
-    Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
+    correction = _get_impedance_correction_factor(br)
+    Y_t = 1 / ((PSY.get_r(br) + PSY.get_x(br) * 1im) * correction)
     tap = _get_tap(br) * exp(PSY.get_α(br) * 1im)
     c_tap = _get_tap(br) * exp(-1 * PSY.get_α(br) * 1im)
     y_shunt = PSY.get_primary_shunt(br)
@@ -453,12 +482,44 @@ function ybus_branch_entries(br::PSY.TwoWindingTransformer)
     return (Y11 + y_shunt, Y12, Y21, Y22)
 end
 
+function _get_impedance_correction_factor(tp::ThreeWindingTransformerWinding)
+    br = get_transformer(tp)
+    winding_num = get_winding_number(tp)
+    target = (
+        PSY.WindingCategory.PRIMARY_WINDING,
+        PSY.WindingCategory.SECONDARY_WINDING,
+        PSY.WindingCategory.TERTIARY_WINDING,
+    )[winding_num]
+    attrs = PSY.get_supplemental_attributes(PSY.ImpedanceCorrectionData, br)
+    for attr in attrs
+        PSY.get_transformer_winding(attr) == target || continue
+        curve = PSY.get_impedance_correction_curve(attr)
+        mode = PSY.get_transformer_control_mode(attr)
+        x = if mode == PSY.ImpedanceCorrectionTransformerControlMode.TAP_RATIO
+            abs((
+                PSY.get_primary_turns_ratio(br),
+                PSY.get_secondary_turns_ratio(br),
+                PSY.get_tertiary_turns_ratio(br),
+            )[winding_num])
+        else  # PHASE_SHIFT_ANGLE — table x-values are in degrees; angles stored in radians
+            rad2deg((
+                PSY.get_α_primary(br),
+                PSY.get_α_secondary(br),
+                PSY.get_α_tertiary(br),
+            )[winding_num])
+        end
+        return _interpolate_correction_factor(curve, x)
+    end
+    return one(Float64)
+end
+
 """Ybus branch entries for an arc in the wye model of a `ThreeWindingTransformer`."""
 function ybus_branch_entries(tp::ThreeWindingTransformerWinding)
+    correction = _get_impedance_correction_factor(tp)
     br = get_transformer(tp)
     winding_number = get_winding_number(tp)
     if winding_number == 1
-        Y_t = 1 / (PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im)
+        Y_t = 1 / ((PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im) * correction)
         tap = PSY.get_primary_turns_ratio(br) * exp(PSY.get_α_primary(br) * 1im)
         c_tap = PSY.get_primary_turns_ratio(br) * exp(-1 * PSY.get_α_primary(br) * 1im)
         Y11 = Y_t / abs2(tap)
@@ -472,7 +533,7 @@ function ybus_branch_entries(tp::ThreeWindingTransformerWinding)
         # primary bus alone gets the shunt term
         Y11 += y_shunt
     elseif winding_number == 2
-        Y_t = 1 / (PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im)
+        Y_t = 1 / ((PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im) * correction)
         tap = PSY.get_secondary_turns_ratio(br) * exp(PSY.get_α_secondary(br) * 1im)
         c_tap = PSY.get_secondary_turns_ratio(br) * exp(-1 * PSY.get_α_secondary(br) * 1im)
         Y11 = Y_t / abs2(tap)
@@ -483,7 +544,7 @@ function ybus_branch_entries(tp::ThreeWindingTransformerWinding)
             )
         end
     elseif winding_number == 3
-        Y_t = 1 / (PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im)
+        Y_t = 1 / ((PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im) * correction)
         tap = PSY.get_tertiary_turns_ratio(br) * exp(PSY.get_α_tertiary(br) * 1im)
         c_tap = PSY.get_tertiary_turns_ratio(br) * exp(-1 * PSY.get_α_tertiary(br) * 1im)
         Y11 = Y_t / abs2(tap)
