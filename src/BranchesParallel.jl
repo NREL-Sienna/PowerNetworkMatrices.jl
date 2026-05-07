@@ -147,13 +147,13 @@ function get_equivalent_rating(
         end
 
         if method === :sum
-             if any(iszero(multiplier) for multiplier in values(multipliers))
-                 throw(
-                     ArgumentError(
-                         "Cannot compute admittance-weighted equivalent rating with method :sum: total series susceptance across the parallel group must be finite and non-zero.",
-                     ),
-                 )
-             end
+            if any(iszero(multiplier) for multiplier in values(multipliers))
+                throw(
+                    ArgumentError(
+                        "Cannot compute admittance-weighted equivalent rating with method :sum: total series susceptance across the parallel group must be finite and non-zero.",
+                    ),
+                )
+            end
 
             # Total interface capacity limited by the first branch to reach its thermal limit.
             return minimum(
