@@ -132,6 +132,7 @@ function get_equivalent_rating(
         )
     end
 
+    if weighting === :admittance_weighted
         multipliers = Dict(
              PSY.get_name(br) => compute_parallel_multiplier(bp, PSY.get_name(br)) for
              br in bp.branches
