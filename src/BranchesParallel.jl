@@ -124,6 +124,14 @@ function get_equivalent_rating(
     method::Symbol = :sum,
     weighting::Symbol = :admittance_weighted,
 )
+     if isempty(bp.branches)
+         throw(
+             ArgumentError(
+                 "Cannot compute equivalent rating for an empty parallel branch group.",
+             ),
+         )
+     end
+     
     if weighting === :admittance_weighted
         if method === :sum
             # Total interface capacity limited by the first branch to reach its thermal limit.
