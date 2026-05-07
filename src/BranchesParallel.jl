@@ -124,15 +124,13 @@ function get_equivalent_rating(
     method::Symbol = :sum,
     weighting::Symbol = :admittance_weighted,
 )
-     if isempty(bp.branches)
-         throw(
-             ArgumentError(
-                 "Cannot compute equivalent rating for an empty parallel branch group.",
-             ),
-         )
-     end
-     
-    if weighting === :admittance_weighted
+    if isempty(bp.branches)
+        throw(
+            ArgumentError(
+                "Cannot compute equivalent rating for an empty parallel branch group.",
+            ),
+        )
+    end
 
         multipliers = Dict(
              PSY.get_name(br) => compute_parallel_multiplier(bp, PSY.get_name(br)) for
