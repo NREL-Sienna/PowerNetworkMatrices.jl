@@ -157,7 +157,7 @@ function get_equivalent_rating(
 
             # Total interface capacity limited by the first branch to reach its thermal limit.
             return minimum(
-                get_equivalent_rating(br) / 
+                get_equivalent_rating(br) /
                 multipliers[PSY.get_name(br)] for br in bp.branches
             )
         elseif method === :average
