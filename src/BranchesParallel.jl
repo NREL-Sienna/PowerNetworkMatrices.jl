@@ -90,8 +90,10 @@ Two orthogonal keyword arguments control the calculation:
 ## `weighting` — how flow is distributed across parallel branches
 
 - `:admittance_weighted` (default): Each branch carries a fraction of the total flow
-  proportional to its series susceptance ``f_i = b_i / \\sum_k b_k``
-  (see [`compute_parallel_multiplier`](@ref)). Reflects actual DC power-flow physics.
+  proportional to its series susceptance ``f_i = b_i / \\sum_k b_k``, 
+  where ``b_i`` is the series susceptance of branch i.
+  This reflects the physical behavior of parallel circuits, where flow 
+  distributes according to branch admittances.
 
 - `:arithmetic`: All branches are treated as carrying equal fractions of total flow
   (uniform weighting).
