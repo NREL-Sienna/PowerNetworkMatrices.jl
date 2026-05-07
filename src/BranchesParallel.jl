@@ -4,10 +4,14 @@ mutable struct BranchesParallel{T <: PSY.ACTransmission} <: PSY.ACTransmission
 end
 
 function BranchesParallel(branches::Vector{T}) where {T <: PSY.ACTransmission}
+    isempty(branches) &&
+        throw(ArgumentError("BranchesParallel requires at least one branch."))
     BranchesParallel(branches, nothing)
 end
 # Constructor for the mixed types
 function BranchesParallel(branches::Vector{PSY.ACTransmission})
+    isempty(branches) &&
+        throw(ArgumentError("BranchesParallel requires at least one branch."))
     return BranchesParallel{PSY.ACTransmission}(branches, nothing)
 end
 
@@ -127,7 +131,7 @@ function get_equivalent_rating(
     if isempty(bp.branches)
         throw(
             ArgumentError(
-                "Cannot compute equivalent rating for an empty parallel branch group.",
+                "Cannot compute admittance-weighted equivalent rating: total series susceptance across the parallel group must be finite and non-zero.",
             ),
         )
     end
@@ -204,13 +208,6 @@ For parallel circuits, the emergency rating is the sum of individual emergency r
 This provides a conservative estimate that accounts for potential overestimation of total capacity.
 """
 function get_equivalent_emergency_rating(bp::BranchesParallel)
-    if isempty(bp.branches)
-        throw(
-            ArgumentError(
-                "Cannot compute equivalent emergency rating for an empty parallel branch group.",
-            ),
-        )
-    end
     equivalent_rating = 0.0
     for branch in bp.branches
         rating_b = get_equivalent_emergency_rating(branch)
@@ -226,13 +223,6 @@ Get the availability status for parallel branches.
 All branches in parallel must be available for the parallel circuit to be available.
 """
 function get_equivalent_available(bp::BranchesParallel)
-    if isempty(bp.branches)
-        throw(
-            ArgumentError(
-                "Cannot compute equivalent availability for an empty parallel branch group.",
-            ),
-        )
-    end
     # All branches must be available
     return all(PSY.get_available(branch) for branch in bp.branches)
 end
