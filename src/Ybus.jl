@@ -449,10 +449,10 @@ function _interpolate_correction_factor(curve::IS.PiecewiseLinearData, x::Real)
     return points[end].y
 end
 
-function _get_impedance_correction_factor(br::PSY.TwoWindingTransformer)
-    attrs = PSY.get_supplemental_attributes(PSY.ImpedanceCorrectionData, br)
-    isempty(attrs) && return one(Float64)
-    ict = only(attrs)
+function _compute_icd_factor(
+    br::PSY.TwoWindingTransformer,
+    ict::PSY.ImpedanceCorrectionData,
+)
     curve = PSY.get_impedance_correction_curve(ict)
     mode = PSY.get_transformer_control_mode(ict)
     x = if mode == PSY.ImpedanceCorrectionTransformerControlMode.TAP_RATIO
@@ -463,7 +463,91 @@ function _get_impedance_correction_factor(br::PSY.TwoWindingTransformer)
     return _interpolate_correction_factor(curve, x)
 end
 
+function _compute_icd_factor(
+    br::PSY.ThreeWindingTransformer,
+    ict::PSY.ImpedanceCorrectionData,
+    winding_num::Int,
+)
+    curve = PSY.get_impedance_correction_curve(ict)
+    mode = PSY.get_transformer_control_mode(ict)
+    x = if mode == PSY.ImpedanceCorrectionTransformerControlMode.TAP_RATIO
+        abs(
+            (
+                PSY.get_primary_turns_ratio(br),
+                PSY.get_secondary_turns_ratio(br),
+                PSY.get_tertiary_turns_ratio(br),
+            )[winding_num],
+        )
+    else  # PHASE_SHIFT_ANGLE — table x-values are in degrees; angles stored in radians
+        rad2deg(
+            (
+                PSY.get_α_primary(br),
+                PSY.get_α_secondary(br),
+                PSY.get_α_tertiary(br),
+            )[winding_num],
+        )
+    end
+    return _interpolate_correction_factor(curve, x)
+end
+
+function _winding_category_to_number(cat::PSY.WindingCategoryModule.WindingCategory)::Int
+    cat == PSY.WindingCategory.PRIMARY_WINDING && return 1
+    cat == PSY.WindingCategory.SECONDARY_WINDING && return 2
+    return 3
+end
+
+function _build_icd_correction_map(sys::PSY.System)::Union{Nothing, ICDCorrectionMap}
+    pairs_2w = PSY.get_component_supplemental_attribute_pairs(
+        PSY.TwoWindingTransformer,
+        PSY.ImpedanceCorrectionData,
+        sys,
+    )
+    pairs_3w = PSY.get_component_supplemental_attribute_pairs(
+        PSY.ThreeWindingTransformer,
+        PSY.ImpedanceCorrectionData,
+        sys,
+    )
+    isempty(pairs_2w) && isempty(pairs_3w) && return nothing
+    map_2w = Dict{Base.UUID, Float64}()
+    for pair in pairs_2w
+        map_2w[IS.get_uuid(pair.component)] =
+            _compute_icd_factor(pair.component, pair.supplemental_attribute)
+    end
+    map_3w = Dict{Tuple{Base.UUID, Int}, Float64}()
+    for pair in pairs_3w
+        wnum = _winding_category_to_number(
+            PSY.get_transformer_winding(pair.supplemental_attribute),
+        )
+        map_3w[(IS.get_uuid(pair.component), wnum)] =
+            _compute_icd_factor(pair.component, pair.supplemental_attribute, wnum)
+    end
+    return ICDCorrectionMap(map_2w, map_3w)
+end
+
+function _get_impedance_correction_factor(br::PSY.TwoWindingTransformer)
+    attrs = PSY.get_supplemental_attributes(PSY.ImpedanceCorrectionData, br)
+    isempty(attrs) && return one(Float64)
+    return _compute_icd_factor(br, only(attrs))
+end
+
 """Ybus entries for a `Transformer2W`, `TapTransformer`, or `PhaseShiftingTransformer`."""
+function ybus_branch_entries(br::PSY.TwoWindingTransformer, correction::Float64)
+    Y_t = 1 / ((PSY.get_r(br) + PSY.get_x(br) * 1im) * correction)
+    tap = _get_tap(br) * exp(PSY.get_α(br) * 1im)
+    c_tap = _get_tap(br) * exp(-1 * PSY.get_α(br) * 1im)
+    y_shunt = PSY.get_primary_shunt(br)
+    Y11 = Y_t / abs2(tap)
+    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
+        error(
+            "Data in $(summary(br)) gives a non-finite Ybus entry; check input data.",
+        )
+    end
+    Y12 = -Y_t / c_tap
+    Y21 = -Y_t / tap
+    Y22 = Y_t
+    return (Y11 + y_shunt, Y12, Y21, Y22)
+end
+
 function ybus_branch_entries(br::PSY.TwoWindingTransformer)
     correction = _get_impedance_correction_factor(br)
     Y_t = 1 / ((PSY.get_r(br) + PSY.get_x(br) * 1im) * correction)
@@ -493,31 +577,59 @@ function _get_impedance_correction_factor(tp::ThreeWindingTransformerWinding)
     attrs = PSY.get_supplemental_attributes(PSY.ImpedanceCorrectionData, br)
     for attr in attrs
         PSY.get_transformer_winding(attr) == target || continue
-        curve = PSY.get_impedance_correction_curve(attr)
-        mode = PSY.get_transformer_control_mode(attr)
-        x = if mode == PSY.ImpedanceCorrectionTransformerControlMode.TAP_RATIO
-            abs(
-                (
-                    PSY.get_primary_turns_ratio(br),
-                    PSY.get_secondary_turns_ratio(br),
-                    PSY.get_tertiary_turns_ratio(br),
-                )[winding_num],
-            )
-        else  # PHASE_SHIFT_ANGLE — table x-values are in degrees; angles stored in radians
-            rad2deg(
-                (
-                    PSY.get_α_primary(br),
-                    PSY.get_α_secondary(br),
-                    PSY.get_α_tertiary(br),
-                )[winding_num],
-            )
-        end
-        return _interpolate_correction_factor(curve, x)
+        return _compute_icd_factor(br, attr, winding_num)
     end
     return one(Float64)
 end
 
 """Ybus branch entries for an arc in the wye model of a `ThreeWindingTransformer`."""
+function ybus_branch_entries(tp::ThreeWindingTransformerWinding, correction::Float64)
+    br = get_transformer(tp)
+    winding_number = get_winding_number(tp)
+    if winding_number == 1
+        Y_t = 1 / ((PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im) * correction)
+        tap = PSY.get_primary_turns_ratio(br) * exp(PSY.get_α_primary(br) * 1im)
+        c_tap = PSY.get_primary_turns_ratio(br) * exp(-1 * PSY.get_α_primary(br) * 1im)
+        Y11 = Y_t / abs2(tap)
+        y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
+        if !isfinite(Y11) || !isfinite(y_shunt)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
+            )
+        end
+        # primary bus alone gets the shunt term
+        Y11 += y_shunt
+    elseif winding_number == 2
+        Y_t = 1 / ((PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im) * correction)
+        tap = PSY.get_secondary_turns_ratio(br) * exp(PSY.get_α_secondary(br) * 1im)
+        c_tap =
+            PSY.get_secondary_turns_ratio(br) * exp(-1 * PSY.get_α_secondary(br) * 1im)
+        Y11 = Y_t / abs2(tap)
+        if !isfinite(Y11)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
+            )
+        end
+    elseif winding_number == 3
+        Y_t = 1 / ((PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im) * correction)
+        tap = PSY.get_tertiary_turns_ratio(br) * exp(PSY.get_α_tertiary(br) * 1im)
+        c_tap = PSY.get_tertiary_turns_ratio(br) * exp(-1 * PSY.get_α_tertiary(br) * 1im)
+        Y11 = Y_t / abs2(tap)
+        if !isfinite(Y11)
+            error(
+                "Data in $(PSY.get_name(br)) is incorrect.
+                r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
+            )
+        end
+    end
+    Y12 = (-Y_t / c_tap)
+    Y21 = (-Y_t / tap)
+    Y22 = Y_t
+    return (Y11, Y12, Y21, Y22)
+end
+
 function ybus_branch_entries(tp::ThreeWindingTransformerWinding)
     correction = _get_impedance_correction_factor(tp)
     br = get_transformer(tp)
@@ -574,6 +686,7 @@ function _ybus!(
     y21::Vector{YBUS_ELTYPE},
     y22::Vector{YBUS_ELTYPE},
     br::PSY.ACTransmission,
+    correction::Float64,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
     fb::Vector{Int},
@@ -591,7 +704,8 @@ function _ybus!(
     y12::Vector{YBUS_ELTYPE},
     y21::Vector{YBUS_ELTYPE},
     y22::Vector{YBUS_ELTYPE},
-    br::PSY.DynamicBranch,
+    br::PSY.TwoWindingTransformer,
+    correction::Float64,
     num_bus::Dict{Int, Int},
     branch_ix::Int,
     fb::Vector{Int},
@@ -599,19 +713,30 @@ function _ybus!(
     nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
-    _ybus!(
-        y11,
-        y12,
-        y21,
-        y22,
-        br.branch,
-        num_bus,
-        branch_ix,
-        fb,
-        tb,
-        nr,
-        adj,
-    )
+    add_branch_entries_to_indexing_maps!(num_bus, branch_ix, nr, fb, tb, adj, br)
+    Y11, Y12, Y21, Y22 = ybus_branch_entries(br, correction)
+    y11[branch_ix] = Y11
+    y12[branch_ix] = Y12
+    y21[branch_ix] = Y21
+    y22[branch_ix] = Y22
+    return
+end
+
+function _ybus!(
+    y11::Vector{YBUS_ELTYPE},
+    y12::Vector{YBUS_ELTYPE},
+    y21::Vector{YBUS_ELTYPE},
+    y22::Vector{YBUS_ELTYPE},
+    br::PSY.DynamicBranch,
+    correction::Float64,
+    num_bus::Dict{Int, Int},
+    branch_ix::Int,
+    fb::Vector{Int},
+    tb::Vector{Int},
+    nr::NetworkReductionData,
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
+)
+    _ybus!(y11, y12, y21, y22, br.branch, correction, num_bus, branch_ix, fb, tb, nr, adj)
     return
 end
 
@@ -628,6 +753,9 @@ function _ybus!(
     ix::Int,
     nr::NetworkReductionData,
     adj::SparseArrays.SparseMatrixCSC{Int8, Int},
+    c1::Float64,
+    c2::Float64,
+    c3::Float64,
 )
     primary_star_arc = PSY.get_primary_star_arc(br)
     secondary_star_arc = PSY.get_secondary_star_arc(br)
@@ -643,7 +771,8 @@ function _ybus!(
         adj[star_ix, primary_ix] = -1
         fb[offset_ix + ix + n_entries] = primary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        (Y11, Y12, Y21, Y22) = ybus_branch_entries(ThreeWindingTransformerWinding(br, 1))
+        (Y11, Y12, Y21, Y22) =
+            ybus_branch_entries(ThreeWindingTransformerWinding(br, 1), c1)
         y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
         y21[offset_ix + ix + n_entries] = Y21
@@ -656,7 +785,8 @@ function _ybus!(
         adj[star_ix, secondary_ix] = -1
         fb[offset_ix + ix + n_entries] = secondary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        (Y11, Y12, Y21, Y22) = ybus_branch_entries(ThreeWindingTransformerWinding(br, 2))
+        (Y11, Y12, Y21, Y22) =
+            ybus_branch_entries(ThreeWindingTransformerWinding(br, 2), c2)
         y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
         y21[offset_ix + ix + n_entries] = Y21
@@ -669,7 +799,8 @@ function _ybus!(
         adj[star_ix, tertiary_ix] = -1
         fb[offset_ix + ix + n_entries] = tertiary_ix
         tb[offset_ix + ix + n_entries] = star_ix
-        (Y11, Y12, Y21, Y22) = ybus_branch_entries(ThreeWindingTransformerWinding(br, 3))
+        (Y11, Y12, Y21, Y22) =
+            ybus_branch_entries(ThreeWindingTransformerWinding(br, 3), c3)
         y11[offset_ix + ix + n_entries] = Y11
         y12[offset_ix + ix + n_entries] = Y12
         y21[offset_ix + ix + n_entries] = Y21
@@ -743,6 +874,7 @@ function _buildybus!(
     fixed_admittances::Vector{PSY.FixedAdmittance},
     switched_admittances::Vector{PSY.SwitchedAdmittance},
     standard_loads::Vector{PSY.StandardLoad},
+    icd_map::Union{Nothing, ICDCorrectionMap} = nothing,
 )
     branch_entries_transformer_3w = 0
     for br in transformer_3w
@@ -766,17 +898,38 @@ function _buildybus!(
     y22 = zeros(YBUS_ELTYPE, branchcount)
     ysh = zeros(YBUS_ELTYPE, fa_count + sa_count + sl_count)
 
-    _foreach_ybus_branch(branches) do b, ix
+    _foreach_ybus_branch(branches, icd_map) do b, ix, correction
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb, network_reduction_data, adj)
+        _ybus!(
+            y11,
+            y12,
+            y21,
+            y22,
+            b,
+            correction,
+            num_bus,
+            ix,
+            fb,
+            tb,
+            network_reduction_data,
+            adj,
+        )
     end
 
     ix = 1
     for b in transformer_3w
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Transformer3W is invalid"))
+        end
+        uuid = IS.get_uuid(b)
+        c1, c2, c3 = if isnothing(icd_map)
+            1.0, 1.0, 1.0
+        else
+            get(icd_map.map_3w, (uuid, 1), 1.0),
+            get(icd_map.map_3w, (uuid, 2), 1.0),
+            get(icd_map.map_3w, (uuid, 3), 1.0)
         end
         n_entries = _ybus!(
             y11,
@@ -791,6 +944,9 @@ function _buildybus!(
             ix,
             network_reduction_data,
             adj,
+            c1,
+            c2,
+            c3,
         )
         ix += n_entries
     end
@@ -957,6 +1113,7 @@ function Ybus(
         bus_lookup[b] = ix
     end
     adj = SparseArrays.spdiagm(ones(Int8, busnumber))
+    icd_map = _build_icd_correction_map(sys)
     branches = _get_ybus_two_terminal_ac_branches(sys)
     append!(branches.breaker_switches, breaker_switches)
     transformer_3W =
@@ -980,6 +1137,7 @@ function Ybus(
             fixed_admittances,
             switched_admittances,
             standard_loads,
+            icd_map,
         )
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
