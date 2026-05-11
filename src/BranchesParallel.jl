@@ -31,10 +31,7 @@ function MixedBranchesParallel(branches::Vector{<:PSY.ACTransmission})
     return MixedBranchesParallel(Vector{PSY.ACTransmission}(branches), nothing)
 end
 
-function add_branch!(
-    bp::BranchesParallel{T},
-    branch::T,
-) where {T <: PSY.ACTransmission}
+function add_branch!(bp::BranchesParallel{T}, branch::T) where {T <: PSY.ACTransmission}
     push!(bp.branches, branch)
 end
 
@@ -102,17 +99,61 @@ function populate_equivalent_ybus!(bp::AbstractBranchesParallel)
 end
 
 """
-    get_equivalent_rating(bp::AbstractBranchesParallel)
+    get_sum_of_max_rating(bp::AbstractBranchesParallel)
 
-Calculate the total rating for branches in parallel.
-For parallel circuits, the rating is the sum of individual ratings divided by the number of circuits.
-This provides a conservative estimate that accounts for potential overestimation of total capacity.
+Sum of the individual branch ratings, treating each circuit as independently loadable
+up to its own thermal limit. This is the least conservative aggregate and assumes
+unconstrained flow steering across the parallel group.
 """
-function get_equivalent_rating(bp::AbstractBranchesParallel)
-    # Sum of ratings divided by number of circuits
-    return sum(get_equivalent_rating(branch) for branch in bp.branches) /
-           length(bp.branches)
+function get_sum_of_max_rating(bp::AbstractBranchesParallel)
+    return sum(get_equivalent_rating(branch) for branch in bp.branches)
 end
+
+"""
+    get_single_element_contingency_rating(bp::AbstractBranchesParallel)
+
+N-1 rating for the parallel group: the surviving capacity after the largest-rated
+circuit trips, ``\\sum_i S_i - \\max_i S_i``. For a group of one branch this is zero.
+"""
+function get_single_element_contingency_rating(bp::AbstractBranchesParallel)
+    ratings = [get_equivalent_rating(branch) for branch in bp.branches]
+    return sum(ratings) - maximum(ratings)
+end
+
+"""
+    get_impedance_averaged_rating(bp::AbstractBranchesParallel)
+
+Susceptance-weighted average of individual branch ratings,
+``\\sum_i f_i \\cdot S_i`` with ``f_i = b_i / \\sum_k b_k``. Reflects how DC flow
+physically splits across a parallel group. Throws `ArgumentError` if the total
+series susceptance is zero or non-finite.
+"""
+function get_impedance_averaged_rating(bp::AbstractBranchesParallel)
+    multipliers = _admittance_multipliers(bp)
+    if any(!isfinite, values(multipliers)) || all(iszero, values(multipliers))
+        throw(
+            ArgumentError(
+                "Cannot compute impedance-averaged rating: total series susceptance across the parallel group must be finite and non-zero.",
+            ),
+        )
+    end
+    return sum(
+        multipliers[PSY.get_name(br)] * get_equivalent_rating(br) for br in bp.branches
+    )
+end
+
+# Internal helper: compute per-branch admittance multipliers for a parallel group.
+function _admittance_multipliers(bp::AbstractBranchesParallel)
+    return Dict(
+        PSY.get_name(br) => compute_parallel_multiplier(bp, PSY.get_name(br)) for
+        br in bp.branches
+    )
+end
+
+# Series-chain rating contribution for a parallel block: dispatch arm for
+# `get_equivalent_rating(::BranchesSeries)` defined in BranchesSeries.jl.
+_series_member_rating(bp::AbstractBranchesParallel) =
+    get_single_element_contingency_rating(bp)
 
 """
     get_equivalent_emergency_rating(bp::AbstractBranchesParallel)
@@ -193,11 +234,7 @@ function Base.:(==)(a::AbstractBranchesParallel, b::AbstractBranchesParallel)
     return a.branches == b.branches
 end
 
-function Base.show(
-    io::IO,
-    x::MIME{Symbol("text/plain")},
-    y::AbstractBranchesParallel,
-)
+function Base.show(io::IO, x::MIME{Symbol("text/plain")}, y::AbstractBranchesParallel)
     show(io, x, y.branches)
 end
 

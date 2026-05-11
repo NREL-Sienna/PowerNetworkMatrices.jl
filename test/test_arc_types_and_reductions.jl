@@ -161,8 +161,9 @@ end
     @test Y21_m ≈ Y21_l + Y21_t
     @test Y22_m ≈ Y22_l + Y22_t
 
-    # Equivalent rating averages individual ratings; emergency rating sums them.
-    @test PNM.get_equivalent_rating(mbp) ≈ (100.0 + 80.0) / 2
+    # Explicit equivalent-rating strategies for parallel groups; emergency rating sums them.
+    @test PNM.get_sum_of_max_rating(mbp) ≈ 100.0 + 80.0
+    @test PNM.get_single_element_contingency_rating(mbp) ≈ 80.0
     @test PNM.get_equivalent_emergency_rating(mbp) ≈ 100.0 + 80.0
 
     # add_to_map: empty filters short-circuit (no warning).
