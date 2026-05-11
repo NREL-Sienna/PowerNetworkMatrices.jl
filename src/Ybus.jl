@@ -163,18 +163,65 @@ function get_reduction(
     return get_reduction(A, sys, reduction)
 end
 
+function _make_parallel_branch_pair(
+    a::T,
+    b::T,
+    ::Tuple{Int, Int},
+) where {T <: PSY.ACTransmission}
+    return BranchesParallel(T[a, b])
+end
+
+function _make_parallel_branch_pair(
+    a::PSY.ACTransmission,
+    b::PSY.ACTransmission,
+    arc_tuple::Tuple{Int, Int},
+)
+    @warn "Mismatch in parallel device types for arc $(arc_tuple). This could indicate issues in the network data."
+    return MixedBranchesParallel(PSY.ACTransmission[a, b])
+end
+
 function _push_parallel_branch!(
     parallel_branch_map::Dict,
     arc_tuple::Tuple{Int, Int},
+    br::PSY.ACTransmission,
+)
+    existing = parallel_branch_map[arc_tuple]
+    _push_parallel_branch_dispatch!(parallel_branch_map, arc_tuple, existing, br)
+    return
+end
+
+function _push_parallel_branch_dispatch!(
+    ::Dict,
+    ::Tuple{Int, Int},
+    existing::BranchesParallel{T},
     br::T,
 ) where {T <: PSY.ACTransmission}
-    if get_branch_type(parallel_branch_map[arc_tuple]) == T
-        add_branch!(parallel_branch_map[arc_tuple], br)
-    else
+    add_branch!(existing, br)
+    return
+end
+
+function _push_parallel_branch_dispatch!(
+    parallel_branch_map::Dict,
+    arc_tuple::Tuple{Int, Int},
+    existing::BranchesParallel,
+    br::PSY.ACTransmission,
+)
+    @warn "Mismatch in parallel device types for arc $(arc_tuple). This could indicate issues in the network data."
+    parallel_branch_map[arc_tuple] =
+        MixedBranchesParallel(PSY.ACTransmission[existing.branches..., br])
+    return
+end
+
+function _push_parallel_branch_dispatch!(
+    ::Dict,
+    arc_tuple::Tuple{Int, Int},
+    existing::MixedBranchesParallel,
+    br::PSY.ACTransmission,
+)
+    if !any(typeof(b) === typeof(br) for b in existing.branches)
         @warn "Mismatch in parallel device types for arc $(arc_tuple). This could indicate issues in the network data."
-        parallel_branch_map[arc_tuple] =
-            BranchesParallel([parallel_branch_map[arc_tuple].branches..., br])
     end
+    add_branch!(existing, br)
     return
 end
 
@@ -217,7 +264,8 @@ function add_to_branch_maps!(
         corresponding_branch = direct_branch_map[arc_tuple]
         delete!(direct_branch_map, arc_tuple)
         delete!(reverse_direct_branch_map, corresponding_branch)
-        parallel_branch_map[arc_tuple] = BranchesParallel([corresponding_branch, br])
+        parallel_branch_map[arc_tuple] =
+            _make_parallel_branch_pair(corresponding_branch, br, arc_tuple)
         reverse_parallel_branch_map[corresponding_branch] = arc_tuple
         reverse_parallel_branch_map[br] = arc_tuple
     else
@@ -412,7 +460,7 @@ function ybus_branch_entries(br::PSY.GenericArcImpedance)
     return (Y11, Y12, Y21, Y22)
 end
 
-function ybus_branch_entries(parallel_br::BranchesParallel)
+function ybus_branch_entries(parallel_br::AbstractBranchesParallel)
     arc = get_arc_tuple(first(parallel_br))
     Y11 = Y12 = Y21 = Y22 = zero(YBUS_ELTYPE)
     for br in parallel_br
@@ -1707,7 +1755,7 @@ end
 
 """
     add_segment_to_ybus!(
-        segment::BranchesParallel,
+        segment::AbstractBranchesParallel,
         y11::Vector{YBUS_ELTYPE},
         y12::Vector{YBUS_ELTYPE},
         y21::Vector{YBUS_ELTYPE},
@@ -1725,7 +1773,7 @@ branches between the same pair of buses. Each branch in the set is added to the
 same Y-bus position, effectively combining their admittances.
 
 # Arguments
-- `segment::BranchesParallel`: Set of parallel AC transmission branches
+- `segment::AbstractBranchesParallel`: Set of parallel AC transmission branches
 - `y11::Vector{YBUS_ELTYPE}`: Vector for from-bus self admittances
 - `y12::Vector{YBUS_ELTYPE}`: Vector for from-to mutual admittances
 - `y21::Vector{YBUS_ELTYPE}`: Vector for to-from mutual admittances
@@ -1746,7 +1794,7 @@ same Y-bus position, effectively combining their admittances.
 - [`DegreeTwoReduction`](@ref): Series chain elimination
 """
 function add_segment_to_ybus!(
-    segment::BranchesParallel,
+    segment::AbstractBranchesParallel,
     y11::Vector{YBUS_ELTYPE},
     y12::Vector{YBUS_ELTYPE},
     y21::Vector{YBUS_ELTYPE},
