@@ -85,6 +85,96 @@ end
     @test PNM.BranchesParallel{Line} in types_in_series_reduction(nrd)
 end
 
+@testset "MixedBranchesParallel construction and methods" begin
+    bus1 = PSY.ACBus(;
+        number = 101,
+        name = "bus_101",
+        available = true,
+        bustype = PSY.ACBusTypes.PV,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.9, max = 1.1),
+        base_voltage = 230.0,
+    )
+    bus2 = PSY.ACBus(;
+        number = 102,
+        name = "bus_102",
+        available = true,
+        bustype = PSY.ACBusTypes.PV,
+        angle = 0.0,
+        magnitude = 1.0,
+        voltage_limits = (min = 0.9, max = 1.1),
+        base_voltage = 230.0,
+    )
+    line = PSY.Line(;
+        name = "mixed_line",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = PSY.Arc(; from = bus1, to = bus2),
+        r = 0.05,
+        x = 0.10,
+        b = (from = 0.01, to = 0.01),
+        g = (from = 0.0, to = 0.0),
+        rating = 100.0,
+        angle_limits = (min = -π / 2, max = π / 2),
+    )
+    tap = PSY.TapTransformer(;
+        name = "mixed_tap",
+        available = true,
+        active_power_flow = 0.0,
+        reactive_power_flow = 0.0,
+        arc = PSY.Arc(; from = bus1, to = bus2),
+        r = 0.122,
+        x = 0.10,
+        primary_shunt = 0.01 + im * 0.02,
+        tap = 1.0,
+        rating = 80.0,
+        base_power = 100.0,
+        winding_group_number = WindingGroupNumber.GROUP_11,
+    )
+
+    # Homogeneous group dispatches to BranchesParallel{Line}.
+    bp_homog = PNM.BranchesParallel([line])
+    @test bp_homog isa PNM.BranchesParallel{PSY.Line}
+    @test bp_homog isa PNM.AbstractBranchesParallel
+
+    # The {T} parameter must be concrete; abstract T should fail at construction.
+    @test_throws ErrorException PNM.BranchesParallel{PSY.ACTransmission}(
+        PSY.ACTransmission[line, tap],
+        nothing,
+    )
+
+    # MixedBranchesParallel holds heterogeneous branches.
+    mbp = PNM.MixedBranchesParallel([line, tap])
+    @test mbp isa PNM.MixedBranchesParallel
+    @test mbp isa PNM.AbstractBranchesParallel
+    @test length(mbp) == 2
+    @test eltype(mbp.branches) === PSY.ACTransmission
+
+    # ybus_branch_entries on the mixed group should equal the sum of the parts.
+    Y11_l, Y12_l, Y21_l, Y22_l = PNM.ybus_branch_entries(line)
+    Y11_t, Y12_t, Y21_t, Y22_t = PNM.ybus_branch_entries(tap)
+    Y11_m, Y12_m, Y21_m, Y22_m = PNM.ybus_branch_entries(mbp)
+    @test Y11_m ≈ Y11_l + Y11_t
+    @test Y12_m ≈ Y12_l + Y12_t
+    @test Y21_m ≈ Y21_l + Y21_t
+    @test Y22_m ≈ Y22_l + Y22_t
+
+    # Equivalent rating averages individual ratings; emergency rating sums them.
+    @test PNM.get_equivalent_rating(mbp) ≈ (100.0 + 80.0) / 2
+    @test PNM.get_equivalent_emergency_rating(mbp) ≈ 100.0 + 80.0
+
+    # add_to_map: empty filters short-circuit (no warning).
+    @test PNM.add_to_map(mbp, Dict{DataType, Function}()) == true
+
+    # add_to_map: non-empty filters trigger the mixed-type warning.
+    filters = Dict{DataType, Function}(PSY.Line => x -> true)
+    @test_logs (:warn, r"mixed branch types") match_mode = :any begin
+        @test PNM.add_to_map(mbp, filters) == true
+    end
+end
+
 @testset "Test Reductions with filters" begin
     sys_rts_da = build_system(PSISystems, "modified_RTS_GMLC_DA_sys")
 
