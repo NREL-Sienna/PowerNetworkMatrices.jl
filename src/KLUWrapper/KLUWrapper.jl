@@ -34,7 +34,7 @@ This is a `const` rather than a `Preferences.@load_preference` flag so
 that toggling it forces a precompile rebuild and the production binary
 never carries the diagnostic code.
 """
-const KLU_POOL_DEBUG = true
+const KLU_POOL_DEBUG = false
 
 """
     _LIBKLU_LOCK :: ReentrantLock

@@ -92,8 +92,8 @@ function KLULinSolveCache(
     check_pattern::Bool = true,
 ) where {Tv <: Union{Float64, ComplexF64}}
     Int === Int64 || error(
-        "KLULinSolveCache requires 64-bit Int (Julia >= 1.10 on 64-bit). " *
-        "Got Int = $(Int).",
+        "KLULinSolveCache requires a 64-bit Julia build (SuiteSparse_long " *
+        "bindings need Int64 indices). Got Int = $(Int).",
     )
     n = size(A, 1)
     n == size(A, 2) || throw(DimensionMismatch("matrix must be square; got $(size(A))"))
@@ -332,4 +332,3 @@ function klu_factorize(A::SparseMatrixCSC{Tv, Int};
         reuse_symbolic = reuse_symbolic, check_pattern = check_pattern)
     return full_factor!(cache, A)
 end
-
