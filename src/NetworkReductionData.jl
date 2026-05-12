@@ -59,21 +59,16 @@ function get_typed_reverse_direct_branch_map(
     return b.reverse_direct_branch_map[T]::Dict{T, Tuple{Int, Int}}
 end
 
+# Per-type bucket is widened to `AbstractBranchesParallel` so that a
+# `MixedBranchesParallel` group is reachable under each of its underlying
+# branch types (e.g. both `parallel_branch_map[Line]` and
+# `parallel_branch_map[MonitoredLine]` see the same group). Pure
+# `BranchesParallel{T}` groups remain assignment-compatible.
 function get_typed_parallel_branch_map(
     b::BranchMapsByType,
     ::Type{T},
 ) where {T <: PSY.ACTransmission}
-    return b.parallel_branch_map[T]::Dict{Tuple{Int, Int}, BranchesParallel{T}}
-end
-
-function get_typed_parallel_branch_map(
-    b::BranchMapsByType,
-    ::Type{MixedBranchesParallel},
-)
-    return b.parallel_branch_map[MixedBranchesParallel]::Dict{
-        Tuple{Int, Int},
-        MixedBranchesParallel,
-    }
+    return b.parallel_branch_map[T]::Dict{Tuple{Int, Int}, AbstractBranchesParallel}
 end
 
 function get_typed_reverse_parallel_branch_map(
@@ -405,14 +400,17 @@ _get_segment_type(
 
 _get_concrete_types(x::T) where {T <: PSY.ACBranch} = [T]
 _get_concrete_types(::BranchesParallel{T}) where {T <: PSY.ACTransmission} = [T]
-_get_concrete_types(::MixedBranchesParallel) = [MixedBranchesParallel]
+# A heterogeneous group must be discoverable under each of its members'
+# concrete branch types so that downstream per-type iteration (e.g. PSI's
+# `name_to_arc_map[MonitoredLine]`) can find it.
+_get_concrete_types(bp::MixedBranchesParallel) = unique(typeof.(bp.branches))
 
-# Construct an empty per-slot dict matching the segment kind, used when
-# bucketing entries inside `BranchMapsByType.parallel_branch_map`.
-_empty_parallel_branch_map(::BranchesParallel{T}) where {T <: PSY.ACTransmission} =
-    Dict{Tuple{Int, Int}, BranchesParallel{T}}()
-_empty_parallel_branch_map(::MixedBranchesParallel) =
-    Dict{Tuple{Int, Int}, MixedBranchesParallel}()
+# Construct an empty per-slot dict for `BranchMapsByType.parallel_branch_map`.
+# Value type is `AbstractBranchesParallel` so that the same per-type bucket can
+# hold either a homogeneous `BranchesParallel{T}` or a `MixedBranchesParallel`
+# that includes a branch of type `T`.
+_empty_parallel_branch_map(::AbstractBranchesParallel) =
+    Dict{Tuple{Int, Int}, AbstractBranchesParallel}()
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
 """
