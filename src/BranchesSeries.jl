@@ -203,6 +203,8 @@ function get_equivalent_available(bs::BranchesSeries)
     return all(PSY.get_available(branch) for branch in bs)
 end
 
+PSY.get_available(bs::BranchesSeries) = get_equivalent_available(bs)
+
 """
     get_equivalent_α(bs::BranchesSeries)
 

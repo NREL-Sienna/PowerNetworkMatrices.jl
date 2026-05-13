@@ -182,6 +182,8 @@ function get_equivalent_available(bp::AbstractBranchesParallel)
     return all(PSY.get_available(branch) for branch in bp.branches)
 end
 
+PSY.get_available(bp::AbstractBranchesParallel) = get_equivalent_available(bp)
+
 """
     get_equivalent_α(bp::AbstractBranchesParallel)
 
