@@ -15,6 +15,10 @@ only consulted when reusing.
 mutable struct KLULinSolveCache{Tv <: Union{Float64, ComplexF64}}
     colptr::Vector{Int64}
     rowval::Vector{Int64}
+    # Copy of the matrix values used in the most recent numeric factorization.
+    # Lets `_recover_factorization!` rebuild a corrupted numeric handle without
+    # the caller having to re-supply `A`. Empty before the first factor call.
+    nzval::Vector{Tv}
     common::Base.RefValue{KluLCommon}
     symbolic::SymbolicPtr
     numeric::NumericPtr
@@ -109,7 +113,7 @@ function KLULinSolveCache(
     rowval .-= 1
 
     cache = KLULinSolveCache{Tv}(
-        colptr, rowval, common,
+        colptr, rowval, Tv[], common,
         convert(SymbolicPtr, C_NULL),
         convert(NumericPtr, C_NULL),
         reuse_symbolic, check_pattern,
@@ -167,6 +171,36 @@ end
 # Public eager-release alias for `_free_klu_handles!` (the internal helper
 # stays unexported per the KLUWrapper convention).
 Base.finalize(cache::KLULinSolveCache) = _free_klu_handles!(cache)
+
+"""
+Drop a corrupted numeric handle and rebuild it from the values cached in
+`cache.nzval`. Used by `solve_sparse!` on the `KLU_INVALID` retry path, where
+libklu state has been observed to corrupt without the caller having `A` in
+scope. Requires that a numeric factor has been built before (so `cache.nzval`
+is populated) and the symbolic factor is still valid.
+"""
+function _recover_factorization!(
+    cache::KLULinSolveCache{Tv},
+) where {Tv <: Union{Float64, ComplexF64}}
+    cache.symbolic == C_NULL && error(
+        "KLULinSolveCache: cannot recover without a symbolic factor.",
+    )
+    isempty(cache.nzval) && error(
+        "KLULinSolveCache: cannot recover; no cached numerical values yet.",
+    )
+    if cache.numeric != C_NULL
+        num_ref = Ref(cache.numeric)
+        _free_numeric!(Tv, num_ref, cache.common)
+        cache.numeric = num_ref[]
+    end
+    num = _factor_call(
+        Tv, pointer(cache.colptr), pointer(cache.rowval),
+        pointer(cache.nzval), cache.symbolic, cache.common,
+    )
+    num == C_NULL && klu_throw(cache.common[], "klu_factor (recovery)")
+    cache.numeric = num
+    return cache
+end
 
 @inline function _check_pattern_match(cache::KLULinSolveCache,
     A::SparseMatrixCSC, op::AbstractString)
@@ -269,10 +303,11 @@ function numeric_refactor!(cache::KLULinSolveCache{Tv},
     cache.symbolic == C_NULL && error(
         "KLULinSolveCache: call symbolic_factor! before numeric_refactor!.",
     )
+    Anz = nonzeros(A)
     if cache.numeric == C_NULL
         num = _factor_call(
             Tv, pointer(cache.colptr), pointer(cache.rowval),
-            pointer(nonzeros(A)), cache.symbolic, cache.common,
+            pointer(Anz), cache.symbolic, cache.common,
         )
         num == C_NULL && klu_throw(cache.common[], "klu_factor")
         cache.numeric = num
@@ -280,10 +315,14 @@ function numeric_refactor!(cache::KLULinSolveCache{Tv},
         cache.check_pattern && _check_pattern_match(cache, A, "numeric_refactor")
         ok = _refactor_call(
             Tv, pointer(cache.colptr), pointer(cache.rowval),
-            pointer(nonzeros(A)), cache.symbolic, cache.numeric, cache.common,
+            pointer(Anz), cache.symbolic, cache.numeric, cache.common,
         )
         ok != 1 && klu_throw(cache.common[], "klu_refactor")
     end
+    # Snapshot the values used so `_recover_factorization!` can rebuild the
+    # numeric handle without the caller having to re-supply A.
+    resize!(cache.nzval, length(Anz))
+    copyto!(cache.nzval, Anz)
     return cache
 end
 

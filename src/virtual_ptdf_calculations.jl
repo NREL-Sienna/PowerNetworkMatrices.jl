@@ -165,7 +165,7 @@ function _create_factorization(
     ::KLUSolver,
     ABA::SparseArrays.SparseMatrixCSC{Float64, Int},
 )
-    return _create_klu_solver(ABA)
+    return klu_factorize(ABA)
 end
 
 function _create_factorization(

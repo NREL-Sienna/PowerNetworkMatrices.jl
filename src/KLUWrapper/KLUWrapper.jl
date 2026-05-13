@@ -48,11 +48,8 @@ pointers still valid both pre- and post-call, and a `SIGSEGV` inside
 `klu_l_solve` (`klu_solve.c:118` in v7.8.3, the row-permutation read in
 the `nrhs == 1` chunk). The pre-call snapshot dump in `solve!` made
 both modes reproducible on macOS and confirmed the deterministic
-Windows-MinGW failure was the same bug.
-
-This lock is the only mechanism we have evidence for that prevents
-both modes; the `_solve_with_retry` recovery wrapper we briefly
-maintained handles only the graceful-return mode, not the SEGV.
+Windows-MinGW failure was the same bug. This lock is the only
+mechanism we have evidence for that prevents both modes.
 """
 const _LIBKLU_LOCK = ReentrantLock()
 

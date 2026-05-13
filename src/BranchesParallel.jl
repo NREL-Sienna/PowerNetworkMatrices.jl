@@ -116,7 +116,7 @@ N-1 rating for the parallel group: the surviving capacity after the largest-rate
 circuit trips, ``\\sum_i S_i - \\max_i S_i``. For a group of one branch this is zero.
 """
 function get_single_element_contingency_rating(bp::AbstractBranchesParallel)
-    ratings = [get_equivalent_rating(branch) for branch in bp.branches]
+    ratings = get_equivalent_rating.(bp.branches)
     return sum(ratings) - maximum(ratings)
 end
 
@@ -129,8 +129,8 @@ physically splits across a parallel group. Throws `ArgumentError` if the total
 series susceptance is zero or non-finite.
 """
 function get_impedance_averaged_rating(bp::AbstractBranchesParallel)
-    multipliers = _admittance_multipliers(bp)
-    if any(!isfinite, values(multipliers)) || all(iszero, values(multipliers))
+    b_total = sum(PSY.get_series_susceptance, bp.branches)
+    if !isfinite(b_total) || iszero(b_total)
         throw(
             ArgumentError(
                 "Cannot compute impedance-averaged rating: total series susceptance across the parallel group must be finite and non-zero.",
@@ -138,15 +138,8 @@ function get_impedance_averaged_rating(bp::AbstractBranchesParallel)
         )
     end
     return sum(
-        multipliers[PSY.get_name(br)] * get_equivalent_rating(br) for br in bp.branches
-    )
-end
-
-# Internal helper: compute per-branch admittance multipliers for a parallel group.
-function _admittance_multipliers(bp::AbstractBranchesParallel)
-    return Dict(
-        PSY.get_name(br) => compute_parallel_multiplier(bp, PSY.get_name(br)) for
-        br in bp.branches
+        PSY.get_series_susceptance(br) / b_total * get_equivalent_rating(br)
+        for br in bp.branches
     )
 end
 

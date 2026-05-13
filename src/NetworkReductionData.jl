@@ -275,7 +275,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 map_by_type = get!(
                     all_branch_maps_by_type.parallel_branch_map,
                     concrete_type,
-                    _empty_parallel_branch_map(v),
+                    _empty_parallel_branch_map(),
                 )
                 map_by_type[k] = v
                 name_to_arc_map = get!(
@@ -409,7 +409,7 @@ _get_concrete_types(bp::MixedBranchesParallel) = unique(typeof.(bp.branches))
 # Value type is `AbstractBranchesParallel` so that the same per-type bucket can
 # hold either a homogeneous `BranchesParallel{T}` or a `MixedBranchesParallel`
 # that includes a branch of type `T`.
-_empty_parallel_branch_map(::AbstractBranchesParallel) =
+_empty_parallel_branch_map() =
     Dict{Tuple{Int, Int}, AbstractBranchesParallel}()
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses

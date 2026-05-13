@@ -238,7 +238,7 @@ function VirtualMODF(
 
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    K = _create_klu_solver(ABA)
+    K = klu_factorize(ABA)
 
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
 

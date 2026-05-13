@@ -253,7 +253,7 @@ function VirtualLODF(
     subnetwork_axes = make_arc_arc_subnetwork_axes(A)
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    K = _create_klu_solver(ABA)
+    K = klu_factorize(ABA)
     bus_ax = get_bus_axis(A)
 
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)

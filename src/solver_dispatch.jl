@@ -43,15 +43,3 @@ function with_solver(
 ) where {F, KT}
     return @lock solver_lock f(K, work_ba_col[1], temp_data[1])
 end
-
-"""
-    _create_klu_solver(ABA) -> KLULinSolveCache{Float64}
-
-Factory used by `Virtual{PTDF, LODF, MODF}` constructors. Always returns
-a single `KLULinSolveCache`; concurrency is handled by the per-cache
-`solver_lock` at the wrapper level and by `_LIBKLU_LOCK` at the libklu
-boundary.
-"""
-function _create_klu_solver(ABA::SparseArrays.SparseMatrixCSC{Float64, Int})
-    return klu_factorize(ABA)
-end

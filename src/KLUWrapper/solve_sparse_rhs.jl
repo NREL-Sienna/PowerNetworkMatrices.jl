@@ -67,9 +67,9 @@ function solve_sparse!(
         end
 
         if npack > 0
-            # Retry-on-KLU_INVALID is inlined here (mirrors `_solve_with_retry`
-            # in solve_dense.jl) to keep the inner-loop closure from capturing
-            # the per-chunk `npack`, which would force Julia to box it.
+            # Retry-on-KLU_INVALID is inlined here (rather than factored into a
+            # helper) to keep the inner-loop closure from capturing the per-chunk
+            # `npack`, which would force Julia to box it.
             ok = _solve_call(
                 Tv, cache.symbolic, cache.numeric, n, Int64(npack),
                 pointer(scratch), cache.common,
