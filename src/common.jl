@@ -102,11 +102,11 @@ function get_arc_tuple(br::PSY.ACTransmission, nr::NetworkReductionData)
 end
 
 # Parallel branches: all oriented in same direction, so just take arc of first.
-function get_arc_tuple(br::BranchesParallel, nr::NetworkReductionData)
+function get_arc_tuple(br::AbstractBranchesParallel, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(first(br)), nr)
 end
 
-function get_arc_tuple(br::BranchesParallel)
+function get_arc_tuple(br::AbstractBranchesParallel)
     return get_arc_tuple(PSY.get_arc(first(br)))
 end
 
@@ -288,8 +288,8 @@ end
 """
     _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{$YBUS_ELTYPE})
 
-Takes as input a 2x2 Matrix{$YBUS_ELTYPE} representing the Ybus contribution of either a
-BranchesParallel or BranchesSeries object.
+Takes as input a 2x2 Matrix{$YBUS_ELTYPE} representing the Ybus contribution of either an
+AbstractBranchesParallel (homogeneous or mixed) or BranchesSeries object.
 Returns a dictionary of equivalent parameters, matching the PowerModels data format.
 """
 function _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{YBUS_ELTYPE})
@@ -345,7 +345,7 @@ function has_time_series(
 end
 
 function has_time_series(
-    branch::BranchesParallel,
+    branch::AbstractBranchesParallel,
     ts_type::Type{T},
     ts_name::String,
 ) where {
@@ -388,7 +388,7 @@ function get_device_with_time_series(
 end
 
 function get_device_with_time_series(
-    branch::BranchesParallel,
+    branch::AbstractBranchesParallel,
     ts_type::Type{T},
     ts_name::String,
 ) where {
@@ -477,7 +477,7 @@ function _segment_susceptance_after_outage(
 end
 
 function _segment_susceptance_after_outage(
-    segment::BranchesParallel,
+    segment::AbstractBranchesParallel,
     tripped_set::Set{<:PSY.ACTransmission},
 )::Float64
     b_remaining = 0.0

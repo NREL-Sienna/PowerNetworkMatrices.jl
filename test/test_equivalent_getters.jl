@@ -36,9 +36,18 @@
     )
     # Create BranchesParallel
     bp = PNM.BranchesParallel([line1, line2])
-    # Test get_rating: Rating = (Rating1 + Rating2) / n = (100.0 + 150.0) / 2 = 125.0
-    rating_eq = PNM.get_equivalent_rating(bp)
-    @test rating_eq ≈ 125.0 atol = 1e-6
+
+    # Sum of individual thermal limits.
+    @test PNM.get_sum_of_max_rating(bp) ≈ 250.0 atol = 1e-6
+
+    # N-1: capacity remaining after the largest-rated circuit trips.
+    # sum(100, 150) - max(100, 150) = 100.0
+    @test PNM.get_single_element_contingency_rating(bp) ≈ 100.0 atol = 1e-6
+
+    # Susceptance-weighted average.
+    # b1 = x1/(r1²+x1²) = 0.2/0.05 = 4.0, b2 = 0.4/0.20 = 2.0, b_total = 6.0
+    # f1 = 2/3, f2 = 1/3 → (2/3)*100 + (1/3)*150 = 350/3 ≈ 116.667
+    @test PNM.get_impedance_averaged_rating(bp) ≈ 350.0 / 3.0 atol = 1e-6
 
     emergency_rating_eq = PNM.get_equivalent_emergency_rating(bp)
     @test emergency_rating_eq ≈ 250.0 atol = 1e-6
@@ -46,20 +55,20 @@
     bs = PNM.BranchesSeries()
     PNM.add_branch!(bs, line1, :FromTo)
     PNM.add_branch!(bs, line2, :FromTo)
-    # Test get_rating: Rating = minimum rating for series branches (weakest link)
+    # Series weakest-link rule: min(100, 150) = 100.0
     rating_eq = PNM.get_equivalent_rating(bs)
     @test rating_eq ≈ 100.0 atol = 1e-6
 
     emergency_rating_eq = PNM.get_equivalent_emergency_rating(bs)
     @test emergency_rating_eq ≈ 100.0 atol = 1e-6
 
-    #Add test parrallel circuit + line1
+    # Series chain containing a parallel block: the block contributes its N-1
+    # single-element-contingency rating (100.0), so min(100, 150) = 100.0.
     bs = PNM.BranchesSeries()
     PNM.add_branch!(bs, bp, :FromTo)
     PNM.add_branch!(bs, line2, :FromTo)
-    # Test get_rating: Rating = minimum rating for series branches (weakest link)
     rating_eq = PNM.get_equivalent_rating(bs)
-    @test rating_eq ≈ 125.0 atol = 1e-6
+    @test rating_eq ≈ 100.0 atol = 1e-6
 
     emergency_rating_eq = PNM.get_equivalent_emergency_rating(bs)
     @test emergency_rating_eq ≈ 150.0 atol = 1e-6
@@ -99,7 +108,8 @@ function test_ybus_equivalence_branches_parallel(vector_branches)
         voltage_limits = (min = 0.0, max = 1.0),
         base_voltage = 1.0,
         area = nothing,
-        load_zone = nothing)
+        load_zone = nothing,
+    )
     bus2 = ACBus(;
         number = 2,
         name = "bus2",
@@ -110,7 +120,8 @@ function test_ybus_equivalence_branches_parallel(vector_branches)
         voltage_limits = (min = 0.0, max = 1.0),
         base_voltage = 1.0,
         area = nothing,
-        load_zone = nothing)
+        load_zone = nothing,
+    )
 
     add_component!(sys, bus1)
     add_component!(sys, bus2)
@@ -199,7 +210,8 @@ function test_ybus_equivalence_branches_series(vector_branches)
             voltage_limits = (min = 0.0, max = 1.0),
             base_voltage = 1.0,
             area = nothing,
-            load_zone = nothing)
+            load_zone = nothing,
+        )
         add_component!(sys, bus)
     end
     for (ix, br) in enumerate(vector_branches)

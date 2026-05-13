@@ -121,7 +121,7 @@ end
         break
     end
 
-    if parallel_branch !== nothing
+    if !isnothing(parallel_branch)
         mod = NetworkModification(vptdf, parallel_branch)
         result = apply_ybus_modification(ybus, mod)
 
@@ -166,7 +166,7 @@ end
         end
     end
 
-    if series_branch !== nothing
+    if !isnothing(series_branch)
         mod = NetworkModification(vptdf, series_branch)
         result = apply_ybus_modification(ybus, mod)
 

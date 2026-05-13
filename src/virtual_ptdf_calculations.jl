@@ -10,9 +10,19 @@ The VirtualPTDF is initialized with no row stored.
 The VirtualPTDF is indexed using branch names and bus numbers as for the PTDF
 matrix.
 
+# Thread-safety
+
+Concurrent `getindex` is safe but serialized: every libklu solve is wrapped
+by `_LIBKLU_LOCK` (process-wide) and the per-cache `solver_lock` here, and
+the row cache is guarded by `cache_lock`. Multiple threads can call
+`getindex` simultaneously; their libklu work runs one at a time, while the
+JuMP-side work (in callers) parallelizes freely.
+
 # Arguments
-- `K::Union{KLU.KLUFactorization{Float64, Int}, AppleAccelerate.AAFactorization{Float64}}`:
-        LU factorization matrices of the ABA matrix, evaluated by means of KLU or AppleAccelerate
+- `K`:
+        LU factorization of the ABA matrix. A `KLULinSolveCache{Float64}` for
+        the default KLU solver, or an `AppleAccelerate.AAFactorization{Float64}`
+        when the AppleAccelerate extension is loaded.
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix
 - `ref_bus_positions::Set{Int}`:
@@ -31,25 +41,34 @@ matrix.
         and buses with their enumerated indexes. The branch indexes refer to
         the key of the cache dictionary. The bus indexes refer to the position
         of the elements in the PTDF row stored.
-- `temp_data::Vector{Float64}`:
-        Temporary vector for internal use.
+- `temp_data::Vector{Vector{Float64}}`:
+        Single-element vector holding a temporary buffer for internal use.
+        Kept as `Vector{Vector{Float64}}` so the dispatch on
+        `_solve_factorization` stays uniform across backends.
 - `valid_ix::Vector{Int}`:
         Vector containing the row/columns indices of matrices related the buses
         which are not slack ones.
 - `cache::RowCache`:
-        Cache were PTDF rows are stored.
+        Cache where PTDF rows are stored.
+- `cache_lock::ReentrantLock`:
+        Guards `cache` reads/writes for parallel `getindex` callers.
 - `subnetworks::Dict{Int, Set{Int}}`:
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
+- `work_ba_col::Vector{Vector{Float64}}`:
+        Single-element BA-column scratch buffer.
+- `solver_lock::ReentrantLock`:
+        Serializes solves on this cache. Combined with `_LIBKLU_LOCK` at the
+        libklu boundary, ensures one solve at a time per cache.
 - `system_uuid::Union{Base.UUID, Nothing}`:
         UUID of the system used to construct the matrix, used to validate that
         modification operations are applied to the correct system. `nothing` when
         constructed from a Ybus without an associated system.
 """
-struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K <: LinearAlgebra.Factorization} <:
+struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K} <:
        PowerNetworkMatrix{Float64}
     K::K
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
@@ -59,13 +78,15 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K <: LinearAlgebra.Factorization} <
     dist_slack_normalized::Vector{Float64}
     axes::Ax
     lookup::L
-    temp_data::Vector{Float64}
+    temp_data::Vector{Vector{Float64}}
     valid_ix::Vector{Int}
     cache::RowCache
+    cache_lock::ReentrantLock
     subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
-    work_ba_col::Vector{Float64}
+    work_ba_col::Vector{Vector{Float64}}
+    solver_lock::ReentrantLock
     system_uuid::Union{Base.UUID, Nothing}
 end
 
@@ -140,8 +161,11 @@ function VirtualPTDF(
 end
 
 # Factorization dispatch methods for VirtualPTDF solver selection.
-function _create_factorization(::KLUSolver, ABA::SparseArrays.SparseMatrixCSC{Float64, Int})
-    return klu(ABA)
+function _create_factorization(
+    ::KLUSolver,
+    ABA::SparseArrays.SparseMatrixCSC{Float64, Int},
+)
+    return klu_factorize(ABA)
 end
 
 function _create_factorization(
@@ -164,7 +188,7 @@ end
 """
 Builds the Virtual PTDF matrix from a Ybus matrix. This constructor is more efficient when the prerequisite Ybus
 matrix is already available and provides direct control over the underlying matrix computations (including network reductions).
-The return is a VirtualPTDF struct with an empty cache. 
+The return is a VirtualPTDF struct with an empty cache.
 
 # Arguments
 - `ybus::Ybus`: Ybus matrix from which the matrix is constructed
@@ -208,7 +232,6 @@ function VirtualPTDF(
     if length(subnetwork_axes) > 1
         @info "Network is not connected, using subnetworks"
     end
-    temp_data = zeros(length(axes[2]))
 
     if isempty(persistent_arcs)
         empty_cache =
@@ -233,9 +256,13 @@ function VirtualPTDF(
         dist_slack_normalized = Float64[]
     end
 
-    # Pre-allocate work array for BA column extraction
-    valid_ix = setdiff(1:length(temp_data), ref_bus_positions)
-    work_ba_col = zeros(length(valid_ix))
+    # Single scratch slot — solves serialize through `solver_lock` +
+    # `_LIBKLU_LOCK`, so per-worker scratch is unnecessary. Kept as a
+    # `Vector{Vector{Float64}}` so `with_solver`'s callback signature
+    # stays uniform across solver backends.
+    valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
+    temp_data = [zeros(length(bus_ax))]
+    work_ba_col = [zeros(length(valid_ix))]
 
     arc_susceptances = _extract_arc_susceptances(BA.data)
 
@@ -251,10 +278,12 @@ function VirtualPTDF(
         temp_data,
         valid_ix,
         empty_cache,
+        ReentrantLock(),
         subnetwork_axes,
         Ref(tol),
         ybus.network_reduction_data,
         work_ba_col,
+        ReentrantLock(),
         system_uuid,
     )
 end
@@ -292,14 +321,50 @@ if isdefined(Base, :print_array) # 0.7 and later
     Base.print_array(io::IO, X::VirtualPTDF) = "VirtualPTDF"
 end
 
-# Helper function to solve with different factorization types
-function _solve_factorization(K::KLU.KLUFactorization{Float64, Int}, b::Vector{Float64})
-    return KLU.solve!(K, b)
+# Helper function to solve with different factorization types. The
+# `KLULinSolveCache` overload solves in place (zero-allocation hot path);
+# the generic fallback delegates to `\` and is extended by the
+# AppleAccelerate extension for `AAFactorization`.
+function _solve_factorization(K::KLULinSolveCache{Float64}, b::Vector{Float64})
+    solve!(K, b)
+    return b
 end
 
-# Generic fallback for other factorization types (will be extended by extensions)
-function _solve_factorization(K::LinearAlgebra.Factorization, b::Vector{Float64})
+function _solve_factorization(K, b::Vector{Float64})
     return K \ b
+end
+
+function _compute_ptdf_row(vptdf::VirtualPTDF, row::Int)::Vector{Float64}
+    buscount = size(vptdf, 1)
+    ref_bus_positions = get_ref_bus_position(vptdf)
+    if !isempty(vptdf.dist_slack) && length(ref_bus_positions) != 1
+        error(
+            "Distributed slack is not supported for systems with multiple reference buses.",
+        )
+    end
+    use_dist_slack = length(vptdf.dist_slack) == buscount
+    if !use_dist_slack && !isempty(vptdf.dist_slack)
+        error("Distributed bus specification doesn't match the number of buses.")
+    end
+
+    return with_solver(
+        vptdf.K, vptdf.work_ba_col, vptdf.temp_data, vptdf.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
+        valid_ix = vptdf.valid_ix
+        @inbounds for i in eachindex(valid_ix)
+            work_ba_col[i] = vptdf.BA[valid_ix[i], row]
+        end
+        lin_solve = _solve_factorization(K_solver, work_ba_col)
+        fill!(temp_data, 0.0)
+        @inbounds for i in eachindex(valid_ix)
+            temp_data[valid_ix[i]] = lin_solve[i]
+        end
+        if use_dist_slack
+            adjustment = dot(temp_data, vptdf.dist_slack_normalized)
+            return temp_data .- adjustment
+        end
+        return copy(temp_data)
+    end
 end
 
 function _getindex(
@@ -307,44 +372,10 @@ function _getindex(
     row::Int,
     column::Union{Int, Colon},
 )
-    # check if value is in the cache
-    if haskey(vptdf.cache, row)
-        return vptdf.cache.temp_cache[row][column]
-    else
-        # evaluate the value for the PTDF column
-        valid_ix = vptdf.valid_ix
-        # Use pre-allocated work array instead of collect() to reduce allocations
-        @inbounds for i in eachindex(valid_ix)
-            vptdf.work_ba_col[i] = vptdf.BA[valid_ix[i], row]
-        end
-        lin_solve = _solve_factorization(vptdf.K, vptdf.work_ba_col)
-        buscount = size(vptdf, 1)
-        ref_bus_positions = get_ref_bus_position(vptdf)
-        if !isempty(vptdf.dist_slack) && length(ref_bus_positions) != 1
-            error(
-                "Distributed slack is not supported for systems with multiple reference buses.",
-            )
-        elseif isempty(vptdf.dist_slack) && length(ref_bus_positions) < buscount
-            @inbounds for i in eachindex(valid_ix)
-                vptdf.temp_data[valid_ix[i]] = lin_solve[i]
-            end
-            vptdf.cache[row] = copy(vptdf.temp_data)
-        elseif length(vptdf.dist_slack) == buscount
-            @inbounds for i in eachindex(valid_ix)
-                vptdf.temp_data[valid_ix[i]] = lin_solve[i]
-            end
-            # Use pre-computed normalized slack array for efficiency
-            adjustment = dot(vptdf.temp_data, vptdf.dist_slack_normalized)
-            vptdf.cache[row] = vptdf.temp_data .- adjustment
-        else
-            error("Distributed bus specification doesn't match the number of buses.")
-        end
-
-        if get_tol(vptdf) > eps()
-            vptdf.cache[row] = sparsify(vptdf.cache[row], get_tol(vptdf))
-        end
-
-        return vptdf.cache[row][column]
+    return cached_row_lookup(
+        vptdf.cache, vptdf.cache_lock, row, column, get_tol(vptdf),
+    ) do
+        _compute_ptdf_row(vptdf, row)
     end
 end
 

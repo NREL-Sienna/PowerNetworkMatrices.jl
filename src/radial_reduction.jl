@@ -37,9 +37,10 @@ function _build_row_to_cols(A::SparseArrays.SparseMatrixCSC{Int8, Int}, buscount
     n_rows = size(A, 1)
     row_first_col = zeros(Int, n_rows)
     row_to_cols = Vector{Tuple{Int, Int}}(undef, n_rows)
+    Arowval = SparseArrays.rowvals(A)
     for col in 1:buscount
-        for k in A.colptr[col]:(A.colptr[col + 1] - 1)
-            row = A.rowval[k]
+        for k in SparseArrays.nzrange(A, col)
+            row = Arowval[k]
             if row_first_col[row] == 0
                 row_first_col[row] = col
             else

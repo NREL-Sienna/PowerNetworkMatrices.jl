@@ -57,7 +57,7 @@ function run_tests(args...; kwargs...)
     logger = global_logger()
     try
         logging_config_filename = get(ENV, "SIIP_LOGGING_CONFIG", nothing)
-        if logging_config_filename !== nothing
+        if !isnothing(logging_config_filename)
             config = IS.LoggingConfiguration(logging_config_filename)
         else
             config = IS.LoggingConfiguration(;

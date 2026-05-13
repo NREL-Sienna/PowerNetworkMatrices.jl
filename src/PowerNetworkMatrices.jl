@@ -29,6 +29,9 @@ export DC_vPTDF_Matrix
 export DC_BA_Matrix
 export AC_Ybus_Matrix
 export YBUS_ELTYPE
+export get_sum_of_max_rating
+export get_single_element_contingency_rating
+export get_impedance_averaged_rating
 
 export apply_woodbury_correction
 export clear_all_caches!
@@ -64,15 +67,30 @@ import DataStructures: SortedDict
 import SparseArrays
 import SparseArrays: rowvals, nzrange
 import HDF5
-import KLU: klu
-import KLU
 import LinearAlgebra
 import LinearAlgebra: BLAS.gemm
 import LinearAlgebra: ldiv!, mul!, I, dot
 import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 import Preferences
 
+include("KLUWrapper/KLUWrapper.jl")
+import .KLUWrapper:
+    KLULinSolveCache,
+    klu_factorize,
+    symbolic_factor!,
+    symbolic_refactor!,
+    numeric_refactor!,
+    full_factor!,
+    full_refactor!,
+    solve!,
+    tsolve!,
+    solve_sparse!,
+    solve_sparse,
+    n_valid,
+    is_factored
+
 include("linalg_settings.jl")
+include("solver_dispatch.jl")
 
 function __init__()
     something(get_linalg_backend_check(), false) && check_linalg_backend()

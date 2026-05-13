@@ -9,7 +9,7 @@
     # UUID is nothing when constructing from Ybus (no system available)
     ybus = Ybus(sys)
     vptdf_ybus = VirtualPTDF(ybus)
-    @test get_system_uuid(vptdf_ybus) === nothing
+    @test isnothing(get_system_uuid(vptdf_ybus))
 end
 
 @testset "System UUID tracking in VirtualMODF" begin
@@ -24,10 +24,10 @@ end
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
 
     ybus = Ybus(sys)
-    @test get_system_uuid(ybus) === nothing
+    @test isnothing(get_system_uuid(ybus))
 
     ptdf = PTDF(sys)
-    @test get_system_uuid(ptdf) === nothing
+    @test isnothing(get_system_uuid(ptdf))
 end
 
 @testset "System UUID validation in NetworkModification" begin

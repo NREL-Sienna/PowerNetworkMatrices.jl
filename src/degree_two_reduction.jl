@@ -37,7 +37,7 @@ function get_degree2_reduction(
     bus_lookup::Dict{Int, Int},
     exempt_bus_positions::Set{Int},
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
-    parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel},
+    parallel_branch_map::Dict{Tuple{Int, Int}, AbstractBranchesParallel},
     transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding},
 )
     reverse_bus_lookup = Dict(v => k for (k, v) in bus_lookup)
@@ -76,7 +76,7 @@ end
 function _add_to_reverse_series_branch_map!(
     reverse_series_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}},
     composite_arc::Tuple{Int, Int},
-    segment::BranchesParallel,
+    segment::AbstractBranchesParallel,
 )
     for branch in segment.branches
         reverse_series_branch_map[branch] = composite_arc
@@ -113,7 +113,7 @@ end
 
 function _get_branch_map_entry(
     direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission},
-    parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel},
+    parallel_branch_map::Dict{Tuple{Int, Int}, AbstractBranchesParallel},
     transformer3W_map::Dict{Tuple{Int, Int}, ThreeWindingTransformerWinding},
     arc::Tuple{Int, Int},
 )

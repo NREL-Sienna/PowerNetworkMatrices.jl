@@ -5,7 +5,7 @@ Compute the Pi-model Ybus delta for a partial outage on a parallel branch group.
 Finds the circuit whose susceptance matches `delta_b` and returns its negated Pi-model entries.
 """
 function _compute_parallel_partial_ybus_delta(
-    bp::BranchesParallel,
+    bp::AbstractBranchesParallel,
     delta_b::Float64,
 )::NTuple{4, YBUS_ELTYPE}
     for br in bp.branches
