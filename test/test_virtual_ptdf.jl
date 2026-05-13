@@ -1,8 +1,8 @@
 # if it fails, we don't want the terminal to be flooded with errors, therefore failfast=true
 @testset "Test Virtual PTDF matrices" for solver in
                                           ("KLU", "AppleAccelerate")
-    if !PowerNetworkMatrices._has_apple_accelerate_ext() && solver == "AppleAccelerate"
-        @info "Skipped AppleAccelerate tests (extension not loaded)"
+    if !PowerNetworkMatrices._has_apple_accelerate_backend() && solver == "AppleAccelerate"
+        @info "Skipped AppleAccelerate tests (backend unavailable on this platform)"
         continue
     end
     sys = PSB.build_system(
@@ -185,8 +185,8 @@ end
 end
 
 @testset "Test Virtual PTDF with Apple Accelerate" begin
-    if !PowerNetworkMatrices._has_apple_accelerate_ext()
-        @info "Skipped AppleAccelerate tests (extension not loaded)"
+    if !PowerNetworkMatrices._has_apple_accelerate_backend()
+        @info "Skipped AppleAccelerate tests (backend unavailable on this platform)"
     else
         # Test VirtualPTDF with Apple Accelerate solver
         sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")

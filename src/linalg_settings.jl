@@ -1,7 +1,9 @@
 
-# Extensions are loaded when trigger packages (Pardiso, AppleAccelerate) are loaded
+# The MKL/Pardiso path still uses the package-extension mechanism (Pardiso.jl
+# is the only consumer-facing way to access the MKL Pardiso solver). The
+# Apple Accelerate path no longer does — `AccelerateWrapper` is built in via
+# a `@static if Sys.isapple()` gate.
 
-# Check if MKL/Pardiso extension is available at runtime
 function _has_mkl_pardiso_ext()
     ext = Base.get_extension(@__MODULE__, :MKLPardisoExt)
     return !isnothing(ext)
@@ -12,20 +14,11 @@ _mkl_pardiso_install_error() =
     Install the Pardiso package:
     julia> using Pkg; Pkg.add(\"Pardiso\")"""
 
-# Check if AppleAccelerate extension is available at runtime
-function _has_apple_accelerate_ext()
-    ext = Base.get_extension(@__MODULE__, :AppleAccelerateExt)
-    return !isnothing(ext)
-end
+_has_apple_accelerate_backend() = Sys.isapple()
 
-_apple_accelerate_install_error() =
-    """The AppleAccelerate extension is not available.
-    This solver is only available on macOS.
-    Install AppleAccelerate:
-    julia> using Pkg; Pkg.add(\"AppleAccelerate\")"""
-
-# _create_apple_accelerate_factorization is defined in ext/AppleAccelerateExt.jl
-# when AppleAccelerate package is loaded
+_apple_accelerate_unavailable_error() =
+    """The Apple Accelerate sparse backend is macOS-only (Sys.isapple() returned false).
+    Use the KLU solver (the default) on non-Apple platforms."""
 
 "Set a preference of the backend library for sparse linear algebra operations."
 function set_linalg_backend_preference(linalglib::Union{String, Nothing})
@@ -125,14 +118,12 @@ function check_linalg_backend()
             end
         end
 
-        if _has_apple_accelerate_ext()
+        if _has_apple_accelerate_backend()
             @info go_msg("AppleAccelerate")
         else
             if user_linalg_backend == "AppleAccelerate"
-                @warn yo_msg("AppleAccelerate")
+                @warn "AppleAccelerate is only available on Apple platforms."
             end
-            @info no_msg("AppleAccelerate")
-            @info "See https://github.com/JuliaLinearAlgebra/AppleAccelerate.jl"
         end
     end
 end

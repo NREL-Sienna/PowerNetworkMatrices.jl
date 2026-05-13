@@ -94,7 +94,7 @@ function _buildlodf(
     ptdf::Matrix{Float64},
     ::AppleAccelerateSolver,
 )
-    _has_apple_accelerate_ext() || error(_apple_accelerate_install_error())
+    _has_apple_accelerate_backend() || error(_apple_accelerate_unavailable_error())
     return _calculate_LODF_matrix_AppleAccelerate(a, ptdf)
 end
 
@@ -197,8 +197,43 @@ end
 # _pardiso_sequential_LODF!, _pardiso_single_LODF!, _calculate_LODF_matrix_MKLPardiso
 # are defined in ext/MKLPardisoExt.jl when the Pardiso package is loaded
 
-# _calculate_LODF_matrix_AppleAccelerate is defined in ext/AppleAccelerateExt.jl
-# when the AppleAccelerate package is loaded
+"""
+Function for internal use only.
+
+Computes the LODF matrix using the internal Apple Accelerate backend
+(`AccelerateWrapper`). Available only on macOS. Shape mirrors
+`_calculate_LODF_matrix_KLU(a, ptdf)` exactly: factor the diagonal "demand"
+matrix `diag(1 - PTDF·A)` and solve in place against `a · ptdf`.
+
+# Arguments
+- `a::SparseArrays.SparseMatrixCSC{Int8, Int}`: Incidence Matrix
+- `ptdf::Matrix{Float64}`: PTDF matrix
+"""
+@static if Sys.isapple()
+    function _calculate_LODF_matrix_AppleAccelerate(
+        a::SparseArrays.SparseMatrixCSC{Int8, Int},
+        ptdf::Matrix{Float64},
+    )
+        linecount = size(ptdf, 2)
+        ptdf_denominator_t = a * ptdf
+        m_I = Int[]
+        m_V = Float64[]
+        for iline in 1:linecount
+            if (1.0 - ptdf_denominator_t[iline, iline]) < LODF_ENTRY_TOLERANCE
+                push!(m_I, iline)
+                push!(m_V, 1.0)
+            else
+                push!(m_I, iline)
+                push!(m_V, 1 - ptdf_denominator_t[iline, iline])
+            end
+        end
+        Dem_cache =
+            AccelerateWrapper.aa_factorize(SparseArrays.sparse(m_I, m_I, m_V))
+        AccelerateWrapper.solve!(Dem_cache, ptdf_denominator_t)
+        ptdf_denominator_t[LinearAlgebra.diagind(ptdf_denominator_t)] .= -1.0
+        return ptdf_denominator_t
+    end
+end
 
 """
     LODF(sys::PSY.System; linear_solver::String = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)

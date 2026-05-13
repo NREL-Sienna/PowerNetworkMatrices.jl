@@ -111,7 +111,7 @@ function _buildptdf_from_matrices(
     ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64},
     ::AppleAccelerateSolver)
-    _has_apple_accelerate_ext() || error(_apple_accelerate_install_error())
+    _has_apple_accelerate_backend() || error(_apple_accelerate_unavailable_error())
     return _calculate_PTDF_matrix_AppleAccelerate(A, BA, ref_bus_positions, dist_slack)
 end
 
@@ -230,8 +230,59 @@ end
 # _calculate_PTDF_matrix_MKLPardiso is defined in ext/MKLPardisoExt.jl
 # when Pardiso package is loaded
 
-# _calculate_PTDF_matrix_AppleAccelerate is defined in ext/AppleAccelerateExt.jl
-# when AppleAccelerate package is loaded
+"""
+Function for internal use only.
+
+Computes the PTDF matrix using the internal Apple Accelerate backend
+(`AccelerateWrapper`). Available only on macOS — non-Apple callers are
+rejected by `_create_factorization` before reaching this entry. Shape
+mirrors `_calculate_PTDF_matrix_KLU`: factor ABA via LDLT, then solve
+`ABA · X = BA[valid_ix, :]` via the block-packed `solve_sparse!`.
+
+# Arguments
+- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`: Incidence Matrix
+- `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`: BA matrix
+- `ref_bus_positions::Set{Int}`: indexes of reference slack buses
+- `dist_slack::Vector{Float64}`: distributed-slack weights
+"""
+@static if Sys.isapple()
+    function _calculate_PTDF_matrix_AppleAccelerate(
+        A::SparseArrays.SparseMatrixCSC{Int8, Int},
+        BA::SparseArrays.SparseMatrixCSC{Float64, Int},
+        ref_bus_positions::Set{Int},
+        dist_slack::Vector{Float64},
+    )
+        linecount = size(BA, 2)
+        buscount = size(BA, 1)
+        if !isempty(dist_slack) && length(ref_bus_positions) != 1
+            error(
+                "Distributed slack is not supported for systems with multiple reference buses.",
+            )
+        end
+        if !isempty(dist_slack) && length(dist_slack) != buscount
+            error("Distributed bus specification doesn't match the number of buses.")
+        end
+        length(ref_bus_positions) < buscount || error(
+            "All buses are reference buses; PTDF is not defined.",
+        )
+
+        ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
+        cache = AccelerateWrapper.aa_factorize(ABA)
+        valid_ix = setdiff(1:buscount, ref_bus_positions)
+        PTDFm_t = zeros(buscount, linecount)
+        AccelerateWrapper.solve_sparse!(
+            cache,
+            BA[valid_ix, :],
+            view(PTDFm_t, valid_ix, :),
+        )
+
+        isempty(dist_slack) && return PTDFm_t
+
+        @info "Distributed bus"
+        slack_array = reshape(dist_slack ./ sum(dist_slack), 1, buscount)
+        return PTDFm_t .- (slack_array * PTDFm_t)
+    end
+end
 
 """
     PTDF(sys::PSY.System; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)

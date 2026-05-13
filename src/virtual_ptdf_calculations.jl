@@ -172,8 +172,8 @@ function _create_factorization(
     ::AppleAccelerateSolver,
     ABA::SparseArrays.SparseMatrixCSC{Float64, Int},
 )
-    _has_apple_accelerate_ext() || error(_apple_accelerate_install_error())
-    return _create_apple_accelerate_factorization(ABA)
+    _has_apple_accelerate_backend() || error(_apple_accelerate_unavailable_error())
+    return AccelerateWrapper.aa_factorize(ABA)
 end
 
 function _create_factorization(
@@ -321,17 +321,18 @@ if isdefined(Base, :print_array) # 0.7 and later
     Base.print_array(io::IO, X::VirtualPTDF) = "VirtualPTDF"
 end
 
-# Helper function to solve with different factorization types. The
-# `KLULinSolveCache` overload solves in place (zero-allocation hot path);
-# the generic fallback delegates to `\` and is extended by the
-# AppleAccelerate extension for `AAFactorization`.
+# Helper function to solve with different factorization types. Both
+# overloads solve in place (zero-allocation hot path). The KLU and Apple
+# Accelerate backends are the only solvers supported here; adding a new
+# backend requires extending this method.
 function _solve_factorization(K::KLULinSolveCache{Float64}, b::Vector{Float64})
     solve!(K, b)
     return b
 end
 
-function _solve_factorization(K, b::Vector{Float64})
-    return K \ b
+function _solve_factorization(K::AAFactorCache, b::Vector{Float64})
+    AccelerateWrapper.solve!(K, b)
+    return b
 end
 
 function _compute_ptdf_row(vptdf::VirtualPTDF, row::Int)::Vector{Float64}
