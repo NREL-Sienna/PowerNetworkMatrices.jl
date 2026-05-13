@@ -258,8 +258,8 @@ end
     # serial baseline. The KLU path is exercised by the threaded testsets in
     # `test/test_virtual_modf.jl`; this complements that coverage on the
     # AppleAccelerate path.
-    if !PowerNetworkMatrices._has_apple_accelerate_ext()
-        @info "Skipping: AppleAccelerate extension not loaded."
+    if !PowerNetworkMatrices._has_apple_accelerate_backend()
+        @info "Skipping: AppleAccelerate backend not available on this platform."
         return
     end
     if Threads.nthreads() < 2

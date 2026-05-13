@@ -89,6 +89,9 @@ import .KLUWrapper:
     n_valid,
     is_factored
 
+include("AccelerateWrapper/AccelerateWrapper.jl")
+import .AccelerateWrapper: AAFactorCache, aa_factorize, aa_spmm!, aa_spmv!
+
 include("linalg_settings.jl")
 include("solver_dispatch.jl")
 
@@ -137,14 +140,12 @@ include("virtual_modf_calculations.jl")
 include("system_utils.jl")
 include("serialization.jl")
 
-# Declare functions that will be defined by extensions
-# These need to be declared so extensions can extend them
+# Forward declarations for symbols still defined inside package extensions.
+# AppleAccelerate-related functions live in `src/` now (no extension needed)
+# and are not redeclared here.
 function _calculate_PTDF_matrix_MKLPardiso end
-function _calculate_PTDF_matrix_AppleAccelerate end
 function _calculate_LODF_matrix_MKLPardiso end
-function _calculate_LODF_matrix_AppleAccelerate end
 function _pardiso_sequential_LODF! end
 function _pardiso_single_LODF! end
-function _create_apple_accelerate_factorization end
 
 end
