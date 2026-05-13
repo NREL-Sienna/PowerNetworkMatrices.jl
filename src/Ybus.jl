@@ -549,21 +549,7 @@ function ybus_branch_entries(br::PSY.TwoWindingTransformer, correction::Float64)
 end
 
 function ybus_branch_entries(br::PSY.TwoWindingTransformer)
-    correction = _get_impedance_correction_factor(br)
-    Y_t = 1 / ((PSY.get_r(br) + PSY.get_x(br) * 1im) * correction)
-    tap = _get_tap(br) * exp(PSY.get_α(br) * 1im)
-    c_tap = _get_tap(br) * exp(-1 * PSY.get_α(br) * 1im)
-    y_shunt = PSY.get_primary_shunt(br)
-    Y11 = Y_t / abs2(tap)
-    if !isfinite(Y11) || !isfinite(Y_t) || !isfinite(y_shunt * c_tap)
-        error(
-            "Data in $(summary(br)) gives a non-finite Ybus entry; check input data.",
-        )
-    end
-    Y12 = -Y_t / c_tap
-    Y21 = -Y_t / tap
-    Y22 = Y_t
-    return (Y11 + y_shunt, Y12, Y21, Y22)
+    return ybus_branch_entries(br, _get_impedance_correction_factor(br))
 end
 
 function _get_impedance_correction_factor(tp::ThreeWindingTransformerWinding)
@@ -631,50 +617,7 @@ function ybus_branch_entries(tp::ThreeWindingTransformerWinding, correction::Flo
 end
 
 function ybus_branch_entries(tp::ThreeWindingTransformerWinding)
-    correction = _get_impedance_correction_factor(tp)
-    br = get_transformer(tp)
-    winding_number = get_winding_number(tp)
-    if winding_number == 1
-        Y_t = 1 / ((PSY.get_r_primary(br) + PSY.get_x_primary(br) * 1im) * correction)
-        tap = PSY.get_primary_turns_ratio(br) * exp(PSY.get_α_primary(br) * 1im)
-        c_tap = PSY.get_primary_turns_ratio(br) * exp(-1 * PSY.get_α_primary(br) * 1im)
-        Y11 = Y_t / abs2(tap)
-        y_shunt = PSY.get_g(br) + im * PSY.get_b(br)
-        if !isfinite(Y11) || !isfinite(y_shunt)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_p = $(PSY.get_r_primary(br)), x_p = $(PSY.get_x_primary(br)), primary_turns_ratio = $(PSY.get_primary_turns_ratio(br))",
-            )
-        end
-        # primary bus alone gets the shunt term
-        Y11 += y_shunt
-    elseif winding_number == 2
-        Y_t = 1 / ((PSY.get_r_secondary(br) + PSY.get_x_secondary(br) * 1im) * correction)
-        tap = PSY.get_secondary_turns_ratio(br) * exp(PSY.get_α_secondary(br) * 1im)
-        c_tap = PSY.get_secondary_turns_ratio(br) * exp(-1 * PSY.get_α_secondary(br) * 1im)
-        Y11 = Y_t / abs2(tap)
-        if !isfinite(Y11)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_s = $(PSY.get_r_secondary(br)), x_s = $(PSY.get_x_secondary(br)), secondary_turns_ratio = $(PSY.get_secondary_turns_ratio(br))",
-            )
-        end
-    elseif winding_number == 3
-        Y_t = 1 / ((PSY.get_r_tertiary(br) + PSY.get_x_tertiary(br) * 1im) * correction)
-        tap = PSY.get_tertiary_turns_ratio(br) * exp(PSY.get_α_tertiary(br) * 1im)
-        c_tap = PSY.get_tertiary_turns_ratio(br) * exp(-1 * PSY.get_α_tertiary(br) * 1im)
-        Y11 = Y_t / abs2(tap)
-        if !isfinite(Y11)
-            error(
-                "Data in $(PSY.get_name(br)) is incorrect.
-                r_t = $(PSY.get_r_tertiary(br)), x_t = $(PSY.get_x_tertiary(br)), tertiary_turns_ratio = $(PSY.get_tertiary_turns_ratio(br))",
-            )
-        end
-    end
-    Y12 = (-Y_t / c_tap)
-    Y21 = (-Y_t / tap)
-    Y22 = Y_t
-    return (Y11, Y12, Y21, Y22)
+    return ybus_branch_entries(tp, _get_impedance_correction_factor(tp))
 end
 
 """Handles ybus entries for most 2-node AC branches. The types handled here are:
