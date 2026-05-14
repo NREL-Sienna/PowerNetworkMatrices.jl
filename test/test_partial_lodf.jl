@@ -89,7 +89,9 @@ end
 
 @testset "Partial LODF: half-susceptance matches rebuilt ground truth" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    vlodf = VirtualLODF(sys5)
+    # Pin KLU here: the ground-truth path below calls `PNM.solve!` directly on
+    # `vlodf.K`, which is dispatched on `KLULinSolveCache` only.
+    vlodf = VirtualLODF(sys5; linear_solver = "KLU")
     e = 1  # test arc index
     b_e = vlodf.arc_susceptances[e]
 

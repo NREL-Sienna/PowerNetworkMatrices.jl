@@ -147,3 +147,29 @@ end
     end
     @test test_value
 end
+
+@testset "Test Virtual LODF with Apple Accelerate" begin
+    if !PNM._has_apple_accelerate_backend()
+        @info "Skipped AppleAccelerate VirtualLODF tests (backend unavailable on this platform)"
+    else
+        sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+
+        vlodf_aa = VirtualLODF(sys; linear_solver = "AppleAccelerate")
+        vlodf_klu = VirtualLODF(sys; linear_solver = "KLU")
+
+        @test contains(string(typeof(vlodf_aa.K)), "AAFactorCache")
+        @test vlodf_klu.K isa PNM.KLULinSolveCache{Float64}
+
+        arc_axis = PNM.get_arc_axis(vlodf_aa)
+        @test arc_axis == PNM.get_arc_axis(vlodf_klu)
+        for arc in arc_axis
+            row_aa = vlodf_aa[arc, :]
+            row_klu = vlodf_klu[arc, :]
+            @test isapprox(row_aa, row_klu, atol = 1e-9)
+        end
+
+        # macOS default should resolve to AppleAccelerate.
+        vlodf_default = VirtualLODF(sys)
+        @test contains(string(typeof(vlodf_default.K)), "AAFactorCache")
+    end
+end

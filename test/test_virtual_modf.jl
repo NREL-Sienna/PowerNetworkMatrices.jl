@@ -436,6 +436,39 @@ end
     end
 end
 
+@testset "VirtualMODF with Apple Accelerate backend matches KLU" begin
+    if !PNM._has_apple_accelerate_backend()
+        @info "Skipped AppleAccelerate VirtualMODF tests (backend unavailable on this platform)"
+    else
+        sys, _ = _build_c_sys14_with_outages()
+
+        vmodf_aa = VirtualMODF(sys; linear_solver = "AppleAccelerate")
+        vmodf_klu = VirtualMODF(sys; linear_solver = "KLU")
+
+        # Factorization should be the AA cache type.
+        @test contains(string(typeof(vmodf_aa.K)), "AAFactorCache")
+        @test vmodf_klu.K isa PNM.KLULinSolveCache{Float64}
+
+        registered_aa = get_registered_contingencies(vmodf_aa)
+        registered_klu = get_registered_contingencies(vmodf_klu)
+        @test !isempty(registered_aa)
+        @test keys(registered_aa) == keys(registered_klu)
+
+        # Compare post-contingency rows for every registered contingency
+        # against the KLU build, sweeping all monitored arcs.
+        arc_axis = PNM.get_arc_axis(vmodf_aa)
+        @test arc_axis == PNM.get_arc_axis(vmodf_klu)
+        for (uuid, ctg_aa) in registered_aa
+            ctg_klu = registered_klu[uuid]
+            for arc in arc_axis
+                row_aa = vmodf_aa[arc, ctg_aa]
+                row_klu = vmodf_klu[arc, ctg_klu]
+                @test isapprox(row_aa, row_klu, atol = 1e-9)
+            end
+        end
+    end
+end
+
 @testset "VirtualMODF concurrent getindex on the SAME (arc, ctg) is consistent" begin
     # Complements the previous testset: there, each (arc, ctg) pair appears
     # once in the work list, so only the `woodbury_cache` first-call race is
