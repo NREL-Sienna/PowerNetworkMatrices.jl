@@ -21,8 +21,8 @@ JuMP-side work (in callers) parallelizes freely.
 # Arguments
 - `K`:
         LU factorization of the ABA matrix. A `KLULinSolveCache{Float64}` for
-        the default KLU solver, or an `AppleAccelerate.AAFactorization{Float64}`
-        when the AppleAccelerate extension is loaded.
+        the default KLU solver, or an `AccelerateWrapper.AAFactorCache` when the
+        AppleAccelerate backend is selected on macOS.
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix
 - `ref_bus_positions::Set{Int}`:

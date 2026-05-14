@@ -194,8 +194,8 @@ end
         # Create VirtualPTDF with AppleAccelerate
         vptdf_aa = VirtualPTDF(sys; linear_solver = "AppleAccelerate")
 
-        # Verify the factorization type is AAFactorization
-        @test contains(string(typeof(vptdf_aa.K)), "AAFactorization")
+        # Verify the factorization type is AAFactorCache
+        @test contains(string(typeof(vptdf_aa.K)), "AAFactorCache")
 
         # Create reference VirtualPTDF with KLU
         vptdf_klu = VirtualPTDF(sys; linear_solver = "KLU")
@@ -209,7 +209,7 @@ end
 
         # Test with tolerance
         vptdf_aa_tol = VirtualPTDF(sys; linear_solver = "AppleAccelerate", tol = 1e-2)
-        @test contains(string(typeof(vptdf_aa_tol.K)), "AAFactorization")
+        @test contains(string(typeof(vptdf_aa_tol.K)), "AAFactorCache")
 
         # Test with distributed slack
         buscount = length(PSY.get_available_components(PSY.ACBus, sys))
@@ -217,7 +217,7 @@ end
         dist_slack = Dict(i => dist_slack_factor for i in 1:buscount)
         vptdf_aa_slack =
             VirtualPTDF(sys; linear_solver = "AppleAccelerate", dist_slack = dist_slack)
-        @test contains(string(typeof(vptdf_aa_slack.K)), "AAFactorization")
+        @test contains(string(typeof(vptdf_aa_slack.K)), "AAFactorCache")
 
         # Compare with KLU for distributed slack case
         vptdf_klu_slack = VirtualPTDF(sys; linear_solver = "KLU", dist_slack = dist_slack)
