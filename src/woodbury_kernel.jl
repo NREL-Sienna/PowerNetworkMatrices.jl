@@ -83,6 +83,7 @@ function _compute_woodbury_factors_impl(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     arc_sus::Vector{Float64},
     valid_ix::Vector{Int},
+    bus_to_valid_idx::Vector{Int},
     modifications::Tuple{Vararg{ArcModification}},
 )::WoodburyFactors
     M = length(modifications)
@@ -97,13 +98,19 @@ function _compute_woodbury_factors_impl(
 
     # Compute Z[:,j] = B⁻¹ν_j for each modified arc
     Z = Matrix{Float64}(undef, n_bus, M)
+    ba_rv_outer = SparseArrays.rowvals(BA)
+    ba_nz_outer = SparseArrays.nonzeros(BA)
 
     for (j, mod) in enumerate(modifications)
         e = mod.arc_index
         b_e = arc_sus[e]
 
-        @inbounds for i in eachindex(valid_ix)
-            work_ba_col[i] = BA[valid_ix[i], e]
+        # Sparse-only extraction of BA[:, e] into work_ba_col.
+        fill!(work_ba_col, 0.0)
+        @inbounds for k in SparseArrays.nzrange(BA, e)
+            valid_i = bus_to_valid_idx[ba_rv_outer[k]]
+            valid_i > 0 || continue
+            work_ba_col[valid_i] = ba_nz_outer[k]
         end
         lin_solve = _solve_factorization(K, work_ba_col)
 
@@ -159,6 +166,7 @@ function _apply_woodbury_correction_impl(
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     arc_sus::Vector{Float64},
     valid_ix::Vector{Int},
+    bus_to_valid_idx::Vector{Int},
     monitored_idx::Int,
     wf::WoodburyFactors,
 )::Vector{Float64}
@@ -177,10 +185,15 @@ function _apply_woodbury_correction_impl(
         return zeros(n_bus)
     end
 
-    # z_m = B⁻¹ν_m / b_mon_pre via KLU solve on BA column
+    # z_m = B⁻¹ν_m / b_mon_pre via sparse-only BA-column extraction + solve.
     b_mon_pre = arc_sus[monitored_idx]
-    @inbounds for i in eachindex(valid_ix)
-        work_ba_col[i] = BA[valid_ix[i], monitored_idx]
+    fill!(work_ba_col, 0.0)
+    ba_rv_mon = SparseArrays.rowvals(BA)
+    ba_nz_mon = SparseArrays.nonzeros(BA)
+    @inbounds for k in SparseArrays.nzrange(BA, monitored_idx)
+        valid_i = bus_to_valid_idx[ba_rv_mon[k]]
+        valid_i > 0 || continue
+        work_ba_col[valid_i] = ba_nz_mon[k]
     end
     lin_solve = _solve_factorization(K, work_ba_col)
 
@@ -226,7 +239,8 @@ function _compute_woodbury_factors(
     ) do K_solver, work_ba_col, temp_data
         _compute_woodbury_factors_impl(
             K_solver, work_ba_col, temp_data,
-            mat.BA, mat.arc_susceptances, mat.valid_ix, modifications,
+            mat.BA, mat.arc_susceptances, mat.valid_ix, mat.bus_to_valid_idx,
+            modifications,
         )
     end
 end
@@ -241,7 +255,8 @@ function _apply_woodbury_correction(
     ) do K_solver, work_ba_col, temp_data
         _apply_woodbury_correction_impl(
             K_solver, work_ba_col, temp_data,
-            mat.BA, mat.arc_susceptances, mat.valid_ix, monitored_idx, wf,
+            mat.BA, mat.arc_susceptances, mat.valid_ix, mat.bus_to_valid_idx,
+            monitored_idx, wf,
         )
     end
 end

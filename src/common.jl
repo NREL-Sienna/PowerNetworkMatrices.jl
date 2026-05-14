@@ -6,6 +6,23 @@ function _add_to_collection!(
     return
 end
 
+"""
+    _build_bus_to_valid_idx(n_buses, valid_ix) -> Vector{Int}
+
+Build the inverse of `valid_ix`: a length-`n_buses` vector where entry `b`
+is the position of bus `b` inside `valid_ix`, or 0 if `b` is a reference
+bus. Used by the Virtual\\* row-computation hot path so it can iterate the
+nonzeros of a sparse `BA` column directly (O(nnz_col)) instead of scanning
+the full bus axis (O(n_buses)) and bisecting the CSC for each entry.
+"""
+function _build_bus_to_valid_idx(n_buses::Int, valid_ix::Vector{Int})
+    bus_to_valid_idx = zeros(Int, n_buses)
+    @inbounds for (i, b) in enumerate(valid_ix)
+        bus_to_valid_idx[b] = i
+    end
+    return bus_to_valid_idx
+end
+
 function _add_to_collection!(
     collection_tr3w::Vector{PSY.ThreeWindingTransformer},
     transformer_tr3w::PSY.ThreeWindingTransformer,
