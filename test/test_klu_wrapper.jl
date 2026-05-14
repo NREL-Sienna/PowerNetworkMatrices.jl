@@ -360,7 +360,7 @@ end
 
     x_true = randn(n)
     b = A * x_true
-    X = PNM.KLUWrapper.solve_w_refinement(cache, A, b)
+    X = PNM.solve_w_refinement(cache, A, b)
     @test isapprox(X, x_true, atol = 1e-12)
 end
 
@@ -375,7 +375,7 @@ end
     x_true = randn(n)
     b = A * x_true
     X = zeros(n)
-    PNM.KLUWrapper.solve_w_refinement!(cache, A, X, b; tol = 1e-12)
+    PNM.solve_w_refinement!(cache, A, X, b; tol = 1e-12)
     @test isapprox(X, x_true, atol = 1e-8)
 end
 
@@ -384,7 +384,7 @@ end
     A = SparseArrays.spdiagm(0 => 1.0:n)
     cache = PNM.KLUWrapper.KLULinSolveCache(A)  # not factored
     b = randn(n)
-    @test_throws ErrorException PNM.KLUWrapper.solve_w_refinement(cache, A, b)
+    @test_throws ErrorException PNM.solve_w_refinement(cache, A, b)
 end
 
 @testset "KLU wrapper: solve_w_refinement works on Int32 cache" begin
@@ -396,6 +396,6 @@ end
     cache = PNM.klu_factorize(A)
     x_true = randn(n)
     b = A64 * x_true
-    X = PNM.KLUWrapper.solve_w_refinement(cache, A, b)
+    X = PNM.solve_w_refinement(cache, A, b)
     @test isapprox(X, x_true, atol = 1e-10)
 end

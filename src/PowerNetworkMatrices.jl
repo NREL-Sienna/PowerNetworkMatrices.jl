@@ -94,6 +94,7 @@ import .AccelerateWrapper: AAFactorCache, aa_factorize, aa_spmm!, aa_spmv!
 
 include("linalg_settings.jl")
 include("solver_dispatch.jl")
+include("iterative_refinement.jl")
 
 function __init__()
     something(get_linalg_backend_check(), false) && check_linalg_backend()

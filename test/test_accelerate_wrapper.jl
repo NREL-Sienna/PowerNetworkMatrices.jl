@@ -126,3 +126,63 @@ end
         @test isapprox(work_klu, work_aa; atol = 1e-9)
     end
 end
+
+@testset "AccelerateWrapper: solve_w_refinement matches direct solve on AA cache" begin
+    PNM._has_apple_accelerate_backend() || return
+    Random.seed!(_AA_TEST_SEED)
+    n = 60
+    ABA = _random_spd(n)
+    cache = PNM.AccelerateWrapper.aa_factorize(ABA; check_symmetry = false)
+
+    x_true = randn(n)
+    b = ABA * x_true
+    X = PNM.solve_w_refinement(cache, ABA, b)
+    @test isapprox(X, x_true; atol = 1e-10)
+end
+
+@testset "AccelerateWrapper: solve_w_refinement! recovers ill-conditioned AA solve" begin
+    PNM._has_apple_accelerate_backend() || return
+    Random.seed!(_AA_TEST_SEED + 1)
+    n = 80
+    # Symmetric ill-conditioned tridiagonal — back-solve leaves residual that
+    # refinement closes. Less pathological than the KLU equivalent because
+    # AA's pivoted-LDLT has a higher pivot floor than KLU's BTF + LU on a
+    # nearly-defective tridiagonal.
+    A = SparseArrays.spdiagm(
+        0 => fill(1.0, n),
+        1 => fill(1.0 - 1e-6, n - 1),
+        -1 => fill(1.0 - 1e-6, n - 1),
+    )
+    cache = PNM.AccelerateWrapper.aa_factorize(A; check_symmetry = false)
+
+    x_true = randn(n)
+    b = A * x_true
+    X = zeros(n)
+    PNM.solve_w_refinement!(cache, A, X, b; tol = 1e-12)
+    @test isapprox(X, x_true; atol = 1e-8)
+end
+
+@testset "AccelerateWrapper: solve_w_refinement requires a factored AA cache" begin
+    PNM._has_apple_accelerate_backend() || return
+    n = 12
+    A = SparseArrays.sparse(Float64.(LinearAlgebra.I(n)))
+    cache = PNM.AAFactorCache(A; check_symmetry = false)  # not factored
+    b = randn(n)
+    @test_throws ErrorException PNM.solve_w_refinement(cache, A, b)
+end
+
+@testset "AccelerateWrapper: solve_w_refinement KLU vs AA parity" begin
+    PNM._has_apple_accelerate_backend() || return
+    Random.seed!(_AA_TEST_SEED + 2)
+    n = 50
+    A = _random_spd(n)
+    x_true = randn(n)
+    b = A * x_true
+
+    K_klu = PNM.klu_factorize(A)
+    K_aa = PNM.AccelerateWrapper.aa_factorize(A; check_symmetry = false)
+
+    X_klu = PNM.solve_w_refinement(K_klu, A, b)
+    X_aa = PNM.solve_w_refinement(K_aa, A, b)
+    @test isapprox(X_klu, X_aa; atol = 1e-10)
+end
