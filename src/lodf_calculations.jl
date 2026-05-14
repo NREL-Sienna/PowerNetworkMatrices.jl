@@ -196,19 +196,19 @@ end
 # _pardiso_sequential_LODF!, _pardiso_single_LODF!, _calculate_LODF_matrix_MKLPardiso
 # are defined in ext/MKLPardisoExt.jl when the Pardiso package is loaded
 
-"""
-Function for internal use only.
-
-Computes the LODF matrix using the internal Apple Accelerate backend
-(`AccelerateWrapper`). Available only on macOS. Shape mirrors
-`_calculate_LODF_matrix_KLU(a, ptdf)` exactly: factor the diagonal "demand"
-matrix `diag(1 - PTDF·A)` and solve in place against `a · ptdf`.
-
-# Arguments
-- `a::SparseArrays.SparseMatrixCSC{Int8, Int}`: Incidence Matrix
-- `ptdf::Matrix{Float64}`: PTDF matrix
-"""
 @static if Sys.isapple()
+    """
+    Function for internal use only.
+
+    Computes the LODF matrix using the internal Apple Accelerate backend
+    (`AccelerateWrapper`). Available only on macOS. Shape mirrors
+    `_calculate_LODF_matrix_KLU(a, ptdf)` exactly: factor the diagonal "demand"
+    matrix `diag(1 - PTDF·A)` and solve in place against `a · ptdf`.
+
+    # Arguments
+    - `a::SparseArrays.SparseMatrixCSC{Int8, Int}`: Incidence Matrix
+    - `ptdf::Matrix{Float64}`: PTDF matrix
+    """
     function _calculate_LODF_matrix_AppleAccelerate(
         a::SparseArrays.SparseMatrixCSC{Int8, Int},
         ptdf::Matrix{Float64},

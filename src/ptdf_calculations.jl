@@ -230,22 +230,22 @@ end
 # _calculate_PTDF_matrix_MKLPardiso is defined in ext/MKLPardisoExt.jl
 # when Pardiso package is loaded
 
-"""
-Function for internal use only.
-
-Computes the PTDF matrix using the internal Apple Accelerate backend
-(`AccelerateWrapper`). Available only on macOS — non-Apple callers are
-rejected by `_create_factorization` before reaching this entry. Shape
-mirrors `_calculate_PTDF_matrix_KLU`: factor ABA via LDLT, then solve
-`ABA · X = BA[valid_ix, :]` via the block-packed `solve_sparse!`.
-
-# Arguments
-- `A::SparseArrays.SparseMatrixCSC{Int8, Int}`: Incidence Matrix
-- `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`: BA matrix
-- `ref_bus_positions::Set{Int}`: indexes of reference slack buses
-- `dist_slack::Vector{Float64}`: distributed-slack weights
-"""
 @static if Sys.isapple()
+    """
+    Function for internal use only.
+
+    Computes the PTDF matrix using the internal Apple Accelerate backend
+    (`AccelerateWrapper`). Available only on macOS — non-Apple callers are
+    rejected by `_create_factorization` before reaching this entry. Shape
+    mirrors `_calculate_PTDF_matrix_KLU`: factor ABA via LDLT, then solve
+    `ABA · X = BA[valid_ix, :]` via the block-packed `solve_sparse!`.
+
+    # Arguments
+    - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`: Incidence Matrix
+    - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`: BA matrix
+    - `ref_bus_positions::Set{Int}`: indexes of reference slack buses
+    - `dist_slack::Vector{Float64}`: distributed-slack weights
+    """
     function _calculate_PTDF_matrix_AppleAccelerate(
         A::SparseArrays.SparseMatrixCSC{Int8, Int},
         BA::SparseArrays.SparseMatrixCSC{Float64, Int},
