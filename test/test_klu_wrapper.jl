@@ -1,4 +1,6 @@
 import SparseArrays
+import LinearAlgebra
+import Random
 
 @testset "KLU wrapper: real round-trip and refactor" begin
     n = 50
@@ -231,4 +233,169 @@ end
     # Warm call must not scale with `n * nrhs`; bound is well below that.
     alloc_warm = @allocated PNM.solve_sparse!(cache, B, out; block = 32)
     @test alloc_warm < n * size(B, 2) * sizeof(Float64) ÷ 4
+end
+
+# ---------------------------------------------------------------------------
+# Int32 index-type path
+# ---------------------------------------------------------------------------
+
+@testset "KLU wrapper: Int32 real round-trip and refactor" begin
+    n = 50
+    rng_vals = collect(1.0:n)
+    A64 = SparseArrays.spdiagm(0 => rng_vals .+ 1.0,
+        1 => fill(0.1, n - 1), -1 => fill(0.1, n - 1))
+    A = SparseArrays.SparseMatrixCSC{Float64, Int32}(A64)
+    x = collect(1.0:n)
+    b = A64 * x
+
+    cache = PNM.klu_factorize(A)
+    @test PNM.is_factored(cache)
+    @test cache isa PNM.KLUWrapper.KLULinSolveCache{Float64, Int32}
+    @test size(cache) == (n, n)
+
+    y = copy(b)
+    PNM.solve!(cache, y)
+    @test isapprox(y, x, atol = 1e-10)
+
+    # Refactor with new values, same pattern.
+    A2_64 = SparseArrays.spdiagm(0 => rng_vals .+ 2.0,
+        1 => fill(0.2, n - 1), -1 => fill(0.2, n - 1))
+    A2 = SparseArrays.SparseMatrixCSC{Float64, Int32}(A2_64)
+    x2 = randn(n)
+    b2 = A2_64 * x2
+    PNM.numeric_refactor!(cache, A2)
+    y2 = copy(b2)
+    PNM.solve!(cache, y2)
+    @test isapprox(y2, x2, atol = 1e-9)
+end
+
+@testset "KLU wrapper: Int32 vs Int64 solves agree bit-for-bit" begin
+    # KLU is deterministic; identical entries and identical permutation give
+    # identical solves regardless of the C entry point's index width.
+    Random.seed!(0xC0FFEE)
+    n = 200
+    A64 = SparseArrays.spdiagm(0 => 4.0 .+ rand(n), 1 => 0.1 .* rand(n - 1),
+        -1 => 0.1 .* rand(n - 1))
+    A32 = SparseArrays.SparseMatrixCSC{Float64, Int32}(A64)
+
+    c64 = PNM.klu_factorize(A64)
+    c32 = PNM.klu_factorize(A32)
+    @test c64 isa PNM.KLUWrapper.KLULinSolveCache{Float64, Int64}
+    @test c32 isa PNM.KLUWrapper.KLULinSolveCache{Float64, Int32}
+
+    b = randn(n)
+    y64 = copy(b)
+    y32 = copy(b)
+    PNM.solve!(c64, y64)
+    PNM.solve!(c32, y32)
+    @test y64 == y32   # bit-equal
+end
+
+@testset "KLU wrapper: Int32 solve_sparse! agrees with dense reference" begin
+    Random.seed!(0xBEEF)
+    n = 80
+    A_dense = Matrix(SparseArrays.sprandn(n, n, 0.1)) + 4 * LinearAlgebra.I
+    A = SparseArrays.SparseMatrixCSC{Float64, Int32}(SparseArrays.sparse(A_dense))
+    cache = PNM.klu_factorize(A)
+
+    B_dense = SparseArrays.sprandn(n, 20, 0.1)
+    B = SparseArrays.SparseMatrixCSC{Float64, Int32}(B_dense)
+
+    out = PNM.solve_sparse(cache, B)
+    @test isapprox(out, A_dense \ Matrix(B_dense); atol = 1e-9)
+end
+
+@testset "KLU wrapper: Int32 numeric_refactor! is allocation-free" begin
+    n = 100
+    A64 = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.0,
+        1 => fill(0.05, n - 1), -1 => fill(0.05, n - 1))
+    A = SparseArrays.SparseMatrixCSC{Float64, Int32}(A64)
+    cache = PNM.klu_factorize(A)
+
+    A2_64 = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.5,
+        1 => fill(0.07, n - 1), -1 => fill(0.07, n - 1))
+    A2 = SparseArrays.SparseMatrixCSC{Float64, Int32}(A2_64)
+
+    # Warm up specialization on the Int32 path.
+    PNM.numeric_refactor!(cache, A2)
+    alloc = @allocated PNM.numeric_refactor!(cache, A2)
+    @test alloc == 0
+end
+
+# ---------------------------------------------------------------------------
+# Performance-knob surface
+# ---------------------------------------------------------------------------
+
+@testset "KLU wrapper: sort_factors!/condest!/rcond! work on both index types" begin
+    n = 60
+    A64 = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.0,
+        1 => fill(0.1, n - 1), -1 => fill(0.1, n - 1))
+    A32 = SparseArrays.SparseMatrixCSC{Float64, Int32}(A64)
+
+    for cache in (PNM.klu_factorize(A64), PNM.klu_factorize(A32))
+        PNM.KLUWrapper.sort_factors!(cache)
+        # Subsequent solve still returns the right answer.
+        b = randn(n)
+        y = copy(b)
+        PNM.solve!(cache, y)
+        @test isapprox(y, A64 \ b, atol = 1e-10)
+
+        c = PNM.KLUWrapper.condest!(cache)
+        r = PNM.KLUWrapper.rcond!(cache)
+        @test c > 0
+        @test 0 < r <= 1.0
+    end
+end
+
+# ---------------------------------------------------------------------------
+# Iterative refinement
+# ---------------------------------------------------------------------------
+
+@testset "KLU wrapper: solve_w_refinement matches direct solve on well-conditioned A" begin
+    Random.seed!(2)
+    n = 40
+    A = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.0,
+        1 => fill(0.1, n - 1), -1 => fill(0.1, n - 1))
+    cache = PNM.klu_factorize(A)
+
+    x_true = randn(n)
+    b = A * x_true
+    X = PNM.KLUWrapper.solve_w_refinement(cache, A, b)
+    @test isapprox(X, x_true, atol = 1e-12)
+end
+
+@testset "KLU wrapper: solve_w_refinement! recovers ill-conditioned solve" begin
+    # Build a noticeably ill-conditioned tridiagonal so a single back-solve
+    # leaves residual headroom that refinement actually closes.
+    Random.seed!(3)
+    n = 50
+    A = SparseArrays.spdiagm(0 => fill(1.0, n), 1 => fill(1.0 - 1e-10, n - 1))
+    cache = PNM.klu_factorize(A)
+
+    x_true = randn(n)
+    b = A * x_true
+    X = zeros(n)
+    PNM.KLUWrapper.solve_w_refinement!(cache, A, X, b; tol = 1e-12)
+    @test isapprox(X, x_true, atol = 1e-8)
+end
+
+@testset "KLU wrapper: solve_w_refinement requires a factored cache" begin
+    n = 10
+    A = SparseArrays.spdiagm(0 => 1.0:n)
+    cache = PNM.KLUWrapper.KLULinSolveCache(A)  # not factored
+    b = randn(n)
+    @test_throws ErrorException PNM.KLUWrapper.solve_w_refinement(cache, A, b)
+end
+
+@testset "KLU wrapper: solve_w_refinement works on Int32 cache" begin
+    Random.seed!(4)
+    n = 30
+    A64 = SparseArrays.spdiagm(0 => collect(1.0:n) .+ 1.0,
+        1 => fill(0.05, n - 1), -1 => fill(0.05, n - 1))
+    A = SparseArrays.SparseMatrixCSC{Float64, Int32}(A64)
+    cache = PNM.klu_factorize(A)
+    x_true = randn(n)
+    b = A64 * x_true
+    X = PNM.KLUWrapper.solve_w_refinement(cache, A, b)
+    @test isapprox(X, x_true, atol = 1e-10)
 end

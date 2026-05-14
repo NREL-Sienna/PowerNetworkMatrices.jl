@@ -179,7 +179,7 @@ power flow analysis, sensitivity calculations, and linear power system studies.
 struct ABA_Matrix{
     Ax <: NTuple{2, Vector},
     L <: NTuple{2, Dict},
-    F <: Union{Nothing, KLULinSolveCache{Float64}},
+    F <: Union{Nothing, KLULinSolveCache{Float64, Int64}},
 } <: PowerNetworkMatrix{Float64}
     data::SparseArrays.SparseMatrixCSC{Float64, Int}
     axes::Ax
@@ -358,7 +358,7 @@ Check if an ABA_Matrix has been factorized (i.e., contains LU factorization matr
 """
 is_factorized(ABA::ABA_Matrix{Ax, L, Nothing}) where {Ax, L <: NTuple{2, Dict}} = false
 is_factorized(
-    ABA::ABA_Matrix{Ax, L, <:KLULinSolveCache{Float64}},
+    ABA::ABA_Matrix{Ax, L, <:KLULinSolveCache{Float64, Int64}},
 ) where {Ax, L <: NTuple{2, Dict}} = true
 
 # get_index functions: BA_Matrix stores the transposed matrix, thus get index

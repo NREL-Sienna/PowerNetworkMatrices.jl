@@ -74,12 +74,19 @@ export KLULinSolveCache,
     tsolve!,
     solve_sparse!,
     solve_sparse,
+    solve_w_refinement,
+    solve_w_refinement!,
+    sort_factors!,
+    condest!,
+    rcond!,
     n_valid,
-    is_factored
+    is_factored,
+    get_reuse_symbolic
 
 include("klu_jll_bindings.jl")
 include("klu_cache.jl")
 include("solve_dense.jl")
 include("solve_sparse_rhs.jl")
+include("iterative_refinement.jl")
 
 end # module
