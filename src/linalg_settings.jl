@@ -20,6 +20,16 @@ _apple_accelerate_unavailable_error() =
     """The Apple Accelerate sparse backend is macOS-only (Sys.isapple() returned false).
     Use the KLU solver (the default) on non-Apple platforms."""
 
+"""
+    _default_linear_solver() -> String
+
+Default sparse linear solver name. Returns "AppleAccelerate" on macOS (Apple's
+built-in libSparse via `AccelerateWrapper`) and "KLU" elsewhere. Used as the
+default for the `linear_solver` keyword on PTDF / LODF / VirtualPTDF /
+VirtualLODF / VirtualMODF constructors.
+"""
+_default_linear_solver() = Sys.isapple() ? "AppleAccelerate" : "KLU"
+
 "Set a preference of the backend library for sparse linear algebra operations."
 function set_linalg_backend_preference(linalglib::Union{String, Nothing})
     if !isnothing(linalglib) && !(linalglib in ["MKLPardiso", "AppleAccelerate"])
