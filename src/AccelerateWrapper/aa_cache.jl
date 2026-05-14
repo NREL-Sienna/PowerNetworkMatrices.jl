@@ -43,8 +43,7 @@ Base.eltype(::Type{AAFactorCache}) = Cdouble
 the libSparse handles have been finalized.
 """
 function is_factored(cache::AAFactorCache)
-    return cache.numeric.status == SparseStatusOk &&
-           cache.symbolic.status == SparseStatusOk
+    return cache.numeric.status == SparseStatusOk && cache.symbolic.status == SparseStatusOk
 end
 
 """
@@ -66,8 +65,7 @@ function AAFactorCache(
     factorization_type::SparseFactorization_t = SparseFactorizationLDLT,
 )
     n = size(A, 1)
-    n == size(A, 2) ||
-        throw(DimensionMismatch("matrix must be square; got $(size(A))"))
+    n == size(A, 2) || throw(DimensionMismatch("matrix must be square; got $(size(A))"))
 
     nnz_tri = _count_lower_triangle(A)
     cache = AAFactorCache(
@@ -156,34 +154,27 @@ function _check_pattern_match(
 )
     n = cache.n
     if size(A, 1) != n || size(A, 2) != n
-        throw(DimensionMismatch(
-            "Cannot $op: cache is $(n)×$(n) but A is $(size(A)).",
-        ))
+        throw(DimensionMismatch("Cannot $op: cache is $(n)×$(n) but A is $(size(A))."))
     end
     rowval = rowvals(A)
     pos = 0
     @inbounds for j in 1:n
-        col_start = pos
+        cache.columnStarts[j] == Clong(pos) || return _pattern_mismatch(op)
         for p in nzrange(A, j)
             if rowval[p] >= j
                 pos += 1
                 pos > cache.nnz_tri && return _pattern_mismatch(op)
-                cache.rowIndices[pos] == Cint(rowval[p] - 1) ||
-                    return _pattern_mismatch(op)
+                cache.rowIndices[pos] == Cint(rowval[p] - 1) || return _pattern_mismatch(op)
             end
         end
-        cache.columnStarts[j + 1] == Clong(pos) ||
-            return _pattern_mismatch(op)
-        # silence unused-warning on col_start
-        col_start === col_start
+        cache.columnStarts[j + 1] == Clong(pos) || return _pattern_mismatch(op)
     end
     pos == cache.nnz_tri || return _pattern_mismatch(op)
     return nothing
 end
 
-_pattern_mismatch(op::AbstractString) = throw(ArgumentError(
-    "Cannot $op: matrix has different sparsity structure.",
-))
+_pattern_mismatch(op::AbstractString) =
+    throw(ArgumentError("Cannot $op: matrix has different sparsity structure."))
 
 """
 Release the libSparse numeric and symbolic handles held by `cache`, leaving
@@ -232,9 +223,7 @@ calls reuse the analysis.
 function symbolic_factor!(cache::AAFactorCache, A::SparseMatrixCSC{Float64, Int})
     n = cache.n
     if size(A, 1) != n || size(A, 2) != n
-        throw(DimensionMismatch(
-            "Cannot factor: cache is $(n)×$(n) but A is $(size(A)).",
-        ))
+        throw(DimensionMismatch("Cannot factor: cache is $(n)×$(n) but A is $(size(A))."))
     end
     _free_handles!(cache)
     new_nnz_tri = _count_lower_triangle(A)
@@ -251,8 +240,7 @@ function symbolic_factor!(cache::AAFactorCache, A::SparseMatrixCSC{Float64, Int}
         _structure_view(cache),
         SparseSymbolicFactorOptions(),
     )
-    sym.status == SparseStatusOk ||
-        _libsparse_throw(sym.status, "symbolic factor")
+    sym.status == SparseStatusOk || _libsparse_throw(sym.status, "symbolic factor")
     cache.symbolic = sym
     return cache
 end
@@ -277,8 +265,7 @@ function numeric_refactor!(cache::AAFactorCache, A::SparseMatrixCSC{Float64, Int
         _matrix_view(cache),
         SparseNumericFactorOptions(),
     )
-    num.status == SparseStatusOk ||
-        _libsparse_throw(num.status, "numeric factor")
+    num.status == SparseStatusOk || _libsparse_throw(num.status, "numeric factor")
     cache.numeric = num
     return cache
 end
