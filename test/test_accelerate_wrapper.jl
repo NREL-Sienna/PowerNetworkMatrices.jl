@@ -83,6 +83,28 @@ end
     @test Base.unwrap_unionall(m.sig).parameters[3] === PNM.AAFactorCache
 end
 
+@testset "AccelerateWrapper: structural-symmetry check" begin
+    PNM._has_apple_accelerate_backend() || return
+    n = 8
+    # Build a clearly non-symmetric matrix with a missing mirror entry.
+    A = SparseArrays.sparse(Float64.(LinearAlgebra.I(n)))
+    A[2, 5] = 1.0
+    SparseArrays.dropzeros!(A)
+
+    @test_throws ArgumentError PNM.AAFactorCache(A)
+    @test_throws ArgumentError PNM.AccelerateWrapper.aa_factorize(A)
+
+    # Bypass: caller asserts symmetry; AAFactorCache returns without throwing.
+    cache = PNM.AAFactorCache(A; check_symmetry = false)
+    @test cache isa PNM.AAFactorCache
+
+    # symbolic_factor! must also honor the cache's check_symmetry flag.
+    Random.seed!(_AA_TEST_SEED)
+    ABA = _random_spd(n; density = 0.4)
+    cache_strict = PNM.AAFactorCache(ABA)
+    @test_throws ArgumentError PNM.AccelerateWrapper.symbolic_factor!(cache_strict, A)
+end
+
 @testset "AccelerateWrapper: KLU vs AA per-column solve parity" begin
     PNM._has_apple_accelerate_backend() || return
     Random.seed!(_AA_TEST_SEED)

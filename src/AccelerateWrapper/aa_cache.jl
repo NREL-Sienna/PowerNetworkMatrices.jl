@@ -8,7 +8,9 @@ Bunch-Kaufman), which matches what the old `AppleAccelerateExt.jl` used.
 
 `reuse_symbolic` controls whether `symbolic_refactor!` keeps the analysis;
 `check_pattern` adds a structural-equality check on refactor calls and is
-only consulted when reusing.
+only consulted when reusing. `check_symmetry` enforces structural symmetry of
+the input pattern on the analysis path (constructor and `symbolic_factor!`);
+disable only when the caller can guarantee symmetry by construction.
 """
 mutable struct AAFactorCache
     # Apple-side 0-based, narrower-integer copies of the input CSC pattern.
@@ -24,6 +26,7 @@ mutable struct AAFactorCache
     numeric::SparseOpaqueFactorization_t
     reuse_symbolic::Bool
     check_pattern::Bool
+    check_symmetry::Bool
     # Bounded reusable scratch for `solve_sparse!`. Lazy-grown on first call.
     scratch::Matrix{Cdouble}
     col_map::Vector{Int}
@@ -48,6 +51,7 @@ end
 
 """
     AAFactorCache(A; reuse_symbolic=true, check_pattern=true,
+                  check_symmetry=true,
                   factorization_type=SparseFactorizationLDLT)
 
 Build a cache for the symmetric sparse matrix `A`. Allocates the Apple-side
@@ -57,15 +61,24 @@ triangle of `A` but does **not** factorize. Call `full_factor!` (or
 
 A finalizer frees libSparse handles on GC; call `Base.finalize(cache)` to
 release them eagerly.
+
+`check_symmetry=true` (default) verifies that `A`'s nonzero pattern is
+structurally symmetric on construction and on each `symbolic_factor!`. Pass
+`check_symmetry=false` only when the caller can guarantee symmetry by
+construction (e.g. `ABA = Aᵀ B A`).
 """
 function AAFactorCache(
     A::SparseMatrixCSC{Float64, Int};
     reuse_symbolic::Bool = true,
     check_pattern::Bool = true,
+    check_symmetry::Bool = true,
     factorization_type::SparseFactorization_t = SparseFactorizationLDLT,
 )
     n = size(A, 1)
     n == size(A, 2) || throw(DimensionMismatch("matrix must be square; got $(size(A))"))
+    if check_symmetry
+        _assert_structural_symmetry(A)
+    end
 
     nnz_tri = _count_lower_triangle(A)
     cache = AAFactorCache(
@@ -79,12 +92,44 @@ function AAFactorCache(
         _null_factorization(),
         reuse_symbolic,
         check_pattern,
+        check_symmetry,
         Matrix{Cdouble}(undef, 0, 0),
         Int[],
     )
     _populate_lower_triangle_pattern!(cache, A)
     finalizer(_free_handles!, cache)
     return cache
+end
+
+# Structural-symmetry check: for every nonzero at (i, j) with i != j, require
+# a mirror nonzero at (j, i). Throws on first violation. O(nnz · avg-col-len).
+function _assert_structural_symmetry(A::SparseMatrixCSC{Float64, Int})
+    n = size(A, 1)
+    rowval = rowvals(A)
+    @inbounds for j in 1:n
+        for p in nzrange(A, j)
+            i = rowval[p]
+            i == j && continue
+            mirror = false
+            for q in nzrange(A, i)
+                if rowval[q] == j
+                    mirror = true
+                    break
+                end
+            end
+            if !mirror
+                throw(
+                    ArgumentError(
+                        "AAFactorCache: input matrix is not structurally symmetric " *
+                        "(nonzero at ($i, $j) has no mirror at ($j, $i)). " *
+                        "Pass `check_symmetry=false` to bypass if the caller " *
+                        "guarantees symmetry by construction.",
+                    ),
+                )
+            end
+        end
+    end
+    return nothing
 end
 
 # Count nonzeros in the lower triangle (i >= j) of A.
@@ -225,6 +270,9 @@ function symbolic_factor!(cache::AAFactorCache, A::SparseMatrixCSC{Float64, Int}
     if size(A, 1) != n || size(A, 2) != n
         throw(DimensionMismatch("Cannot factor: cache is $(n)×$(n) but A is $(size(A))."))
     end
+    if cache.check_symmetry
+        _assert_structural_symmetry(A)
+    end
     _free_handles!(cache)
     new_nnz_tri = _count_lower_triangle(A)
     if new_nnz_tri != cache.nnz_tri
@@ -240,7 +288,12 @@ function symbolic_factor!(cache::AAFactorCache, A::SparseMatrixCSC{Float64, Int}
         _structure_view(cache),
         SparseSymbolicFactorOptions(),
     )
-    sym.status == SparseStatusOk || _libsparse_throw(sym.status, "symbolic factor")
+    if sym.status != SparseStatusOk
+        # libSparse may have allocated C-side state before deciding to fail —
+        # release it before throwing so we don't leak per failed factor.
+        _sparse_cleanup_symbolic!(sym)
+        _libsparse_throw(sym.status, "symbolic factor")
+    end
     cache.symbolic = sym
     return cache
 end
@@ -265,7 +318,11 @@ function numeric_refactor!(cache::AAFactorCache, A::SparseMatrixCSC{Float64, Int
         _matrix_view(cache),
         SparseNumericFactorOptions(),
     )
-    num.status == SparseStatusOk || _libsparse_throw(num.status, "numeric factor")
+    if num.status != SparseStatusOk
+        # Same rationale as in symbolic_factor!: release before throwing.
+        _sparse_cleanup_factor!(num)
+        _libsparse_throw(num.status, "numeric factor")
+    end
     cache.numeric = num
     return cache
 end
@@ -310,20 +367,24 @@ end
 
 """
     aa_factorize(A; reuse_symbolic=true, check_pattern=true,
+                  check_symmetry=true,
                   factorization_type=SparseFactorizationLDLT) -> AAFactorCache
 
-Build a cache for `A` and immediately compute the full factorization.
+Build a cache for `A` and immediately compute the full factorization. See
+`AAFactorCache` for the kwarg semantics, including `check_symmetry`.
 """
 function aa_factorize(
     A::SparseMatrixCSC{Float64, Int};
     reuse_symbolic::Bool = true,
     check_pattern::Bool = true,
+    check_symmetry::Bool = true,
     factorization_type::SparseFactorization_t = SparseFactorizationLDLT,
 )
     cache = AAFactorCache(
         A;
         reuse_symbolic = reuse_symbolic,
         check_pattern = check_pattern,
+        check_symmetry = check_symmetry,
         factorization_type = factorization_type,
     )
     return full_factor!(cache, A)

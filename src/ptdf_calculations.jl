@@ -267,7 +267,8 @@ end
         )
 
         ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-        cache = AccelerateWrapper.aa_factorize(ABA)
+        # ABA = Aᵀ B A is symmetric by construction; skip the structural check.
+        cache = AccelerateWrapper.aa_factorize(ABA; check_symmetry = false)
         valid_ix = setdiff(1:buscount, ref_bus_positions)
         PTDFm_t = zeros(buscount, linecount)
         AccelerateWrapper.solve_sparse!(

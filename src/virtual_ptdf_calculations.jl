@@ -180,7 +180,8 @@ function _create_factorization(
     ABA::SparseArrays.SparseMatrixCSC{Float64, Int},
 )
     _has_apple_accelerate_backend() || error(_apple_accelerate_unavailable_error())
-    return AccelerateWrapper.aa_factorize(ABA)
+    # ABA = Aᵀ B A is symmetric by construction; skip the structural check.
+    return AccelerateWrapper.aa_factorize(ABA; check_symmetry = false)
 end
 
 function _create_factorization(

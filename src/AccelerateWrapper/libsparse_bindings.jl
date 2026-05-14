@@ -92,19 +92,13 @@ struct SparseSymbolicFactorOptions
     reportError::Ptr{Cvoid}
 end
 
-# Called by libSparse on failure with a null-terminated C string; we surface
-# the message via `@error`. Must be a top-level function so `@cfunction` can
-# resolve it.
-function _libsparse_report_error(msg::Cstring)
-    s = unsafe_string(msg)
-    @error "libSparse reported an error" message = s
-    return nothing
-end
-
-# `reportError` is fired by libSparse before it returns a failure status —
-# we log the message so it ends up in user output rather than libSparse's
-# own stderr. Passing libc malloc/free explicitly (the C_NULL "use Apple
-# defaults" path is documented but unreliable from a non-Obj-C caller).
+# `reportError` is fired by libSparse before it returns a failure status. The
+# inline `error(unsafe_string(text))` matches AppleAccelerate.jl's pattern: it
+# propagates the libSparse message as a Julia exception that unwinds back
+# through the originating ccall. Avoids `@error`'s allocator/logger overhead,
+# which is fragile when libSparse invokes the callback from its own threads.
+# Passing libc malloc/free explicitly (the C_NULL "use Apple defaults" path is
+# documented but unreliable from a non-Obj-C caller).
 function SparseSymbolicFactorOptions()
     return SparseSymbolicFactorOptions(
         SparseDefaultControl,
@@ -113,7 +107,7 @@ function SparseSymbolicFactorOptions()
         C_NULL,
         @cfunction(Libc.malloc, Ptr{Cvoid}, (Csize_t,)),
         @cfunction(Libc.free, Cvoid, (Ptr{Cvoid},)),
-        @cfunction(_libsparse_report_error, Cvoid, (Cstring,)),
+        @cfunction(text -> error(unsafe_string(text)), Cvoid, (Cstring,)),
     )
 end
 
