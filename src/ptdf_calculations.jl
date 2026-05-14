@@ -285,7 +285,7 @@ mirrors `_calculate_PTDF_matrix_KLU`: factor ABA via LDLT, then solve
 end
 
 """
-    PTDF(sys::PSY.System; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
+    PTDF(sys::PSY.System; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = _default_linear_solver(), tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
 
 Construct a Power Transfer Distribution Factor (PTDF) matrix from a PowerSystems.System by computing
 the sensitivity of transmission line flows to bus power injections. This is the primary constructor
@@ -298,7 +298,7 @@ for PTDF analysis starting from system data.
 - `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
         Dictionary mapping bus numbers to distributed slack weights for realistic slack modeling.
         Empty dictionary uses single slack bus (default behavior)
-- `linear_solver::String = "KLU"`:
+- `linear_solver::String = _default_linear_solver()`:
         Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
 - `tol::Float64 = eps()`:
         Sparsification tolerance for dropping small matrix elements to reduce memory usage
@@ -351,7 +351,7 @@ where A is the incidence matrix and B is the susceptance matrix.
 """
 function PTDF(sys::PSY.System;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
-    linear_solver = "KLU",
+    linear_solver = _default_linear_solver(),
     tol::Float64 = eps(),
     kwargs...,
 )
@@ -363,7 +363,7 @@ function PTDF(sys::PSY.System;
 end
 
 """
-    PTDF(ybus::Ybus; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
+    PTDF(ybus::Ybus; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = _default_linear_solver(), tol::Float64 = eps(), network_reductions::Vector{NetworkReduction} = NetworkReduction[], kwargs...)
 
 Construct a Power Transfer Distribution Factor (PTDF) matrix from existing Ybus matrix.
 This constructor is more efficient when the prerequisite matrices are already available and provides
@@ -376,7 +376,7 @@ direct control over the underlying matrix computations.
 - `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
         Dictionary mapping bus numbers to distributed slack weights for realistic slack modeling.
         Empty dictionary uses single slack bus (default behavior)
-- `linear_solver::String = "KLU"`:
+- `linear_solver::String = _default_linear_solver()`:
         Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
 - `tol::Float64 = eps()`:
         Sparsification tolerance for dropping small matrix elements to reduce memory usage
@@ -421,7 +421,7 @@ where A is the incidence matrix and B is the susceptance matrix.
 """
 function PTDF(ybus::Ybus;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
-    linear_solver = "KLU",
+    linear_solver = _default_linear_solver(),
     tol::Float64 = eps(),
 )
     A = IncidenceMatrix(ybus)
@@ -436,7 +436,7 @@ function PTDF(ybus::Ybus;
 end
 
 """
-    PTDF(A::IncidenceMatrix, BA::BA_Matrix; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = "KLU", tol::Float64 = eps())
+    PTDF(A::IncidenceMatrix, BA::BA_Matrix; dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(), linear_solver = _default_linear_solver(), tol::Float64 = eps())
 
 Construct a Power Transfer Distribution Factor (PTDF) matrix from existing incidence and BA matrices.
 This constructor is more efficient when the prerequisite matrices are already available and provides
@@ -450,7 +450,7 @@ direct control over the underlying matrix computations.
 - `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
         Dictionary mapping bus numbers to distributed slack participation factors.
         Empty dictionary uses single slack bus (reference bus from matrices)
-- `linear_solver::String = "KLU"`:
+- `linear_solver::String = _default_linear_solver()`:
         Linear solver algorithm for matrix computations. Options: "KLU", "Dense", "MKLPardiso"
 - `tol::Float64 = eps()`:
         Sparsification tolerance for dropping small matrix elements to reduce memory usage
@@ -502,7 +502,7 @@ function PTDF(
     A::IncidenceMatrix,
     BA::BA_Matrix;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
-    linear_solver = "KLU",
+    linear_solver = _default_linear_solver(),
     tol::Float64 = eps(),
 )
     dist_slack_vector = if !(isempty(dist_slack))

@@ -48,6 +48,11 @@ JuMP-side work (in callers) parallelizes freely.
 - `valid_ix::Vector{Int}`:
         Vector containing the row/columns indices of matrices related the buses
         which are not slack ones.
+- `bus_to_valid_idx::Vector{Int}`:
+        Inverse of `valid_ix`: `bus_to_valid_idx[b]` is the position of bus
+        `b` inside `valid_ix`, or 0 if `b` is a reference bus. Lets the hot
+        path iterate the nonzeros of a `BA` column instead of scanning the
+        full bus axis.
 - `cache::RowCache`:
         Cache where PTDF rows are stored.
 - `cache_lock::ReentrantLock`:
@@ -80,6 +85,7 @@ struct VirtualPTDF{Ax, L <: NTuple{2, Dict}, K} <:
     lookup::L
     temp_data::Vector{Vector{Float64}}
     valid_ix::Vector{Int}
+    bus_to_valid_idx::Vector{Int}
     cache::RowCache
     cache_lock::ReentrantLock
     subnetwork_axes::Dict{Int, Ax}
@@ -120,8 +126,9 @@ struct with an empty cache.
 - `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
         Dictionary of weights to be used as distributed slack bus.
         The distributed slack dictionary must have the same number of entries as the number of buses.
-- `linear_solver::String = "KLU"`:
-        Linear solver to use for factorization. Options: "KLU", "AppleAccelerate"
+- `linear_solver::String = _default_linear_solver()`:
+        Linear solver to use for factorization. Options: "KLU", "AppleAccelerate".
+        Defaults to "AppleAccelerate" on macOS and "KLU" elsewhere.
 - `tol::Float64 = eps()`:
         Tolerance related to sparsification and values to drop.
 - `max_cache_size::Int`:
@@ -136,7 +143,7 @@ struct with an empty cache.
 function VirtualPTDF(
     sys::PSY.System;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
-    linear_solver::String = "KLU",
+    linear_solver::String = _default_linear_solver(),
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
@@ -197,8 +204,9 @@ The return is a VirtualPTDF struct with an empty cache.
 - `dist_slack::Dict{Int, Float64} = Dict{Int, Float64}()`:
         Dictionary of weights to be used as distributed slack bus.
         The distributed slack dictionary must have the same number of entries as the number of buses.
-- `linear_solver::String = "KLU"`:
-        Linear solver to use for factorization. Options: "KLU", "AppleAccelerate"
+- `linear_solver::String = _default_linear_solver()`:
+        Linear solver to use for factorization. Options: "KLU", "AppleAccelerate".
+        Defaults to "AppleAccelerate" on macOS and "KLU" elsewhere.
 - `tol::Float64 = eps()`:
         Tolerance related to sparsification and values to drop.
 - `max_cache_size::Int`:
@@ -209,7 +217,7 @@ The return is a VirtualPTDF struct with an empty cache.
 function VirtualPTDF(
     ybus::Ybus;
     dist_slack::Dict{Int, Float64} = Dict{Int, Float64}(),
-    linear_solver::String = "KLU",
+    linear_solver::String = _default_linear_solver(),
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
@@ -261,6 +269,7 @@ function VirtualPTDF(
     # `Vector{Vector{Float64}}` so `with_solver`'s callback signature
     # stays uniform across solver backends.
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
+    bus_to_valid_idx = _build_bus_to_valid_idx(length(bus_ax), valid_ix)
     temp_data = [zeros(length(bus_ax))]
     work_ba_col = [zeros(length(valid_ix))]
 
@@ -277,6 +286,7 @@ function VirtualPTDF(
         look_up,
         temp_data,
         valid_ix,
+        bus_to_valid_idx,
         empty_cache,
         ReentrantLock(),
         subnetwork_axes,
@@ -351,12 +361,23 @@ function _compute_ptdf_row(vptdf::VirtualPTDF, row::Int)::Vector{Float64}
     return with_solver(
         vptdf.K, vptdf.work_ba_col, vptdf.temp_data, vptdf.solver_lock,
     ) do K_solver, work_ba_col, temp_data
-        valid_ix = vptdf.valid_ix
-        @inbounds for i in eachindex(valid_ix)
-            work_ba_col[i] = vptdf.BA[valid_ix[i], row]
+        # Extract BA[:, row] non-zeros into work_ba_col at non-ref-bus
+        # positions. Iterates only the nonzeros of the BA column (typically
+        # 2 per arc) instead of scanning the full bus axis and bisecting
+        # the CSC for each entry.
+        fill!(work_ba_col, 0.0)
+        BA = vptdf.BA
+        bus_to_valid_idx = vptdf.bus_to_valid_idx
+        ba_rv = SparseArrays.rowvals(BA)
+        ba_nz = SparseArrays.nonzeros(BA)
+        @inbounds for k in SparseArrays.nzrange(BA, row)
+            valid_i = bus_to_valid_idx[ba_rv[k]]
+            valid_i > 0 || continue
+            work_ba_col[valid_i] = ba_nz[k]
         end
         lin_solve = _solve_factorization(K_solver, work_ba_col)
         fill!(temp_data, 0.0)
+        valid_ix = vptdf.valid_ix
         @inbounds for i in eachindex(valid_ix)
             temp_data[valid_ix[i]] = lin_solve[i]
         end
