@@ -22,17 +22,23 @@ end
 
 function _populate_ybus_branch_vector!(
     vec::Vector{T},
-    sys::PSY.System,
+    sys::PSY.System;
+    skip_names::Set{String} = Set{String}(),
 ) where {T <: PSY.ACTransmission}
     iter = PSY.get_components(T, sys)
     sizehint!(vec, length(iter))
     for br in iter
-        PSY.get_available(br) && push!(vec, br)
+        PSY.get_available(br) || continue
+        PSY.get_name(br) in skip_names && continue
+        push!(vec, br)
     end
     return
 end
 
-function _get_ybus_two_terminal_ac_branches(sys::PSY.System)::YbusACBranches
+function _get_ybus_two_terminal_ac_branches(
+    sys::PSY.System;
+    skip_names::Set{String} = Set{String}(),
+)::YbusACBranches
     branches = YbusACBranches(
         Vector{PSY.Line}(),
         Vector{PSY.MonitoredLine}(),
@@ -43,13 +49,25 @@ function _get_ybus_two_terminal_ac_branches(sys::PSY.System)::YbusACBranches
         Vector{PSY.DynamicBranch}(),
         Vector{PSY.DiscreteControlledACBranch}(),
     )
-    _populate_ybus_branch_vector!(branches.lines, sys)
-    _populate_ybus_branch_vector!(branches.monitored_lines, sys)
-    _populate_ybus_branch_vector!(branches.generic_arc_impedances, sys)
-    _populate_ybus_branch_vector!(branches.tap_transformers, sys)
-    _populate_ybus_branch_vector!(branches.phase_shifting_transformers, sys)
-    _populate_ybus_branch_vector!(branches.transformer2w, sys)
-    _populate_ybus_branch_vector!(branches.dynamic_branches, sys)
+    _populate_ybus_branch_vector!(branches.lines, sys; skip_names = skip_names)
+    _populate_ybus_branch_vector!(branches.monitored_lines, sys; skip_names = skip_names)
+    _populate_ybus_branch_vector!(
+        branches.generic_arc_impedances,
+        sys;
+        skip_names = skip_names,
+    )
+    _populate_ybus_branch_vector!(branches.tap_transformers, sys; skip_names = skip_names)
+    _populate_ybus_branch_vector!(
+        branches.phase_shifting_transformers,
+        sys;
+        skip_names = skip_names,
+    )
+    _populate_ybus_branch_vector!(branches.transformer2w, sys; skip_names = skip_names)
+    _populate_ybus_branch_vector!(
+        branches.dynamic_branches,
+        sys;
+        skip_names = skip_names,
+    )
     return branches
 end
 

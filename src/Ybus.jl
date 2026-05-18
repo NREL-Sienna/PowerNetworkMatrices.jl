@@ -821,6 +821,114 @@ function _get_filtered_components(
 end
 
 """
+Apply reductions that always run during Ybus construction, before any user-specified
+`network_reductions`. Currently this performs two steps:
+
+  - Merge closed zero-impedance `DiscreteControlledACBranch` components by collapsing
+    their endpoint buses (mutates `nr.bus_reduction_map` and `nr.reverse_bus_search_map`).
+  - Identify any other two-terminal branches whose endpoints both resolve to the same
+    surviving bus after the merge, and exclude them so they cannot produce self-loop
+    rows in the incidence matrix downstream.
+
+Returns `(breaker_switches, collapsed_branch_names)`:
+
+  - `breaker_switches`: closed breakers with non-trivial impedance that still need to
+    be modeled as Y-bus branches.
+  - `collapsed_branch_names`: names of non-breaker two-terminal branches to be excluded
+    from `_get_ybus_two_terminal_ac_branches`.
+"""
+function _apply_implicit_reductions!(sys::PSY.System, nr::NetworkReductionData)
+    breaker_switches = _merge_zero_impedance_breakers!(sys, nr)
+    collapsed_branch_names = _eliminate_collapsed_branches!(sys, breaker_switches, nr)
+    return breaker_switches, collapsed_branch_names
+end
+
+"""
+Merge closed `DiscreteControlledACBranch` components with near-zero impedance by
+collapsing their endpoints in the network reduction maps. Returns the closed breakers
+with non-trivial impedance that must still be modeled as Y-bus branches.
+"""
+function _merge_zero_impedance_breakers!(sys::PSY.System, nr::NetworkReductionData)
+    breaker_switches = Vector{PSY.DiscreteControlledACBranch}()
+    reverse_bus_search_map = get_reverse_bus_search_map(nr)
+    bus_reduction_map = get_bus_reduction_map(nr)
+    for br in PSY.get_components(PSY.DiscreteControlledACBranch, sys)
+        PSY.get_available(br) || continue
+        PSY.get_branch_status(br) == PSY.DiscreteControlledBranchStatus.CLOSED ||
+            continue
+        r = PSY.get_r(br)
+        x = PSY.get_x(br)
+        if r == 0.0 && x < ZERO_IMPEDANCE_LINE_REACTANCE_THRESHOLD
+            from_bus_number = PSY.get_number(PSY.get_from(PSY.get_arc(br)))
+            to_bus_number = PSY.get_number(PSY.get_to(PSY.get_arc(br)))
+            _update_bus_maps!(
+                reverse_bus_search_map,
+                bus_reduction_map,
+                to_bus_number,
+                from_bus_number,
+            )
+            push!(nr.removed_arcs, (from_bus_number, to_bus_number))
+        else
+            push!(breaker_switches, br)
+        end
+    end
+    return breaker_switches
+end
+
+"""
+Identify two-terminal branches whose endpoints both resolve to the same surviving
+bus after the zero-impedance breaker merge. Such branches would produce self-loop
+rows in the incidence matrix and corrupt downstream reduction algorithms.
+
+Filters collapsed entries out of `breaker_switches` in place. Returns a set of names
+for non-breaker branches that the caller must exclude from
+`_get_ybus_two_terminal_ac_branches`.
+"""
+function _eliminate_collapsed_branches!(
+    sys::PSY.System,
+    breaker_switches::Vector{PSY.DiscreteControlledACBranch},
+    nr::NetworkReductionData,
+)
+    collapsed = Set{String}()
+    reverse_bus_search_map = get_reverse_bus_search_map(nr)
+    isempty(reverse_bus_search_map) && return collapsed
+    for br in PSY.get_components(PSY.ACTransmission, sys)
+        PSY.get_available(br) || continue
+        br isa PSY.ThreeWindingTransformer && continue
+        br isa PSY.DiscreteControlledACBranch && continue
+        if _record_if_collapsed!(br, nr, reverse_bus_search_map)
+            push!(collapsed, PSY.get_name(br))
+        end
+    end
+    filter!(
+        br -> !_record_if_collapsed!(br, nr, reverse_bus_search_map),
+        breaker_switches,
+    )
+    return collapsed
+end
+
+# Returns `true` if both endpoints of `br` resolve to the same surviving bus, in
+# which case the arc is added to `nr.removed_arcs`. Used by
+# `_eliminate_collapsed_branches!` to flag and audit branches that the implicit
+# breaker merge has turned into self-loops.
+function _record_if_collapsed!(
+    br::PSY.ACTransmission,
+    nr::NetworkReductionData,
+    reverse_bus_search_map::Dict{Int, Int},
+)
+    arc = PSY.get_arc(br)
+    fr_no = PSY.get_number(PSY.get_from(arc))
+    to_no = PSY.get_number(PSY.get_to(arc))
+    fr_resolved = get(reverse_bus_search_map, fr_no, fr_no)
+    to_resolved = get(reverse_bus_search_map, to_no, to_no)
+    fr_resolved == to_resolved || return false
+    push!(nr.removed_arcs, (fr_no, to_no))
+    @debug "Implicit reduction: branch $(PSY.get_name(br)) excluded; endpoints " *
+           "$fr_no and $to_no both collapse to bus $fr_resolved."
+    return true
+end
+
+"""
     Ybus(
         sys::PSY.System;
         make_arc_admittance_matrices::Bool = false,
@@ -907,29 +1015,7 @@ function Ybus(
         end
     end
 
-    #Building map for removed Breaker/Switches
-    breaker_switches = Vector{PSY.DiscreteControlledACBranch}()
-    for br in PSY.get_components(PSY.DiscreteControlledACBranch, sys)
-        !PSY.get_available(br) && continue
-        r = PSY.get_r(br)
-        x = PSY.get_x(br)
-        status = PSY.get_branch_status(br)
-        if status == PSY.DiscreteControlledBranchStatus.CLOSED
-            if r == 0.0 && x < ZERO_IMPEDANCE_LINE_REACTANCE_THRESHOLD
-                from_bus_number = PSY.get_number(PSY.get_from(PSY.get_arc(br)))
-                to_bus_number = PSY.get_number(PSY.get_to(PSY.get_arc(br)))
-                _update_bus_maps!(
-                    reverse_bus_search_map,
-                    bus_reduction_map,
-                    to_bus_number,
-                    from_bus_number,
-                )
-                push!(nr.removed_arcs, (from_bus_number, to_bus_number))
-            else
-                push!(breaker_switches, br)
-            end
-        end
-    end
+    breaker_switches, collapsed_branch_names = _apply_implicit_reductions!(sys, nr)
 
     bus_ax = sort!(collect(keys(bus_reduction_map)))
     axes = (bus_ax, bus_ax)
@@ -940,7 +1026,8 @@ function Ybus(
         bus_lookup[b] = ix
     end
     adj = SparseArrays.spdiagm(ones(Int8, busnumber))
-    branches = _get_ybus_two_terminal_ac_branches(sys)
+    branches =
+        _get_ybus_two_terminal_ac_branches(sys; skip_names = collapsed_branch_names)
     append!(branches.breaker_switches, breaker_switches)
     transformer_3W =
         _get_filtered_components(PSY.ThreeWindingTransformer, sys, PSY.get_available)

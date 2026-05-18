@@ -36,7 +36,10 @@ by that branch.
 function _build_row_to_cols(A::SparseArrays.SparseMatrixCSC{Int8, Int}, buscount::Int)
     n_rows = size(A, 1)
     row_first_col = zeros(Int, n_rows)
-    row_to_cols = Vector{Tuple{Int, Int}}(undef, n_rows)
+    # Initialize with a (0, 0) sentinel so any row with fewer than two stored
+    # entries can be detected after the loop. Without this, such rows leave
+    # `undef` slots that silently propagate garbage memory downstream.
+    row_to_cols = fill((0, 0), n_rows)
     Arowval = SparseArrays.rowvals(A)
     for col in 1:buscount
         for k in SparseArrays.nzrange(A, col)
@@ -46,6 +49,17 @@ function _build_row_to_cols(A::SparseArrays.SparseMatrixCSC{Int8, Int}, buscount
             else
                 row_to_cols[row] = (row_first_col[row], col)
             end
+        end
+    end
+    for r in 1:n_rows
+        if row_to_cols[r] == (0, 0)
+            n_found = row_first_col[r] == 0 ? 0 : 1
+            error(
+                "Incidence-matrix row $r has $n_found stored entr$(n_found == 1 ? "y" : "ies") " *
+                "but exactly 2 are required (one per branch endpoint). This usually " *
+                "indicates a self-loop arc or a network reduction that left a " *
+                "collapsed arc in the arc axis.",
+            )
         end
     end
     return row_to_cols
