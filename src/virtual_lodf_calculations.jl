@@ -17,8 +17,9 @@ every libklu solve runs under `_LIBKLU_LOCK` (process-wide) and the per-cache
 callers can issue requests concurrently; the libklu work runs one at a time.
 
 # Arguments
-- `K::KLULinSolveCache{Float64}`:
-        ABA factorization (single cache; solves serialize via the locks above).
+- `K`:
+        ABA factorization cache (`KLULinSolveCache{Float64}` or `AAFactorization`).
+        Solves serialize via the locks above.
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix.
 - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
@@ -109,8 +110,24 @@ function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
     return
 end
 
+# Map bus index (1:n_buses) to its position in `valid_ix`; ref buses map to 0.
+function _build_bus_to_valid_idx(n_buses::Int, valid_ix::Vector{Int})::Vector{Int}
+    bus_to_valid = zeros(Int, n_buses)
+    for (vi, bus_ix) in enumerate(valid_ix)
+        bus_to_valid[bus_ix] = vi
+    end
+    return bus_to_valid
+end
+
+"""
+    _get_PTDF_A_diag(K, BA, A, ref_bus_positions) -> Vector{Float64}
+
+Compute `diag(PTDF · A)`. Each row of `A` has exactly two nonzeros (+1 at the
+from-bus, -1 at the to-bus), so the per-arc dot product reduces to two indexed
+reads into the solved PTDF row after a one-time transpose of `A`.
+"""
 function _get_PTDF_A_diag(
-    K::KLULinSolveCache{Float64},
+    K,
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     ref_bus_positions::Set{Int},
@@ -119,35 +136,61 @@ function _get_PTDF_A_diag(
     n_buses = size(BA, 1)
     diag_ = zeros(n_branches)
 
-    # Pre-compute valid indices (non-reference buses)
     valid_ix = setdiff(1:n_buses, ref_bus_positions)
     n_valid = length(valid_ix)
+    bus_to_valid_idx = _build_bus_to_valid_idx(n_buses, valid_ix)
 
-    # Pre-allocate work arrays for efficiency
-    ba_col = zeros(n_valid)
-    ptdf_row = zeros(n_buses)
-
-    # For each branch, compute PTDF row and dot with incidence column
+    # Per-arc (from_valid, to_valid) via one transpose of A; 0 = ref bus.
+    A_T = SparseArrays.sparse(transpose(A))
+    arc_from_valid = Vector{Int}(undef, n_branches)
+    arc_to_valid = Vector{Int}(undef, n_branches)
+    at_rv = SparseArrays.rowvals(A_T)
+    at_nz = SparseArrays.nonzeros(A_T)
     for i in 1:n_branches
-        # Extract BA column for valid indices
+        f_valid = 0
+        t_valid = 0
+        @inbounds for k in SparseArrays.nzrange(A_T, i)
+            bus_ix = at_rv[k]
+            v = at_nz[k]
+            valid_i = bus_to_valid_idx[bus_ix]
+            if v > 0
+                f_valid = valid_i
+            elseif v < 0
+                t_valid = valid_i
+            end
+        end
+        arc_from_valid[i] = f_valid
+        arc_to_valid[i] = t_valid
+    end
+
+    ba_col = zeros(n_valid)
+    ba_rv = SparseArrays.rowvals(BA)
+    ba_nz = SparseArrays.nonzeros(BA)
+
+    for i in 1:n_branches
         fill!(ba_col, 0.0)
-        for idx in 1:n_valid
-            bus_idx = valid_ix[idx]
-            ba_col[idx] = BA[bus_idx, i]
+        @inbounds for k in SparseArrays.nzrange(BA, i)
+            valid_i = bus_to_valid_idx[ba_rv[k]]
+            valid_i > 0 || continue
+            ba_col[valid_i] = ba_nz[k]
         end
 
-        solve!(K, ba_col)
+        _solve_factorization(K, ba_col)
 
-        # Map back to full bus indices
-        fill!(ptdf_row, 0.0)
-        for idx in 1:n_valid
-            ptdf_row[valid_ix[idx]] = ba_col[idx]
+        # ba_col is now PTDF row i in valid-index space; H[e,e] = ptdf[from] - ptdf[to].
+        f = arc_from_valid[i]
+        t = arc_to_valid[i]
+        v_f = if f > 0
+            ba_col[f]
+        else
+            0.0
         end
-
-        # Compute diagonal element: sum of PTDF[i,j] * A[i,j] for all buses j
-        for j in 1:n_buses
-            diag_[i] += ptdf_row[j] * A[i, j]
+        v_t = if t > 0
+            ba_col[t]
+        else
+            0.0
         end
+        @inbounds diag_[i] = v_f - v_t
     end
     return diag_
 end
