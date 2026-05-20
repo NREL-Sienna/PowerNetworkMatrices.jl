@@ -427,14 +427,18 @@ function add_branch_entries_to_indexing_maps!(
     return
 end
 
-_get_shunt(br::PSY.ACTransmission, node::Symbol) =
-    PSY.get_g(br)[node] + 1im * PSY.get_b(br)[node]
-_get_shunt(::PSY.DiscreteControlledACBranch, ::Symbol) = zero(YBUS_ELTYPE)
+function _get_shunts(br::PSY.ACTransmission)
+    g = PSY.get_g(br)
+    b = PSY.get_b(br)
+    return (g[:from] + 1im * b[:from], g[:to] + 1im * b[:to])
+end
+_get_shunts(::PSY.DiscreteControlledACBranch) = (zero(YBUS_ELTYPE), zero(YBUS_ELTYPE))
 
 """Ybus entries for a `Line` or a `DiscreteControlledACBranch`."""
 function ybus_branch_entries(br::PSY.ACTransmission)
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
-    Y11 = Y_l + _get_shunt(br, :from)
+    shunt_from, shunt_to = _get_shunts(br)
+    Y11 = Y_l + shunt_from
     if !isfinite(Y11) || !isfinite(Y_l)
         error(
             "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
@@ -442,7 +446,7 @@ function ybus_branch_entries(br::PSY.ACTransmission)
     end
     Y12 = -Y_l
     Y21 = Y12
-    Y22 = Y_l + _get_shunt(br, :to)
+    Y22 = Y_l + shunt_to
     return (Y11, Y12, Y21, Y22)
 end
 
