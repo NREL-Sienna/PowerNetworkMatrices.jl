@@ -95,7 +95,9 @@ function verify_modf_n2_lodf_identity(
     L21 = vlodf[arc_idx2, arc_idx1]
     denom = 1 - L12 * L21
     abs(denom) < 1e-6 &&
-        error("Arc pair ($arc_idx1, $arc_idx2) is an N-2 islanding pair (denom=$denom); use a non-islanding pair")
+        error(
+            "Arc pair ($arc_idx1, $arc_idx2) is an N-2 islanding pair (denom=$denom); use a non-islanding pair",
+        )
 
     ctg_uuid = Base.UUID(UInt128(hash((arc_idx1, arc_idx2, :n2))))
     ctg = ContingencySpec(
