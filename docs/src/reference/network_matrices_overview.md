@@ -93,6 +93,19 @@ LODF is derived from PTDF using matrix operations that model the effect of remov
 
 See [`VirtualLODF`](@ref) for cases where it is not possible to compute or store the full LODF matrix.
 
+### Modification Distribution Factors ([`VirtualMODF`](@ref))
+
+The MODF answers: "Under a registered contingency or network modification (one or more branch outages, partial-susceptance changes, or shunt changes), what is the resulting PTDF row for a given monitored arc?"
+
+**Key Characteristics:**
+
+  - On-demand computation of post-modification PTDF rows via the Woodbury matrix identity over a base PTDF.
+  - Caches Woodbury factors per modification and post-modification PTDF rows per `(monitored_arc, modification)` pair.
+  - Auto-registers `PSY.Outage` supplemental attributes attached to the source system.
+  - Rows are indexed by monitored arc tuples or arc indices; the second index is a [`ContingencySpec`](@ref), a [`NetworkModification`](@ref), or a `PSY.Outage`.
+
+**Use it when:** you need post-contingency or post-modification flow sensitivities for one or a few contingencies on a large system, and constructing the full LODF or recomputing PTDF per contingency is too expensive.
+
 ## Arc-Based Indexing
 
 All matrices that involve branches use **arc tuples** as identifiers instead of branch name strings. An arc tuple is a `Tuple{Int, Int}` of the form `(from_bus_number, to_bus_number)`, representing the directed connection between two buses.
@@ -119,6 +132,7 @@ Each matrix stores `axes` and `lookup` fields:
 | `Ybus`            | Bus numbers        | Bus numbers           |
 | `VirtualPTDF`     | Arc tuples         | Bus numbers           |
 | `VirtualLODF`     | Arc tuples         | Arc tuples            |
+| `VirtualMODF`     | Arc tuples         | Bus numbers           |
 
 !!! note
     

@@ -468,3 +468,181 @@ end
         end
     end
 end
+
+@testset "VirtualMODF: N-2 post-contingency PTDF matches N-2 LODF correction" begin
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    vlodf = VirtualLODF(sys5)
+    ptdf_ref = PTDF(sys5)
+    vmodf = VirtualMODF(sys5)
+
+    n_arcs = size(vlodf, 1)
+
+    # N-2 expected row from pre-contingency PTDF + LODF values.
+    # Derived from Woodbury/Sherman-Morrison on the 2×2 susceptance update:
+    #   denom = 1 - LODF[e1,e2]*LODF[e2,e1]
+    #   eff1  = (LODF[m,e1] + LODF[e2,e1]*LODF[m,e2]) / denom
+    #   eff2  = (LODF[e1,e2]*LODF[m,e1] + LODF[m,e2]) / denom
+    function n2_lodf_expected(m, e1, e2)
+        Lm1 = vlodf[m, e1]
+        Lm2 = vlodf[m, e2]
+        L12 = vlodf[e1, e2]
+        L21 = vlodf[e2, e1]
+        denom = 1 - L12 * L21
+        eff1 = (Lm1 + L21 * Lm2) / denom
+        eff2 = (L12 * Lm1 + Lm2) / denom
+        return ptdf_ref[m, :] .+ eff1 .* ptdf_ref[e1, :] .+ eff2 .* ptdf_ref[e2, :]
+    end
+
+    # Bridge arcs (PTDF_A_diag ≈ 1) produce N-1 islanding; skip them.
+    is_bridge(e) = abs(vmodf.PTDF_A_diag[e]) >= 1.0 - 1e-6
+
+    # Two non-bridge arcs can still form an N-2 island (bridge pair) where
+    # removing both disconnects the network. This is detected by
+    # L12*L21 ≈ 1 (the 2×2 Woodbury denominator collapses to zero).
+    # In that regime VirtualMODF uses a pseudoinverse while the closed-form
+    # LODF formula is undefined; skip those pairs.
+    n2_is_islanding(e1, e2) = abs(1 - vlodf[e1, e2] * vlodf[e2, e1]) < 1e-6
+
+    uuid_counter = UInt128(10_000)
+    for e1 in 1:n_arcs
+        is_bridge(e1) && continue
+        for e2 in (e1 + 1):n_arcs
+            is_bridge(e2) && continue
+            n2_is_islanding(e1, e2) && continue
+
+            b_e1 = vmodf.arc_susceptances[e1]
+            b_e2 = vmodf.arc_susceptances[e2]
+
+            ctg_uuid = Base.UUID(uuid_counter)
+            uuid_counter += 1
+            ctg = ContingencySpec(
+                ctg_uuid,
+                NetworkModification(
+                    "n2_outage_$(e1)_$(e2)",
+                    [ArcModification(e1, -b_e1), ArcModification(e2, -b_e2)],
+                ),
+            )
+            vmodf.contingency_cache[ctg_uuid] = ctg
+
+            for m in 1:n_arcs
+                modf_row = PNM._compute_modf_entry(vmodf, m, ctg.modification)
+                expected = n2_lodf_expected(m, e1, e2)
+                @test isapprox(modf_row, expected; atol = 1e-6)
+            end
+
+            # Clear Woodbury cache between contingencies to avoid stale entries.
+            empty!(vmodf.woodbury_cache)
+        end
+    end
+end
+
+@testset "VirtualMODF: PTDF_A_diag is lazy, logs on first access, caches" begin
+    sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    vmodf = VirtualMODF(sys5)
+    n_arcs = length(PNM.get_arc_axis(vmodf))
+
+    # `getfield` bypasses the `getproperty` hook under test.
+    @test isempty(getfield(vmodf, :PTDF_A_diag))
+
+    diag1 = @test_logs (:info, r"Computing.*PTDF_A_diag.*first access") (
+        :info, r"Computed.*PTDF_A_diag",
+    ) vmodf.PTDF_A_diag
+    @test length(diag1) == n_arcs
+    @test !isempty(getfield(vmodf, :PTDF_A_diag))
+
+    # Second read is a cache hit: same identity, no further logs.
+    diag2 = @test_logs min_level = Logging.Info vmodf.PTDF_A_diag
+    @test diag2 === diag1
+    @test PNM.get_PTDF_A_diag(vmodf) === diag1
+
+    # Cross-check against VirtualLODF (which still computes eagerly).
+    vlodf = VirtualLODF(sys5)
+    @test diag1 ≈ vlodf.PTDF_A_diag atol = 1e-10
+end
+
+@testset "VirtualMODF: N-2 non-bridge islanding pair — connected subnetwork matches rebuilt PTDF" begin
+    # Real-world flowgate scenario: two individually non-critical lines (neither is
+    # a bridge on its own) whose simultaneous loss isolates bus 222 in the RTS-GMLC
+    # network.  Lines "B34" (221–222) and "B30" (217–222) are the only connections
+    # to bus 222; removing both makes it electrically isolated.
+    #
+    # The 2×2 Woodbury matrix is singular (L12·L21 ≈ 1), so VirtualMODF falls back
+    # to its pseudoinverse path.  We verify correctness against a freshly built PTDF
+    # with both lines disabled, skipping the isolated bus column because the
+    # pseudoinverse does not force that column to zero.
+    sys = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys")
+    vmodf = VirtualMODF(sys)
+
+    arc_ax = PNM.get_arc_axis(vmodf)
+    bus_ax = PNM.get_bus_axis(vmodf)
+    arc_lookup = PNM.get_arc_lookup(vmodf)
+    n_arcs = length(arc_ax)
+
+    line_b34 = PSY.get_component(PSY.ACBranch, sys, "B34")
+    line_b30 = PSY.get_component(PSY.ACBranch, sys, "B30")
+
+    function arc_idx_for_line(line)
+        arc = PSY.get_arc(line)
+        return arc_lookup[(arc.from.number, arc.to.number)]
+    end
+
+    e1 = arc_idx_for_line(line_b34)  # arc (221, 222)
+    e2 = arc_idx_for_line(line_b30)  # arc (217, 222)
+
+    b_e1 = vmodf.arc_susceptances[e1]
+    b_e2 = vmodf.arc_susceptances[e2]
+    ctg_uuid = Base.UUID(UInt128(88_000))
+    ctg = ContingencySpec(
+        ctg_uuid,
+        NetworkModification(
+            "n2_island_B34_B30",
+            [ArcModification(e1, -b_e1), ArcModification(e2, -b_e2)],
+        ),
+    )
+    vmodf.contingency_cache[ctg_uuid] = ctg
+
+    # Rebuild the PTDF with both lines disabled — gold-standard ground truth.
+    sys_mod = PSB.build_system(PSB.PSITestSystems, "test_RTS_GMLC_sys")
+    for name in ("B34", "B30")
+        PSY.set_available!(PSY.get_component(PSY.ACBranch, sys_mod, name), false)
+    end
+    ptdf_rebuilt = PTDF(sys_mod)
+    rebuilt_arc_lookup = PNM.get_arc_lookup(ptdf_rebuilt)
+    rebuilt_bus_lookup = PNM.get_bus_lookup(ptdf_rebuilt)
+
+    # Connected buses: every bus appearing in at least one surviving arc.
+    # Bus 222 is absent because both its lines are outaged.
+    connected_buses = Set{Int}()
+    for (fb, tb) in keys(rebuilt_arc_lookup)
+        push!(connected_buses, fb)
+        push!(connected_buses, tb)
+    end
+
+    for m in 1:n_arcs
+        modf_row = vmodf[m, ctg]
+
+        # Pseudoinverse must produce a finite result even for islanding events.
+        @test all(isfinite, modf_row)
+
+        monitored_arc = arc_ax[m]
+
+        # Outaged arcs: full loss of flow sensitivity → zero row.
+        if !haskey(rebuilt_arc_lookup, monitored_arc)
+            @test all(abs.(modf_row) .< 1e-8)
+            continue
+        end
+
+        # Surviving arcs: match rebuilt PTDF for every electrically connected bus.
+        rebuilt_m = rebuilt_arc_lookup[monitored_arc]
+        for (b_idx, bus_num) in enumerate(bus_ax)
+            bus_num ∈ connected_buses || continue
+            @test isapprox(
+                modf_row[b_idx],
+                ptdf_rebuilt[rebuilt_m, rebuilt_bus_lookup[bus_num]];
+                atol = 1e-6,
+            )
+        end
+    end
+
+    PNM.clear_caches!(vmodf)
+end

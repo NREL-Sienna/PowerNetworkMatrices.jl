@@ -30,7 +30,8 @@ cache and skips the recomputation.
 - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
         Incidence matrix.
 - `PTDF_A_diag::Vector{Float64}`:
-        Raw diagonal elements of PTDF·A (H[e,e] values).
+        Diagonal of `PTDF·A` (H[e,e] values). Lazily populated on the first
+        read of `vmodf.PTDF_A_diag`; empty until then.
 - `arc_susceptances::Vector{Float64}`:
         Effective susceptance for each arc.
 - `branch_susceptances_by_arc::Vector{Vector{Float64}}`:
@@ -110,6 +111,49 @@ get_arc_axis(mat::VirtualMODF) = mat.axes[1]
 get_bus_axis(mat::VirtualMODF) = mat.axes[2]
 get_tol(mat::VirtualMODF) = mat.tol[]
 get_system_uuid(M::VirtualMODF) = M.system_uuid
+
+function Base.getproperty(vmodf::VirtualMODF, name::Symbol)
+    name === :PTDF_A_diag && return _get_ptdf_a_diag_lazy!(vmodf)
+    return getfield(vmodf, name)
+end
+
+# Use `getfield` for every field read here — `vmodf.PTDF_A_diag` would
+# recurse via `getproperty`.
+function _get_ptdf_a_diag_lazy!(vmodf::VirtualMODF)
+    diag = getfield(vmodf, :PTDF_A_diag)
+    !isempty(diag) && return diag
+    @lock getfield(vmodf, :solver_lock) begin
+        diag = getfield(vmodf, :PTDF_A_diag)
+        !isempty(diag) && return diag
+        n_arcs = length(getfield(vmodf, :axes)[1])
+        @info "Computing VirtualMODF.PTDF_A_diag on first access ($n_arcs arcs)."
+        t0 = time_ns()
+        K = getfield(vmodf, :K)
+        BA = getfield(vmodf, :BA)
+        A = getfield(vmodf, :A)
+        ref_bus_set = _ref_bus_positions(vmodf)
+        new_diag = _get_PTDF_A_diag(K, BA, A, ref_bus_set)
+        resize!(diag, length(new_diag))
+        copyto!(diag, new_diag)
+        elapsed = (time_ns() - t0) / 1e9
+        @info "Computed VirtualMODF.PTDF_A_diag in $(round(elapsed; digits = 2)) s (cached)."
+        return diag
+    end
+end
+
+function _ref_bus_positions(vmodf::VirtualMODF)
+    n_buses = length(getfield(vmodf, :axes)[2])
+    valid_ix = getfield(vmodf, :valid_ix)
+    return Set{Int}(setdiff(1:n_buses, valid_ix))
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Return `H[e, e]` for each arc `e`. Same as `vmodf.PTDF_A_diag`; both trigger
+the lazy compute on first call and return the cached vector thereafter.
+"""
+get_PTDF_A_diag(vmodf::VirtualMODF) = vmodf.PTDF_A_diag
 
 # Woodbury kernel accessors. The Woodbury kernel always goes through
 # `with_solver` so it picks up the `solver_lock` + `_LIBKLU_LOCK` chain.
@@ -242,8 +286,8 @@ function VirtualMODF(
 
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
 
-    # PTDF diagonal precompute runs serially on the dispatcher thread.
-    PTDF_A_diag = _get_PTDF_A_diag(K, BA.data, A.data, Set(ref_bus_positions))
+    # Empty: populated lazily on first read of `vmodf.PTDF_A_diag`.
+    PTDF_A_diag = Float64[]
     arc_susceptances = _extract_arc_susceptances(BA.data)
     branch_susceptances_by_arc =
         _extract_branch_susceptances_by_arc(BA.data, arc_ax, Ymatrix.network_reduction_data)

@@ -63,6 +63,90 @@ function verify_modf_lodf_identity(
 end
 
 """
+Verify the N-2 simultaneous-outage identity for VirtualMODF.
+
+For full outage of arcs `e1` and `e2` simultaneously, checks:
+
+    VirtualMODF[m, ctg] ≈ PTDF[m,:] + eff1*PTDF[e1,:] + eff2*PTDF[e2,:]
+
+for every monitored arc m, where eff1/eff2 come from the 2×2 LODF
+correction (Woodbury identity on the pre-contingency LODF matrix):
+
+    denom = 1 - LODF[e1,e2] * LODF[e2,e1]
+    eff1  = (LODF[m,e1] + LODF[e2,e1] * LODF[m,e2]) / denom
+    eff2  = (LODF[e1,e2] * LODF[m,e1] + LODF[m,e2]) / denom
+
+Raises an error if the pair {e1, e2} is an N-2 islanding pair
+(denom ≈ 0), since the closed-form formula is undefined in that case.
+"""
+function verify_modf_n2_lodf_identity(
+    vmodf::VirtualMODF,
+    vlodf::VirtualLODF,
+    ptdf::PTDF,
+    arc_idx1::Int,
+    arc_idx2::Int;
+    atol = 1e-6,
+)
+    n_arcs = size(vlodf, 1)
+    b_arc1 = vmodf.arc_susceptances[arc_idx1]
+    b_arc2 = vmodf.arc_susceptances[arc_idx2]
+
+    L12 = vlodf[arc_idx1, arc_idx2]
+    L21 = vlodf[arc_idx2, arc_idx1]
+    denom = 1 - L12 * L21
+    abs(denom) < 1e-6 &&
+        error(
+            "Arc pair ($arc_idx1, $arc_idx2) is an N-2 islanding pair (denom=$denom); use a non-islanding pair",
+        )
+
+    ctg_uuid = Base.UUID(UInt128(hash((arc_idx1, arc_idx2, :n2))))
+    ctg = ContingencySpec(
+        ctg_uuid,
+        NetworkModification(
+            "n2_test_$(arc_idx1)_$(arc_idx2)",
+            [ArcModification(arc_idx1, -b_arc1), ArcModification(arc_idx2, -b_arc2)],
+        ),
+    )
+    vmodf.contingency_cache[ctg_uuid] = ctg
+
+    for m in 1:n_arcs
+        Lm1 = vlodf[m, arc_idx1]
+        Lm2 = vlodf[m, arc_idx2]
+        eff1 = (Lm1 + L21 * Lm2) / denom
+        eff2 = (L12 * Lm1 + Lm2) / denom
+
+        modf_row = vmodf[m, ctg]
+        expected = ptdf[m, :] .+ eff1 .* ptdf[arc_idx1, :] .+ eff2 .* ptdf[arc_idx2, :]
+        @test isapprox(modf_row, expected; atol = atol)
+    end
+
+    empty!(vmodf.woodbury_cache)
+    return
+end
+
+"""
+Return two distinct non-islanding arcs from `branch_map` whose simultaneous
+outage does not island the network (L12*L21 ≠ 1 in the pre-contingency LODF).
+Raises an error if no such pair exists in the map.
+"""
+function _find_two_non_islanding_arcs(vmodf, vlodf, branch_map)
+    candidates = Tuple{Any, Int}[]
+    for (arc_tuple, _) in branch_map
+        arc_idx = vmodf.lookup[1][arc_tuple]
+        if abs(vmodf.PTDF_A_diag[arc_idx]) < 1.0 - 1e-6
+            push!(candidates, (arc_tuple, arc_idx))
+        end
+    end
+    for i in eachindex(candidates), j in (i + 1):length(candidates)
+        _, idx1 = candidates[i]
+        _, idx2 = candidates[j]
+        denom = 1 - vlodf[idx1, idx2] * vlodf[idx2, idx1]
+        abs(denom) >= 1e-6 && return candidates[i], candidates[j]
+    end
+    error("No non-islanding arc pair found in map ($(length(candidates)) candidates)")
+end
+
+"""
 Find a representative non-islanding arc from a branch map.
 
 Skips arcs where PTDF_A_diag ≈ 1.0 (bridge arcs), since those produce
@@ -184,4 +268,17 @@ end
         delta_b = PNM._compute_series_outage_delta_b(series_chain, segment)
         verify_modf_lodf_identity(vmodf, vlodf, ptdf, arc_idx, delta_b)
     end
+end
+
+@testset "MODF vs LODF N-2: direct branch pair" begin
+    sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
+    reductions = NetworkReduction[]
+    ptdf = PTDF(sys; network_reductions = reductions)
+    vlodf = VirtualLODF(sys; network_reductions = reductions)
+    vmodf = VirtualMODF(sys; network_reductions = reductions)
+    nrd = get_network_reduction_data(vmodf)
+
+    (_, arc_idx1), (_, arc_idx2) =
+        _find_two_non_islanding_arcs(vmodf, vlodf, nrd.direct_branch_map)
+    verify_modf_n2_lodf_identity(vmodf, vlodf, ptdf, arc_idx1, arc_idx2)
 end
