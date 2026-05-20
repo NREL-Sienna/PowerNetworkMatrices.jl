@@ -5,8 +5,9 @@ A small, allocation-aware wrapper over Apple's `libSparse.dylib`
 (`/System/Library/Frameworks/Accelerate.framework/.../libSparse.dylib`)
 designed for the access patterns of `PowerNetworkMatrices`:
 
-- Cache the symbolic and numeric factorizations of a symmetric sparse matrix
-  (LDLT by default) and reuse them across many solves.
+- Cache the symbolic and numeric factorizations of a general (unsymmetric)
+  sparse matrix (LU with threshold partial pivoting + Inf-norm equilibration
+  scaling) and reuse them across many solves.
 - Refresh the numeric factor (`numeric_refactor!`) while keeping the symbolic
   analysis, without re-allocating the structural arrays.
 - Solve dense and **sparse** right-hand sides in place, with the sparse path

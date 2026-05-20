@@ -10,12 +10,18 @@ const LIBSPARSE =
     "/System/Library/Frameworks/Accelerate.framework/Versions/A/" *
     "Frameworks/vecLib.framework/libSparse.dylib"
 
+# Only `SparseFactorizationLU` is used by PNM (the documented default,
+# "currently LU with TPP" — threshold partial pivoting, provably stable).
+# The other LU codes are listed for documentation. All LU codes require
+# macOS 15.5+. QR = 40 and CholeskyAtA = 41 are intentionally not wrapped
+# (see file header). The LDLT/Cholesky family (codes 0–4) is not wrapped
+# because all PNM workloads use the general LU path.
 @enum SparseFactorization_t::UInt8 begin
-    SparseFactorizationCholesky = 0
-    SparseFactorizationLDLT = 1
-    SparseFactorizationLDLTUnpivoted = 2
-    SparseFactorizationLDLTSBK = 3
-    SparseFactorizationLDLTTPP = 4
+    # QR = 40, CholeskyAtA = 41 — intentionally not wrapped (see file header).
+    SparseFactorizationLU = 80
+    SparseFactorizationLUUnpivoted = 81
+    SparseFactorizationLUSPP = 82
+    SparseFactorizationLUTPP = 83
 end
 
 @enum SparseOrder_t::UInt8 begin
@@ -73,14 +79,18 @@ struct SparseNumericFactorOptions
     zeroTolerance::Float64
 end
 
-# Defaults match Apple's SolveImplementation.h.
-SparseNumericFactorOptions() = SparseNumericFactorOptions(
-    SparseDefaultControl,
-    SparseScalingDefault,
-    C_NULL,
-    0.01,
-    eps(Cdouble) * 1e-4,
-)
+# Defaults match Apple's SolveImplementation.h. The scaling method is the
+# meaningful knob — `SparseScalingEquilibriationInf` on the LU path is a ~4×
+# speedup with no correctness impact for well-conditioned ABA-like inputs.
+function SparseNumericFactorOptions(scaling::SparseScaling_t)
+    return SparseNumericFactorOptions(
+        SparseDefaultControl,
+        scaling,
+        C_NULL,
+        0.01,
+        eps(Cdouble) * 1e-4,
+    )
+end
 
 struct SparseSymbolicFactorOptions
     control::SparseControl_t
@@ -152,7 +162,7 @@ function _null_symbolic()
         0,
         ATT_ORDINARY,
         0,
-        SparseFactorizationLDLT,
+        SparseFactorizationLU,
         C_NULL,
         0,
         0,
@@ -257,6 +267,49 @@ function _sparse_solve_vector!(
         b::DenseVector_t,
     )::Cvoid
     return nothing
+end
+
+# Workspace-aware solve overloads (libSparse, macOS 10.13+). The factor
+# exposes `solveWorkspaceRequiredStatic + nrhs * solveWorkspaceRequiredPerRHS`
+# bytes of scratch it needs per call; supplying a reusable buffer eliminates
+# the implicit malloc/free that the no-workspace variants perform internally.
+# On AA_LU at 10k nodes that buffer is ~234 KiB / RHS — substantial per-call
+# churn when the no-workspace path is used in a tight row loop. The workspace
+# pointer must be 16-byte aligned; Julia's `Vector{Float64}` data satisfies
+# this for any non-trivial size.
+function _sparse_solve_matrix_ws!(
+    factor::SparseOpaqueFactorization_t,
+    B::DenseMatrix_t,
+    workspace::Ptr{Cvoid},
+)
+    @ccall LIBSPARSE._Z11SparseSolve32SparseOpaqueFactorization_Double18DenseMatrix_DoublePv(
+        factor::SparseOpaqueFactorization_t,
+        B::DenseMatrix_t,
+        workspace::Ptr{Cvoid},
+    )::Cvoid
+    return nothing
+end
+
+function _sparse_solve_vector_ws!(
+    factor::SparseOpaqueFactorization_t,
+    b::DenseVector_t,
+    workspace::Ptr{Cvoid},
+)
+    @ccall LIBSPARSE._Z11SparseSolve32SparseOpaqueFactorization_Double18DenseVector_DoublePv(
+        factor::SparseOpaqueFactorization_t,
+        b::DenseVector_t,
+        workspace::Ptr{Cvoid},
+    )::Cvoid
+    return nothing
+end
+
+# Bytes of workspace required to solve with `nrhs` right-hand sides.
+@inline function _solve_workspace_bytes(
+    factor::SparseOpaqueFactorization_t,
+    nrhs::Integer,
+)
+    return Int(factor.solveWorkspaceRequiredStatic) +
+           Int(nrhs) * Int(factor.solveWorkspaceRequiredPerRHS)
 end
 
 # `Y = A · X`, dense multi-column. `Y` must be allocated to (rowCount, ncols)

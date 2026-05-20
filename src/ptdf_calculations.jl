@@ -110,7 +110,7 @@ function _buildptdf_from_matrices(
     BA::SparseArrays.SparseMatrixCSC{T, Int} where {T <: Union{Float32, Float64}},
     ref_bus_positions::Set{Int},
     dist_slack::Vector{Float64},
-    ::AppleAccelerateSolver)
+    ::AppleAccelerateLUSolver)
     _has_apple_accelerate_backend() || error(_apple_accelerate_unavailable_error())
     return _calculate_PTDF_matrix_AppleAccelerate(A, BA, ref_bus_positions, dist_slack)
 end
@@ -236,8 +236,8 @@ end
 
     Computes the PTDF matrix using the internal Apple Accelerate backend
     (`AccelerateWrapper`). Available only on macOS — non-Apple callers are
-    rejected by `_create_factorization` before reaching this entry. Shape
-    mirrors `_calculate_PTDF_matrix_KLU`: factor ABA via LDLT, then solve
+    rejected by `_buildptdf_from_matrices` before reaching this entry. Shape
+    mirrors `_calculate_PTDF_matrix_KLU`: factor ABA via LU, then solve
     `ABA · X = BA[valid_ix, :]` via the block-packed `solve_sparse!`.
 
     # Arguments
@@ -267,8 +267,7 @@ end
         )
 
         ABA = calculate_ABA_matrix(A, BA, ref_bus_positions)
-        # ABA = Aᵀ B A is symmetric by construction; skip the structural check.
-        cache = AccelerateWrapper.aa_factorize(ABA; check_symmetry = false)
+        cache = AccelerateWrapper.aa_factorize(ABA)
         valid_ix = setdiff(1:buscount, ref_bus_positions)
         PTDFm_t = zeros(buscount, linecount)
         AccelerateWrapper.solve_sparse!(

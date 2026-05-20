@@ -127,8 +127,8 @@ struct with an empty cache.
         Dictionary of weights to be used as distributed slack bus.
         The distributed slack dictionary must have the same number of entries as the number of buses.
 - `linear_solver::String = _default_linear_solver()`:
-        Linear solver to use for factorization. Options: "KLU", "AppleAccelerate".
-        Defaults to "AppleAccelerate" on macOS and "KLU" elsewhere.
+        Linear solver to use for factorization. Options: "KLU", "AppleAccelerateLU".
+        Defaults to "AppleAccelerateLU" on macOS 15.5+ and "KLU" elsewhere.
 - `tol::Float64 = eps()`:
         Tolerance related to sparsification and values to drop.
 - `max_cache_size::Int`:
@@ -176,12 +176,11 @@ function _create_factorization(
 end
 
 function _create_factorization(
-    ::AppleAccelerateSolver,
+    ::AppleAccelerateLUSolver,
     ABA::SparseArrays.SparseMatrixCSC{Float64, Int},
 )
     _has_apple_accelerate_backend() || error(_apple_accelerate_unavailable_error())
-    # ABA = Aᵀ B A is symmetric by construction; skip the structural check.
-    return AccelerateWrapper.aa_factorize(ABA; check_symmetry = false)
+    return AccelerateWrapper.aa_factorize(ABA)
 end
 
 function _create_factorization(
@@ -189,7 +188,7 @@ function _create_factorization(
     ::SparseArrays.SparseMatrixCSC{Float64, Int},
 )
     return error(
-        "Only KLU and AppleAccelerate solvers are supported for VirtualPTDF factorization.",
+        "Only KLU and AppleAccelerateLU solvers are supported for VirtualPTDF factorization.",
     )
 end
 
@@ -206,8 +205,8 @@ The return is a VirtualPTDF struct with an empty cache.
         Dictionary of weights to be used as distributed slack bus.
         The distributed slack dictionary must have the same number of entries as the number of buses.
 - `linear_solver::String = _default_linear_solver()`:
-        Linear solver to use for factorization. Options: "KLU", "AppleAccelerate".
-        Defaults to "AppleAccelerate" on macOS and "KLU" elsewhere.
+        Linear solver to use for factorization. Options: "KLU", "AppleAccelerateLU".
+        Defaults to "AppleAccelerateLU" on macOS 15.5+ and "KLU" elsewhere.
 - `tol::Float64 = eps()`:
         Tolerance related to sparsification and values to drop.
 - `max_cache_size::Int`:

@@ -19,7 +19,10 @@ function solve!(cache::AAFactorCache, B::StridedMatrix{Cdouble})
     stride(B, 1) == 1 ||
         throw(ArgumentError("B must have unit stride in the first dimension."))
     size(B, 2) == 0 && return B
-    _sparse_solve_matrix!(cache.numeric, _dense_matrix(B))
+    # Workspace-aware overload — caller-supplied scratch avoids a per-call
+    # malloc/free inside libSparse.
+    ws = _ensure_solve_workspace!(cache, size(B, 2))
+    GC.@preserve cache _sparse_solve_matrix_ws!(cache.numeric, _dense_matrix(B), ws)
     return B
 end
 
@@ -28,7 +31,8 @@ function solve!(cache::AAFactorCache, b::StridedVector{Cdouble})
     n = cache.n
     length(b) == n || throw(DimensionMismatch("length(b) = $(length(b)), cache n = $(n)"))
     stride(b, 1) == 1 || throw(ArgumentError("b must have unit stride."))
-    _sparse_solve_vector!(cache.numeric, _dense_vector(b))
+    ws = _ensure_solve_workspace!(cache, 1)
+    GC.@preserve cache _sparse_solve_vector_ws!(cache.numeric, _dense_vector(b), ws)
     return b
 end
 

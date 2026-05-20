@@ -22,14 +22,16 @@ abstract type LinearSolverType end
 struct KLUSolver <: LinearSolverType end
 struct DenseSolver <: LinearSolverType end
 struct MKLPardisoSolver <: LinearSolverType end
-struct AppleAccelerateSolver <: LinearSolverType end
+struct AppleAccelerateLUSolver <: LinearSolverType end
 
-const SUPPORTED_LINEAR_SOLVERS = ("KLU", "MKLPardiso", "AppleAccelerate", "Dense")
+const SUPPORTED_LINEAR_SOLVERS =
+    ("KLU", "MKLPardiso", "AppleAccelerateLU", "Dense")
 
 @inline function resolve_linear_solver(s::String)
     s == "KLU" && return KLUSolver()
     s == "Dense" && return DenseSolver()
     s == "MKLPardiso" && return MKLPardisoSolver()
-    s == "AppleAccelerate" && return AppleAccelerateSolver()
+    s == "AppleAccelerateLU" && return AppleAccelerateLUSolver()
+    s == "AppleAccelerate" && return AppleAccelerateLUSolver()
     error("Unsupported linear solver: $s. Supported: $SUPPORTED_LINEAR_SOLVERS")
 end

@@ -40,6 +40,11 @@ function solve_sparse!(
     Bnzval = nonzeros(B)
 
     _ensure_scratch!(cache, block)
+    # Size the libSparse solve workspace to the *maximum* chunk size once.
+    # Sizing it per chunk would `resize!` on every short tail block, churning
+    # allocations in the hot PTDF loop. At 10k nodes a 64-RHS block needs
+    # ~15 MiB of scratch; without this, libSparse mallocs+frees it per call.
+    ws = _ensure_solve_workspace!(cache, block)
     scratch = cache.scratch
     col_map = cache.col_map
 
@@ -70,7 +75,7 @@ function solve_sparse!(
                 ATT_ORDINARY,
                 pointer(scratch),
             )
-            _sparse_solve_matrix!(cache.numeric, dm)
+            GC.@preserve cache _sparse_solve_matrix_ws!(cache.numeric, dm, ws)
 
             for k in 1:npack
                 copyto!(view(out, :, col_map[k]), view(scratch, :, k))

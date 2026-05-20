@@ -126,7 +126,7 @@ end
 function _buildlodf(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
-    ::AppleAccelerateSolver,
+    ::AppleAccelerateLUSolver,
 )
     _has_apple_accelerate_backend() || error(_apple_accelerate_unavailable_error())
     return _calculate_LODF_matrix_AppleAccelerate(a, ptdf)

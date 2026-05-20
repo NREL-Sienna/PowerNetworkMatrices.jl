@@ -75,7 +75,6 @@ Efficient computation of power network matrices for large-scale systems. Support
 ### `ext/`
 
   - **MKLPardisoExt.jl**: MKL-Pardiso sparse solver (Windows/Linux)
-  - **AppleAccelerateExt.jl**: native macOS BLAS acceleration
 
 ### `test/`
 
@@ -112,7 +111,7 @@ Documentation source
 ### Optional Extensions
 
   - **MKL + Pardiso**: high-performance sparse factorization
-  - **AppleAccelerate**: native macOS dense linear algebra
+  - **AppleAccelerate**: native macOS sparse direct solver (libSparse `SparseFactorizationLU`, built-in via `src/AccelerateWrapper/`, macOS 15.5+)
 
 ## Core Abstractions
 
@@ -160,7 +159,7 @@ Documentation source
   - **Indexing**: `matrix[bus_num, branch_tuple]` auto-maps to internal indices
   - **Subnetworks**: `subnetwork_axes` Dict maps reference buses to island components
   - **Caching**: VirtualPTDF/LODF use LRU cache (default 100 MiB) for row storage
-  - **Solvers**: KLU (default), Dense, MKLPardiso, AppleAccelerate via extensions
+  - **Solvers**: KLU, Dense, MKLPardiso (ext), and built-in AppleAccelerateLU (libSparse `SparseFactorizationLU` + Inf-norm equilibration scaling, macOS 15.5+) via `src/AccelerateWrapper/`; KLU is the default on non-Apple / macOS < 15.5; AppleAccelerateLU is the default on macOS ≥ 15.5.
 
 ## Test Patterns
 

@@ -14,25 +14,66 @@ _mkl_pardiso_install_error() =
     Install the Pardiso package:
     julia> using Pkg; Pkg.add(\"Pardiso\")"""
 
-_has_apple_accelerate_backend() = Sys.isapple()
+# Minimum macOS for the AppleAccelerate (libSparse LU) backend. The
+# `SparseFactorizationLU` code is API_AVAILABLE(macos(15.5)); older
+# libSparse rejects factorization type 80.
+const _AA_MIN_MACOS = v"15.5"
 
-_apple_accelerate_unavailable_error() =
-    """The Apple Accelerate sparse backend is macOS-only (Sys.isapple() returned false).
+# Query the running macOS product version via the `kern.osproductversion`
+# sysctl (libc, no subprocess). Returns a VersionNumber, or v"0" if the
+# sysctl is unavailable (treated as "too old").
+function _macos_product_version()
+    Sys.isapple() || return v"0"
+    buf = Vector{UInt8}(undef, 64)
+    len = Ref{Csize_t}(length(buf))
+    rc = ccall(
+        :sysctlbyname, Cint,
+        (Cstring, Ptr{UInt8}, Ptr{Csize_t}, Ptr{Cvoid}, Csize_t),
+        "kern.osproductversion", buf, len, C_NULL, 0,
+    )
+    rc == 0 || return v"0"
+    s = String(buf[1:(len[] - 1)])  # NUL-terminated; drop the NUL
+    try
+        return VersionNumber(s)
+    catch
+        return v"0"
+    end
+end
+
+_macos_at_least(v::VersionNumber) = _macos_product_version() >= v
+
+_has_apple_accelerate_backend() = Sys.isapple() && _macos_at_least(_AA_MIN_MACOS)
+
+function _apple_accelerate_unavailable_error()
+    if Sys.isapple()
+        return """The Apple Accelerate sparse backend requires macOS $(_AA_MIN_MACOS.major).$(_AA_MIN_MACOS.minor) or newer \
+        (libSparse LU / SparseFactorizationLU is API_AVAILABLE(macos(15.5))); \
+        detected macOS $(_macos_product_version()). Use the KLU solver (the default fallback)."""
+    end
+    return """The Apple Accelerate sparse backend is macOS-only (Sys.isapple() returned false).
     Use the KLU solver (the default) on non-Apple platforms."""
+end
 
 """
     _default_linear_solver() -> String
 
-Default sparse linear solver name. Returns "AppleAccelerate" on macOS (Apple's
-built-in libSparse via `AccelerateWrapper`) and "KLU" elsewhere. Used as the
-default for the `linear_solver` keyword on PTDF / LODF / VirtualPTDF /
-VirtualLODF / VirtualMODF constructors.
+Default sparse linear solver name. Returns "AppleAccelerateLU" on macOS
+$(_AA_MIN_MACOS.major).$(_AA_MIN_MACOS.minor)+ (Apple's built-in libSparse LU via `AccelerateWrapper`)
+and "KLU" elsewhere (non-Apple, or macOS older than $(_AA_MIN_MACOS.major).$(_AA_MIN_MACOS.minor)).
+Used as the default for the `linear_solver` keyword on PTDF / LODF /
+VirtualPTDF / VirtualLODF / VirtualMODF constructors.
 """
-_default_linear_solver() = Sys.isapple() ? "AppleAccelerate" : "KLU"
+function _default_linear_solver()
+    if Sys.isapple() && _macos_at_least(_AA_MIN_MACOS)
+        return "AppleAccelerateLU"
+    end
+    return "KLU"
+end
 
 "Set a preference of the backend library for sparse linear algebra operations."
 function set_linalg_backend_preference(linalglib::Union{String, Nothing})
-    if !isnothing(linalglib) && !(linalglib in ["MKLPardiso", "AppleAccelerate"])
+    if !isnothing(linalglib) &&
+       !(linalglib in ["MKLPardiso", "AppleAccelerateLU", "AppleAccelerate"])
         throw(
             ArgumentError(
                 "Unsupported sparse linear algebra backend requested: $(linalglib)",
@@ -82,7 +123,7 @@ function check_linalg_backend()
         @info """The sparse linear algebra solver preference has been set to $(user_linalg_backend).
                 To change this for your active project, call the function
                 PowerNetworkMatrices.set_linalg_backend_preference()
-                with one of "MKLPardiso" or "AppleAccelerate", or `nothing` to turn off.
+                with one of "MKLPardiso", "AppleAccelerateLU", or `nothing` to turn off.
               """
     end
 
@@ -104,7 +145,7 @@ function check_linalg_backend()
             @info no_msg("Pardiso")
             @info "See https://github.com/JuliaSparse/Pardiso.jl for more details."
         end
-        if user_linalg_backend == "AppleAccelerate"
+        if (user_linalg_backend !== nothing && startswith(user_linalg_backend, "AppleAccelerate"))
             @warn "AppleAccelerate is not supported on non-Apple systems."
         end
     end
@@ -131,8 +172,10 @@ function check_linalg_backend()
         if _has_apple_accelerate_backend()
             @info go_msg("AppleAccelerate")
         else
-            if user_linalg_backend == "AppleAccelerate"
-                @warn "AppleAccelerate is only available on Apple platforms."
+            if (user_linalg_backend !== nothing && startswith(user_linalg_backend, "AppleAccelerate"))
+                @warn """AppleAccelerate was requested but is unavailable: it requires \
+                macOS $(_AA_MIN_MACOS.major).$(_AA_MIN_MACOS.minor)+ (detected macOS $(_macos_product_version())). \
+                Falling back to KLU."""
             end
         end
     end
