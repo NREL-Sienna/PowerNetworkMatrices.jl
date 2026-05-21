@@ -1456,12 +1456,16 @@ function _remap_merged_bus_in_branch_maps!(
         (new_from == arc[1] && new_to == arc[2]) && continue
         val = pop!(nr.direct_branch_map, arc)
         new_arc = (new_from, new_to)
-        new_arc[1] == new_arc[2] && continue  # self-loop: drop
+        if new_arc[1] == new_arc[2]
+            @debug "Bus merge collapsed direct branch $(get_name(val)) (arc $arc) into a self-loop; dropping."
+            continue
+        end
         push!(arcs_to_insert, new_arc => val)
     end
     for (new_arc, val) in arcs_to_insert
         if haskey(nr.direct_branch_map, new_arc)
             existing = pop!(nr.direct_branch_map, new_arc)
+            @debug "Bus merge collision on direct arc $new_arc: promoting $(get_name(existing)) and $(get_name(val)) to a parallel group."
             if haskey(nr.parallel_branch_map, new_arc)
                 _push_parallel_branch!(nr.parallel_branch_map, new_arc, existing)
                 _push_parallel_branch!(nr.parallel_branch_map, new_arc, val)
@@ -1470,6 +1474,7 @@ function _remap_merged_bus_in_branch_maps!(
                     _make_parallel_branch_pair(existing, val, new_arc)
             end
         elseif haskey(nr.parallel_branch_map, new_arc)
+            @debug "Bus merge collision on direct arc $new_arc: adding $(get_name(val)) to existing parallel group."
             _push_parallel_branch!(nr.parallel_branch_map, new_arc, val)
         else
             nr.direct_branch_map[new_arc] = val
@@ -1484,16 +1489,21 @@ function _remap_merged_bus_in_branch_maps!(
         (new_from == arc[1] && new_to == arc[2]) && continue
         val = pop!(nr.parallel_branch_map, arc)
         new_arc = (new_from, new_to)
-        new_arc[1] == new_arc[2] && continue
+        if new_arc[1] == new_arc[2]
+            @debug "Bus merge collapsed parallel group at arc $arc into a self-loop; dropping $(length(val)) branch(es)."
+            continue
+        end
         push!(parallel_to_insert, new_arc => val)
     end
     for (new_arc, val) in parallel_to_insert
         if haskey(nr.parallel_branch_map, new_arc)
+            @debug "Bus merge collision on parallel arc $new_arc: merging incoming group ($(length(val)) branch(es)) into existing group."
             # Merge: push all branches from the incoming group into the existing group.
             for br in val
                 _push_parallel_branch!(nr.parallel_branch_map, new_arc, br)
             end
         elseif haskey(nr.direct_branch_map, new_arc)
+            @debug "Bus merge collision on parallel arc $new_arc: promoting existing direct branch into the incoming parallel group."
             # Promote: move the single direct branch into the incoming group.
             existing = pop!(nr.direct_branch_map, new_arc)
             nr.parallel_branch_map[new_arc] = val
@@ -1512,7 +1522,10 @@ function _remap_merged_bus_in_branch_maps!(
         (new_from == arc[1] && new_to == arc[2]) && continue
         val = pop!(nr.transformer3W_map, arc)
         new_arc = (new_from, new_to)
-        new_arc[1] == new_arc[2] && continue
+        if new_arc[1] == new_arc[2]
+            @debug "Bus merge collapsed 3-winding transformer winding $(get_winding_number(val)) of $(PSY.get_name(get_transformer(val))) (arc $arc) into a self-loop; dropping."
+            continue
+        end
         push!(t3w_to_insert, new_arc => val)
     end
     for (new_arc, val) in t3w_to_insert
