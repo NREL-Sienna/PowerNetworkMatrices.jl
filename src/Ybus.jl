@@ -1439,28 +1439,16 @@ function _apply_bus_reductions!(nr::NetworkReductionData, nr_new::NetworkReducti
     return bus_numbers_to_remove
 end
 
-function _remap_arc_keys_batch!(
-    map::Dict{Tuple{Int, Int}, V},
-    merged_bus_pairs::Dict{Int, Int},
-) where {V}
-    for arc in collect(keys(map))
-        new_from = get(merged_bus_pairs, arc[1], arc[1])
-        new_to = get(merged_bus_pairs, arc[2], arc[2])
-        (new_from == arc[1] && new_to == arc[2]) && continue
-        val = pop!(map, arc)
-        new_arc = (new_from, new_to)
-        new_arc[1] != new_arc[2] && (map[new_arc] = val)
-    end
-    return
-end
-
 function _remap_merged_bus_in_branch_maps!(
     nr::NetworkReductionData,
     merged_bus_pairs::Dict{Int, Int},
 )
-    # Single pass over direct_branch_map: collect all arcs that touch a removed bus,
-    # then apply them with collision → parallel-group promotion. Using a two-phase
-    # approach (collect then apply) avoids scanning entries that were just inserted.
+    # All four maps use a two-phase collect-then-apply loop. The collect phase pops every
+    # entry whose arc touches a removed bus and records the resolved new arc alongside the
+    # value. The apply phase re-inserts with map-specific collision handling. Using two
+    # phases avoids visiting entries that were just inserted during the apply phase.
+
+    # --- direct_branch_map: collision → parallel-group promotion ---
     arcs_to_insert = Pair{Tuple{Int, Int}, PSY.ACTransmission}[]
     for arc in collect(keys(nr.direct_branch_map))
         new_from = get(merged_bus_pairs, arc[1], arc[1])
@@ -1487,13 +1475,61 @@ function _remap_merged_bus_in_branch_maps!(
             nr.direct_branch_map[new_arc] = val
         end
     end
-    _remap_arc_keys_batch!(nr.parallel_branch_map, merged_bus_pairs)
-    _remap_arc_keys_batch!(nr.series_branch_map, merged_bus_pairs)
-    _remap_arc_keys_batch!(nr.transformer3W_map, merged_bus_pairs)
-    # Rebuild all reverse maps once after all forward maps are fully remapped.
+
+    # --- parallel_branch_map: collision → merge both groups into one ---
+    parallel_to_insert = Pair{Tuple{Int, Int}, AbstractBranchesParallel}[]
+    for arc in collect(keys(nr.parallel_branch_map))
+        new_from = get(merged_bus_pairs, arc[1], arc[1])
+        new_to = get(merged_bus_pairs, arc[2], arc[2])
+        (new_from == arc[1] && new_to == arc[2]) && continue
+        val = pop!(nr.parallel_branch_map, arc)
+        new_arc = (new_from, new_to)
+        new_arc[1] == new_arc[2] && continue
+        push!(parallel_to_insert, new_arc => val)
+    end
+    for (new_arc, val) in parallel_to_insert
+        if haskey(nr.parallel_branch_map, new_arc)
+            # Merge: push all branches from the incoming group into the existing group.
+            for br in val
+                _push_parallel_branch!(nr.parallel_branch_map, new_arc, br)
+            end
+        elseif haskey(nr.direct_branch_map, new_arc)
+            # Promote: move the single direct branch into the incoming group.
+            existing = pop!(nr.direct_branch_map, new_arc)
+            nr.parallel_branch_map[new_arc] = val
+            _push_parallel_branch!(nr.parallel_branch_map, new_arc, existing)
+        else
+            nr.parallel_branch_map[new_arc] = val
+        end
+    end
+
+    # --- transformer3W_map: collision means a degenerate transformer (two terminals
+    #     merged to the same bus). Warn and keep the pre-existing winding. ---
+    t3w_to_insert = Pair{Tuple{Int, Int}, ThreeWindingTransformerWinding}[]
+    for arc in collect(keys(nr.transformer3W_map))
+        new_from = get(merged_bus_pairs, arc[1], arc[1])
+        new_to = get(merged_bus_pairs, arc[2], arc[2])
+        (new_from == arc[1] && new_to == arc[2]) && continue
+        val = pop!(nr.transformer3W_map, arc)
+        new_arc = (new_from, new_to)
+        new_arc[1] == new_arc[2] && continue
+        push!(t3w_to_insert, new_arc => val)
+    end
+    for (new_arc, val) in t3w_to_insert
+        if haskey(nr.transformer3W_map, new_arc)
+            @warn "Bus merge creates a degenerate 3-winding transformer: two windings of " *
+                  "$(PSY.get_name(get_transformer(val))) now share arc $new_arc. " *
+                  "Retaining the pre-existing winding; winding $(get_winding_number(val)) is dropped."
+        else
+            nr.transformer3W_map[new_arc] = val
+        end
+    end
+
+    # Rebuild reverse maps for the three forward maps that were modified above.
+    # series_branch_map is always empty when ZIR runs (D2 populates it afterwards),
+    # so its reverse map does not need rebuilding here.
     _remake_reverse_direct_branch_map!(nr)
     _remake_reverse_parallel_branch_map!(nr)
-    _remake_reverse_series_branch_map!(nr)
     _remake_reverse_transformer3W_map!(nr)
     return
 end
