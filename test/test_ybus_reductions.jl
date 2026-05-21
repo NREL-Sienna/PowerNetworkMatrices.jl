@@ -311,3 +311,41 @@ end
         end
     end
 end
+
+function _set_zero_impedance!(branch)
+    set_r!(branch, 0.0)
+    set_x!(branch, 1e-5)
+end
+
+@testset "ZeroImpedanceBranchReduction: chained bus merge" begin
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    _set_zero_impedance!(get_component(Line, sys, "Line3"))  # bus 2 → 3
+    _set_zero_impedance!(get_component(Line, sys, "Line6"))  # bus 3 → 4
+
+    ybus = Ybus(sys)
+    nrd = ybus.network_reduction_data
+    rbsm = nrd.reverse_bus_search_map
+
+    @test get(rbsm, 3, nothing) == 2
+    @test get(rbsm, 4, nothing) == 2
+
+    @test 3 ∉ PNM.get_bus_axis(ybus)
+    @test 4 ∉ PNM.get_bus_axis(ybus)
+    @test length(PNM.get_bus_axis(ybus)) == 14 - 2
+end
+
+@testset "ZeroImpedanceBranchReduction: transformer arcs are excluded" begin
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    t = get_component(Transformer2W, sys, "Trans4")  # from=7, to=8
+    set_r!(t, 0.0)
+    set_x!(t, 1e-5)   
+
+    ybus = Ybus(sys)
+    nrd = ybus.network_reduction_data
+
+    @test !haskey(nrd.reverse_bus_search_map, 7)
+    @test !haskey(nrd.reverse_bus_search_map, 8)
+
+    @test 7 ∈ PNM.get_bus_axis(ybus)
+    @test 8 ∈ PNM.get_bus_axis(ybus)
+end
