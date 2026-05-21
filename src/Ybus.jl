@@ -1439,44 +1439,17 @@ function _apply_bus_reductions!(nr::NetworkReductionData, nr_new::NetworkReducti
     return bus_numbers_to_remove
 end
 
-function _remap_arc_key!(
+function _remap_arc_keys_batch!(
     map::Dict{Tuple{Int, Int}, V},
-    removed_bus::Int,
-    surviving_bus::Int,
+    merged_bus_pairs::Dict{Int, Int},
 ) where {V}
     for arc in collect(keys(map))
-        if arc[1] == removed_bus || arc[2] == removed_bus
-            val = pop!(map, arc)
-            new_arc = (
-                arc[1] == removed_bus ? surviving_bus : arc[1],
-                arc[2] == removed_bus ? surviving_bus : arc[2],
-            )
-            if new_arc[1] != new_arc[2]
-                map[new_arc] = val
-            end
-        end
-    end
-    return
-end
-
-function _remap_reverse_arc_map!(
-    map::Dict{V, Tuple{Int, Int}},
-    removed_bus::Int,
-    surviving_bus::Int,
-) where {V}
-    for k in collect(keys(map))
-        arc = map[k]
-        if arc[1] == removed_bus || arc[2] == removed_bus
-            new_arc = (
-                arc[1] == removed_bus ? surviving_bus : arc[1],
-                arc[2] == removed_bus ? surviving_bus : arc[2],
-            )
-            if new_arc[1] != new_arc[2]
-                map[k] = new_arc
-            else
-                delete!(map, k)
-            end
-        end
+        new_from = get(merged_bus_pairs, arc[1], arc[1])
+        new_to = get(merged_bus_pairs, arc[2], arc[2])
+        (new_from == arc[1] && new_to == arc[2]) && continue
+        val = pop!(map, arc)
+        new_arc = (new_from, new_to)
+        new_arc[1] != new_arc[2] && (map[new_arc] = val)
     end
     return
 end
@@ -1485,39 +1458,39 @@ function _remap_merged_bus_in_branch_maps!(
     nr::NetworkReductionData,
     merged_bus_pairs::Dict{Int, Int},
 )
-    for (removed_bus, surviving_bus) in merged_bus_pairs
-        # Remap direct_branch_map with collision handling: when the remapped arc key
-        # already exists, both branches become a parallel group rather than one overwriting
-        # the other and being permanently lost.
-        for arc in collect(keys(nr.direct_branch_map))
-            if arc[1] == removed_bus || arc[2] == removed_bus
-                val = pop!(nr.direct_branch_map, arc)
-                new_arc = (
-                    arc[1] == removed_bus ? surviving_bus : arc[1],
-                    arc[2] == removed_bus ? surviving_bus : arc[2],
-                )
-                new_arc[1] == new_arc[2] && continue  # self-loop: drop
-                if haskey(nr.direct_branch_map, new_arc)
-                    existing = pop!(nr.direct_branch_map, new_arc)
-                    if haskey(nr.parallel_branch_map, new_arc)
-                        _push_parallel_branch!(nr.parallel_branch_map, new_arc, existing)
-                        _push_parallel_branch!(nr.parallel_branch_map, new_arc, val)
-                    else
-                        nr.parallel_branch_map[new_arc] =
-                            _make_parallel_branch_pair(existing, val, new_arc)
-                    end
-                elseif haskey(nr.parallel_branch_map, new_arc)
-                    _push_parallel_branch!(nr.parallel_branch_map, new_arc, val)
-                else
-                    nr.direct_branch_map[new_arc] = val
-                end
-            end
-        end
-        _remap_arc_key!(nr.parallel_branch_map, removed_bus, surviving_bus)
-        _remap_arc_key!(nr.series_branch_map, removed_bus, surviving_bus)
-        _remap_arc_key!(nr.transformer3W_map, removed_bus, surviving_bus)
+    # Single pass over direct_branch_map: collect all arcs that touch a removed bus,
+    # then apply them with collision → parallel-group promotion. Using a two-phase
+    # approach (collect then apply) avoids scanning entries that were just inserted.
+    arcs_to_insert = Pair{Tuple{Int, Int}, PSY.ACTransmission}[]
+    for arc in collect(keys(nr.direct_branch_map))
+        new_from = get(merged_bus_pairs, arc[1], arc[1])
+        new_to = get(merged_bus_pairs, arc[2], arc[2])
+        (new_from == arc[1] && new_to == arc[2]) && continue
+        val = pop!(nr.direct_branch_map, arc)
+        new_arc = (new_from, new_to)
+        new_arc[1] == new_arc[2] && continue  # self-loop: drop
+        push!(arcs_to_insert, new_arc => val)
     end
-    # Rebuild all reverse maps from scratch after forward maps are fully remapped.
+    for (new_arc, val) in arcs_to_insert
+        if haskey(nr.direct_branch_map, new_arc)
+            existing = pop!(nr.direct_branch_map, new_arc)
+            if haskey(nr.parallel_branch_map, new_arc)
+                _push_parallel_branch!(nr.parallel_branch_map, new_arc, existing)
+                _push_parallel_branch!(nr.parallel_branch_map, new_arc, val)
+            else
+                nr.parallel_branch_map[new_arc] =
+                    _make_parallel_branch_pair(existing, val, new_arc)
+            end
+        elseif haskey(nr.parallel_branch_map, new_arc)
+            _push_parallel_branch!(nr.parallel_branch_map, new_arc, val)
+        else
+            nr.direct_branch_map[new_arc] = val
+        end
+    end
+    _remap_arc_keys_batch!(nr.parallel_branch_map, merged_bus_pairs)
+    _remap_arc_keys_batch!(nr.series_branch_map, merged_bus_pairs)
+    _remap_arc_keys_batch!(nr.transformer3W_map, merged_bus_pairs)
+    # Rebuild all reverse maps once after all forward maps are fully remapped.
     _remake_reverse_direct_branch_map!(nr)
     _remake_reverse_parallel_branch_map!(nr)
     _remake_reverse_series_branch_map!(nr)
