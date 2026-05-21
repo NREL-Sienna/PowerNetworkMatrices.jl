@@ -338,7 +338,7 @@ end
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
     t = get_component(Transformer2W, sys, "Trans4")  # from=7, to=8
     set_r!(t, 0.0)
-    set_x!(t, 1e-5)   
+    set_x!(t, 1e-5)
 
     ybus = Ybus(sys)
     nrd = ybus.network_reduction_data
