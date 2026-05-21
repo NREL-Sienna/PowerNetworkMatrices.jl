@@ -26,15 +26,19 @@ function _find_zero_impedance_arc_key(bus_i::Int, bus_j::Int, nrd::NetworkReduct
     return nothing
 end
 
+_is_transformer(::PSY.TwoWindingTransformer) = true
+_is_transformer(::PSY.ACTransmission) = false
+_any_transformer(parallel_br::AbstractBranchesParallel) =
+    any(_is_transformer(br) for br in parallel_br)
+
 function _build_transformer_arc_set(nrd::NetworkReductionData)
     transformer_arcs = Set{Tuple{Int, Int}}()
     union!(transformer_arcs, keys(nrd.transformer3W_map))
     for (arc, branch) in nrd.direct_branch_map
-        branch isa PSY.TwoWindingTransformer && push!(transformer_arcs, arc)
+        _is_transformer(branch) && push!(transformer_arcs, arc)
     end
     for (arc, parallel_br) in nrd.parallel_branch_map
-        any(br isa PSY.TwoWindingTransformer for br in parallel_br) &&
-            push!(transformer_arcs, arc)
+        _any_transformer(parallel_br) && push!(transformer_arcs, arc)
     end
     return transformer_arcs
 end
@@ -51,7 +55,7 @@ function get_reduction(
     nz_rows, nz_cols, nz_vals = SparseArrays.findnz(get_data(ybus))
     for (row_ix, col_ix, v) in zip(nz_rows, nz_cols, nz_vals)
         row_ix >= col_ix && continue
-        real(v) == 0.0 || continue
+        iszero(real(v)) || continue
         imag(v) >= ZERO_IMPEDANCE_BRANCH_YBUS_SUSCEPTANCE_THRESHOLD || continue
         bus_i = bus_ax[row_ix]
         bus_j = bus_ax[col_ix]

@@ -1216,13 +1216,13 @@ end
 function _resolve_arc_admittance(
     new_y_ft::ArcAdmittanceMatrix,
     new_y_tf::ArcAdmittanceMatrix,
-    existing_ft,
-    existing_tf,
-    removed_arcs,
-    bus_ax,
-    bus_lookup,
-    bus_ix,
-    nr,
+    existing_ft::Union{ArcAdmittanceMatrix, Nothing},
+    existing_tf::Union{ArcAdmittanceMatrix, Nothing},
+    removed_arcs::Set{Tuple{Int, Int}},
+    bus_ax::Vector{Int},
+    bus_lookup::Dict{Int, Int},
+    bus_ix::Vector{Int},
+    nr::NetworkReductionData,
     merged_bus_pairs::Dict{Int, Int} = Dict{Int, Int}(),
 )
     arc_ax = setdiff(get_arc_axis(new_y_ft), removed_arcs)
@@ -1288,13 +1288,13 @@ end
 function _resolve_arc_admittance(
     ::Nothing,
     ::Nothing,
-    existing_ft,
-    existing_tf,
-    removed_arcs,
-    bus_ax,
-    bus_lookup,
-    bus_ix,
-    nr,
+    existing_ft::Union{ArcAdmittanceMatrix, Nothing},
+    existing_tf::Union{ArcAdmittanceMatrix, Nothing},
+    removed_arcs::Set{Tuple{Int, Int}},
+    bus_ax::Vector{Int},
+    bus_lookup::Dict{Int, Int},
+    bus_ix::Vector{Int},
+    nr::NetworkReductionData,
     merged_bus_pairs::Dict{Int, Int} = Dict{Int, Int}(),
 )
     return existing_ft, existing_tf
@@ -1325,6 +1325,58 @@ _merge_arc_admittance_bus_columns!(
     ::Dict{Int, Int},
 ) = nothing
 
+function _accumulate_csc_row_into!(
+    M::SparseArrays.SparseMatrixCSC,
+    i::Int,
+    j::Int,
+)
+    rows = SparseArrays.rowvals(M)
+    vals = SparseArrays.nonzeros(M)
+    for col in 1:size(M, 2)
+        v_j = zero(eltype(M))
+        for k in SparseArrays.nzrange(M, col)
+            rows[k] == j && (v_j = vals[k])
+        end
+        iszero(v_j) && continue
+        found = false
+        for k in SparseArrays.nzrange(M, col)
+            if rows[k] == i
+                vals[k] += v_j
+                found = true
+                break
+            end
+        end
+        found || (M[i, col] += v_j)
+    end
+    return
+end
+
+function _accumulate_csc_col_into!(
+    M::SparseArrays.SparseMatrixCSC,
+    i::Int,
+    j::Int,
+)
+    rows = SparseArrays.rowvals(M)
+    vals = SparseArrays.nonzeros(M)
+    j_range = SparseArrays.nzrange(M, j)
+    i_range = SparseArrays.nzrange(M, i)
+    for k_j in j_range
+        r = rows[k_j]
+        v_j = vals[k_j]
+        iszero(v_j) && continue
+        found = false
+        for k_i in i_range
+            if rows[k_i] == r
+                vals[k_i] += v_j
+                found = true
+                break
+            end
+        end
+        found || (M[r, i] += v_j)
+    end
+    return
+end
+
 function _merge_ybus_buses!(
     data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int},
     adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int},
@@ -1334,10 +1386,10 @@ function _merge_ybus_buses!(
     for (removed_bus, surviving_bus) in merged_bus_pairs
         i = bus_lookup[surviving_bus]
         j = bus_lookup[removed_bus]
-        data[i, :] += data[j, :]
-        data[:, i] += data[:, j]
-        adjacency_data[i, :] += adjacency_data[j, :]
-        adjacency_data[:, i] += adjacency_data[:, j]
+        _accumulate_csc_row_into!(data, i, j)
+        _accumulate_csc_col_into!(data, i, j)
+        _accumulate_csc_row_into!(adjacency_data, i, j)
+        _accumulate_csc_col_into!(adjacency_data, i, j)
     end
     return
 end
