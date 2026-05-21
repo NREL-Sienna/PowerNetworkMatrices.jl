@@ -66,9 +66,8 @@ function get_reduction(
         from_no, to_no = arc_key
 
         _update_bus_maps!(nr.reverse_bus_search_map, nr.bus_reduction_map, to_no, from_no)
-        # Use chain-resolved surviving bus so _merge_ybus_buses! processes correctly for chains
-        nr.merged_bus_pairs[to_no] = nr.reverse_bus_search_map[to_no]
         push!(nr.removed_arcs, arc_key)
     end
+    nr.merged_bus_pairs = copy(nr.reverse_bus_search_map)
     return nr
 end
