@@ -45,12 +45,12 @@ const PSB = PowerSystemCaseBuilder
 # Top-level configuration constants
 # ─────────────────────────────────────────────────────────────────────────────
 
-const SYSTEM_NAME    = "matpower_ACTIVSg10k_sys"
-const KV_THRESHOLD   = 230.0          # inject outages on arcs above this kV
-const N_ROWS         = 200            # arc-rows to time per batch
-const SOLVERS        = ["KLU", "AppleAccelerateLU"]
-const PASSES         = 10             # timed passes per measurement (range)
-const WARMUP         = 1              # untimed warmup passes (excluded)
+const SYSTEM_NAME = "matpower_ACTIVSg10k_sys"
+const KV_THRESHOLD = 230.0          # inject outages on arcs above this kV
+const N_ROWS = 200            # arc-rows to time per batch
+const SOLVERS = ["KLU", "AppleAccelerateLU"]
+const PASSES = 10             # timed passes per measurement (range)
+const WARMUP = 1              # untimed warmup passes (excluded)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Timing helpers
@@ -162,15 +162,15 @@ injected count, and three example (name, kV) pairs.
 """
 function inject_line_outages!(sys::PSY.System; kv_threshold::Float64 = KV_THRESHOLD)::Int
     all_branches = collect(PSY.get_components(PSY.Line, sys))
-    n_total      = length(all_branches)
-    injected     = 0
-    examples     = Tuple{String, Float64}[]
+    n_total = length(all_branches)
+    injected = 0
+    examples = Tuple{String, Float64}[]
 
     for branch in all_branches
         arc = PSY.get_arc(branch)
         from_kv = PSY.get_base_voltage(PSY.get_from(arc))
-        to_kv   = PSY.get_base_voltage(PSY.get_to(arc))
-        v       = max(from_kv, to_kv)
+        to_kv = PSY.get_base_voltage(PSY.get_to(arc))
+        v = max(from_kv, to_kv)
         if v > kv_threshold
             outage = PSY.FixedForcedOutage(; outage_status = 1.0)
             PSY.add_supplemental_attribute!(sys, branch, outage)
@@ -181,8 +181,10 @@ function inject_line_outages!(sys::PSY.System; kv_threshold::Float64 = KV_THRESH
         end
     end
 
-    println("inject_line_outages!: $n_total total PSY.Line components; " *
-            "injected $injected outages (kv_threshold = $kv_threshold kV)")
+    println(
+        "inject_line_outages!: $n_total total PSY.Line components; " *
+        "injected $injected outages (kv_threshold = $kv_threshold kV)",
+    )
     for (name, kv) in examples
         println("  example: \"$name\" at $(kv) kV")
     end
@@ -239,9 +241,11 @@ for solver in SOLVERS
     try
         println("  [VirtualPTDF] timed build …")
         vptdf_ref = PNM.VirtualPTDF(sys; linear_solver = solver)
-        s = collect_stats(() -> time_call(
-            () -> PNM.VirtualPTDF(sys; linear_solver = solver),
-        ))
+        s = collect_stats(
+            () -> time_call(
+                () -> PNM.VirtualPTDF(sys; linear_solver = solver),
+            ),
+        )
         results["VirtualPTDF build"][solver] = s
         println("  VirtualPTDF build: $(cell_str(s))")
     catch e
@@ -281,9 +285,11 @@ for solver in SOLVERS
         vmodf_ref = PNM.VirtualMODF(sys; linear_solver = solver)
         n_ctg = length(PNM.get_registered_contingencies(vmodf_ref))
         println("  VirtualMODF: $n_ctg contingencies registered")
-        s = collect_stats(() -> time_call(
-            () -> PNM.VirtualMODF(sys; linear_solver = solver),
-        ))
+        s = collect_stats(
+            () -> time_call(
+                () -> PNM.VirtualMODF(sys; linear_solver = solver),
+            ),
+        )
         results["VirtualMODF build"][solver] = s
         println("  VirtualMODF build: $(cell_str(s))")
     catch e
@@ -343,17 +349,19 @@ println("Outages:   $n_outages (kv_threshold = $KV_THRESHOLD kV)")
 println("Hardware:  $(Sys.MACHINE)")
 println("Julia:     $(VERSION)")
 println("Passes:    $PASSES timed ($WARMUP warmup discarded); cells are median [min–max]")
-println("Row batch: $N_ROWS spread-out arcs; fresh cold-cache object per pass, row loop only")
+println(
+    "Row batch: $N_ROWS spread-out arcs; fresh cold-cache object per pass, row loop only",
+)
 println()
 
 header = "| Path | KLU | AA_LU | KLU/AA_LU |"
-sep    = "|---|---|---|---|"
+sep = "|---|---|---|---|"
 println(header)
 println(sep)
 
 for p in PATHS
     s_klu = results[p]["KLU"]
-    s_lu  = results[p]["AppleAccelerateLU"]
+    s_lu = results[p]["AppleAccelerateLU"]
     row = @sprintf(
         "| %s | %s | %s | %s |",
         p,

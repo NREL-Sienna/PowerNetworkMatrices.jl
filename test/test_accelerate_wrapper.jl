@@ -90,7 +90,6 @@ end
     @test Base.unwrap_unionall(m.sig).parameters[3] === PNM.AAFactorCache
 end
 
-
 @testset "AccelerateWrapper: KLU vs AA per-column solve parity" begin
     PNM._has_apple_accelerate_backend() || return
     Random.seed!(_AA_TEST_SEED)
@@ -238,7 +237,9 @@ end
     # `SingularException`, while libSparse fires its `reportError` callback with
     # "Matrix is structurally singular." which our binding surfaces as a plain
     # `ErrorException`. Callers needing uniform handling must catch both.
-    @test_throws LinearAlgebra.SingularException PNM._create_factorization(PNM.KLUSolver(), S)
+    @test_throws LinearAlgebra.SingularException PNM._create_factorization(
+        PNM.KLUSolver(),
+        S,
+    )
     @test_throws ErrorException PNM.AccelerateWrapper.aa_factorize(S)
 end
-

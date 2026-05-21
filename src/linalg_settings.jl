@@ -145,7 +145,10 @@ function check_linalg_backend()
             @info no_msg("Pardiso")
             @info "See https://github.com/JuliaSparse/Pardiso.jl for more details."
         end
-        if (user_linalg_backend !== nothing && startswith(user_linalg_backend, "AppleAccelerate"))
+        if (
+            user_linalg_backend !== nothing &&
+            startswith(user_linalg_backend, "AppleAccelerate")
+        )
             @warn "AppleAccelerate is not supported on non-Apple systems."
         end
     end
@@ -172,7 +175,10 @@ function check_linalg_backend()
         if _has_apple_accelerate_backend()
             @info go_msg("AppleAccelerate")
         else
-            if (user_linalg_backend !== nothing && startswith(user_linalg_backend, "AppleAccelerate"))
+            if (
+                user_linalg_backend !== nothing &&
+                startswith(user_linalg_backend, "AppleAccelerate")
+            )
                 @warn """AppleAccelerate was requested but is unavailable: it requires \
                 macOS $(_AA_MIN_MACOS.major).$(_AA_MIN_MACOS.minor)+ (detected macOS $(_macos_product_version())). \
                 Falling back to KLU."""
