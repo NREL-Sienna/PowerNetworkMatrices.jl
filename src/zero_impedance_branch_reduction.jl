@@ -9,11 +9,21 @@ Zero-impedance arcs are identified by scanning the assembled Ybus off-diagonal e
 Transformer arcs are excluded — only non-transformer branches (Lines, MonitoredLines,
 DiscreteControlledACBranch, etc.) are eligible for reduction, matching PSSE behavior.
 
-The from-bus of the arc (as stored in the branch maps) is the surviving bus after the merge.
+The from-bus of the arc (as stored in the branch maps) is the surviving bus after the merge,
+unless the to-bus is listed in `irreducible_buses`, in which case the surviving side is flipped.
 Bus merging is applied by row/column summation of the Ybus data matrix, which automatically cancels
 the series admittance of the zero-impedance arc while preserving shunt contributions from both buses.
+
+# Fields
+- `irreducible_buses::Set{Int}`: Bus numbers that must not be eliminated. When one side of a
+  zero-impedance arc is irreducible the merge is still performed but the irreducible bus is
+  kept as the surviving bus. When both sides are irreducible the merge is skipped with a warning.
 """
-@kwdef struct ZeroImpedanceBranchReduction <: NetworkReduction end
+@kwdef struct ZeroImpedanceBranchReduction <: NetworkReduction
+    irreducible_buses::Set{Int} = Set{Int}()
+end
+
+get_irreducible_buses(zir::ZeroImpedanceBranchReduction) = zir.irreducible_buses
 
 function _find_zero_impedance_arc_key(bus_i::Int, bus_j::Int, nrd::NetworkReductionData)
     for arc_tuple in ((bus_i, bus_j), (bus_j, bus_i))
@@ -68,6 +78,16 @@ function get_reduction(
             continue
         end
         from_no, to_no = arc_key
+        irreducible = get_irreducible_buses(reduction)
+        from_irred = from_no ∈ irreducible
+        to_irred = to_no ∈ irreducible
+        if from_irred && to_irred
+            @warn "Zero-impedance branch between two irreducible buses $from_no and $to_no; skipping merge."
+            continue
+        elseif to_irred
+            # Flip so the irreducible bus survives.
+            from_no, to_no = to_no, from_no
+        end
 
         _update_bus_maps!(nr.reverse_bus_search_map, nr.bus_reduction_map, to_no, from_no)
         push!(nr.removed_arcs, arc_key)

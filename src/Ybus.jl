@@ -1019,8 +1019,17 @@ function Ybus(
         arc_admittance_from_to,
         arc_admittance_to_from,
     )
-    # Always apply zero-impedance branch reduction first (mandatory, internal).
-    ybus = build_reduced_ybus(ybus, sys, ZeroImpedanceBranchReduction())
+    all_irreducible = mapreduce(
+        get_irreducible_buses,
+        union,
+        network_reductions;
+        init = Set{Int}(),
+    )
+    ybus = build_reduced_ybus(
+        ybus,
+        sys,
+        ZeroImpedanceBranchReduction(; irreducible_buses = all_irreducible),
+    )
     for nr in network_reductions
         ybus = build_reduced_ybus(ybus, sys, nr)
     end

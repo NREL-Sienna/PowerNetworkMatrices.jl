@@ -349,3 +349,43 @@ end
     @test 7 ∈ PNM.get_bus_axis(ybus)
     @test 8 ∈ PNM.get_bus_axis(ybus)
 end
+
+@testset "ZeroImpedanceBranchReduction respects irreducible buses" begin
+    # The psse_14_network_reduction_test_system has two ZI branches:
+    #   arc (112, 113) → bus 113 merged into 112 by default
+    #   arc (104, 105) → bus 105 merged into 104 by default
+    sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
+
+    # Baseline: confirm default merge direction.
+    ybus_default = Ybus(sys)
+    nrd_default = ybus_default.network_reduction_data
+    @test get(nrd_default.reverse_bus_search_map, 113, nothing) == 112
+    @test 112 ∉ keys(nrd_default.reverse_bus_search_map)
+
+    # Mark bus 113 irreducible via a downstream RadialReduction.
+    # ZIR should flip the (112,113) merge so 113 survives and 112 is removed.
+    ybus_flip = Ybus(
+        sys;
+        network_reductions = NetworkReduction[RadialReduction(; irreducible_buses = [113])],
+    )
+    nrd_flip = ybus_flip.network_reduction_data
+    @test 113 ∉ keys(nrd_flip.reverse_bus_search_map)   # 113 survived
+    @test get(nrd_flip.reverse_bus_search_map, 112, nothing) == 113  # 112 removed → 113
+    # The other ZI branch (104, 105) is unaffected.
+    @test get(nrd_flip.reverse_bus_search_map, 105, nothing) == 104
+
+    # Mark both sides of the (112, 113) arc irreducible: merge should be skipped.
+    @test_logs (:warn, r"irreducible buses (112 and 113|113 and 112)") Ybus(
+        sys;
+        network_reductions = NetworkReduction[RadialReduction(; irreducible_buses = [112, 113])],
+    )
+    ybus_skip = Ybus(
+        sys;
+        network_reductions = NetworkReduction[RadialReduction(; irreducible_buses = [112, 113])],
+    )
+    nrd_skip = ybus_skip.network_reduction_data
+    @test 112 ∉ keys(nrd_skip.reverse_bus_search_map)   # neither bus removed
+    @test 113 ∉ keys(nrd_skip.reverse_bus_search_map)
+    @test 112 ∈ PNM.get_bus_axis(ybus_skip)
+    @test 113 ∈ PNM.get_bus_axis(ybus_skip)
+end
