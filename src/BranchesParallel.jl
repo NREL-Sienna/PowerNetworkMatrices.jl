@@ -51,15 +51,15 @@ function compute_parallel_multiplier(
     b_branch = 0.0
     for br in parallel_branch_set
         if PSY.get_name(br) == branch_name
-            b_branch += PSY.get_series_susceptance(br)
+            b_branch += PSY.get_series_susceptance(br, PSY.SU)
         end
-        b_total += PSY.get_series_susceptance(br)
+        b_total += PSY.get_series_susceptance(br, PSY.SU)
     end
     return b_branch / b_total
 end
 
-function get_series_susceptance(segment::BranchesParallel)
-    return sum(get_series_susceptance(branch) for branch in segment.branches)
+function get_series_susceptance(segment::BranchesParallel, units::IS.AbstractUnitSystem)
+    return sum(get_series_susceptance(branch, units) for branch in segment.branches)
 end
 
 function get_equivalent_physical_branch_parameters(bp::BranchesParallel)
@@ -85,7 +85,8 @@ This provides a conservative estimate that accounts for potential overestimation
 """
 function get_equivalent_rating(bp::BranchesParallel)
     # Sum of ratings divided by number of circuits
-    return sum(PSY.get_rating(branch, Float64) for branch in bp.branches) / length(bp.branches)
+    return sum(PSY.get_rating(branch, PSY.DU) for branch in bp.branches) /
+           length(bp.branches)
 end
 
 """

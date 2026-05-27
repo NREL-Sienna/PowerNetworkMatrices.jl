@@ -79,7 +79,7 @@ end
     rating3 = PNM.get_equivalent_rating(PNM.ThreeWindingTransformerWinding(trf, 3))
     # Should return winding-specific rating if non-zero, else transformer rating
     expected_rating3 =
-        trf.rating_tertiary == 0.0 ? PSY.get_rating(trf) : trf.rating_tertiary
+        trf.rating_tertiary == 0.0 ? PSY.get_rating(trf, PSY.DU) : trf.rating_tertiary
     @test rating3 == expected_rating3
 
     set_available_secondary!(trf, false)

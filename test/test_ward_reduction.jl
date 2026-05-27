@@ -113,6 +113,7 @@ end
     )
     existing_line_susceptance = PSY.get_series_susceptance(
         ptdf_2.network_reduction_data.direct_branch_map[(101, 102)],
+        PSY.SU,
     )
     ward_line_susceptance =
         1 / imag(1 / (ptdf_2.network_reduction_data.added_branch_map[(101, 102)]))
