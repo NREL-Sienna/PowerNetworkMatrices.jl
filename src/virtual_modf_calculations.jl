@@ -65,9 +65,10 @@ cache and skips the recomputation.
 - `max_cache_size_bytes::Int`:
         Max cache size in bytes per contingency.
 - `network_reduction_data::NetworkReductionData`:
-        Network reduction mappings for branch resolution. Its `irreducible_buses`
-        set records the buses retained from reduction, including those protected
-        so outaged and monitored components stay queryable (the "exception list").
+        Network reduction mappings for branch resolution. The retained buses are the
+        keys of its `bus_reduction_map`; its `irreducible_buses` set is the narrower
+        "exception list" of buses protected from reduction so outaged and monitored
+        components stay queryable.
 - `temp_data::Vector{Vector{Float64}}`:
         Single-element scratch vector of size n_buses.
 - `work_ba_col::Vector{Vector{Float64}}`:
@@ -294,8 +295,12 @@ function VirtualMODF(
         applied_reductions = network_reductions
     else
         protected_buses = _collect_protected_buses(sys)
-        applied_reductions =
-            _adjust_reductions_for_protection(network_reductions, protected_buses)
+        if isempty(protected_buses)
+            applied_reductions = network_reductions
+        else
+            applied_reductions =
+                _adjust_reductions_for_protection(network_reductions, protected_buses)
+        end
     end
 
     # Build network matrices (same path as VirtualLODF)
@@ -377,7 +382,7 @@ function _warn_if_transmission_dropped(
     isempty(mod.arc_modifications) || return
     transmission =
         PSY.get_associated_components(sys, outage; component_type = PSY.ACTransmission)
-    isempty(collect(transmission)) && return
+    isempty(transmission) && return
     @warn "Outage (label=$(mod.label)) references transmission components but " *
           "resolved to no arc modifications; they were eliminated by a network " *
           "reduction. Querying this contingency returns the unmodified PTDF row."
