@@ -32,6 +32,20 @@ function _populate_ybus_branch_vector!(
     return
 end
 
+function _populate_ybus_branch_vector!(
+    vec::Vector{T},
+    sys::PSY.System,
+) where {T <: PSY.DiscreteControlledACBranch}
+    iter = PSY.get_components(T, sys)
+    sizehint!(vec, length(iter))
+    for br in iter
+        PSY.get_available(br) &&
+            PSY.get_branch_status(br) == PSY.DiscreteControlledBranchStatus.CLOSED &&
+            push!(vec, br)
+    end
+    return
+end
+
 function _get_ybus_two_terminal_ac_branches(sys::PSY.System)::YbusACBranches
     branches = YbusACBranches(
         Vector{PSY.Line}(),
@@ -50,6 +64,7 @@ function _get_ybus_two_terminal_ac_branches(sys::PSY.System)::YbusACBranches
     _populate_ybus_branch_vector!(branches.phase_shifting_transformers, sys)
     _populate_ybus_branch_vector!(branches.transformer2w, sys)
     _populate_ybus_branch_vector!(branches.dynamic_branches, sys)
+    _populate_ybus_branch_vector!(branches.breaker_switches, sys)
     return branches
 end
 

@@ -276,9 +276,10 @@ end
 @testset "MODF vs LODF: degree-two reduction" begin
     sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
     reductions = NetworkReduction[DegreeTwoReduction()]
-    ptdf = PTDF(sys; network_reductions = reductions)
-    vlodf = VirtualLODF(sys; network_reductions = reductions)
-    vmodf = VirtualMODF(sys; network_reductions = reductions)
+    # reductions is modified by adding irreducible buses; pass a copy to ensure consistency.
+    ptdf = PTDF(sys; network_reductions = deepcopy(reductions))
+    vlodf = VirtualLODF(sys; network_reductions = deepcopy(reductions))
+    vmodf = VirtualMODF(sys; network_reductions = deepcopy(reductions))
     nrd = get_network_reduction_data(vmodf)
 
     @testset "direct branch" begin
@@ -307,9 +308,10 @@ end
 @testset "MODF vs LODF: radial + degree-two reduction" begin
     sys = PSB.build_system(PSSEParsingTestSystems, "psse_14_network_reduction_test_system")
     reductions = NetworkReduction[RadialReduction(), DegreeTwoReduction()]
-    ptdf = PTDF(sys; network_reductions = reductions)
-    vlodf = VirtualLODF(sys; network_reductions = reductions)
-    vmodf = VirtualMODF(sys; network_reductions = reductions)
+    # reductions is modified by adding irreducible buses; pass a copy to ensure consistency.
+    ptdf = PTDF(sys; network_reductions = deepcopy(reductions))
+    vlodf = VirtualLODF(sys; network_reductions = deepcopy(reductions))
+    vmodf = VirtualMODF(sys; network_reductions = deepcopy(reductions))
     nrd = get_network_reduction_data(vmodf)
 
     @testset "direct branch" begin
