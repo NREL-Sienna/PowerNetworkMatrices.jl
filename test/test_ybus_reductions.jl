@@ -393,3 +393,64 @@ end
     @test 112 ∈ PNM.get_bus_axis(ybus_skip)
     @test 113 ∈ PNM.get_bus_axis(ybus_skip)
 end
+
+@testset "ZeroImpedanceBranchReduction: stub off a merged junction (no fake island)" begin
+    # Regression for the chained zero-impedance topology
+    #     grid ──normal── M(903) ──[ZI]──► J(901) ◄──[ZI]── S(902, stub)
+    # where both zero-impedance branches are oriented INTO the junction J. The
+    # junction must fold the WHOLE cluster {S, J, M} into one survivor. Previously
+    # J was merged twice (its reverse-map entry overwritten), dropping the stub's
+    # arc from the branch maps -> S stranded in BA (fake island) -> singular ABA.
+    sys = PSB.build_system(PSITestSystems, "c_sys5")
+    template = first(get_components(ACBus, sys))
+    grid_bus = first(
+        b for b in get_components(ACBus, sys) if
+        get_bustype(b) != PSY.ACBusTypes.REF && get_bustype(b) != PSY.ACBusTypes.ISOLATED
+    )
+    function _mk_bus(num, name)
+        b = deepcopy(template)
+        b.internal = IS.InfrastructureSystemsInternal()
+        set_number!(b, num)
+        set_name!(b, name)
+        set_bustype!(b, PSY.ACBusTypes.PQ)
+        return b
+    end
+    J = _mk_bus(901, "JUNCTION")
+    S = _mk_bus(902, "STUB")
+    M = _mk_bus(903, "MID")
+    foreach(b -> add_component!(sys, b), (J, S, M))
+    function _mk_line(name, from, to, r, x)
+        arc = Arc(from, to)
+        add_component!(sys, arc)
+        add_component!(
+            sys,
+            Line(
+                name,
+                true,
+                0.0,
+                0.0,
+                arc,
+                r,
+                x,
+                (from = 0.0, to = 0.0),
+                100.0,
+                (-1.5, 1.5),
+            ),
+        )
+    end
+    _mk_line("MID_grid", M, grid_bus, 0.01, 0.10)  # normal: M joins the grid
+    _mk_line("ZI_M_J", M, J, 0.0, 1e-5)            # zero-impedance, into J
+    _mk_line("ZI_S_J", S, J, 0.0, 1e-5)            # zero-impedance, into J
+
+    Y = Ybus(sys)
+    nr = Y.network_reduction_data
+    # The whole zero-impedance cluster collapses to a single surviving bus.
+    surv = PNM.get_mapped_bus_number(nr, 901)
+    @test PNM.get_mapped_bus_number(nr, 902) == surv
+    @test PNM.get_mapped_bus_number(nr, 903) == surv
+    @test 901 ∉ PNM.get_bus_axis(Y)
+    @test 902 ∉ PNM.get_bus_axis(Y)   # the stub is merged, not stranded
+    # The ABA must be non-singular: a KLU PTDF builds without a singular solve.
+    ptdf = PTDF(sys; linear_solver = "KLU")
+    @test all(isfinite, ptdf.data)
+end

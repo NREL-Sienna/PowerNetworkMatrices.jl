@@ -36,15 +36,14 @@ by that branch.
 function _build_row_to_cols(A::SparseArrays.SparseMatrixCSC{Int8, Int}, buscount::Int)
     n_rows = size(A, 1)
     row_first_col = zeros(Int, n_rows)
-    # `(0, 0)` sentinel for rows that never get a second bus column — e.g. a
-    # self-loop arc (from == to) whose incidence entries cancel to an all-zero
-    # row. Without it these rows would be read as undefined memory.
+    # `(0, 0)` sentinel for rows lacking a second bus column (e.g. a self-loop arc
+    # whose incidence entries cancel), which would otherwise be read undefined.
     row_to_cols = fill((0, 0), n_rows)
     Arowval = SparseArrays.rowvals(A)
     for col in 1:buscount
         for k in SparseArrays.nzrange(A, col)
             row = Arowval[k]
-            if row_first_col[row] == 0
+            if iszero(row_first_col[row])
                 row_first_col[row] = col
             else
                 row_to_cols[row] = (row_first_col[row], col)
@@ -146,9 +145,8 @@ function calculate_radial_arcs(
     end
     for row in 1:n_arcs
         c1, c2 = row_to_cols[row]
-        # Rows with fewer than two distinct bus columns (the `(0, 0)` sentinel,
-        # e.g. a self-loop arc) contribute no edge to the connectivity graph.
-        (c1 == 0 || c2 == 0) && continue
+        # Sentinel rows (a self-loop arc, no second bus column) add no graph edge.
+        (iszero(c1) || iszero(c2)) && continue
         push!(adj[c1], (c2, row))
         push!(adj[c2], (c1, row))
     end
@@ -188,7 +186,7 @@ function calculate_radial_arcs(
             end
         end
 
-        if parent == 0
+        if iszero(parent)
             continue
         end
 

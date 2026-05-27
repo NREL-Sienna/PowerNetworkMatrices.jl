@@ -66,9 +66,8 @@ cache and skips the recomputation.
         Max cache size in bytes per contingency.
 - `network_reduction_data::NetworkReductionData`:
         Network reduction mappings for branch resolution. Its `irreducible_buses`
-        set is the authoritative record of buses retained from reduction,
-        including those protected so every outaged and monitored component stays
-        expressible as an arc (the MODF "exception list").
+        set records the buses retained from reduction, including those protected
+        so outaged and monitored components stay queryable (the "exception list").
 - `temp_data::Vector{Vector{Float64}}`:
         Single-element scratch vector of size n_buses.
 - `work_ba_col::Vector{Vector{Float64}}`:
@@ -255,12 +254,10 @@ Base.setindex!(::VirtualMODF, _, ::CartesianIndex) =
 Build a VirtualMODF from a PowerSystems System. Automatically registers all
 Outage supplemental attributes found in the system.
 
-When `network_reductions` are supplied, the reductions are always adjusted so
-that the buses of every outaged component and the components each outage declares
-as monitored (`get_monitored_components`) are retained. This is mandatory, not
-optional: the ABA matrix and Woodbury solve are built on the reduced network, so
-a branch that participates in a contingency must survive reduction or those
-matrices are inconsistent with the queries.
+When `network_reductions` are supplied, they are adjusted to retain the buses of
+every outaged component and the components each outage declares monitored
+(`get_monitored_components`). This is mandatory: the ABA/Woodbury solve runs on the
+reduced network, so a branch in a contingency must survive reduction.
 
 # Arguments
 - `sys::PSY.System`: Power system to build from
@@ -285,18 +282,14 @@ function VirtualMODF(
     automatically_register_outages::Bool = true,
     kwargs...,
 )
-    if length(dist_slack) != 0
+    if !isempty(dist_slack)
         @info "Distributed bus"
     end
     solver = resolve_linear_solver(linear_solver)
 
-    # Adjusting the reductions for outaged and monitored branches is mandatory:
-    # the ABA matrix and the Woodbury solve are built on the reduced network, so a
-    # branch that participates in a contingency must survive reduction or those
-    # matrices are inconsistent with the queries. The protected buses end up
-    # recorded in the resulting `NetworkReductionData`, so no separate copy is
-    # kept here. The guard only skips the no-reduction case, where there is
-    # nothing to adjust.
+    # Mandatory: the ABA/Woodbury solve runs on the reduced network, so a branch in
+    # a contingency must survive reduction or the matrices won't match the queries.
+    # Protected buses land in the resulting `NetworkReductionData` (no copy kept).
     if isempty(network_reductions)
         applied_reductions = network_reductions
     else
@@ -370,12 +363,11 @@ end
 """
     _warn_if_transmission_dropped(sys, outage, mod)
 
-Warn when an outage references transmission (`ACTransmission`) components but its
-resolved modification has no arc modifications — meaning those branches were
-eliminated by a network reduction, so querying the contingency would silently
-return the unmodified base PTDF row. Outages that touch only non-network
-components (generators, loads) legitimately resolve to an empty modification and
-are NOT flagged, so this does not fire on the common generator-outage case.
+Warn when an outage references `ACTransmission` components but its modification has
+no arc modifications — those branches were eliminated by reduction, so the
+contingency would silently return the unmodified base row. Outages touching only
+non-network components (generators, loads) resolve empty legitimately and are not
+flagged.
 """
 function _warn_if_transmission_dropped(
     sys::PSY.System,
@@ -416,7 +408,7 @@ function _register_all_outages!(vmodf::VirtualMODF, sys::PSY.System)
         end
     end
 
-    if count == 0
+    if iszero(count)
         @warn "No outage supplemental attributes found in system. " *
               "VirtualMODF contingency cache is empty."
     else
@@ -508,12 +500,10 @@ function Base.getindex(vmodf::VirtualMODF, monitored_idx::Int, mod::NetworkModif
     end
 end
 
-# Resolve a monitored arc tuple to its row index, with a clear error when the
-# arc was eliminated by a reduction (otherwise the caller hits a raw KeyError).
-# Only the canonical (from, to) orientation is accepted: the row is built from
-# `BA[:, idx]`, whose signs encode that orientation, so returning the same row
-# for the reversed tuple would silently sign-flip it. This matches the no-reverse
-# lookup in VirtualPTDF / VirtualLODF.
+# Row index for a monitored arc, with a clear error when it was reduced away (else
+# a raw KeyError). Only the canonical (from, to) orientation is accepted: the row
+# comes from `BA[:, idx]`, so the reversed tuple would silently sign-flip it
+# (matches VirtualPTDF / VirtualLODF).
 function _monitored_arc_index(vmodf::VirtualMODF, monitored::Tuple{Int, Int})
     arc_lookup = vmodf.lookup[1]
     haskey(arc_lookup, monitored) && return arc_lookup[monitored]
