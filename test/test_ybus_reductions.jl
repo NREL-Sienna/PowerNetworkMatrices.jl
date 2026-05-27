@@ -375,13 +375,17 @@ end
     @test get(nrd_flip.reverse_bus_search_map, 105, nothing) == 104
 
     # Mark both sides of the (112, 113) arc irreducible: merge should be skipped.
-    @test_logs (:warn, r"irreducible buses (112 and 113|113 and 112)") Ybus(
+    @test_logs (:warn, r"irreducible buses (112 and 113|113 and 112)") match_mode = :any Ybus(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(; irreducible_buses = [112, 113])],
+        network_reductions = NetworkReduction[RadialReduction(;
+            irreducible_buses = [112, 113],
+        )],
     )
     ybus_skip = Ybus(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(; irreducible_buses = [112, 113])],
+        network_reductions = NetworkReduction[RadialReduction(;
+            irreducible_buses = [112, 113],
+        )],
     )
     nrd_skip = ybus_skip.network_reduction_data
     @test 112 ∉ keys(nrd_skip.reverse_bus_search_map)   # neither bus removed
