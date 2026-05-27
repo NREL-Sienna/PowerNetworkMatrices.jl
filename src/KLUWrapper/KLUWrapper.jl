@@ -74,8 +74,12 @@ export KLULinSolveCache,
     tsolve!,
     solve_sparse!,
     solve_sparse,
+    sort_factors!,
+    condest!,
+    rcond!,
     n_valid,
-    is_factored
+    is_factored,
+    get_reuse_symbolic
 
 include("klu_jll_bindings.jl")
 include("klu_cache.jl")

@@ -15,15 +15,12 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SuiteSparse_jll = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
 
 [weakdeps]
-AppleAccelerate = "13e28ba4-7ad8-5781-acae-3021b1ed3924"
 Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 
 [extensions]
-AppleAccelerateExt = "AppleAccelerate"
 MKLPardisoExt = "Pardiso"
 
 [compat]
-AppleAccelerate = "^0.4"
 DataStructures = "^0.19"
 DocStringExtensions = "~0.8, ~0.9"
 HDF5 = "0.17"

@@ -14,3 +14,14 @@ symbols are exported from `PowerNetworkMatrices`.
 ```@autodocs
 Modules = [PowerNetworkMatrices.KLUWrapper]
 ```
+
+## `AccelerateWrapper`
+
+`PowerNetworkMatrices.AccelerateWrapper` is a thin, allocation-aware wrapper over Apple's
+`libSparse.dylib` (provided by the system Accelerate framework) used internally for sparse
+linear solves on macOS. Non-Apple builds load stub fallbacks that throw on use. None of
+these symbols are exported from `PowerNetworkMatrices`.
+
+```@autodocs
+Modules = [PowerNetworkMatrices.AccelerateWrapper]
+```

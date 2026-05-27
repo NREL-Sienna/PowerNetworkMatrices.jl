@@ -46,6 +46,10 @@ cache and skips the recomputation.
         Tuple of lookup dictionaries for indexing.
 - `valid_ix::Vector{Int}`:
         Indices of non-reference buses.
+- `bus_to_valid_idx::Vector{Int}`:
+        Inverse of `valid_ix`: `bus_to_valid_idx[b]` is the position of bus
+        `b` inside `valid_ix`, or 0 if `b` is a reference bus. Lets the
+        Woodbury kernel iterate the nonzeros of a `BA` column directly.
 - `contingency_cache::Dict{Base.UUID, ContingencySpec}`:
         Resolved contingencies keyed by outage UUID.
 - `woodbury_cache::Dict{NetworkModification, WoodburyFactors}`:
@@ -86,6 +90,7 @@ struct VirtualMODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}, K} <:
     axes::Ax
     lookup::L
     valid_ix::Vector{Int}
+    bus_to_valid_idx::Vector{Int}
     contingency_cache::Dict{Base.UUID, ContingencySpec}
     woodbury_cache::Dict{NetworkModification, WoodburyFactors}
     row_caches::Dict{NetworkModification, RowCache}
@@ -178,6 +183,7 @@ function _compute_woodbury_factors(
             mat.BA,
             mat.arc_susceptances,
             mat.valid_ix,
+            mat.bus_to_valid_idx,
             modifications,
         )
     end
@@ -201,6 +207,7 @@ function _apply_woodbury_correction(
             mat.BA,
             mat.arc_susceptances,
             mat.valid_ix,
+            mat.bus_to_valid_idx,
             monitored_idx,
             wf,
         )
@@ -250,6 +257,9 @@ Outage supplemental attributes found in the system.
 
 # Keyword Arguments
 - `dist_slack::Vector{Float64}`: Distributed slack weights (default: empty)
+- `linear_solver::String = _default_linear_solver()`: Linear solver for the
+        ABA factorization. Options: "KLU", "AppleAccelerate". Defaults to
+        "AppleAccelerate" on macOS and "KLU" elsewhere.
 - `tol::Float64`: Tolerance for row sparsification (default: eps())
 - `max_cache_size::Int`: Max cache size in MiB per contingency (default: MAX_CACHE_SIZE_MiB)
 - `network_reductions::Vector{NetworkReduction}`: Network reductions to apply
@@ -257,6 +267,7 @@ Outage supplemental attributes found in the system.
 function VirtualMODF(
     sys::PSY.System;
     dist_slack::Vector{Float64} = Float64[],
+    linear_solver::String = _default_linear_solver(),
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
@@ -266,6 +277,7 @@ function VirtualMODF(
     if length(dist_slack) != 0
         @info "Distributed bus"
     end
+    solver = resolve_linear_solver(linear_solver)
 
     # Build network matrices (same path as VirtualLODF)
     Ymatrix = Ybus(sys; network_reductions = network_reductions, kwargs...)
@@ -282,9 +294,10 @@ function VirtualMODF(
 
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    K = klu_factorize(ABA)
+    K = _create_factorization(solver, ABA)
 
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
+    bus_to_valid_idx = _build_bus_to_valid_idx(length(bus_ax), valid_ix)
 
     # Empty: populated lazily on first read of `vmodf.PTDF_A_diag`.
     PTDF_A_diag = Float64[]
@@ -308,6 +321,7 @@ function VirtualMODF(
         axes,
         look_up,
         valid_ix,
+        bus_to_valid_idx,
         Dict{Base.UUID, ContingencySpec}(),
         Dict{NetworkModification, WoodburyFactors}(),
         Dict{NetworkModification, RowCache}(),

@@ -53,6 +53,10 @@ callers can issue requests concurrently; the libklu work runs one at a time.
 - `valid_ix::Vector{Int}`:
         Vector containing the row/columns indices of matrices related the buses
         which are not slack ones.
+- `bus_to_valid_idx::Vector{Int}`:
+        Inverse of `valid_ix`: `bus_to_valid_idx[b]` is the position of bus
+        `b` inside `valid_ix`, or 0 if `b` is a reference bus. Lets the hot
+        path iterate the nonzeros of a `BA` column directly.
 - `temp_data::Vector{Vector{Float64}}`:
         Single-element scratch vector kept as a `Vector{Vector{Float64}}` for
         uniform `with_solver` callback signatures.
@@ -82,6 +86,7 @@ struct VirtualLODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}, K} <:
     axes::Ax
     lookup::L
     valid_ix::Vector{Int}
+    bus_to_valid_idx::Vector{Int}
     temp_data::Vector{Vector{Float64}}
     cache::RowCache
     cache_lock::ReentrantLock
@@ -108,15 +113,6 @@ function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
     println(io, ":")
     Base.print_array(io, array)
     return
-end
-
-# Map bus index (1:n_buses) to its position in `valid_ix`; ref buses map to 0.
-function _build_bus_to_valid_idx(n_buses::Int, valid_ix::Vector{Int})::Vector{Int}
-    bus_to_valid = zeros(Int, n_buses)
-    for (vi, bus_ix) in enumerate(valid_ix)
-        bus_to_valid[bus_ix] = vi
-    end
-    return bus_to_valid
 end
 
 """
@@ -175,18 +171,21 @@ function _get_PTDF_A_diag(
             ba_col[valid_i] = ba_nz[k]
         end
 
-        _solve_factorization(K, ba_col)
+        # Read PTDF row from the returned buffer — backend-agnostic
+        # (KLU mutates `ba_col` and returns it; other backends may
+        # return a fresh vector, so capture the return value).
+        lin_solve = _solve_factorization(K, ba_col)
 
-        # ba_col is now PTDF row i in valid-index space; H[e,e] = ptdf[from] - ptdf[to].
+        # H[e,e] = ptdf[from] - ptdf[to]; ref-bus entries are 0.
         f = arc_from_valid[i]
         t = arc_to_valid[i]
         v_f = if f > 0
-            ba_col[f]
+            lin_solve[f]
         else
             0.0
         end
         v_t = if t > 0
-            ba_col[t]
+            lin_solve[t]
         else
             0.0
         end
@@ -265,6 +264,9 @@ struct with an empty cache.
         PSY system for which the matrix is constructed
 
 # Keyword Arguments
+- `linear_solver::String = _default_linear_solver()`: Linear solver for the
+        ABA factorization. Options: "KLU", "AppleAccelerate". Defaults to
+        "AppleAccelerate" on macOS and "KLU" elsewhere.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
@@ -273,6 +275,7 @@ struct with an empty cache.
 function VirtualLODF(
     sys::PSY.System;
     dist_slack::Vector{Float64} = Float64[],
+    linear_solver::String = _default_linear_solver(),
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
@@ -282,6 +285,7 @@ function VirtualLODF(
     if length(dist_slack) != 0
         @info "Distributed bus"
     end
+    solver = resolve_linear_solver(linear_solver)
     Ymatrix = Ybus(
         sys;
         network_reductions = network_reductions,
@@ -296,7 +300,7 @@ function VirtualLODF(
     subnetwork_axes = make_arc_arc_subnetwork_axes(A)
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    K = klu_factorize(ABA)
+    K = _create_factorization(solver, ABA)
     bus_ax = get_bus_axis(A)
 
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
@@ -324,6 +328,7 @@ function VirtualLODF(
     # Single scratch slot — solves serialize via `solver_lock` + `_LIBKLU_LOCK`.
     temp_data = [zeros(length(bus_ax))]
     work_ba_col = [zeros(length(valid_ix))]
+    bus_to_valid_idx = _build_bus_to_valid_idx(length(bus_ax), valid_ix)
 
     return VirtualLODF(
         K,
@@ -337,6 +342,7 @@ function VirtualLODF(
         axes,
         look_up,
         valid_ix,
+        bus_to_valid_idx,
         temp_data,
         empty_cache,
         ReentrantLock(),
@@ -384,8 +390,17 @@ function _compute_lodf_row(vlodf::VirtualLODF, row::Int)::Vector{Float64}
     return with_solver(
         vlodf.K, vlodf.work_ba_col, vlodf.temp_data, vlodf.solver_lock,
     ) do K_solver, work_ba_col, temp_data
-        @inbounds for i in eachindex(vlodf.valid_ix)
-            work_ba_col[i] = vlodf.BA[vlodf.valid_ix[i], row]
+        # Sparse-only extraction: iterate BA[:, row] non-zeros (typically
+        # 2 per arc) instead of scanning the full bus axis.
+        fill!(work_ba_col, 0.0)
+        BA = vlodf.BA
+        bus_to_valid_idx = vlodf.bus_to_valid_idx
+        ba_rv = SparseArrays.rowvals(BA)
+        ba_nz = SparseArrays.nonzeros(BA)
+        @inbounds for k in SparseArrays.nzrange(BA, row)
+            valid_i = bus_to_valid_idx[ba_rv[k]]
+            valid_i > 0 || continue
+            work_ba_col[valid_i] = ba_nz[k]
         end
         lin_solve = _solve_factorization(K_solver, work_ba_col)
 
@@ -515,9 +530,17 @@ function _getindex_partial(
     return with_solver(
         vlodf.K, vlodf.work_ba_col, vlodf.temp_data, vlodf.solver_lock,
     ) do K_solver, work_ba_col, temp_data
-        # Steps 1-2: Compute B⁻¹(b_e · ν_e) via KLU solve.
-        @inbounds for i in eachindex(vlodf.valid_ix)
-            work_ba_col[i] = vlodf.BA[vlodf.valid_ix[i], arc_idx]
+        # Steps 1-2: Compute B⁻¹(b_e · ν_e) via sparse-only BA-column
+        # extraction + solve.
+        fill!(work_ba_col, 0.0)
+        BA = vlodf.BA
+        bus_to_valid_idx = vlodf.bus_to_valid_idx
+        ba_rv = SparseArrays.rowvals(BA)
+        ba_nz = SparseArrays.nonzeros(BA)
+        @inbounds for k in SparseArrays.nzrange(BA, arc_idx)
+            valid_i = bus_to_valid_idx[ba_rv[k]]
+            valid_i > 0 || continue
+            work_ba_col[valid_i] = ba_nz[k]
         end
         lin_solve = _solve_factorization(K_solver, work_ba_col)
 
