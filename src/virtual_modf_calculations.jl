@@ -61,7 +61,10 @@ cache and skips the recomputation.
 - `max_cache_size_bytes::Int`:
         Max cache size in bytes per contingency.
 - `network_reduction_data::NetworkReductionData`:
-        Network reduction mappings for branch resolution.
+        Network reduction mappings for branch resolution. Its `irreducible_buses`
+        set is the authoritative record of buses retained from reduction,
+        including those protected so every outaged and monitored component stays
+        expressible as an arc (the MODF "exception list").
 - `temp_data::Vector{Vector{Float64}}`:
         Single-element scratch vector of size n_buses.
 - `work_ba_col::Vector{Vector{Float64}}`:
@@ -245,6 +248,13 @@ Base.setindex!(::VirtualMODF, _, ::CartesianIndex) =
 Build a VirtualMODF from a PowerSystems System. Automatically registers all
 Outage supplemental attributes found in the system.
 
+When `network_reductions` are supplied, the reductions are always adjusted so
+that the buses of every outaged component and the components each outage declares
+as monitored (`get_monitored_components`) are retained. This is mandatory, not
+optional: the ABA matrix and Woodbury solve are built on the reduced network, so
+a branch that participates in a contingency must survive reduction or those
+matrices are inconsistent with the queries.
+
 # Arguments
 - `sys::PSY.System`: Power system to build from
 
@@ -253,6 +263,7 @@ Outage supplemental attributes found in the system.
 - `tol::Float64`: Tolerance for row sparsification (default: eps())
 - `max_cache_size::Int`: Max cache size in MiB per contingency (default: MAX_CACHE_SIZE_MiB)
 - `network_reductions::Vector{NetworkReduction}`: Network reductions to apply
+- `automatically_register_outages::Bool`: Register all system Outage attributes (default: true)
 """
 function VirtualMODF(
     sys::PSY.System;
@@ -267,8 +278,23 @@ function VirtualMODF(
         @info "Distributed bus"
     end
 
+    # Adjusting the reductions for outaged and monitored branches is mandatory:
+    # the ABA matrix and the Woodbury solve are built on the reduced network, so a
+    # branch that participates in a contingency must survive reduction or those
+    # matrices are inconsistent with the queries. The protected buses end up
+    # recorded in the resulting `NetworkReductionData`, so no separate copy is
+    # kept here. The guard only skips the no-reduction case, where there is
+    # nothing to adjust.
+    if isempty(network_reductions)
+        applied_reductions = network_reductions
+    else
+        protected_buses = _collect_protected_buses(sys)
+        applied_reductions =
+            _adjust_reductions_for_protection(network_reductions, protected_buses)
+    end
+
     # Build network matrices (same path as VirtualLODF)
-    Ymatrix = Ybus(sys; network_reductions = network_reductions, kwargs...)
+    Ymatrix = Ybus(sys; network_reductions = applied_reductions, kwargs...)
     ref_bus_positions = get_ref_bus_position(Ymatrix)
     A = IncidenceMatrix(Ymatrix)
 
@@ -327,6 +353,31 @@ function VirtualMODF(
     return vmodf
 end
 
+"""
+    _warn_if_transmission_dropped(sys, outage, mod)
+
+Warn when an outage references transmission (`ACTransmission`) components but its
+resolved modification has no arc modifications — meaning those branches were
+eliminated by a network reduction, so querying the contingency would silently
+return the unmodified base PTDF row. Outages that touch only non-network
+components (generators, loads) legitimately resolve to an empty modification and
+are NOT flagged, so this does not fire on the common generator-outage case.
+"""
+function _warn_if_transmission_dropped(
+    sys::PSY.System,
+    outage::PSY.Outage,
+    mod::NetworkModification,
+)
+    isempty(mod.arc_modifications) || return
+    transmission =
+        PSY.get_associated_components(sys, outage; component_type = PSY.ACTransmission)
+    isempty(collect(transmission)) && return
+    @warn "Outage (label=$(mod.label)) references transmission components but " *
+          "resolved to no arc modifications; they were eliminated by a network " *
+          "reduction. Querying this contingency returns the unmodified PTDF row."
+    return
+end
+
 # --- Outage registration ---
 
 """
@@ -375,6 +426,7 @@ function _register_outage!(vmodf::VirtualMODF, sys::PSY.System, outage::PSY.Outa
     mod = NetworkModification(vmodf, sys, outage)
     ctg = ContingencySpec(outage_uuid, mod)
     vmodf.contingency_cache[outage_uuid] = ctg
+    _warn_if_transmission_dropped(sys, outage, mod)
     return
 end
 
@@ -442,6 +494,23 @@ function Base.getindex(vmodf::VirtualMODF, monitored_idx::Int, mod::NetworkModif
     end
 end
 
+# Resolve a monitored arc tuple to its row index, with a clear error when the
+# arc was eliminated by a reduction (otherwise the caller hits a raw KeyError).
+# Only the canonical (from, to) orientation is accepted: the row is built from
+# `BA[:, idx]`, whose signs encode that orientation, so returning the same row
+# for the reversed tuple would silently sign-flip it. This matches the no-reverse
+# lookup in VirtualPTDF / VirtualLODF.
+function _monitored_arc_index(vmodf::VirtualMODF, monitored::Tuple{Int, Int})
+    arc_lookup = vmodf.lookup[1]
+    haskey(arc_lookup, monitored) && return arc_lookup[monitored]
+    error(
+        "Monitored arc $monitored is not present in the reduced network; it was " *
+        "likely eliminated by a network reduction. Declare this branch as a " *
+        "monitored component on the outage (`get_monitored_components`) so its " *
+        "buses are protected from reduction.",
+    )
+end
+
 """
 Arc-tuple indexed version of getindex for VirtualMODF with NetworkModification.
 
@@ -452,7 +521,7 @@ function Base.getindex(
     monitored::Tuple{Int, Int},
     mod::NetworkModification,
 )
-    m_idx = vmodf.lookup[1][monitored]
+    m_idx = _monitored_arc_index(vmodf, monitored)
     return vmodf[m_idx, mod]
 end
 
@@ -506,7 +575,7 @@ Arc-tuple indexed version of getindex by PSY.Outage.
 $(TYPEDSIGNATURES)
 """
 function Base.getindex(vmodf::VirtualMODF, monitored::Tuple{Int, Int}, outage::PSY.Outage)
-    m_idx = vmodf.lookup[1][monitored]
+    m_idx = _monitored_arc_index(vmodf, monitored)
     return vmodf[m_idx, outage]
 end
 
