@@ -1697,8 +1697,9 @@ function _apply_series_branch_maps!(nr::NetworkReductionData, nr_new::NetworkRed
 end
 
 """
-Updates both existing bus maps (forward and reverse) for a new reduction of bus b1 into bus b2. 
-Handles both the case where b2 is already reduced and the case where it is not. 
+Updates both existing bus maps (forward and reverse) for a new reduction of bus b1 into bus b2.
+Resolves each bus to its current root before merging so that the entire group previously
+associated with b1's root (not just b1 itself) is correctly transferred to b2's root.
 """
 function _update_bus_maps!(
     reverse_bus_search_map::Dict{Int, Int},
@@ -1706,29 +1707,21 @@ function _update_bus_maps!(
     b1_number::Int,
     b2_number::Int,
 )
-    if haskey(reverse_bus_search_map, b2_number)
-        reduced_b2_number = reverse_bus_search_map[b2_number]
-        s1 = get(bus_reduction_map, reduced_b2_number, Set{Int}())
-        s2 = union(
-            get(bus_reduction_map, b1_number, Set{Int}(b1_number)),
-            b1_number,
-        )
-        bus_reduction_map[reduced_b2_number] = union(s1, s2)
-        delete!(bus_reduction_map, b1_number)
-        for x in s2
-            reverse_bus_search_map[x] = reduced_b2_number
-        end
-    else
-        s1 = get(bus_reduction_map, b2_number, Set{Int}())
-        s2 = union(
-            get(bus_reduction_map, b1_number, Set{Int}(b1_number)),
-            b1_number,
-        )
-        bus_reduction_map[b2_number] = union(s1, s2)
-        delete!(bus_reduction_map, b1_number)
-        for x in s2
-            reverse_bus_search_map[x] = b2_number
-        end
+    b1_root = get(reverse_bus_search_map, b1_number, b1_number)
+    b2_root = get(reverse_bus_search_map, b2_number, b2_number)
+    b1_root == b2_root && return
+
+    # Collect b1_root plus every bus already reduced under it
+    s_moving = union(get(bus_reduction_map, b1_root, Set{Int}()), Set{Int}((b1_root,)))
+    b1_number != b1_root && push!(s_moving, b1_number)
+
+    # Merge into b2_root's group
+    bus_reduction_map[b2_root] =
+        union(get(bus_reduction_map, b2_root, Set{Int}()), s_moving)
+    delete!(bus_reduction_map, b1_root)
+
+    for x in s_moving
+        reverse_bus_search_map[x] = b2_root
     end
     return
 end
