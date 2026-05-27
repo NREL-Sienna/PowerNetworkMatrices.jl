@@ -454,3 +454,64 @@ end
     ptdf = PTDF(sys; linear_solver = "KLU")
     @test all(isfinite, ptdf.data)
 end
+
+@testset "ZeroImpedanceBranchReduction: column merge symmetric when survivor index > removed" begin
+    # When ZIR merges a removed bus into a survivor whose bus index is GREATER than the
+    # removed bus's (i > j), `_accumulate_csc_col_into!` must still copy every mutual from
+    # the removed column. The old offset bookkeeping only held for i < j, so for i > j a
+    # remapped arc's mutual was dropped on one side -> asymmetric Ybus -> BA computes
+    # 1/imag(1/0) = NaN. Regression for that index-ordering bug.
+    sys = PSB.build_system(PSITestSystems, "c_sys5")
+    template = first(get_components(ACBus, sys))
+    grid_bus = first(
+        b for b in get_components(ACBus, sys) if
+        get_bustype(b) != PSY.ACBusTypes.REF && get_bustype(b) != PSY.ACBusTypes.ISOLATED
+    )
+    function _mk_bus(num, name)
+        b = deepcopy(template)
+        b.internal = IS.InfrastructureSystemsInternal()
+        set_number!(b, num)
+        set_name!(b, name)
+        set_bustype!(b, PSY.ACBusTypes.PQ)
+        return b
+    end
+    lo = _mk_bus(910, "ZI_LOW")
+    hi = _mk_bus(920, "ZI_HIGH")
+    foreach(b -> add_component!(sys, b), (lo, hi))
+    function _mk_line(name, from, to, r, x)
+        arc = Arc(from, to)
+        add_component!(sys, arc)
+        add_component!(
+            sys,
+            Line(
+                name,
+                true,
+                0.0,
+                0.0,
+                arc,
+                r,
+                x,
+                (from = 0.0, to = 0.0),
+                100.0,
+                (-1.5, 1.5),
+            ),
+        )
+    end
+    # Zero-impedance arc HIGH(920) -> LOW(910): survivor = from = 920, removed = to = 910,
+    # so the surviving column index exceeds the removed one (the i > j case).
+    _mk_line("ZI_hi_lo", hi, lo, 0.0, 1e-5)
+    # A normal line to the REMOVED bus; after the merge it remaps onto the survivor and
+    # needs a brand-new structural entry in the survivor's column.
+    _mk_line("grid_lo", grid_bus, lo, 0.01, 0.10)
+
+    yb = Ybus(sys)
+    @test PNM.get_mapped_bus_number(yb.network_reduction_data, 910) == 920
+    bl = yb.lookup[1]
+    g = bl[get_number(grid_bus)]
+    s = bl[920]
+    # The remapped mutual must be present and symmetric (the bug zeroed one side).
+    @test yb.data[g, s] != 0
+    @test yb.data[g, s] == yb.data[s, g]
+    @test all(isfinite, BA_Matrix(yb).data.nzval)
+    @test all(isfinite, ABA_Matrix(yb; factorize = false).data.nzval)
+end
