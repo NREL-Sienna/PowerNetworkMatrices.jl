@@ -15,6 +15,14 @@ function _accumulate_protected_buses!(::Vector{Int}, ::PSY.Component)
     return
 end
 
+# A stale monitored-component UUID makes `IS.get_component` throw `ArgumentError`;
+# warn and skip it. Any other error is unexpected and re-raised. Dispatching on the
+# exception type keeps the missing-component case off an `isa` branch.
+_warn_or_rethrow_missing_component(::ArgumentError, uuid) =
+    @warn "Outage monitored component UUID $uuid not found in system; " *
+          "cannot protect it from reduction."
+_warn_or_rethrow_missing_component(e, uuid) = rethrow(e)
+
 # Buses of the components an outage declares monitored (a `Set{Base.UUID}` on the
 # outage). A stale UUID is surfaced via warning, not silently skipped.
 function _accumulate_monitored_buses!(
@@ -27,9 +35,7 @@ function _accumulate_monitored_buses!(
         try
             component = IS.get_component(sys, uuid)
         catch e
-            e isa ArgumentError || rethrow()
-            @warn "Outage monitored component UUID $uuid not found in system; " *
-                  "cannot protect it from reduction."
+            _warn_or_rethrow_missing_component(e, uuid)
             continue
         end
         _accumulate_protected_buses!(buses, component)

@@ -150,8 +150,9 @@ end
     # Two branches between the same bus pair with opposite from/to arcs each contribute
     # +1/-1 to the signed bus adjacency; summed naively they cancel to zero, which hides
     # the connection from the value-based DFS connectivity check (`find_connected_components`,
-    # the scalable alternative to Goderya). The Ybus build must retain the first branch's
-    # orientation and warn. Real datasets contain anti-parallel lines, so this must hold.
+    # the scalable alternative to Goderya). The Ybus build must retain the last branch's
+    # orientation (matching the original overwrite semantics) and warn. Real datasets
+    # contain anti-parallel lines, so this must hold.
     sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
     grid_bus = first(
         b for b in get_components(ACBus, sys) if
