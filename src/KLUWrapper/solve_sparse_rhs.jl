@@ -20,20 +20,23 @@ Not thread-safe (mutates per-cache scratch). Callers should serialize
 access through a per-cache lock if invoked from multiple threads.
 """
 function solve_sparse!(
-    cache::KLULinSolveCache{Tv},
-    B::SparseMatrixCSC{Tb, Int},
+    cache::KLULinSolveCache{Tv, Ti},
+    B::SparseMatrixCSC{Tb, <:Integer},
     out::AbstractMatrix{Tv};
     block::Int = SPARSE_RHS_DEFAULT_BLOCK,
-) where {Tv <: Union{Float64, ComplexF64}, Tb <: Number}
+) where {Tv, Ti, Tb <: Number}
     is_factored(cache) || error("KLULinSolveCache: not factored yet.")
     block >= 1 || throw(ArgumentError("block must be >= 1; got $(block)"))
     n = _dim(cache)
-    size(B, 1) == n || throw(DimensionMismatch(
-        "size(B, 1) = $(size(B, 1)), cache n = $(n)",
+    size(B, 1) == Int(n) || throw(DimensionMismatch(
+        "size(B, 1) = $(size(B, 1)), cache n = $(Int(n))",
     ))
-    size(out, 1) == n && size(out, 2) == size(B, 2) || throw(DimensionMismatch(
-        "out has size $(size(out)); expected $((n, size(B, 2))).",
-    ))
+    size(out, 1) == Int(n) && size(out, 2) == size(B, 2) ||
+        throw(
+            DimensionMismatch(
+                "out has size $(size(out)); expected $((Int(n), size(B, 2))).",
+            ),
+        )
 
     nb = size(B, 2)
     nb == 0 && return out
@@ -71,7 +74,7 @@ function solve_sparse!(
             # helper) to keep the inner-loop closure from capturing the per-chunk
             # `npack`, which would force Julia to box it.
             ok = _solve_call(
-                Tv, cache.symbolic, cache.numeric, n, Int64(npack),
+                Tv, Ti, cache.symbolic, cache.numeric, n, npack,
                 pointer(scratch), cache.common,
             )
             if ok == 0 && cache.common[].status == KLU_INVALID
@@ -79,7 +82,7 @@ function solve_sparse!(
                     objectid(cache)
                 _recover_factorization!(cache)
                 ok = _solve_call(
-                    Tv, cache.symbolic, cache.numeric, n, Int64(npack),
+                    Tv, Ti, cache.symbolic, cache.numeric, n, npack,
                     pointer(scratch), cache.common,
                 )
             end
@@ -96,12 +99,13 @@ function solve_sparse!(
 end
 
 """Allocating wrapper around `solve_sparse!`."""
-function solve_sparse(cache::KLULinSolveCache{Tv},
-    B::SparseMatrixCSC{<:Number, Int};
+function solve_sparse(
+    cache::KLULinSolveCache{Tv, Ti},
+    B::SparseMatrixCSC{<:Number, <:Integer};
     block::Int = SPARSE_RHS_DEFAULT_BLOCK,
-) where {Tv <: Union{Float64, ComplexF64}}
+) where {Tv, Ti}
     return solve_sparse!(
-        cache, B, Matrix{Tv}(undef, _dim(cache), size(B, 2));
+        cache, B, Matrix{Tv}(undef, Int(_dim(cache)), size(B, 2));
         block = block,
     )
 end

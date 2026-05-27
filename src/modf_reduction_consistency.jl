@@ -53,6 +53,15 @@ function _accumulate_monitored_buses!(
     return
 end
 
+# Map every bus to the survivor it is merged into by `ZeroImpedanceBranchReduction`
+# (buses joined by a zero-impedance branch). Read from an unreduced `Ybus` so the
+# map is main's EXACT result rather than a re-derived susceptance threshold (which
+# is fragile to floating point — e.g. `1/1e-4` underflows the threshold). The map
+# is already flattened (chained merges resolve to the final survivor).
+function _zero_impedance_survivor_map(sys::PSY.System)
+    return get_reverse_bus_search_map(get_network_reduction_data(Ybus(sys)))
+end
+
 """
     _collect_protected_buses(sys) -> Set{Int}
 
@@ -61,6 +70,12 @@ Return the set of bus numbers that must NOT be reduced so that, for every
 components it declares as monitored (`get_monitored_components`) remain
 expressible as arcs in the reduced network. This is the VirtualMODF
 "exception list".
+
+Protected buses are mapped through the mandatory zero-impedance merge: marking
+both endpoints of a zero-impedance branch irreducible would make
+`ZeroImpedanceBranchReduction` skip the (numerically required) merge and leave a
+singular ABA. Protecting the merge survivor instead keeps the branch's real arcs
+queryable while letting the merge proceed.
 """
 function _collect_protected_buses(sys::PSY.System)
     buses = Int[]
@@ -70,7 +85,9 @@ function _collect_protected_buses(sys::PSY.System)
         end
         _accumulate_monitored_buses!(buses, sys, outage)
     end
-    return Set{Int}(buses)
+    isempty(buses) && return Set{Int}()
+    zi_map = _zero_impedance_survivor_map(sys)
+    return Set{Int}(get(zi_map, b, b) for b in buses)
 end
 
 # Return a copy of `reduction` whose protected/irreducible bus set is extended
