@@ -1367,13 +1367,22 @@ function _accumulate_csc_col_into!(
 )
     rows = SparseArrays.rowvals(M)
     vals = SparseArrays.nonzeros(M)
-    j_range = SparseArrays.nzrange(M, j)
-    i_range = SparseArrays.nzrange(M, i)
-    for k_j in j_range
+    j_range_init = SparseArrays.nzrange(M, j)
+    isempty(j_range_init) && return
+    j_start = first(j_range_init)
+    j_len = length(j_range_init)
+    # Structural inserts into column i (which precedes j in CSC order) shift colptr[j]
+    # upward, invalidating any pre-captured range. Track cumulative shift in `offset` so
+    # the absolute position of entry idx in column j's backing store remains j_start + offset + idx.
+    offset = 0
+    for idx in 0:(j_len - 1)
+        k_j = j_start + offset + idx
         r = rows[k_j]
         v_j = vals[k_j]
         iszero(v_j) && continue
         found = false
+        # Re-read i_range each iteration: a structural insert changes where column i lives.
+        i_range = SparseArrays.nzrange(M, i)
         for k_i in i_range
             if rows[k_i] == r
                 vals[k_i] += v_j
@@ -1381,7 +1390,11 @@ function _accumulate_csc_col_into!(
                 break
             end
         end
-        found || (M[r, i] += v_j)
+        if !found
+            before = M.colptr[i + 1]
+            M[r, i] += v_j
+            offset += M.colptr[i + 1] - before
+        end
     end
     return
 end
@@ -1473,6 +1486,9 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         nr_new.merged_bus_pairs,
     )
     nr.boundary_bus_to_removed_arcs = nr_new.boundary_bus_to_removed_arcs
+    if !isempty(nr_new.merged_bus_pairs)
+        nr.merged_bus_pairs = nr_new.merged_bus_pairs
+    end
     return Ybus(
         data,
         adjacency_data,
