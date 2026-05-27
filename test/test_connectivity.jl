@@ -146,6 +146,65 @@ end
     end
 end
 
+@testset "Anti-parallel branches stay connected for DFS connectivity" begin
+    # Two branches between the same bus pair with opposite from/to arcs each contribute
+    # +1/-1 to the signed bus adjacency; summed naively they cancel to zero, which hides
+    # the connection from the value-based DFS connectivity check (`find_connected_components`,
+    # the scalable alternative to Goderya). The Ybus build must retain the first branch's
+    # orientation and warn. Real datasets contain anti-parallel lines, so this must hold.
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys5")
+    grid_bus = first(
+        b for b in get_components(ACBus, sys) if
+        get_bustype(b) != PSY.ACBusTypes.REF && get_bustype(b) != PSY.ACBusTypes.ISOLATED
+    )
+    stub = deepcopy(first(get_components(ACBus, sys)))
+    stub.internal = IS.InfrastructureSystemsInternal()
+    set_number!(stub, 950)
+    set_name!(stub, "ANTIPARALLEL_STUB")
+    set_bustype!(stub, PSY.ACBusTypes.PQ)
+    add_component!(sys, stub)
+    function _mk_line(name, from, to)
+        arc = Arc(from, to)
+        add_component!(sys, arc)
+        add_component!(
+            sys,
+            Line(
+                name,
+                true,
+                0.0,
+                0.0,
+                arc,
+                0.01,
+                0.10,
+                (from = 0.0, to = 0.0),
+                100.0,
+                (-1.5, 1.5),
+            ),
+        )
+    end
+    # The stub is reachable from the grid only through this anti-parallel pair.
+    _mk_line("AP_fwd", grid_bus, stub)   # grid -> stub
+    _mk_line("AP_rev", stub, grid_bus)   # stub -> grid (anti-parallel)
+
+    ybus =
+        @test_logs (:warn, r"Anti-parallel branches between buses") match_mode = :any Ybus(
+            sys,
+        )
+
+    i = ybus.lookup[1][get_number(grid_bus)]
+    j = ybus.lookup[1][950]
+    # The signed entries are retained (not cancelled to zero) and stay antisymmetric.
+    @test ybus.adjacency_data[i, j] != 0
+    @test ybus.adjacency_data[j, i] != 0
+    @test ybus.adjacency_data[i, j] == -ybus.adjacency_data[j, i]
+
+    # Value-based DFS connectivity sees the stub connected: a single component.
+    cc = PNM.find_connected_components(ybus.adjacency_data, ybus.lookup[1])
+    @test length(cc) == 1
+    # Structure-based union find agrees.
+    @test length(PNM.find_subnetworks(ybus.adjacency_data, ybus.axes[1])) == 1
+end
+
 @testset "Subnetwork algorithms" begin
     sys = build_hvdc_with_small_island()
     ybus = @test_logs (:info, r"Finding subnetworks via iterative union find") match_mode =
