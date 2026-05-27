@@ -129,13 +129,15 @@ end
     get_equivalent_rating(bs::BranchesSeries)
 
 Calculate the rating for branches in series.
-Series chains, can be composed of PSY.ACTransmission branches and PNM.BranchesParallel.
-For series circuits, the rating is limited by the weakest link: Rating_total = min(Rating1, Rating2, ..., Ratingn)
+Series chains can be composed of PSY.ACTransmission branches and parallel groups.
+For series circuits, the rating is limited by the weakest link: Rating_total = min(Rating1, Rating2, ..., Ratingn).
+Parallel members contribute their N-1 single-element-contingency rating.
 """
 function get_equivalent_rating(bs::BranchesSeries)
-    # Minimum rating for series branches (weakest link)
-    return minimum(get_equivalent_rating(branch) for branch in bs)
+    return minimum(_series_member_rating(branch) for branch in bs)
 end
+
+_series_member_rating(branch::PSY.ACTransmission) = get_equivalent_rating(branch)
 
 """
     get_equivalent_rating(bs<:PSY.ACTransmission)
@@ -200,6 +202,8 @@ function get_equivalent_available(bs::BranchesSeries)
     # All branches must be available
     return all(PSY.get_available(branch) for branch in bs)
 end
+
+PSY.get_available(bs::BranchesSeries) = get_equivalent_available(bs)
 
 """
     get_equivalent_α(bs::BranchesSeries)

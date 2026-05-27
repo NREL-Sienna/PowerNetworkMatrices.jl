@@ -31,7 +31,7 @@
                 break
             end
         end
-        @test outaged_line !== nothing
+        @test !isnothing(outaged_line)
         PSY.set_available!(outaged_line, false)
         ptdf_rebuilt = PTDF(sys_mod)
         rebuilt_arc_ax = PNM.get_arc_axis(ptdf_rebuilt)
@@ -247,6 +247,47 @@ end
                     atol = 1e-6,
                 )
             end
+        end
+    end
+end
+
+@testset "Woodbury correction concurrent across arcs (AppleAccelerate backend)" begin
+    # Validates the AA-backend concurrency claim documented in
+    # `src/virtual_ptdf_modification.jl`: many tasks calling
+    # `apply_woodbury_correction` on a single VirtualPTDF should agree with the
+    # serial baseline. The KLU path is exercised by the threaded testsets in
+    # `test/test_virtual_modf.jl`; this complements that coverage on the
+    # AppleAccelerate path.
+    if !PowerNetworkMatrices._has_apple_accelerate_backend()
+        @info "Skipping: AppleAccelerate backend not available on this platform."
+        return
+    end
+    if Threads.nthreads() < 2
+        @info "Skipping: requires Threads.nthreads() ≥ 2 to exercise concurrent access."
+        return
+    end
+
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    vptdf = VirtualPTDF(sys; linear_solver = "AppleAccelerate")
+
+    arc_ax = PNM.get_arc_axis(vptdf)
+    n_arcs = length(arc_ax)
+    @test n_arcs ≥ 2
+
+    outaged_arc = arc_ax[1]
+    mod = NetworkModification(vptdf, outaged_arc)
+    wf = compute_woodbury_factors(vptdf, mod)
+
+    monitored_indices = collect(2:n_arcs)
+    serial = [apply_woodbury_correction(vptdf, m, wf) for m in monitored_indices]
+
+    for iter in 1:5
+        parallel = Vector{Vector{Float64}}(undef, length(monitored_indices))
+        Threads.@threads :dynamic for i in eachindex(monitored_indices)
+            parallel[i] = apply_woodbury_correction(vptdf, monitored_indices[i], wf)
+        end
+        for i in eachindex(monitored_indices)
+            @test parallel[i] ≈ serial[i]
         end
     end
 end

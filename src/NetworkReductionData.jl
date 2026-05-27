@@ -59,11 +59,16 @@ function get_typed_reverse_direct_branch_map(
     return b.reverse_direct_branch_map[T]::Dict{T, Tuple{Int, Int}}
 end
 
+# Per-type bucket is widened to `AbstractBranchesParallel` so that a
+# `MixedBranchesParallel` group is reachable under each of its underlying
+# branch types (e.g. both `parallel_branch_map[Line]` and
+# `parallel_branch_map[MonitoredLine]` see the same group). Pure
+# `BranchesParallel{T}` groups remain assignment-compatible.
 function get_typed_parallel_branch_map(
     b::BranchMapsByType,
     ::Type{T},
 ) where {T <: PSY.ACTransmission}
-    return b.parallel_branch_map[T]::Dict{Tuple{Int, Int}, BranchesParallel{T}}
+    return b.parallel_branch_map[T]::Dict{Tuple{Int, Int}, AbstractBranchesParallel}
 end
 
 function get_typed_reverse_parallel_branch_map(
@@ -110,7 +115,7 @@ network reduction algorithms.
 - `reverse_bus_search_map::Dict{Int, Int}`: Maps eliminated buses to their parent buses
 - `direct_branch_map::Dict{Tuple{Int, Int}, PSY.ACTransmission}`: One-to-one branch mappings
 - `reverse_direct_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}}`: Reverse direct mappings
-- `parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel}`: Parallel branch combinations
+- `parallel_branch_map::Dict{Tuple{Int, Int}, AbstractBranchesParallel}`: Parallel branch combinations (homogeneous `BranchesParallel{T}` or `MixedBranchesParallel`)
 - `reverse_parallel_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}}`: Reverse parallel mappings
 - `series_branch_map::Dict{Tuple{Int, Int}, BranchesSeries}`: Series branch combinations
 - `reverse_series_branch_map::Dict{Any, Tuple{Int, Int}}`: Reverse series mappings
@@ -118,6 +123,7 @@ network reduction algorithms.
 - `reverse_transformer3W_map::Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}`: Reverse transformer mappings
 - `removed_buses::Set{Int}`: Set of buses eliminated from the network
 - `removed_arcs::Set{Tuple{Int, Int}}`: Set of arcs eliminated from the network
+- `merged_bus_pairs::Dict{Int, Int}`: Maps removed bus number to surviving bus number for zero-impedance branch bus merges; drives row/column summation in `_merge_ybus_buses!`
 - `removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int}`: Maps removed arcs to the connected surviving bus number (occurs for radial reduction or Ward reduction)
 - `boundary_bus_to_removed_arcs::Dict{Int, Set{Tuple{Int, Int}}}`: Maps boundary buses to the set of removed arcs connected to them
 - `added_admittance_map::Dict{Int, PSY.FixedAdmittance}`: Admittances added to buses during reduction
@@ -137,8 +143,8 @@ network reduction algorithms.
         Dict{Tuple{Int, Int}, PSY.ACTransmission}()
     reverse_direct_branch_map::Dict{PSY.ACTransmission, Tuple{Int, Int}} =
         Dict{PSY.ACTransmission, Tuple{Int, Int}}()
-    parallel_branch_map::Dict{Tuple{Int, Int}, BranchesParallel} =
-        Dict{Tuple{Int, Int}, BranchesParallel}()
+    parallel_branch_map::Dict{Tuple{Int, Int}, AbstractBranchesParallel} =
+        Dict{Tuple{Int, Int}, AbstractBranchesParallel}()
     reverse_parallel_branch_map::Dict{<:PSY.ACTransmission, Tuple{Int, Int}} =
         Dict{PSY.ACTransmission, Tuple{Int, Int}}()
     series_branch_map::Dict{Tuple{Int, Int}, BranchesSeries} =
@@ -155,6 +161,7 @@ network reduction algorithms.
     } = Dict{ThreeWindingTransformerWinding, Tuple{Int, Int}}()
     removed_buses::Set{Int} = Set{Int}()
     removed_arcs::Set{Tuple{Int, Int}} = Set{Tuple{Int, Int}}()
+    merged_bus_pairs::Dict{Int, Int} = Dict{Int, Int}()
     removed_arc_to_surviving_bus::Dict{Tuple{Int, Int}, Int} = Dict{Tuple{Int, Int}, Int}()
     boundary_bus_to_removed_arcs::Dict{Int, Set{Tuple{Int, Int}}} =
         Dict{Int, Set{Tuple{Int, Int}}}()
@@ -270,7 +277,7 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
                 map_by_type = get!(
                     all_branch_maps_by_type.parallel_branch_map,
                     concrete_type,
-                    Dict{Tuple{Int, Int}, BranchesParallel{_get_segment_type(v)}}(),
+                    _empty_parallel_branch_map(),
                 )
                 map_by_type[k] = v
                 name_to_arc_map = get!(
@@ -385,16 +392,27 @@ function populate_branch_maps_by_type!(nrd::NetworkReductionData, filters = Dict
 end
 
 _get_segment_components(x::T) where {T <: PSY.ACBranch} = [x]
-_get_segment_components(x::BranchesParallel{T}) where {T <: PSY.ACTransmission} = x.branches
+_get_segment_components(x::AbstractBranchesParallel) = x.branches
 _get_segment_type(::T) where {T <: PSY.ACBranch} = T
 _get_segment_type(::BranchesParallel{T}) where {T <: PSY.ACTransmission} = T
+_get_segment_type(::MixedBranchesParallel) = MixedBranchesParallel
 _get_segment_type(
     ::ThreeWindingTransformerWinding{T},
 ) where {T <: PSY.ThreeWindingTransformer} = T
 
 _get_concrete_types(x::T) where {T <: PSY.ACBranch} = [T]
-_get_concrete_types(x::BranchesParallel{T}) where {T <: PSY.ACTransmission} =
-    unique(_get_segment_type.(x.branches))
+_get_concrete_types(::BranchesParallel{T}) where {T <: PSY.ACTransmission} = [T]
+# A heterogeneous group must be discoverable under each of its members'
+# concrete branch types so that downstream per-type iteration (e.g. PSI's
+# `name_to_arc_map[MonitoredLine]`) can find it.
+_get_concrete_types(bp::MixedBranchesParallel) = unique(typeof.(bp.branches))
+
+# Construct an empty per-slot dict for `BranchMapsByType.parallel_branch_map`.
+# Value type is `AbstractBranchesParallel` so that the same per-type bucket can
+# hold either a homogeneous `BranchesParallel{T}` or a `MixedBranchesParallel`
+# that includes a branch of type `T`.
+_empty_parallel_branch_map() =
+    Dict{Tuple{Int, Int}, AbstractBranchesParallel}()
 
 get_irreducible_buses(rb::NetworkReductionData) = rb.irreducible_buses
 """

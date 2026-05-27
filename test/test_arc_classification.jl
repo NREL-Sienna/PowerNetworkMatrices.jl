@@ -48,5 +48,5 @@ end
 
     tag, arc = PNM._resolve_branch_arc(nr2, line)
     @test tag === :not_found
-    @test arc === nothing
+    @test isnothing(arc)
 end

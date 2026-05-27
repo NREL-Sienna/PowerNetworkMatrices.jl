@@ -79,6 +79,21 @@ vlodf_matrix = PNM.VirtualLODF(sys)
 vlodf_matrix[(1, 2), (3, 4)]
 ```
 
+## Computing Virtual MODF Matrix
+
+For post-contingency / post-modification PTDF rows using [`VirtualMODF`](@ref):
+
+```julia
+vmodf_matrix = PNM.VirtualMODF(sys)
+
+# Inspect contingencies auto-registered from PSY.Outage supplemental attributes
+PNM.get_registered_contingencies(vmodf_matrix)
+
+# Access the post-modification PTDF row for monitored arc (1, 2) under a contingency
+contingency = first(values(PNM.get_registered_contingencies(vmodf_matrix)))
+vmodf_matrix[(1, 2), contingency]
+```
+
 ## Computing Incidence and BA Matrices
 
 For the fundamental network topology matrices:
@@ -134,6 +149,7 @@ For matrices involving branches (IncidenceMatrix, PTDF, LODF), branches are repr
 | `Ybus`            | Bus numbers        | Bus numbers           |
 | `VirtualPTDF`     | Arc tuples         | Bus numbers           |
 | `VirtualLODF`     | Arc tuples         | Arc tuples            |
+| `VirtualMODF`     | Arc tuples         | Bus numbers           |
 
 !!! note
     

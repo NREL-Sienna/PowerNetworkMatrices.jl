@@ -162,6 +162,8 @@ function get_equivalent_available(tw::ThreeWindingTransformerWinding)
     return winding_status
 end
 
+PSY.get_available(tw::ThreeWindingTransformerWinding) = get_equivalent_available(tw)
+
 function get_arc_tuple(tr::ThreeWindingTransformerWinding)
     t3W = get_transformer(tr)
     arc_number = get_winding_number(tr)

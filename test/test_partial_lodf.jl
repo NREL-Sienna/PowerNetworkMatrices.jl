@@ -89,7 +89,9 @@ end
 
 @testset "Partial LODF: half-susceptance matches rebuilt ground truth" begin
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
-    vlodf = VirtualLODF(sys5)
+    # Pin KLU here: the ground-truth path below calls `PNM.solve!` directly on
+    # `vlodf.K`, which is dispatched on `KLULinSolveCache` only.
+    vlodf = VirtualLODF(sys5; linear_solver = "KLU")
     e = 1  # test arc index
     b_e = vlodf.arc_susceptances[e]
 
@@ -107,8 +109,13 @@ end
     # Extract the BA column for arc e at non-reference bus indices.
     ba_col_e = [vlodf.BA[vlodf.valid_ix[i], e] for i in 1:n_valid]
 
-    # Solve ABA x = ba_col_e using the factorization (fresh copy to avoid aliasing).
-    lin_solve = vlodf.K \ copy(ba_col_e)
+    # Solve ABA x = ba_col_e using the cache's factorization (fresh copy
+    # to avoid aliasing).
+    lin_solve = let
+        b = copy(ba_col_e)
+        PNM.solve!(vlodf.K, b)
+        b
+    end
 
     # Map the solution back to full bus space.
     temp_full = zeros(n_buses)

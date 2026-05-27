@@ -163,18 +163,65 @@ function get_reduction(
     return get_reduction(A, sys, reduction)
 end
 
+function _make_parallel_branch_pair(
+    a::T,
+    b::T,
+    ::Tuple{Int, Int},
+) where {T <: PSY.ACTransmission}
+    return BranchesParallel(T[a, b])
+end
+
+function _make_parallel_branch_pair(
+    a::PSY.ACTransmission,
+    b::PSY.ACTransmission,
+    arc_tuple::Tuple{Int, Int},
+)
+    @warn "Mismatch in parallel device types for arc $(arc_tuple). This could indicate issues in the network data."
+    return MixedBranchesParallel(PSY.ACTransmission[a, b])
+end
+
 function _push_parallel_branch!(
     parallel_branch_map::Dict,
     arc_tuple::Tuple{Int, Int},
+    br::PSY.ACTransmission,
+)
+    existing = parallel_branch_map[arc_tuple]
+    _push_parallel_branch_dispatch!(parallel_branch_map, arc_tuple, existing, br)
+    return
+end
+
+function _push_parallel_branch_dispatch!(
+    ::Dict,
+    ::Tuple{Int, Int},
+    existing::BranchesParallel{T},
     br::T,
 ) where {T <: PSY.ACTransmission}
-    if get_branch_type(parallel_branch_map[arc_tuple]) == T
-        add_branch!(parallel_branch_map[arc_tuple], br)
-    else
+    add_branch!(existing, br)
+    return
+end
+
+function _push_parallel_branch_dispatch!(
+    parallel_branch_map::Dict,
+    arc_tuple::Tuple{Int, Int},
+    existing::BranchesParallel,
+    br::PSY.ACTransmission,
+)
+    @warn "Mismatch in parallel device types for arc $(arc_tuple). This could indicate issues in the network data."
+    parallel_branch_map[arc_tuple] =
+        MixedBranchesParallel(PSY.ACTransmission[existing.branches..., br])
+    return
+end
+
+function _push_parallel_branch_dispatch!(
+    ::Dict,
+    arc_tuple::Tuple{Int, Int},
+    existing::MixedBranchesParallel,
+    br::PSY.ACTransmission,
+)
+    if !any(typeof(b) === typeof(br) for b in existing.branches)
         @warn "Mismatch in parallel device types for arc $(arc_tuple). This could indicate issues in the network data."
-        parallel_branch_map[arc_tuple] =
-            BranchesParallel([parallel_branch_map[arc_tuple].branches..., br])
     end
+    add_branch!(existing, br)
     return
 end
 
@@ -217,7 +264,8 @@ function add_to_branch_maps!(
         corresponding_branch = direct_branch_map[arc_tuple]
         delete!(direct_branch_map, arc_tuple)
         delete!(reverse_direct_branch_map, corresponding_branch)
-        parallel_branch_map[arc_tuple] = BranchesParallel([corresponding_branch, br])
+        parallel_branch_map[arc_tuple] =
+            _make_parallel_branch_pair(corresponding_branch, br, arc_tuple)
         reverse_parallel_branch_map[corresponding_branch] = arc_tuple
         reverse_parallel_branch_map[br] = arc_tuple
     else
@@ -385,7 +433,13 @@ _get_shunt(::PSY.DiscreteControlledACBranch, ::Symbol) = zero(YBUS_ELTYPE)
 
 """Ybus entries for a `Line` or a `DiscreteControlledACBranch`."""
 function ybus_branch_entries(br::PSY.ACTransmission)
-    Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
+    r = PSY.get_r(br)
+    x = PSY.get_x(br)
+    if r == 0.0 && x == 0.0
+        @warn "Branch $(PSY.get_name(br)) has r=0.0 and x=0.0; substituting x=$(ZERO_IMPEDANCE_X_EPSILON) to avoid division by zero. This branch will be reduced by ZeroImpedanceBranchReduction."
+        x = ZERO_IMPEDANCE_X_EPSILON
+    end
+    Y_l = (1 / (r + x * 1im))
     Y11 = Y_l + _get_shunt(br, :from)
     if !isfinite(Y11) || !isfinite(Y_l)
         error(
@@ -412,7 +466,7 @@ function ybus_branch_entries(br::PSY.GenericArcImpedance)
     return (Y11, Y12, Y21, Y22)
 end
 
-function ybus_branch_entries(parallel_br::BranchesParallel)
+function ybus_branch_entries(parallel_br::AbstractBranchesParallel)
     arc = get_arc_tuple(first(parallel_br))
     Y11 = Y12 = Y21 = Y22 = zero(YBUS_ELTYPE)
     for br in parallel_br
@@ -1023,30 +1077,6 @@ function Ybus(
         end
     end
 
-    #Building map for removed Breaker/Switches
-    breaker_switches = Vector{PSY.DiscreteControlledACBranch}()
-    for br in PSY.get_components(PSY.DiscreteControlledACBranch, sys)
-        !PSY.get_available(br) && continue
-        r = PSY.get_r(br)
-        x = PSY.get_x(br)
-        status = PSY.get_branch_status(br)
-        if status == PSY.DiscreteControlledBranchStatus.CLOSED
-            if r == 0.0 && x < ZERO_IMPEDANCE_LINE_REACTANCE_THRESHOLD
-                from_bus_number = PSY.get_number(PSY.get_from(PSY.get_arc(br)))
-                to_bus_number = PSY.get_number(PSY.get_to(PSY.get_arc(br)))
-                _update_bus_maps!(
-                    reverse_bus_search_map,
-                    bus_reduction_map,
-                    to_bus_number,
-                    from_bus_number,
-                )
-                push!(nr.removed_arcs, (from_bus_number, to_bus_number))
-            else
-                push!(breaker_switches, br)
-            end
-        end
-    end
-
     bus_ax = sort!(collect(keys(bus_reduction_map)))
     axes = (bus_ax, bus_ax)
     bus_lookup = Dict{Int, Int}()
@@ -1058,7 +1088,6 @@ function Ybus(
     adj = SparseArrays.spdiagm(ones(Int8, busnumber))
     icd_map = _build_icd_correction_map(sys)
     branches = _get_ybus_two_terminal_ac_branches(sys)
-    append!(branches.breaker_switches, breaker_switches)
     transformer_3W =
         _get_filtered_components(PSY.ThreeWindingTransformer, sys, PSY.get_available)
     fixed_admittances =
@@ -1156,7 +1185,17 @@ function Ybus(
         arc_admittance_from_to,
         arc_admittance_to_from,
     )
-
+    all_irreducible = mapreduce(
+        get_irreducible_buses,
+        union,
+        network_reductions;
+        init = Set{Int}(),
+    )
+    ybus = build_reduced_ybus(
+        ybus,
+        sys,
+        ZeroImpedanceBranchReduction(; irreducible_buses = all_irreducible),
+    )
     for nr in network_reductions
         ybus = build_reduced_ybus(ybus, sys, nr)
     end
@@ -1352,17 +1391,54 @@ end
 function _resolve_arc_admittance(
     new_y_ft::ArcAdmittanceMatrix,
     new_y_tf::ArcAdmittanceMatrix,
-    existing_ft,
-    existing_tf,
-    removed_arcs,
-    bus_ax,
-    bus_lookup,
-    bus_ix,
-    nr,
+    existing_ft::Union{ArcAdmittanceMatrix, Nothing},
+    existing_tf::Union{ArcAdmittanceMatrix, Nothing},
+    removed_arcs::Set{Tuple{Int, Int}},
+    bus_ax::Vector{Int},
+    bus_lookup::Dict{Int, Int},
+    bus_ix::Vector{Int},
+    nr::NetworkReductionData,
+    merged_bus_pairs::Dict{Int, Int} = Dict{Int, Int}(),
 )
     arc_ax = setdiff(get_arc_axis(new_y_ft), removed_arcs)
     arc_remove_ixs = indexin(removed_arcs, get_arc_axis(new_y_ft))
     arc_keep_ixs = setdiff(collect(1:length(get_arc_axis(new_y_ft))), arc_remove_ixs)
+    # Remap arc endpoint labels to surviving bus numbers. Column data was already merged
+    # in _merge_arc_admittance_bus_columns! before this call; only the axis labels need
+    # updating so downstream reductions can match arcs by their new bus numbers.
+    if !isempty(merged_bus_pairs)
+        for k in eachindex(arc_ax)
+            arc = arc_ax[k]
+            new_from = get(merged_bus_pairs, arc[1], arc[1])
+            new_to = get(merged_bus_pairs, arc[2], arc[2])
+            (new_from == arc[1] && new_to == arc[2]) || (arc_ax[k] = (new_from, new_to))
+        end
+        # Drop self-loops that can arise if both endpoints map to the same surviving bus.
+        valid = findall(arc -> arc[1] != arc[2], arc_ax)
+        arc_ax = arc_ax[valid]
+        arc_keep_ixs = arc_keep_ixs[valid]
+        # Collapse duplicates that appear when a bus merge maps two winding arcs to the
+        # same (from, to) label (e.g. primary and secondary windings both become (X, S)).
+        # Sum their rows so the combined admittance is preserved, then drop the extras.
+        seen_arc_positions = Dict{Tuple{Int, Int}, Int}()
+        rows_to_drop = Int[]
+        for k in eachindex(arc_ax)
+            arc = arc_ax[k]
+            if haskey(seen_arc_positions, arc)
+                first_k = seen_arc_positions[arc]
+                new_y_ft.data[arc_keep_ixs[first_k], :] += new_y_ft.data[arc_keep_ixs[k], :]
+                new_y_tf.data[arc_keep_ixs[first_k], :] += new_y_tf.data[arc_keep_ixs[k], :]
+                push!(rows_to_drop, k)
+            else
+                seen_arc_positions[arc] = k
+            end
+        end
+        if !isempty(rows_to_drop)
+            keep = setdiff(eachindex(arc_ax), rows_to_drop)
+            arc_ax = arc_ax[keep]
+            arc_keep_ixs = arc_keep_ixs[keep]
+        end
+    end
     arc_lookup = make_ax_ref(arc_ax)
     yft_data = new_y_ft.data[arc_keep_ixs, bus_ix]
     ytf_data = new_y_tf.data[arc_keep_ixs, bus_ix]
@@ -1387,15 +1463,123 @@ end
 function _resolve_arc_admittance(
     ::Nothing,
     ::Nothing,
-    existing_ft,
-    existing_tf,
-    removed_arcs,
-    bus_ax,
-    bus_lookup,
-    bus_ix,
-    nr,
+    existing_ft::Union{ArcAdmittanceMatrix, Nothing},
+    existing_tf::Union{ArcAdmittanceMatrix, Nothing},
+    removed_arcs::Set{Tuple{Int, Int}},
+    bus_ax::Vector{Int},
+    bus_lookup::Dict{Int, Int},
+    bus_ix::Vector{Int},
+    nr::NetworkReductionData,
+    merged_bus_pairs::Dict{Int, Int} = Dict{Int, Int}(),
 )
     return existing_ft, existing_tf
+end
+
+# Transfer arc admittance contributions from the removed bus column to the surviving bus
+# column before the removed bus column is sliced out. Without this, to-bus admittance
+# entries for arcs that terminate at the removed bus are silently dropped.
+function _merge_arc_admittance_bus_columns!(
+    yft::ArcAdmittanceMatrix,
+    ytf::ArcAdmittanceMatrix,
+    bus_lookup::Dict{Int, Int},
+    merged_bus_pairs::Dict{Int, Int},
+)
+    for (removed_bus, surviving_bus) in merged_bus_pairs
+        i = bus_lookup[surviving_bus]
+        j = bus_lookup[removed_bus]
+        yft.data[:, i] += yft.data[:, j]
+        ytf.data[:, i] += ytf.data[:, j]
+    end
+    return
+end
+
+_merge_arc_admittance_bus_columns!(
+    ::Nothing,
+    ::Nothing,
+    ::Dict{Int, Int},
+    ::Dict{Int, Int},
+) = nothing
+
+function _accumulate_csc_row_into!(
+    M::SparseArrays.SparseMatrixCSC,
+    i::Int,
+    j::Int,
+)
+    rows = SparseArrays.rowvals(M)
+    vals = SparseArrays.nonzeros(M)
+    for col in 1:size(M, 2)
+        v_j = zero(eltype(M))
+        for k in SparseArrays.nzrange(M, col)
+            rows[k] == j && (v_j = vals[k])
+        end
+        iszero(v_j) && continue
+        found = false
+        for k in SparseArrays.nzrange(M, col)
+            if rows[k] == i
+                vals[k] += v_j
+                found = true
+                break
+            end
+        end
+        found || (M[i, col] += v_j)
+    end
+    return
+end
+
+function _accumulate_csc_col_into!(
+    M::SparseArrays.SparseMatrixCSC,
+    i::Int,
+    j::Int,
+)
+    rows = SparseArrays.rowvals(M)
+    vals = SparseArrays.nonzeros(M)
+    j_range_init = SparseArrays.nzrange(M, j)
+    isempty(j_range_init) && return
+    j_start = first(j_range_init)
+    j_len = length(j_range_init)
+    # Structural inserts into column i (which precedes j in CSC order) shift colptr[j]
+    # upward, invalidating any pre-captured range. Track cumulative shift in `offset` so
+    # the absolute position of entry idx in column j's backing store remains j_start + offset + idx.
+    offset = 0
+    for idx in 0:(j_len - 1)
+        k_j = j_start + offset + idx
+        r = rows[k_j]
+        v_j = vals[k_j]
+        iszero(v_j) && continue
+        found = false
+        # Re-read i_range each iteration: a structural insert changes where column i lives.
+        i_range = SparseArrays.nzrange(M, i)
+        for k_i in i_range
+            if rows[k_i] == r
+                vals[k_i] += v_j
+                found = true
+                break
+            end
+        end
+        if !found
+            before = M.colptr[i + 1]
+            M[r, i] += v_j
+            offset += M.colptr[i + 1] - before
+        end
+    end
+    return
+end
+
+function _merge_ybus_buses!(
+    data::SparseArrays.SparseMatrixCSC{YBUS_ELTYPE, Int},
+    adjacency_data::SparseArrays.SparseMatrixCSC{Int8, Int},
+    bus_lookup::Dict{Int, Int},
+    merged_bus_pairs::Dict{Int, Int},
+)
+    for (removed_bus, surviving_bus) in merged_bus_pairs
+        i = bus_lookup[surviving_bus]
+        j = bus_lookup[removed_bus]
+        _accumulate_csc_row_into!(data, i, j)
+        _accumulate_csc_col_into!(data, i, j)
+        _accumulate_csc_row_into!(adjacency_data, i, j)
+        _accumulate_csc_col_into!(adjacency_data, i, j)
+    end
+    return
 end
 
 function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
@@ -1405,8 +1589,16 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
     bus_lookup = get_bus_lookup(ybus)
     nr = get_network_reduction_data(ybus)
 
+    if !isempty(nr_new.merged_bus_pairs)
+        _merge_ybus_buses!(data, adjacency_data, bus_lookup, nr_new.merged_bus_pairs)
+        _merge_arc_admittance_bus_columns!(
+            ybus.arc_admittance_from_to,
+            ybus.arc_admittance_to_from,
+            bus_lookup,
+            nr_new.merged_bus_pairs,
+        )
+    end
     bus_numbers_to_remove = _apply_bus_reductions!(nr, nr_new)
-
     # Add additional entries to the ybus corresponding to the equivalent series arcs
     new_y_ft, new_y_tf = _add_series_branches_to_ybus!(
         ybus.data,
@@ -1424,6 +1616,9 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         nr_new.reductions,
     )
     _remove_arcs_from_branch_maps!(nr, nr_new)
+    if !isempty(nr_new.merged_bus_pairs)
+        _remap_merged_bus_in_branch_maps!(nr, nr_new.merged_bus_pairs)
+    end
     _apply_added_components!(nr, nr_new, data, bus_lookup)
     _apply_series_branch_maps!(nr, nr_new)
     add_reduction!(nr.reductions, nr_new.reductions)
@@ -1454,8 +1649,12 @@ function _apply_reduction(ybus::Ybus, nr_new::NetworkReductionData)
         bus_lookup,
         bus_ix,
         nr,
+        nr_new.merged_bus_pairs,
     )
     nr.boundary_bus_to_removed_arcs = nr_new.boundary_bus_to_removed_arcs
+    if !isempty(nr_new.merged_bus_pairs)
+        nr.merged_bus_pairs = nr_new.merged_bus_pairs
+    end
     return Ybus(
         data,
         adjacency_data,
@@ -1481,6 +1680,114 @@ function _apply_bus_reductions!(nr::NetworkReductionData, nr_new::NetworkReducti
         delete!(nr.bus_reduction_map, x)
     end
     return bus_numbers_to_remove
+end
+
+function _remap_merged_bus_in_branch_maps!(
+    nr::NetworkReductionData,
+    merged_bus_pairs::Dict{Int, Int},
+)
+    # All four maps use a two-phase collect-then-apply loop. The collect phase pops every
+    # entry whose arc touches a removed bus and records the resolved new arc alongside the
+    # value. The apply phase re-inserts with map-specific collision handling. Using two
+    # phases avoids visiting entries that were just inserted during the apply phase.
+
+    # --- direct_branch_map: collision → parallel-group promotion ---
+    arcs_to_insert = Pair{Tuple{Int, Int}, PSY.ACTransmission}[]
+    for arc in collect(keys(nr.direct_branch_map))
+        new_from = get(merged_bus_pairs, arc[1], arc[1])
+        new_to = get(merged_bus_pairs, arc[2], arc[2])
+        (new_from == arc[1] && new_to == arc[2]) && continue
+        val = pop!(nr.direct_branch_map, arc)
+        new_arc = (new_from, new_to)
+        if new_arc[1] == new_arc[2]
+            @debug "Bus merge collapsed direct branch $(get_name(val)) (arc $arc) into a self-loop; dropping."
+            continue
+        end
+        push!(arcs_to_insert, new_arc => val)
+    end
+    for (new_arc, val) in arcs_to_insert
+        if haskey(nr.direct_branch_map, new_arc)
+            existing = pop!(nr.direct_branch_map, new_arc)
+            @debug "Bus merge collision on direct arc $new_arc: promoting $(get_name(existing)) and $(get_name(val)) to a parallel group."
+            if haskey(nr.parallel_branch_map, new_arc)
+                _push_parallel_branch!(nr.parallel_branch_map, new_arc, existing)
+                _push_parallel_branch!(nr.parallel_branch_map, new_arc, val)
+            else
+                nr.parallel_branch_map[new_arc] =
+                    _make_parallel_branch_pair(existing, val, new_arc)
+            end
+        elseif haskey(nr.parallel_branch_map, new_arc)
+            @debug "Bus merge collision on direct arc $new_arc: adding $(get_name(val)) to existing parallel group."
+            _push_parallel_branch!(nr.parallel_branch_map, new_arc, val)
+        else
+            nr.direct_branch_map[new_arc] = val
+        end
+    end
+
+    # --- parallel_branch_map: collision → merge both groups into one ---
+    parallel_to_insert = Pair{Tuple{Int, Int}, AbstractBranchesParallel}[]
+    for arc in collect(keys(nr.parallel_branch_map))
+        new_from = get(merged_bus_pairs, arc[1], arc[1])
+        new_to = get(merged_bus_pairs, arc[2], arc[2])
+        (new_from == arc[1] && new_to == arc[2]) && continue
+        val = pop!(nr.parallel_branch_map, arc)
+        new_arc = (new_from, new_to)
+        if new_arc[1] == new_arc[2]
+            @debug "Bus merge collapsed parallel group at arc $arc into a self-loop; dropping $(length(val)) branch(es)."
+            continue
+        end
+        push!(parallel_to_insert, new_arc => val)
+    end
+    for (new_arc, val) in parallel_to_insert
+        if haskey(nr.parallel_branch_map, new_arc)
+            @debug "Bus merge collision on parallel arc $new_arc: merging incoming group ($(length(val)) branch(es)) into existing group."
+            # Merge: push all branches from the incoming group into the existing group.
+            for br in val
+                _push_parallel_branch!(nr.parallel_branch_map, new_arc, br)
+            end
+        elseif haskey(nr.direct_branch_map, new_arc)
+            @debug "Bus merge collision on parallel arc $new_arc: promoting existing direct branch into the incoming parallel group."
+            # Promote: move the single direct branch into the incoming group.
+            existing = pop!(nr.direct_branch_map, new_arc)
+            nr.parallel_branch_map[new_arc] = val
+            _push_parallel_branch!(nr.parallel_branch_map, new_arc, existing)
+        else
+            nr.parallel_branch_map[new_arc] = val
+        end
+    end
+
+    # --- transformer3W_map: collision means a degenerate transformer (two terminals
+    #     merged to the same bus). Warn and keep the pre-existing winding. ---
+    t3w_to_insert = Pair{Tuple{Int, Int}, ThreeWindingTransformerWinding}[]
+    for arc in collect(keys(nr.transformer3W_map))
+        new_from = get(merged_bus_pairs, arc[1], arc[1])
+        new_to = get(merged_bus_pairs, arc[2], arc[2])
+        (new_from == arc[1] && new_to == arc[2]) && continue
+        val = pop!(nr.transformer3W_map, arc)
+        new_arc = (new_from, new_to)
+        if new_arc[1] == new_arc[2]
+            @debug "Bus merge collapsed 3-winding transformer winding $(get_winding_number(val)) of $(PSY.get_name(get_transformer(val))) (arc $arc) into a self-loop; dropping."
+            continue
+        end
+        push!(t3w_to_insert, new_arc => val)
+    end
+    for (new_arc, val) in t3w_to_insert
+        if haskey(nr.transformer3W_map, new_arc)
+            @warn "Bus merge creates a degenerate 3-winding transformer: two windings of " *
+                  "$(PSY.get_name(get_transformer(val))) now share arc $new_arc. " *
+                  "Retaining the pre-existing winding; winding $(get_winding_number(val)) is dropped."
+        else
+            nr.transformer3W_map[new_arc] = val
+        end
+    end
+
+    # Rebuild reverse maps for the three forward maps that were modified above.
+    # series_branch_map is always empty when ZIR runs (D2 populates it afterwards),
+    # so its reverse map does not need rebuilding here.
+    _remake_reverse_direct_branch_map!(nr)
+    _remake_reverse_parallel_branch_map!(nr)
+    _remake_reverse_transformer3W_map!(nr)
+    return
 end
 
 function _remove_arcs_from_branch_maps!(
@@ -1600,16 +1907,19 @@ function _make_subnetwork_axes(
 )
     subnetwork_axes = deepcopy(ybus.subnetwork_axes)
     arc_subnetwork_axis = deepcopy(ybus.arc_subnetwork_axis)
+    subnetwork_key_removed = Set{Int}()
     for k in keys(subnetwork_axes)
         if k in bus_numbers_to_remove
-            axis_1, axis_2 = pop!(subnetwork_axes, k)
-            new_ref_bus = pop!(axis_1)
-            pop!(axis_2)
-            subnetwork_axes[new_ref_bus] = (axis_1, axis_2)
-            # If a reference bus key is reduced, change the arc subnetwork axis key as well:
-            arc_subnetwork_axis[new_ref_bus] = pop!(arc_subnetwork_axis, k)
-            @warn "Original reference bus $k removed during reduction; assigning arbitrary reference bus to be $new_ref_bus."
+            push!(subnetwork_key_removed, k)
         end
+    end
+    for k in subnetwork_key_removed
+        axis_1, axis_2 = pop!(subnetwork_axes, k)
+        new_ref_bus = pop!(axis_1)
+        subnetwork_axes[new_ref_bus] = (axis_1, axis_2)
+        # If a reference bus key is reduced, change the arc subnetwork axis key as well:
+        arc_subnetwork_axis[new_ref_bus] = pop!(arc_subnetwork_axis, k)
+        @warn "Original reference bus $k removed during reduction; assigning arbitrary reference bus to be $new_ref_bus."
     end
     empty_subnetwork_keys = Set{Int}()
     for (k, values) in subnetwork_axes
@@ -1873,7 +2183,7 @@ end
 
 """
     add_segment_to_ybus!(
-        segment::BranchesParallel,
+        segment::AbstractBranchesParallel,
         y11::Vector{YBUS_ELTYPE},
         y12::Vector{YBUS_ELTYPE},
         y21::Vector{YBUS_ELTYPE},
@@ -1891,7 +2201,7 @@ branches between the same pair of buses. Each branch in the set is added to the
 same Y-bus position, effectively combining their admittances.
 
 # Arguments
-- `segment::BranchesParallel`: Set of parallel AC transmission branches
+- `segment::AbstractBranchesParallel`: Set of parallel AC transmission branches
 - `y11::Vector{YBUS_ELTYPE}`: Vector for from-bus self admittances
 - `y12::Vector{YBUS_ELTYPE}`: Vector for from-to mutual admittances
 - `y21::Vector{YBUS_ELTYPE}`: Vector for to-from mutual admittances
@@ -1912,7 +2222,7 @@ same Y-bus position, effectively combining their admittances.
 - [`DegreeTwoReduction`](@ref): Series chain elimination
 """
 function add_segment_to_ybus!(
-    segment::BranchesParallel,
+    segment::AbstractBranchesParallel,
     y11::Vector{YBUS_ELTYPE},
     y12::Vector{YBUS_ELTYPE},
     y21::Vector{YBUS_ELTYPE},
