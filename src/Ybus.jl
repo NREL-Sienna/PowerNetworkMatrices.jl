@@ -384,15 +384,14 @@ end
         nr::NetworkReductionData,
         fb::Vector{Int},
         tb::Vector{Int},
-        adj::SparseArrays.SparseMatrixCSC{Int8, Int},
         br::PSY.ACTransmission
     )
 
 Update indexing structures when adding an AC transmission branch to the Y-bus.
 
 This function handles the bookkeeping required when adding a branch: updates network
-reduction mappings, sets adjacency matrix entries, and records from/to bus indices
-for the branch in the Y-bus construction vectors.
+reduction mappings and records from/to bus indices for the branch in the Y-bus
+construction vectors.
 
 # Arguments
 - `num_bus::Dict{Int, Int}`: Mapping from bus numbers to matrix indices
@@ -400,12 +399,10 @@ for the branch in the Y-bus construction vectors.
 - `nr::NetworkReductionData`: Network reduction data to update
 - `fb::Vector{Int}`: Vector of from-bus indices
 - `tb::Vector{Int}`: Vector of to-bus indices
-- `adj::SparseArrays.SparseMatrixCSC{Int8, Int}`: Adjacency matrix
 - `br::PSY.ACTransmission`: AC transmission branch to add
 
 # Implementation Details
 - Calls `add_to_branch_maps!()` to update reduction mappings
-- Updates adjacency matrix with branch connectivity
 - Records bus indices in from/to vectors for sparse matrix construction
 """
 function add_branch_entries_to_indexing_maps!(
@@ -414,14 +411,11 @@ function add_branch_entries_to_indexing_maps!(
     nr::NetworkReductionData,
     fb::Vector{Int},
     tb::Vector{Int},
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
     br::PSY.ACTransmission,
 )
     arc = PSY.get_arc(br)
     add_to_branch_maps!(nr, arc, br)
     bus_from_no, bus_to_no = get_bus_indices(arc, num_bus, nr)
-    adj[bus_from_no, bus_to_no] = 1
-    adj[bus_to_no, bus_from_no] = -1
     fb[branch_ix] = bus_from_no
     tb[branch_ix] = bus_to_no
     return
@@ -568,9 +562,8 @@ function _ybus!(
     fb::Vector{Int},
     tb::Vector{Int},
     nr::NetworkReductionData,
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
-    add_branch_entries_to_indexing_maps!(num_bus, branch_ix, nr, fb, tb, adj, br)
+    add_branch_entries_to_indexing_maps!(num_bus, branch_ix, nr, fb, tb, br)
     add_branch_entries_to_ybus!(y11, y12, y21, y22, branch_ix, br)
     return
 end
@@ -586,7 +579,6 @@ function _ybus!(
     fb::Vector{Int},
     tb::Vector{Int},
     nr::NetworkReductionData,
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     _ybus!(
         y11,
@@ -599,7 +591,6 @@ function _ybus!(
         fb,
         tb,
         nr,
-        adj,
     )
     return
 end
@@ -616,7 +607,6 @@ function _ybus!(
     tb::Vector{Int},
     ix::Int,
     nr::NetworkReductionData,
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
 )
     primary_star_arc = PSY.get_primary_star_arc(br)
     secondary_star_arc = PSY.get_secondary_star_arc(br)
@@ -628,8 +618,6 @@ function _ybus!(
     n_entries = 0
     if primary_available
         primary_ix, star_ix = get_bus_indices(primary_star_arc, num_bus, nr)
-        adj[primary_ix, star_ix] = 1
-        adj[star_ix, primary_ix] = -1
         fb[offset_ix + ix + n_entries] = primary_ix
         tb[offset_ix + ix + n_entries] = star_ix
         (Y11, Y12, Y21, Y22) = ybus_branch_entries(ThreeWindingTransformerWinding(br, 1))
@@ -641,8 +629,6 @@ function _ybus!(
     end
     if secondary_available
         secondary_ix, star_ix = get_bus_indices(secondary_star_arc, num_bus, nr)
-        adj[secondary_ix, star_ix] = 1
-        adj[star_ix, secondary_ix] = -1
         fb[offset_ix + ix + n_entries] = secondary_ix
         tb[offset_ix + ix + n_entries] = star_ix
         (Y11, Y12, Y21, Y22) = ybus_branch_entries(ThreeWindingTransformerWinding(br, 2))
@@ -654,8 +640,6 @@ function _ybus!(
     end
     if tertiary_available
         tertiary_ix, star_ix = get_bus_indices(tertiary_star_arc, num_bus, nr)
-        adj[tertiary_ix, star_ix] = 1
-        adj[star_ix, tertiary_ix] = -1
         fb[offset_ix + ix + n_entries] = tertiary_ix
         tb[offset_ix + ix + n_entries] = star_ix
         (Y11, Y12, Y21, Y22) = ybus_branch_entries(ThreeWindingTransformerWinding(br, 3))
@@ -725,7 +709,6 @@ end
 
 function _buildybus!(
     network_reduction_data::NetworkReductionData,
-    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
     branches::YbusACBranches,
     transformer_3w::Vector{PSY.ThreeWindingTransformer},
     num_bus::Dict{Int, Int},
@@ -759,7 +742,7 @@ function _buildybus!(
         if PSY.get_name(b) == "init"
             throw(DataFormatError("The data in Branch is invalid"))
         end
-        _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb, network_reduction_data, adj)
+        _ybus!(y11, y12, y21, y22, b, num_bus, ix, fb, tb, network_reduction_data)
     end
 
     ix = 1
@@ -779,7 +762,6 @@ function _buildybus!(
             tb,
             ix,
             network_reduction_data,
-            adj,
         )
         ix += n_entries
     end
@@ -882,6 +864,42 @@ ybus = Ybus(system; include_constant_impedance_loads=false)
 - [`PTDF`](@ref): Power transfer distribution factors
 - [`LODF`](@ref): Line outage distribution factors
 """
+# Re-impose the original last-write-wins orientation (`adj[i,j]=1; adj[j,i]=-1` per
+# branch) for bus pairs carrying anti-parallel branches, whose +1/-1 contributions
+# cancel or flip in the summed (COO) adjacency. Entries are set explicitly, so a
+# cancelled position is restored to ±1 whether or not a zero was stored there —
+# guaranteeing the connection survives a later `dropzeros!`. Warns once per affected
+# bus pair.
+function _resolve_antiparallel_adjacency!(
+    adj::SparseArrays.SparseMatrixCSC{Int8, Int},
+    fb::Vector{Int},
+    tb::Vector{Int},
+    bus_ax::Vector{Int},
+)
+    last_orientation = Dict{Tuple{Int, Int}, Tuple{Int, Int}}()
+    antiparallel = Set{Tuple{Int, Int}}()
+    for k in eachindex(fb)
+        i = fb[k]
+        j = tb[k]
+        i == j && continue
+        canonical = minmax(i, j)
+        prev = get(last_orientation, canonical, (0, 0))
+        if !iszero(prev[1]) && prev != (i, j)
+            push!(antiparallel, canonical)
+        end
+        last_orientation[canonical] = (i, j)  # last write wins, matching the original
+    end
+    for canonical in antiparallel
+        i, j = last_orientation[canonical]
+        adj[i, j] = one(Int8)
+        adj[j, i] = -one(Int8)
+        @warn "Anti-parallel branches between buses $(bus_ax[i]) and $(bus_ax[j]) " *
+              "detected; retaining the last branch's orientation in the bus " *
+              "adjacency matrix used for connectivity checks."
+    end
+    return
+end
+
 function Ybus(
     sys::PSY.System;
     make_arc_admittance_matrices::Bool = false,
@@ -921,7 +939,6 @@ function Ybus(
     for (ix, b) in enumerate(bus_ax)
         bus_lookup[b] = ix
     end
-    adj = SparseArrays.spdiagm(ones(Int8, busnumber))
     branches = _get_ybus_two_terminal_ac_branches(sys)
     transformer_3W =
         _get_filtered_components(PSY.ThreeWindingTransformer, sys, PSY.get_available)
@@ -937,7 +954,6 @@ function Ybus(
     y11, y12, y21, y22, ysh, fb, tb, sb =
         _buildybus!(
             nr,
-            adj,
             branches,
             transformer_3W,
             bus_lookup,
@@ -945,6 +961,39 @@ function Ybus(
             switched_admittances,
             standard_loads,
         )
+    # Build adjacency matrix from COO triplets in a single sparse() call to avoid
+    # ~2×branchcount structural insertions into a growing CSC matrix.
+    # Values: diagonal = +1, forward arc (from→to) = +1, reverse arc (to→from) = -1.
+    # Parallel branches (same orientation) produce duplicate (i,j) entries that sum;
+    # clamp back to ±1 via sign. Anti-parallel branches are reconciled separately below.
+    branchcount = length(fb)
+    adj_I = Vector{Int}(undef, busnumber + 2 * branchcount)
+    adj_J = Vector{Int}(undef, busnumber + 2 * branchcount)
+    adj_V = Vector{Int8}(undef, busnumber + 2 * branchcount)
+    @inbounds for k in 1:busnumber
+        adj_I[k] = k
+        adj_J[k] = k
+        adj_V[k] = one(Int8)
+    end
+    @inbounds for k in 1:branchcount
+        adj_I[busnumber + k] = fb[k]
+        adj_J[busnumber + k] = tb[k]
+        adj_V[busnumber + k] = one(Int8)
+        adj_I[busnumber + branchcount + k] = tb[k]
+        adj_J[busnumber + branchcount + k] = fb[k]
+        adj_V[busnumber + branchcount + k] = -one(Int8)
+    end
+    adj = SparseArrays.sparse(adj_I, adj_J, adj_V, busnumber, busnumber)
+    map!(sign, adj.nzval, adj.nzval)
+    # Anti-parallel bus pairs cancel to a zero in the summed adjacency. The diagonal is
+    # always +1, so any zero here flags such a cancellation. When that happens, re-impose
+    # ±1 (last-write-wins, matching the original incremental build) right now — before
+    # `adj` is used for connectivity or copied/`dropzeros!`-ed by AdjacencyMatrix — so the
+    # connection is never carried by a zero that could be eliminated. The check is a
+    # cheap scan of `adj.nzval` (no per-branch bookkeeping); `_resolve_*` sets the entries
+    # explicitly and emits the per-pair warning. (We use the zero as a signal here, but do
+    # not depend on it surviving downstream.)
+    any(iszero, adj.nzval) && _resolve_antiparallel_adjacency!(adj, fb, tb, bus_ax)
     ybus = SparseArrays.sparse(
         [fb; fb; tb; tb; sb],  # row indices
         [fb; tb; fb; tb; sb],  # column indices
@@ -1219,6 +1268,7 @@ function build_reduced_ybus(
         get_reductions(get_network_reduction_data(ybus)),
     )
     network_reduction_data = get_reduction(ybus, sys, network_reduction)
+    isempty(network_reduction_data) && return ybus
     return _apply_reduction(ybus, network_reduction_data)
 end
 
@@ -1367,18 +1417,12 @@ function _accumulate_csc_col_into!(
 )
     rows = SparseArrays.rowvals(M)
     vals = SparseArrays.nonzeros(M)
-    j_range_init = SparseArrays.nzrange(M, j)
-    isempty(j_range_init) && return
-    j_start = first(j_range_init)
-    j_len = length(j_range_init)
-    # Structural inserts into column i (which precedes j in CSC order) shift colptr[j]
-    # upward, invalidating any pre-captured range. Track cumulative shift in `offset` so
-    # the absolute position of entry idx in column j's backing store remains j_start + offset + idx.
-    offset = 0
-    for idx in 0:(j_len - 1)
-        k_j = j_start + offset + idx
-        r = rows[k_j]
-        v_j = vals[k_j]
+    # Snapshot column j up front. Structural inserts into column i shift the CSC backing
+    # store, and the direction of that shift depends on whether i precedes or follows j;
+    # iterating a captured copy of column j stays correct for either ordering. (The
+    # earlier offset-based version was only valid when i < j.)
+    j_entries = [(rows[k], vals[k]) for k in SparseArrays.nzrange(M, j)]
+    for (r, v_j) in j_entries
         iszero(v_j) && continue
         found = false
         # Re-read i_range each iteration: a structural insert changes where column i lives.
@@ -1390,11 +1434,7 @@ function _accumulate_csc_col_into!(
                 break
             end
         end
-        if !found
-            before = M.colptr[i + 1]
-            M[r, i] += v_j
-            offset += M.colptr[i + 1] - before
-        end
+        found || (M[r, i] += v_j)
     end
     return
 end
