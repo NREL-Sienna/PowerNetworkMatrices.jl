@@ -45,7 +45,7 @@ function get_reduction(
     for (row_ix, col_ix, v) in zip(nz_rows, nz_cols, nz_vals)
         row_ix >= col_ix && continue
         iszero(real(v)) || continue
-        imag(v) >= susceptance_threshold || continue
+        abs(imag(v)) >= susceptance_threshold || continue
         bus_i = bus_ax[row_ix]
         bus_j = bus_ax[col_ix]
         # Transformer arcs are excluded from zero-impedance bus merging
