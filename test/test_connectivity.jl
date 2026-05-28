@@ -103,33 +103,28 @@ end
     sys = build_hvdc_with_small_island()
     ybus_3 = Ybus(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(;
-            irreducible_buses = collect(1:14),
-        )],
+        network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set(collect(1:14)),
     )
     ptdf_3 = PTDF(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(;
-            irreducible_buses = collect(1:14),
-        )],
+        network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set(collect(1:14)),
     )
     lodf_3 = LODF(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(;
-            irreducible_buses = collect(1:14),
-        )],
+        network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set(collect(1:14)),
     )
     vptdf_3 = VirtualPTDF(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(;
-            irreducible_buses = collect(1:14),
-        )],
+        network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set(collect(1:14)),
     )
     vlodf_3 = VirtualLODF(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(;
-            irreducible_buses = collect(1:14),
-        )],
+        network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set(collect(1:14)),
     )
 
     for i in ptdf_1.axes[1], j in ptdf_1.axes[2]

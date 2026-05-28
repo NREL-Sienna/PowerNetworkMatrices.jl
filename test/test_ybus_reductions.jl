@@ -201,7 +201,8 @@ end
     # Test irreducible bus input for radial reduction
     ybus = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()])
     @test haskey(ybus.network_reduction_data.reverse_bus_search_map, 116)
-    ybus = Ybus(sys; network_reductions = NetworkReduction[RadialReduction([116])])
+    ybus = Ybus(sys; network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set([116]))
     @test !haskey(ybus.network_reduction_data.reverse_bus_search_map, 116)
     @test ybus.network_reduction_data.irreducible_buses == Set{Int}(116)
 
@@ -210,9 +211,8 @@ end
     @test 117 ∈ ybus.network_reduction_data.removed_buses
     ybus = Ybus(
         sys;
-        network_reductions = NetworkReduction[DegreeTwoReduction(;
-            irreducible_buses = [117],
-        )],
+        network_reductions = NetworkReduction[DegreeTwoReduction()],
+        irreducible_buses = Set([117]),
     )
     @test 117 ∉ ybus.network_reduction_data.removed_buses
     @test ybus.network_reduction_data.irreducible_buses ==
@@ -366,7 +366,8 @@ end
     # ZIR should flip the (112,113) merge so 113 survives and 112 is removed.
     ybus_flip = Ybus(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(; irreducible_buses = [113])],
+        network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set([113]),
     )
     nrd_flip = ybus_flip.network_reduction_data
     @test 113 ∉ keys(nrd_flip.reverse_bus_search_map)   # 113 survived
@@ -377,15 +378,13 @@ end
     # Mark both sides of the (112, 113) arc irreducible: merge should be skipped.
     @test_logs (:warn, r"irreducible buses (112 and 113|113 and 112)") match_mode = :any Ybus(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(;
-            irreducible_buses = [112, 113],
-        )],
+        network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set([112, 113]),
     )
     ybus_skip = Ybus(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(;
-            irreducible_buses = [112, 113],
-        )],
+        network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set([112, 113]),
     )
     nrd_skip = ybus_skip.network_reduction_data
     @test 112 ∉ keys(nrd_skip.reverse_bus_search_map)   # neither bus removed

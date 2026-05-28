@@ -61,7 +61,7 @@ _retained_buses(vmodf) =
         PSY.add_supplemental_attribute!(sys, line, _fixed_outage())
     end
 
-    protected = PNM._collect_protected_buses(sys)
+    protected = PNM._collect_protected_buses(sys, Set{Int}())
     for line in outaged
         fb, tb = _arc_buses(line)
         @test fb in protected
@@ -80,7 +80,7 @@ end
         _fixed_outage(; monitored = [monitored]),
     )
 
-    protected = PNM._collect_protected_buses(sys)
+    protected = PNM._collect_protected_buses(sys, Set{Int}())
     # Both the outaged branch and its monitored branch contribute their buses.
     for branch in (outaged, monitored)
         fb, tb = _arc_buses(branch)
@@ -100,7 +100,7 @@ end
     # Regression: Transformer3W <: ACTransmission but has no `get_arc`, so the
     # generic ACTransmission path would throw MethodError. It must route to the
     # 3WT-specific method and protect all of the transformer's buses.
-    protected = PNM._collect_protected_buses(sys)
+    protected = PNM._collect_protected_buses(sys, Set{Int}())
     @test !isempty(protected)
     for arc in (
         PSY.get_primary_star_arc(t3w),
@@ -112,39 +112,39 @@ end
     end
 end
 
-@testset "augment reductions with protected buses" begin
+@testset "augment Ward study_buses with protected buses" begin
+    # Under the unified-irreducibles design the user-supplied protected set lives
+    # on the orchestrator (`Ybus(sys; irreducible_buses=...)`) and is consumed by
+    # every Radial / DegreeTwo / ZIBR step through the `ReductionContainer`. Only
+    # `WardReduction` keeps its own (semantically distinct) `study_buses` field
+    # and so still needs explicit augmentation at the orchestrator boundary.
     protected = Set{Int}([101, 205])
 
-    radial = RadialReduction(; irreducible_buses = [101])
-    radial2 = PNM._augment_reduction(radial, protected)
-    @test radial2 isa RadialReduction
-    @test Set(radial2.irreducible_buses) == Set([101, 205])
-
-    deg2 = DegreeTwoReduction(;
-        irreducible_buses = [9],
-        reduce_reactive_power_injectors = false,
-    )
-    deg2b = PNM._augment_reduction(deg2, protected)
-    @test deg2b isa DegreeTwoReduction
-    @test Set(deg2b.irreducible_buses) == Set([9, 101, 205])
-    @test deg2b.reduce_reactive_power_injectors == false
-
     ward = WardReduction([1, 2, 3])
-    wardb = PNM._augment_reduction(ward, protected)
+    wardb = PNM._augment_ward(ward, protected)
     @test wardb isa WardReduction
     @test Set(wardb.study_buses) == Set([1, 2, 3, 101, 205])
 
-    # Empty protection set returns the reduction unchanged (identity).
-    @test PNM._augment_reduction(radial, Set{Int}()) === radial
+    # Empty protection set leaves the reduction identity-equal.
+    @test PNM._augment_ward(ward, Set{Int}()) === ward
 
-    adjusted = PNM._adjust_reductions_for_protection(
-        NetworkReduction[radial, deg2],
+    # Non-Ward reductions pass through `_augment_ward` unchanged — they don't
+    # carry a per-spec protected set anymore.
+    radial = RadialReduction()
+    @test PNM._augment_ward(radial, protected) === radial
+
+    deg2 = DegreeTwoReduction(; reduce_reactive_power_injectors = false)
+    @test PNM._augment_ward(deg2, protected) === deg2
+
+    adjusted = PNM._augment_ward_reductions(
+        NetworkReduction[radial, deg2, ward],
         protected,
     )
-    @test length(adjusted) == 2
-    @test adjusted[1] isa RadialReduction
-    @test adjusted[2] isa DegreeTwoReduction
-    @test Set(adjusted[1].irreducible_buses) == Set([101, 205])
+    @test length(adjusted) == 3
+    @test adjusted[1] === radial
+    @test adjusted[2] === deg2
+    @test adjusted[3] isa WardReduction
+    @test Set(adjusted[3].study_buses) == Set([1, 2, 3, 101, 205])
 end
 
 # --- Phase 2/3: constructor wiring + validation ----------------------------

@@ -39,7 +39,10 @@
     @test length(rb.removed_buses) == 0
     @test rb.removed_arcs == Set([(7, 8), (8, 61)])
     @test get_reductions(rb) ==
-          PNM.ReductionContainer(; radial_reduction = RadialReduction())
+          PNM.ReductionContainer(;
+        radial_reduction = RadialReduction(),
+        zero_impedance_reduction = PNM.ZeroImpedanceBranchReduction(),
+    )
 end
 
 @testset "Radial Branches Large" begin
@@ -83,9 +86,8 @@ end
     @test haskey(rr.reverse_bus_search_map, 17)
     ybus = Ybus(
         sys;
-        network_reductions = NetworkReduction[RadialReduction(;
-            irreducible_buses = [16, 17],
-        )],
+        network_reductions = NetworkReduction[RadialReduction()],
+        irreducible_buses = Set([16, 17]),
     )
     rr = get_network_reduction_data(ybus)
     @test !haskey(rr.reverse_bus_search_map, 16)
