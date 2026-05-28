@@ -128,67 +128,86 @@ end
 _is_not_nodal_branch(::PSY.ACTransmission) = false
 _is_not_nodal_branch(::PSY.AreaInterchange) = true
 
+# Push the available endpoint bus numbers of a branch into `buses`. Set-typed so
+# callers can't accidentally pass a spec field and mutate it.
+function _add_arc_buses!(buses::Set{Int}, arc::PSY.Arc)
+    PSY.get_available(PSY.get_from(arc)) &&
+        push!(buses, PSY.get_number(PSY.get_from(arc)))
+    PSY.get_available(PSY.get_to(arc)) &&
+        push!(buses, PSY.get_number(PSY.get_to(arc)))
+    return
+end
+
+_add_arc_buses!(buses::Set{Int}, br::PSY.ACTransmission) =
+    _add_arc_buses!(buses, PSY.get_arc(br))
+
+function _add_arc_buses!(buses::Set{Int}, br::PSY.ThreeWindingTransformer)
+    _add_arc_buses!(buses, PSY.get_primary_star_arc(br))
+    _add_arc_buses!(buses, PSY.get_secondary_star_arc(br))
+    _add_arc_buses!(buses, PSY.get_tertiary_star_arc(br))
+    return
+end
+
+"""
+    _system_derived_irreducible_buses(sys) -> Set{Int}
+
+Fresh `Set{Int}` of buses the system requires kept: `StaticInjection` hosts,
+`TwoTerminalHVDC` endpoints, cross-area `ACTransmission` endpoints (when any
+`AreaInterchange` exists), and branch-typed `TransmissionInterface` contributors.
+"""
+function _system_derived_irreducible_buses(sys::PSY.System)
+    buses = Set{Int}()
+    for c in PSY.get_components(PSY.StaticInjection, sys)
+        PSY.get_available(c) || continue
+        bus = PSY.get_bus(c)
+        PSY.get_available(bus) || continue
+        push!(buses, PSY.get_number(bus))
+    end
+    for tw_hvdc in PSY.get_components(PSY.TwoTerminalHVDC, sys)
+        _add_arc_buses!(buses, PSY.get_arc(tw_hvdc))
+    end
+    if PSY.has_components(sys, PSY.AreaInterchange)
+        for br in PSY.get_components(PSY.ACTransmission, sys)
+            (PSY.get_available(br) && _arc_conecting_two_areas(br)) || continue
+            _add_arc_buses!(buses, br)
+        end
+    end
+    if PSY.has_components(sys, PSY.TransmissionInterface)
+        for interface in PSY.get_components(PSY.TransmissionInterface, sys)
+            for br in PSY.get_contributing_devices(sys, interface)
+                (_is_not_nodal_branch(br) || !PSY.get_available(br)) && continue
+                _add_arc_buses!(buses, br)
+            end
+        end
+    end
+    return buses
+end
+
 function get_reduction(
     A::AdjacencyMatrix,
     sys::PSY.System,
     reduction::DegreeTwoReduction,
 )
-    irreducible_buses = get_irreducible_buses(reduction)
-    validate_buses(A, irreducible_buses)
     network_reduction_data = get_network_reduction_data(A)
-    direct_branch_map = network_reduction_data.direct_branch_map
-    parallel_branch_map = network_reduction_data.parallel_branch_map
-    transformer3W_map = network_reduction_data.transformer3W_map
+    user_irreducible =
+        get_user_irreducible_buses(get_reductions(network_reduction_data))
+    validate_buses(A, collect(user_irreducible))
+    working_set = Set{Int}(user_irreducible)
+    union!(working_set, _system_derived_irreducible_buses(sys))
 
-    for c in PSY.get_components(PSY.StaticInjection, sys)
-        bus = PSY.get_bus(c)
-        if PSY.get_available(bus)
-            push!(irreducible_buses, PSY.get_number(bus))
-        end
-    end
-
-    for tw_hvdc in PSY.get_components(PSY.TwoTerminalHVDC, sys)
-        arc = PSY.get_arc(tw_hvdc)
-        if PSY.get_available(PSY.get_from(arc))
-            push!(irreducible_buses, PSY.get_number(PSY.get_from(arc)))
-        end
-        if PSY.get_available(PSY.get_to(arc))
-            push!(irreducible_buses, PSY.get_number(PSY.get_to(arc)))
-        end
-    end
-
-    # Keep buses connected by area interchange lines
-    if PSY.has_components(sys, PSY.AreaInterchange)
-        for br in PSY.get_components(PSY.ACTransmission, sys)
-            if _arc_conecting_two_areas(br) && PSY.get_available(br)
-                _add_arc_buses_to_irreducible!(irreducible_buses, br)
-            end
-        end
-    end
-
-    if PSY.has_components(sys, PSY.TransmissionInterface)
-        for interface in PSY.get_components(PSY.TransmissionInterface, sys)
-            for br in PSY.get_contributing_devices(sys, interface)
-                if _is_not_nodal_branch(br) || !PSY.get_available(br)
-                    continue
-                end
-                _add_arc_buses_to_irreducible!(irreducible_buses, br)
-            end
-        end
-    end
-
-    exempt_bus_positions = Set(get_irreducible_indices(A, irreducible_buses))
+    exempt_bus_positions =
+        Set(get_irreducible_indices(A, collect(working_set)))
     series_branch_map, reverse_series_branch_map, removed_buses, removed_arcs =
         get_degree2_reduction(
             A.data,
             A.lookup[2],
             exempt_bus_positions,
-            direct_branch_map,
-            parallel_branch_map,
-            transformer3W_map,
+            network_reduction_data.direct_branch_map,
+            network_reduction_data.parallel_branch_map,
+            network_reduction_data.transformer3W_map,
         )
     return NetworkReductionData(;
-        irreducible_buses = Set(irreducible_buses),
+        irreducible_buses = working_set,
         series_branch_map = series_branch_map,
         reverse_series_branch_map = reverse_series_branch_map,
         removed_buses = removed_buses,

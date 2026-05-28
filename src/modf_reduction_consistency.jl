@@ -1,32 +1,40 @@
-# Builds the "exception list" of buses that a VirtualMODF's outaged/monitored
-# branches need kept through reduction (a reduced-away endpoint can't be queried
-# as an arc, silently corrupting post-contingency rows) and injects it into the
-# reductions.
+# Outage-protection set for VirtualMODF: buses whose loss would make an
+# outaged/monitored component non-queryable in the reduced network.
 
-# Both arc endpoints of a branch. `_add_arc_buses_to_irreducible!` dispatches on
-# branch type, so three-winding transformers (three star arcs, no single
-# `get_arc`) work here too. Non-branch components hit the `::PSY.Component` no-op.
-function _accumulate_protected_buses!(buses::Vector{Int}, branch::PSY.ACTransmission)
-    _add_arc_buses_to_irreducible!(buses, branch)
+# Add a monitored component's bus(es). Branches contribute both arc endpoints;
+# unsupported component types warn and are skipped.
+function _accumulate_protected_buses!(buses::Set{Int}, branch::PSY.ACTransmission)
+    _add_arc_buses!(buses, branch)
     return
 end
 
-function _accumulate_protected_buses!(::Vector{Int}, ::PSY.Component)
+function _accumulate_protected_buses!(buses::Set{Int}, bus::PSY.ACBus)
+    PSY.get_available(bus) && push!(buses, PSY.get_number(bus))
     return
 end
 
-# A stale monitored-component UUID makes `IS.get_component` throw `ArgumentError`;
-# warn and skip it. Any other error is unexpected and re-raised. Dispatching on the
-# exception type keeps the missing-component case off an `isa` branch.
+function _accumulate_protected_buses!(buses::Set{Int}, c::PSY.StaticInjection)
+    PSY.get_available(c) || return
+    bus = PSY.get_bus(c)
+    PSY.get_available(bus) && push!(buses, PSY.get_number(bus))
+    return
+end
+
+function _accumulate_protected_buses!(::Set{Int}, c::PSY.Component)
+    @warn "Outage-monitored component $(typeof(c)) ($(PSY.get_name(c))) has no " *
+          "reduction-protection rule; its bus will not be added to the protected " *
+          "set and may be reduced away." maxlog = 5
+    return
+end
+
+# Stale UUID -> warn and skip; everything else rethrows. Dispatched to avoid `isa`.
 _warn_or_rethrow_missing_component(::ArgumentError, uuid) =
     @warn "Outage monitored component UUID $uuid not found in system; " *
           "cannot protect it from reduction."
 _warn_or_rethrow_missing_component(e, uuid) = rethrow(e)
 
-# Buses of the components an outage declares monitored (a `Set{Base.UUID}` on the
-# outage). A stale UUID is surfaced via warning, not silently skipped.
 function _accumulate_monitored_buses!(
-    buses::Vector{Int},
+    buses::Set{Int},
     sys::PSY.System,
     outage::PSY.Outage,
 )
@@ -43,29 +51,23 @@ function _accumulate_monitored_buses!(
     return
 end
 
-# Bus -> zero-impedance merge survivor, read from an unreduced `Ybus` (main's exact
-# map, already flattened). Don't re-derive the susceptance threshold: `1/1e-4`
-# underflows it.
-function _zero_impedance_survivor_map(sys::PSY.System)
-    return get_reverse_bus_search_map(get_network_reduction_data(Ybus(sys)))
+# Bus -> ZI-merge survivor map. Forwarding `user_irreducible` keeps survivor
+# selection consistent with the real reduction pipeline.
+function _zero_impedance_survivor_map(sys::PSY.System, user_irreducible::Set{Int})
+    ybus = Ybus(sys; irreducible_buses = user_irreducible)
+    return get_reverse_bus_search_map(get_network_reduction_data(ybus))
 end
 
 """
-    _collect_protected_buses(sys) -> Set{Int}
+    _collect_protected_buses(sys, user_irreducible) -> Set{Int}
 
-Return the set of bus numbers that must NOT be reduced so that, for every
-`PSY.Outage` supplemental attribute, both its outaged component(s) and the
-components it declares as monitored (`get_monitored_components`) remain
-expressible as arcs in the reduced network. This is the VirtualMODF
-"exception list".
-
-Buses are mapped through the mandatory zero-impedance merge: marking both
-endpoints of a zero-impedance branch irreducible makes `ZeroImpedanceBranchReduction`
-skip the merge, leaving a singular ABA. Protecting the survivor instead keeps the
-real arcs queryable.
+Buses to protect so every `PSY.Outage`'s outaged and monitored components
+remain queryable as arcs after reduction. Buses are routed through the
+ZI-survivor map (built with the same `user_irreducible`) so that protecting a
+ZI-merged endpoint protects its survivor.
 """
-function _collect_protected_buses(sys::PSY.System)
-    buses = Int[]
+function _collect_protected_buses(sys::PSY.System, user_irreducible::Set{Int})
+    buses = Set{Int}()
     for outage in PSY.get_supplemental_attributes(PSY.Outage, sys)
         for component in PSY.get_associated_components(sys, outage)
             _accumulate_protected_buses!(buses, component)
@@ -73,47 +75,25 @@ function _collect_protected_buses(sys::PSY.System)
         _accumulate_monitored_buses!(buses, sys, outage)
     end
     isempty(buses) && return Set{Int}()
-    zi_map = _zero_impedance_survivor_map(sys)
+    zi_map = _zero_impedance_survivor_map(sys, user_irreducible)
     return Set{Int}(get(zi_map, b, b) for b in buses)
 end
 
-# Sorted, de-duplicated union of existing irreducible/study buses with `protected`.
 _merge_irreducible(existing, protected::Set{Int}) =
     sort!(collect(union(Set(existing), protected)))
 
-# A copy of `reduction` with its protected-bus set extended. Empty `protected`
-# returns the input unchanged (no allocation on the no-outage path).
-function _augment_reduction(reduction::RadialReduction, protected::Set{Int})
-    isempty(protected) && return reduction
-    return RadialReduction(;
-        irreducible_buses = _merge_irreducible(reduction.irreducible_buses, protected),
-    )
-end
-
-function _augment_reduction(reduction::DegreeTwoReduction, protected::Set{Int})
-    isempty(protected) && return reduction
-    return DegreeTwoReduction(;
-        irreducible_buses = _merge_irreducible(reduction.irreducible_buses, protected),
-        reduce_reactive_power_injectors = reduction.reduce_reactive_power_injectors,
-    )
-end
-
-# Ward retains `study_buses`; a protected external bus must join the study area
-# so its incident branch is not equivalenced away.
-function _augment_reduction(reduction::WardReduction, protected::Set{Int})
+# Ward's `study_buses` need explicit augmentation; other reductions read the
+# user set via the orchestrator container and pass through.
+_augment_ward(reduction::NetworkReduction, ::Set{Int}) = reduction
+function _augment_ward(reduction::WardReduction, protected::Set{Int})
     isempty(protected) && return reduction
     return WardReduction(_merge_irreducible(reduction.study_buses, protected))
 end
 
-"""
-    _adjust_reductions_for_protection(reductions, protected) -> Vector{NetworkReduction}
-
-Return a new reduction vector in which each reduction's protected-bus set has
-been extended with `protected`.
-"""
-function _adjust_reductions_for_protection(
+"""Extend any `WardReduction.study_buses` in `reductions` with `protected`."""
+function _augment_ward_reductions(
     reductions::Vector{NetworkReduction},
     protected::Set{Int},
 )
-    return NetworkReduction[_augment_reduction(r, protected) for r in reductions]
+    return NetworkReduction[_augment_ward(r, protected) for r in reductions]
 end

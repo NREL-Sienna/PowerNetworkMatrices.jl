@@ -116,12 +116,16 @@ include("NetworkReduction.jl")
 include("radial_reduction.jl")
 include("degree_two_reduction.jl")
 include("ward_reduction.jl")
+# ZIBR's spec marker must precede ReductionContainer (which dispatches
+# `validate_reduction_type` on it). Its `get_reduction(::Ybus, ...)` lives in
+# `apply_zero_impedance_reduction.jl`, included after `Ybus.jl` below.
+include("zero_impedance_branch_reduction.jl")
 include("ReductionContainer.jl")
 include("NetworkReductionData.jl")
 include("ArcAdmittanceMatrix.jl")
 include("YbusACBranches.jl")
 include("Ybus.jl")
-include("zero_impedance_branch_reduction.jl")
+include("apply_zero_impedance_reduction.jl")
 include("IncidenceMatrix.jl")
 include("AdjacencyMatrix.jl")
 include("connectivity_checks.jl")

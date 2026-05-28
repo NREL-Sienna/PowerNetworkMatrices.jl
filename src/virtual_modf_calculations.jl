@@ -280,6 +280,7 @@ function VirtualMODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
+    irreducible_buses::Set{Int} = Set{Int}(),
     automatically_register_outages::Bool = true,
     kwargs...,
 )
@@ -288,23 +289,15 @@ function VirtualMODF(
     end
     solver = resolve_linear_solver(linear_solver)
 
-    # Mandatory: the ABA/Woodbury solve runs on the reduced network, so a branch in
-    # a contingency must survive reduction or the matrices won't match the queries.
-    # Protected buses land in the resulting `NetworkReductionData` (no copy kept).
-    if isempty(network_reductions)
-        applied_reductions = network_reductions
-    else
-        protected_buses = _collect_protected_buses(sys)
-        if isempty(protected_buses)
-            applied_reductions = network_reductions
-        else
-            applied_reductions =
-                _adjust_reductions_for_protection(network_reductions, protected_buses)
-        end
-    end
+    # Outage/monitored buses are auto-protected so contingency branches survive
+    # reduction. Registering an outage with previously-unseen monitored components
+    # after construction shifts this set and requires rebuilding the MODF.
+    protected_buses = _collect_protected_buses(sys, irreducible_buses)
+    applied_irreducible = union(irreducible_buses, protected_buses)
+    applied_reductions = _augment_ward_reductions(network_reductions, applied_irreducible)
 
-    # Build network matrices (same path as VirtualLODF)
-    Ymatrix = Ybus(sys; network_reductions = applied_reductions, kwargs...)
+    Ymatrix = Ybus(sys; network_reductions = applied_reductions,
+        irreducible_buses = applied_irreducible, kwargs...)
     ref_bus_positions = get_ref_bus_position(Ymatrix)
     A = IncidenceMatrix(Ymatrix)
 
