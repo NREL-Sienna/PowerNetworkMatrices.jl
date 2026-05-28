@@ -1,29 +1,10 @@
 """
     RadialReduction <: NetworkReduction
 
-Network reduction algorithm that eliminates radial (dangling) buses and their associated branches
-from the power network. Radial buses are leaf nodes with only one connection that do not affect
-the electrical behavior of the rest of the network.
-
-# Fields
-- `irreducible_buses::Vector{Int}`: List of bus numbers that should not be eliminated even if they are radial
-
-# Examples
-```julia
-# Create radial reduction with no protected buses
-reduction = RadialReduction()
-
-# Create radial reduction protecting specific buses
-reduction = RadialReduction(irreducible_buses=[101, 205])
-
-# Apply to system
-ybus = Ybus(system; network_reductions=[reduction])
-```
+Eliminates leaf (degree-1) buses and their branches. Protect specific buses via
+`Ybus(sys; irreducible_buses=...)`.
 """
-@kwdef struct RadialReduction <: NetworkReduction
-    irreducible_buses::Vector{Int} = Vector{Int}()
-end
-get_irreducible_buses(nr::RadialReduction) = nr.irreducible_buses
+@kwdef struct RadialReduction <: NetworkReduction end
 
 """
 Pre-compute a mapping from each row (branch) in a CSC sparse matrix to its two column
