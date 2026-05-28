@@ -7,7 +7,7 @@ pass via the `zero_impedance_reduction` kwarg to override parameters — putting
 one in `network_reductions` is rejected.
 
 An off-diagonal `Y[i,j]` is treated as zero-impedance when `real(Y[i,j]) == 0`
-and `imag(Y[i,j]) >= susceptance_threshold`. The from-bus survives unless the
+and `abs(imag(Y[i,j])) >= susceptance_threshold`. The from-bus survives unless the
 to-bus is in the user-supplied irreducible set, in which case the sides flip.
 
 # Fields
