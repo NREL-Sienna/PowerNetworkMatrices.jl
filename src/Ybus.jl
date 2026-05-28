@@ -145,8 +145,8 @@ removed to reduce computational complexity.
 
 # Examples
 ```julia
-ybus = Ybus(system)
-reduction = RadialReduction(irreducible_buses=[101, 205])
+ybus = Ybus(system; irreducible_buses=Set([101, 205]))
+reduction = RadialReduction()
 reduction_data = get_reduction(ybus, system, reduction)
 ```
 
@@ -367,9 +367,10 @@ function add_branch_entries_to_ybus!(
     y21::Vector{YBUS_ELTYPE},
     y22::Vector{YBUS_ELTYPE},
     branch_ix::Int,
-    br::PSY.ACTransmission,
+    br::PSY.ACTransmission;
+    min_x_eps::Float64 = ZERO_IMPEDANCE_X_EPSILON,
 )
-    Y11, Y12, Y21, Y22 = ybus_branch_entries(br)
+    Y11, Y12, Y21, Y22 = ybus_branch_entries(br; min_x_eps = min_x_eps)
     y11[branch_ix] = Y11
     y12[branch_ix] = Y12
     y21[branch_ix] = Y21
@@ -425,13 +426,17 @@ _get_shunt(br::PSY.ACTransmission, node::Symbol) =
     PSY.get_g(br)[node] + 1im * PSY.get_b(br)[node]
 _get_shunt(::PSY.DiscreteControlledACBranch, ::Symbol) = zero(YBUS_ELTYPE)
 
-"""Ybus entries for a `Line` or a `DiscreteControlledACBranch`."""
-function ybus_branch_entries(br::PSY.ACTransmission)
+"""Ybus entries for a `Line` or `DiscreteControlledACBranch`. `min_x_eps` substitutes
+for `x` when `r == x == 0`; sister methods accept and ignore it for uniform dispatch."""
+function ybus_branch_entries(
+    br::PSY.ACTransmission;
+    min_x_eps::Float64 = ZERO_IMPEDANCE_X_EPSILON,
+)
     r = PSY.get_r(br)
     x = PSY.get_x(br)
     if r == 0.0 && x == 0.0
-        @warn "Branch $(PSY.get_name(br)) has r=0.0 and x=0.0; substituting x=$(ZERO_IMPEDANCE_X_EPSILON) to avoid division by zero. This branch will be reduced by ZeroImpedanceBranchReduction."
-        x = ZERO_IMPEDANCE_X_EPSILON
+        @warn "Branch $(PSY.get_name(br)) has r=0.0 and x=0.0; substituting x=$(min_x_eps) to avoid division by zero. This branch will be reduced by ZeroImpedanceBranchReduction unless its endpoints are irreducible."
+        x = min_x_eps
     end
     Y_l = (1 / (r + x * 1im))
     Y11 = Y_l + _get_shunt(br, :from)
@@ -446,7 +451,10 @@ function ybus_branch_entries(br::PSY.ACTransmission)
     return (Y11, Y12, Y21, Y22)
 end
 
-function ybus_branch_entries(br::PSY.GenericArcImpedance)
+function ybus_branch_entries(
+    br::PSY.GenericArcImpedance;
+    min_x_eps::Float64 = ZERO_IMPEDANCE_X_EPSILON,
+)
     Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
     Y11 = Y_l
     if !isfinite(Y11) || !isfinite(Y_l)
@@ -460,7 +468,10 @@ function ybus_branch_entries(br::PSY.GenericArcImpedance)
     return (Y11, Y12, Y21, Y22)
 end
 
-function ybus_branch_entries(parallel_br::AbstractBranchesParallel)
+function ybus_branch_entries(
+    parallel_br::AbstractBranchesParallel;
+    min_x_eps::Float64 = ZERO_IMPEDANCE_X_EPSILON,
+)
     arc = get_arc_tuple(first(parallel_br))
     Y11 = Y12 = Y21 = Y22 = zero(YBUS_ELTYPE)
     for br in parallel_br
@@ -474,7 +485,10 @@ function ybus_branch_entries(parallel_br::AbstractBranchesParallel)
     return (Y11, Y12, Y21, Y22)
 end
 
-function ybus_branch_entries(br::BranchesSeries)
+function ybus_branch_entries(
+    br::BranchesSeries;
+    min_x_eps::Float64 = ZERO_IMPEDANCE_X_EPSILON,
+)
     ybus_chain = _build_chain_ybus(br)
     ybus_reduced = _reduce_internal_nodes(ybus_chain)
     return ybus_reduced[1, 1], ybus_reduced[1, 2], ybus_reduced[2, 1], ybus_reduced[2, 2]
@@ -484,7 +498,10 @@ _get_tap(::PSY.Transformer2W) = one(YBUS_ELTYPE)
 _get_tap(br::PSY.TwoWindingTransformer) = PSY.get_tap(br)
 
 """Ybus entries for a `Transformer2W`, `TapTransformer`, or `PhaseShiftingTransformer`."""
-function ybus_branch_entries(br::PSY.TwoWindingTransformer)
+function ybus_branch_entries(
+    br::PSY.TwoWindingTransformer;
+    min_x_eps::Float64 = ZERO_IMPEDANCE_X_EPSILON,
+)
     Y_t = 1 / (PSY.get_r(br) + PSY.get_x(br) * 1im)
     tap = _get_tap(br) * exp(PSY.get_α(br) * 1im)
     c_tap = _get_tap(br) * exp(-1 * PSY.get_α(br) * 1im)
@@ -502,7 +519,10 @@ function ybus_branch_entries(br::PSY.TwoWindingTransformer)
 end
 
 """Ybus branch entries for an arc in the wye model of a `ThreeWindingTransformer`."""
-function ybus_branch_entries(tp::ThreeWindingTransformerWinding)
+function ybus_branch_entries(
+    tp::ThreeWindingTransformerWinding;
+    min_x_eps::Float64 = ZERO_IMPEDANCE_X_EPSILON,
+)
     br = get_transformer(tp)
     winding_number = get_winding_number(tp)
     if winding_number == 1
@@ -564,7 +584,13 @@ function _ybus!(
     nr::NetworkReductionData,
 )
     add_branch_entries_to_indexing_maps!(num_bus, branch_ix, nr, fb, tb, br)
-    add_branch_entries_to_ybus!(y11, y12, y21, y22, branch_ix, br)
+    # ZIBR's substitute reactance for r=x=0 branches; fall back if no spec on the NRD.
+    zir = get_zero_impedance_reduction(get_reductions(nr))
+    min_x_eps =
+        isnothing(zir) ? ZERO_IMPEDANCE_X_EPSILON :
+        get_minimum_retained_impedance(zir)
+    add_branch_entries_to_ybus!(y11, y12, y21, y22, branch_ix, br;
+        min_x_eps = min_x_eps)
     return
 end
 
@@ -904,16 +930,31 @@ function Ybus(
     sys::PSY.System;
     make_arc_admittance_matrices::Bool = false,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
+    irreducible_buses = Set{Int}(),
+    zero_impedance_reduction::ZeroImpedanceBranchReduction =
+    ZeroImpedanceBranchReduction(),
     include_constant_impedance_loads = true,
     subnetwork_algorithm = iterative_union_find,
 )
+    # ZIBR is auto-applied below; reject it in user reductions to avoid double-apply.
+    for r in network_reductions
+        _reject_zibr_in_user_reductions(r)
+    end
     units_base = PSY.get_units_base(sys)
     if units_base != "SYSTEM_BASE"
         @warn "Setting the system unit base from $units_base to SYSTEM_BASE for matrix construction"
         PSY.set_units_base_system!(sys, "SYSTEM_BASE")
     end
+    user_irreducible = Set{Int}(irreducible_buses)
     ref_bus_numbers = Set{Int}()
-    nr = NetworkReductionData()
+    # Seed the user set and ZIBR spec into the container so every reduction step and
+    # the assembly path can read them.
+    nr = NetworkReductionData(;
+        reductions = ReductionContainer(;
+            user_irreducible_buses = user_irreducible,
+            zero_impedance_reduction = zero_impedance_reduction,
+        ),
+    )
     bus_reduction_map = get_bus_reduction_map(nr)
     reverse_bus_search_map = get_reverse_bus_search_map(nr)
 
@@ -1068,17 +1109,7 @@ function Ybus(
         arc_admittance_from_to,
         arc_admittance_to_from,
     )
-    all_irreducible = mapreduce(
-        get_irreducible_buses,
-        union,
-        network_reductions;
-        init = Set{Int}(),
-    )
-    ybus = build_reduced_ybus(
-        ybus,
-        sys,
-        ZeroImpedanceBranchReduction(; irreducible_buses = all_irreducible),
-    )
+    ybus = build_reduced_ybus(ybus, sys, zero_impedance_reduction)
     for nr in network_reductions
         ybus = build_reduced_ybus(ybus, sys, nr)
     end
