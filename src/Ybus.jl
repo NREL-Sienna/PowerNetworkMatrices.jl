@@ -455,11 +455,14 @@ function ybus_branch_entries(
     br::PSY.GenericArcImpedance;
     min_x_eps::Float64 = ZERO_IMPEDANCE_X_EPSILON,
 )
-    Y_l = (1 / (PSY.get_r(br) + PSY.get_x(br) * 1im))
+    # GenericArcImpedance is a detached ward equivalent whose r/x are already the
+    # system-base values; device base (DU) reads them back as identity (system base
+    # would need the system base power, which a detached component cannot resolve).
+    Y_l = (1 / (PSY.get_r(br, PSY.DU) + PSY.get_x(br, PSY.DU) * 1im))
     Y11 = Y_l
     if !isfinite(Y11) || !isfinite(Y_l)
         error(
-            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br)), x = $(PSY.get_x(br))",
+            "Data in $(PSY.get_name(br)) is incorrect. r = $(PSY.get_r(br, PSY.DU)), x = $(PSY.get_x(br, PSY.DU))",
         )
     end
     Y12 = -Y_l

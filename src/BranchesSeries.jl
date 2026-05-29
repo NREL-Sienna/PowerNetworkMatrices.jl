@@ -155,7 +155,8 @@ end
 Rating is assumed to be max_flow for GenericArcImpedance.
 """
 function get_equivalent_rating(bs::PSY.GenericArcImpedance)
-    return PSY.get_max_flow(bs)
+    # Detached synthetic ward equivalent: read the stored value with device base.
+    return PSY.get_max_flow(bs, PSY.DU)
 end
 
 """
@@ -190,7 +191,7 @@ Return the emergency rating for PSY.GenericArcImpedance.
 """
 function get_equivalent_emergency_rating(branch::PSY.GenericArcImpedance)
     @debug "GenericArcImpedance $(get_name(branch)) has no emergency rating. Using max_flow as a proxy instead."
-    return PSY.get_max_flow(branch)
+    return PSY.get_max_flow(branch, PSY.DU)
 end
 
 """
