@@ -3,7 +3,7 @@
 # network matrix, so they live here rather than in a matrix-specific file. Consumed
 # by `AdjacencyMatrix` reductions and by `modf_reduction_consistency.jl`.
 
-function _arc_conecting_two_areas(arc::PSY.Arc)
+function _arc_connecting_two_areas(arc::PSY.Arc)
     from_bus = PSY.get_from(arc)
     to_bus = PSY.get_to(arc)
     area_from = IS.get_uuid(PSY.get_area(from_bus))
@@ -11,10 +11,10 @@ function _arc_conecting_two_areas(arc::PSY.Arc)
     return area_from != area_to
 end
 
-_arc_conecting_two_areas(br::PSY.ACTransmission) =
-    _arc_conecting_two_areas(PSY.get_arc(br))
+_arc_connecting_two_areas(br::PSY.ACTransmission) =
+    _arc_connecting_two_areas(PSY.get_arc(br))
 
-function _arc_conecting_two_areas(br::PSY.ThreeWindingTransformer)
+function _arc_connecting_two_areas(br::PSY.ThreeWindingTransformer)
     # For the 3WT all the 4 buses are kept if any of the 3 arcs connect two areas
     arcs = [
         PSY.get_primary_star_arc(br),
@@ -22,7 +22,7 @@ function _arc_conecting_two_areas(br::PSY.ThreeWindingTransformer)
         PSY.get_tertiary_star_arc(br),
     ]
     for arc in arcs
-        if _arc_conecting_two_areas(arc)
+        if _arc_connecting_two_areas(arc)
             return true
         end
     end
@@ -72,7 +72,7 @@ function _system_derived_irreducible_buses(sys::PSY.System)
     end
     if PSY.has_components(sys, PSY.AreaInterchange)
         for br in PSY.get_components(PSY.ACTransmission, sys)
-            (PSY.get_available(br) && _arc_conecting_two_areas(br)) || continue
+            (PSY.get_available(br) && _arc_connecting_two_areas(br)) || continue
             _add_arc_buses!(buses, br)
         end
     end
