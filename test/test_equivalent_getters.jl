@@ -34,6 +34,12 @@
         rating = 150.0,  # rating
         angle_limits = (min = -π / 2, max = π / 2),
     )
+    # Attach the branches so the system-base getters (e.g. the susceptance
+    # weighting in get_impedance_averaged_rating) can resolve the system base.
+    # These lines carry round, illustrative values, so skip data validation.
+    PSY.add_component!(sys, line1; skip_validation = true)
+    PSY.add_component!(sys, line2; skip_validation = true)
+
     # Create BranchesParallel
     bp = PNM.BranchesParallel([line1, line2])
 
