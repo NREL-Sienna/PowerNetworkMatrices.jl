@@ -142,7 +142,43 @@ function NetworkModification(
     return NetworkModification(
         PSY.get_name(branch),
         mods,
+        ShuntModification[],
+        _3wt_real_bus_islanding(mat, mods),
     )
+end
+
+"""
+    _3wt_real_bus_islanding(mat, mods) -> Bool
+
+True if outaging the 3WT winding arcs `mods` disconnects a real (non-star) bus
+from its reference. A full 3WT outage always isolates the fictitious star bus,
+which is benign (it carries no injection); this flags only the case where a
+load/gen-bearing terminal also disconnects. The star bus is kept in the
+union-find so it connects its terminals in the baseline, but is excluded from
+the component count — a higher post-outage count means a real bus was islanded.
+"""
+function _3wt_real_bus_islanding(
+    mat::PowerNetworkMatrix,
+    mods::Vector{ArcModification},
+)
+    isempty(mods) && return false
+    arc_ax = get_arc_axis(mat)
+    bus_lookup = get_bus_lookup(mat)
+    nbus = length(get_bus_axis(mat))
+    star_idx = bus_lookup[arc_ax[mods[1].arc_index][2]]
+    removed = Set(m.arc_index for m in mods)
+
+    uf_before = collect(1:nbus)
+    uf_after = collect(1:nbus)
+    for (e, arc) in enumerate(arc_ax)
+        f = bus_lookup[arc[1]]
+        t = bus_lookup[arc[2]]
+        union_sets!(uf_before, f, t)
+        e in removed || union_sets!(uf_after, f, t)
+    end
+
+    _count(uf) = length(Set(get_representative(uf, b) for b in 1:nbus if b != star_idx))
+    return _count(uf_after) > _count(uf_before)
 end
 
 """
@@ -219,8 +255,22 @@ function NetworkModification(
     outage_uuid = IS.get_uuid(outage)
     ctg_name = isempty(component_names) ? string(outage_uuid) :
                join(component_names, "+")
-    return NetworkModification(ctg_name, mods, shunt_mods, false)
+
+    # A fully-outaged ThreeWindingTransformer isolates its star bus and may
+    # island a real terminal bus; flag that on `is_islanding`.
+    is_island = false
+    arc_ax = get_arc_axis(mat)
+    for component in all_components
+        _is_three_winding_transformer(component) || continue
+        star_num = get_arc_tuple(ThreeWindingTransformerWinding(component, 1))[2]
+        t3w_mods = [m for m in direct_mods if arc_ax[m.arc_index][2] == star_num]
+        is_island = is_island || _3wt_real_bus_islanding(mat, t3w_mods)
+    end
+    return NetworkModification(ctg_name, mods, shunt_mods, is_island)
 end
+
+_is_three_winding_transformer(::Any) = false
+_is_three_winding_transformer(::PSY.ThreeWindingTransformer) = true
 
 """
     _classify_outage_component!(nr, arc_lookup, arc_sus, bus_lookup, component, ...) -> nothing
