@@ -65,10 +65,10 @@ cache and skips the recomputation.
 - `max_cache_size_bytes::Int`:
         Max cache size in bytes per contingency.
 - `network_reduction_data::NetworkReductionData`:
-        Network reduction mappings for branch resolution. The retained buses are the
-        keys of its `bus_reduction_map`; its `irreducible_buses` set is the narrower
-        "exception list" of buses protected from reduction so outaged and monitored
-        components stay queryable.
+        Network reduction mappings for branch resolution. The buses retained
+        through reduction are the keys of its `bus_reduction_map`; the
+        per-reduction `irreducible_buses` field holds only that step's protected
+        working set, not the full retained-bus record.
 - `temp_data::Vector{Vector{Float64}}`:
         Single-element scratch vector of size n_buses.
 - `work_ba_col::Vector{Vector{Float64}}`:
@@ -280,24 +280,40 @@ function VirtualMODF(
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     network_reductions::Vector{NetworkReduction} = NetworkReduction[],
-    irreducible_buses::Set{Int} = Set{Int}(),
+    irreducible_buses = Set{Int}(),
     automatically_register_outages::Bool = true,
     kwargs...,
 )
     if !isempty(dist_slack)
         @info "Distributed bus"
     end
+    # Accept any iterable of bus numbers and normalize once, matching `Ybus`.
+    irreducible_buses = Set{Int}(irreducible_buses)
     solver = resolve_linear_solver(linear_solver)
+
+    # ZIBR is auto-applied during Ybus construction; reject it in user reductions since
+    # those are applied manually below.
+    for r in network_reductions
+        _reject_zibr_in_user_reductions(r)
+    end
+
+    # Build the base Ybus once (zero-impedance reduction auto-applied). It supplies the
+    # ZI-survivor map for the protection set and is the starting point for the reductions.
+    Ymatrix = Ybus(sys; irreducible_buses = irreducible_buses, kwargs...)
 
     # Outage/monitored buses are auto-protected so contingency branches survive
     # reduction. Registering an outage with previously-unseen monitored components
     # after construction shifts this set and requires rebuilding the MODF.
-    protected_buses = _collect_protected_buses(sys, irreducible_buses)
+    protected_buses = _collect_protected_buses(sys, Ymatrix)
     applied_irreducible = union(irreducible_buses, protected_buses)
-    applied_reductions = _augment_ward_reductions(network_reductions, applied_irreducible)
 
-    Ymatrix = Ybus(sys; network_reductions = applied_reductions,
-        irreducible_buses = applied_irreducible, kwargs...)
+    # Protect via two channels: radial/degree-two read the container's irreducible set,
+    # while Ward reads `study_buses` (augmented separately).
+    _inject_protected_buses!(Ymatrix, protected_buses)
+    applied_reductions = _augment_ward_reductions(network_reductions, applied_irreducible)
+    for reduction in applied_reductions
+        Ymatrix = build_reduced_ybus(Ymatrix, sys, reduction)
+    end
     ref_bus_positions = get_ref_bus_position(Ymatrix)
     A = IncidenceMatrix(Ymatrix)
 

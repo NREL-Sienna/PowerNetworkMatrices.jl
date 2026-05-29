@@ -58,131 +58,6 @@ get_network_reduction_data(M::AdjacencyMatrix) = M.network_reduction_data
 get_bus_axis(M::AdjacencyMatrix) = M.axes[1]
 get_bus_lookup(M::AdjacencyMatrix) = M.lookup[1]
 
-function _arc_conecting_two_areas(arc::PSY.Arc)
-    from_bus = PSY.get_from(arc)
-    to_bus = PSY.get_to(arc)
-    area_from = IS.get_uuid(PSY.get_area(from_bus))
-    area_to = IS.get_uuid(PSY.get_area(to_bus))
-    return area_from != area_to
-end
-
-function _add_arc_buses_to_irreducible!(
-    irreducible_buses::Vector{Int},
-    arc::PSY.Arc,
-)
-    from_bus = PSY.get_from(arc)
-    to_bus = PSY.get_to(arc)
-    if PSY.get_available(from_bus)
-        push!(irreducible_buses, PSY.get_number(from_bus))
-    end
-    if PSY.get_available(to_bus)
-        push!(irreducible_buses, PSY.get_number(to_bus))
-    end
-    return
-end
-
-function _arc_conecting_two_areas(br::PSY.ACTransmission)
-    arc = PSY.get_arc(br)
-    return _arc_conecting_two_areas(arc)
-end
-
-function _add_arc_buses_to_irreducible!(
-    irreducible_buses::Vector{Int},
-    br::PSY.ACTransmission,
-)
-    arc = PSY.get_arc(br)
-    _add_arc_buses_to_irreducible!(irreducible_buses, arc)
-    return
-end
-
-function _arc_conecting_two_areas(br::PSY.ThreeWindingTransformer)
-    # For the 3WT all the 4 buses are kept if any of the 3 arcs connect two areas
-    arcs = [
-        PSY.get_primary_star_arc(br),
-        PSY.get_secondary_star_arc(br),
-        PSY.get_tertiary_star_arc(br),
-    ]
-    for arc in arcs
-        if _arc_conecting_two_areas(arc)
-            return true
-        end
-    end
-    return false
-end
-
-function _add_arc_buses_to_irreducible!(
-    irreducible_buses::Vector{Int},
-    br::PSY.ThreeWindingTransformer,
-)
-    arcs = [
-        PSY.get_primary_star_arc(br),
-        PSY.get_secondary_star_arc(br),
-        PSY.get_tertiary_star_arc(br),
-    ]
-    for arc in arcs
-        _add_arc_buses_to_irreducible!(irreducible_buses, arc)
-    end
-    return
-end
-
-_is_not_nodal_branch(::PSY.ACTransmission) = false
-_is_not_nodal_branch(::PSY.AreaInterchange) = true
-
-# Push the available endpoint bus numbers of a branch into `buses`. Set-typed so
-# callers can't accidentally pass a spec field and mutate it.
-function _add_arc_buses!(buses::Set{Int}, arc::PSY.Arc)
-    PSY.get_available(PSY.get_from(arc)) &&
-        push!(buses, PSY.get_number(PSY.get_from(arc)))
-    PSY.get_available(PSY.get_to(arc)) &&
-        push!(buses, PSY.get_number(PSY.get_to(arc)))
-    return
-end
-
-_add_arc_buses!(buses::Set{Int}, br::PSY.ACTransmission) =
-    _add_arc_buses!(buses, PSY.get_arc(br))
-
-function _add_arc_buses!(buses::Set{Int}, br::PSY.ThreeWindingTransformer)
-    _add_arc_buses!(buses, PSY.get_primary_star_arc(br))
-    _add_arc_buses!(buses, PSY.get_secondary_star_arc(br))
-    _add_arc_buses!(buses, PSY.get_tertiary_star_arc(br))
-    return
-end
-
-"""
-    _system_derived_irreducible_buses(sys) -> Set{Int}
-
-Fresh `Set{Int}` of buses the system requires kept: `StaticInjection` hosts,
-`TwoTerminalHVDC` endpoints, cross-area `ACTransmission` endpoints (when any
-`AreaInterchange` exists), and branch-typed `TransmissionInterface` contributors.
-"""
-function _system_derived_irreducible_buses(sys::PSY.System)
-    buses = Set{Int}()
-    for c in PSY.get_components(PSY.StaticInjection, sys)
-        PSY.get_available(c) || continue
-        bus = PSY.get_bus(c)
-        PSY.get_available(bus) || continue
-        push!(buses, PSY.get_number(bus))
-    end
-    for tw_hvdc in PSY.get_components(PSY.TwoTerminalHVDC, sys)
-        _add_arc_buses!(buses, PSY.get_arc(tw_hvdc))
-    end
-    if PSY.has_components(sys, PSY.AreaInterchange)
-        for br in PSY.get_components(PSY.ACTransmission, sys)
-            (PSY.get_available(br) && _arc_conecting_two_areas(br)) || continue
-            _add_arc_buses!(buses, br)
-        end
-    end
-    if PSY.has_components(sys, PSY.TransmissionInterface)
-        for interface in PSY.get_components(PSY.TransmissionInterface, sys)
-            for br in PSY.get_contributing_devices(sys, interface)
-                (_is_not_nodal_branch(br) || !PSY.get_available(br)) && continue
-                _add_arc_buses!(buses, br)
-            end
-        end
-    end
-    return buses
-end
-
 function get_reduction(
     A::AdjacencyMatrix,
     sys::PSY.System,
@@ -191,7 +66,7 @@ function get_reduction(
     network_reduction_data = get_network_reduction_data(A)
     user_irreducible =
         get_user_irreducible_buses(get_reductions(network_reduction_data))
-    validate_buses(A, collect(user_irreducible))
+    validate_buses(A, user_irreducible)
     working_set = Set{Int}(user_irreducible)
     union!(working_set, _system_derived_irreducible_buses(sys))
 

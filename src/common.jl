@@ -211,8 +211,8 @@ end
 Validates that the user bus input is consistent with the ybus axes and the prior reductions.
 Is used to check `irreducible_buses` for `Radial` and `DegreeTwo` reductions and `study_buses` for `WardReduction`.
 """
-function validate_buses(A::AdjacencyMatrix, buses::Vector{Int})
-    reverse_bus_search_map = A.network_reduction_data.reverse_bus_search_map
+function validate_buses(A::PowerNetworkMatrix, buses::Set{Int})
+    reverse_bus_search_map = get_network_reduction_data(A).reverse_bus_search_map
     for bus_no in buses
         reduced_bus_no = get(reverse_bus_search_map, bus_no, bus_no)
         if reduced_bus_no ∉ get_bus_axis(A)

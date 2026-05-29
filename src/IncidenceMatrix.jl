@@ -69,6 +69,9 @@ function get_reduction(
     # Radial uses only the user set; no system-derived complement.
     user_irreducible =
         get_user_irreducible_buses(get_reductions(get_network_reduction_data(A)))
+    # Fail fast with a clear message if a user irreducible bus is not in the matrix,
+    # rather than throwing a raw KeyError on the lookup below.
+    validate_buses(A, user_irreducible)
     irreducible_positions = Set([A.lookup[2][x] for x in user_irreducible])
     exempt_positions = union(get_ref_bus_position(A), irreducible_positions)
     bus_reduction_map, reverse_bus_search_map, radial_arcs, final_arc_map =

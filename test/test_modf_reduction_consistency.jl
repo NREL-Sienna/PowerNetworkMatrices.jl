@@ -61,7 +61,7 @@ _retained_buses(vmodf) =
         PSY.add_supplemental_attribute!(sys, line, _fixed_outage())
     end
 
-    protected = PNM._collect_protected_buses(sys, Set{Int}())
+    protected = PNM._collect_protected_buses(sys, Ybus(sys))
     for line in outaged
         fb, tb = _arc_buses(line)
         @test fb in protected
@@ -80,7 +80,7 @@ end
         _fixed_outage(; monitored = [monitored]),
     )
 
-    protected = PNM._collect_protected_buses(sys, Set{Int}())
+    protected = PNM._collect_protected_buses(sys, Ybus(sys))
     # Both the outaged branch and its monitored branch contribute their buses.
     for branch in (outaged, monitored)
         fb, tb = _arc_buses(branch)
@@ -100,7 +100,7 @@ end
     # Regression: Transformer3W <: ACTransmission but has no `get_arc`, so the
     # generic ACTransmission path would throw MethodError. It must route to the
     # 3WT-specific method and protect all of the transformer's buses.
-    protected = PNM._collect_protected_buses(sys, Set{Int}())
+    protected = PNM._collect_protected_buses(sys, Ybus(sys))
     @test !isempty(protected)
     for arc in (
         PSY.get_primary_star_arc(t3w),

@@ -1449,9 +1449,9 @@ function _accumulate_csc_col_into!(
     rows = SparseArrays.rowvals(M)
     vals = SparseArrays.nonzeros(M)
     # Snapshot column j up front. Structural inserts into column i shift the CSC backing
-    # store, and the direction of that shift depends on whether i precedes or follows j;
-    # iterating a captured copy of column j stays correct for either ordering. (The
-    # earlier offset-based version was only valid when i < j.)
+    # store, and the shift direction depends on whether i precedes or follows j; iterating
+    # a captured copy of column j stays correct for either ordering. An offset-based version
+    # is only valid when i < j (for i > j it drops a mutual term, giving an asymmetric Ybus).
     j_entries = [(rows[k], vals[k]) for k in SparseArrays.nzrange(M, j)]
     for (r, v_j) in j_entries
         iszero(v_j) && continue

@@ -393,6 +393,52 @@ end
     @test 113 ∈ PNM.get_bus_axis(ybus_skip)
 end
 
+@testset "ZeroImpedanceBranchReduction: custom susceptance_threshold" begin
+    # Line3 (bus 2 → 3) gets r=0 and a reactance giving |imag(Y)| ≈ 1e3, below the
+    # default 1e4 threshold, so it is NOT merged by default. A custom, lower threshold
+    # makes it qualify and bus 3 merges into bus 2.
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    line = get_component(Line, sys, "Line3")
+    set_r!(line, 0.0)
+    set_x!(line, 1e-3)  # susceptance ≈ 1 / 1e-3 = 1e3
+
+    ybus_default = Ybus(sys)
+    @test 3 ∈ PNM.get_bus_axis(ybus_default)
+    @test !haskey(ybus_default.network_reduction_data.reverse_bus_search_map, 3)
+
+    ybus_custom = Ybus(
+        sys;
+        zero_impedance_reduction = PNM.ZeroImpedanceBranchReduction(;
+            susceptance_threshold = 1e2,
+        ),
+    )
+    @test 3 ∉ PNM.get_bus_axis(ybus_custom)
+    @test get(ybus_custom.network_reduction_data.reverse_bus_search_map, 3, nothing) == 2
+end
+
+@testset "ZeroImpedanceBranchReduction: custom minimum_retained_impedance" begin
+    # A branch with r == x == 0 has its reactance replaced by `minimum_retained_impedance`
+    # during assembly. With the default (1e-6) the substituted susceptance (~1e6) exceeds
+    # the threshold and the branch is merged; a large custom value (1.0 → susceptance ~1.0)
+    # drops below the threshold, so the branch is retained instead.
+    sys = PSB.build_system(PSB.PSITestSystems, "c_sys14")
+    line = get_component(Line, sys, "Line3")  # bus 2 → 3
+    set_r!(line, 0.0)
+    set_x!(line, 0.0)
+
+    ybus_default = Ybus(sys)
+    @test 3 ∉ PNM.get_bus_axis(ybus_default)  # merged with the default tiny substitute reactance
+
+    ybus_custom = Ybus(
+        sys;
+        zero_impedance_reduction = PNM.ZeroImpedanceBranchReduction(;
+            minimum_retained_impedance = 1.0,
+        ),
+    )
+    @test 3 ∈ PNM.get_bus_axis(ybus_custom)  # retained: substituted susceptance below threshold
+    @test !haskey(ybus_custom.network_reduction_data.reverse_bus_search_map, 3)
+end
+
 @testset "ZeroImpedanceBranchReduction: stub off a merged junction (no fake island)" begin
     # Regression for the chained zero-impedance topology
     #     grid ──normal── M(903) ──[ZI]──► J(901) ◄──[ZI]── S(902, stub)
