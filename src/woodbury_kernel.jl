@@ -63,43 +63,30 @@ function _invert_woodbury_W(
     return W_inv, is_island
 end
 
-# --- Accessor functions for Woodbury kernel ---
-# VirtualPTDF accessors (VirtualMODF accessors defined in virtual_modf_calculations.jl)
-
-_get_K(m::VirtualPTDF) = m.K
 _get_BA(m::VirtualPTDF) = m.BA
 _get_arc_susceptances(m::VirtualPTDF) = m.arc_susceptances
 _get_valid_ix(m::VirtualPTDF) = m.valid_ix
-_get_temp_data(m::VirtualPTDF) = m.temp_data
-_get_work_ba_col(m::VirtualPTDF) = m.work_ba_col
 
 """
-    _compute_woodbury_factors(mat, modifications) -> WoodburyFactors
+    _compute_woodbury_factors_impl(K, work_ba_col, temp_data, BA, arc_sus,
+                                   valid_ix, modifications) -> WoodburyFactors
 
-Compute the Woodbury correction factors for a set of arc modifications.
-Implements van Dijk et al. Eq. 29:
-    B_m⁻¹ = B_r⁻¹ - B_r⁻¹U (A⁻¹ + U⊤B_r⁻¹U)⁻¹ U⊤B_r⁻¹
-
-where U = [ν_{e1} ... ν_{eM}] and A = diag(Δb₁, ..., Δb_M).
-
-The expensive part (M KLU solves + M×M factorization) is shared
-across all monitored arcs for a given modification set.
-
-!!! warning
-    Not thread-safe. Mutates scratch vectors in `mat`. Do not call
-    concurrently on the same VirtualPTDF/VirtualMODF instance.
+Pure-data Woodbury factor computation. Mutates `work_ba_col` and
+`temp_data`. The caller is responsible for exclusive access to those
+buffers; in `Virtual{PTDF, MODF}` this is provided by holding
+`solver_lock` via `with_solver` for the duration of the call.
 """
-function _compute_woodbury_factors(
-    mat::PowerNetworkMatrix,
+function _compute_woodbury_factors_impl(
+    K,
+    work_ba_col::Vector{Float64},
+    temp_data::Vector{Float64},
+    BA::SparseArrays.SparseMatrixCSC{Float64, Int},
+    arc_sus::Vector{Float64},
+    valid_ix::Vector{Int},
+    bus_to_valid_idx::Vector{Int},
     modifications::Tuple{Vararg{ArcModification}},
 )::WoodburyFactors
     M = length(modifications)
-    K = _get_K(mat)
-    BA = _get_BA(mat)
-    arc_sus = _get_arc_susceptances(mat)
-    valid_ix = _get_valid_ix(mat)
-    temp_data = _get_temp_data(mat)
-    work_ba_col = _get_work_ba_col(mat)
     n_bus = length(temp_data)
 
     arc_indices = Vector{Int}(undef, M)
@@ -111,13 +98,19 @@ function _compute_woodbury_factors(
 
     # Compute Z[:,j] = B⁻¹ν_j for each modified arc
     Z = Matrix{Float64}(undef, n_bus, M)
+    ba_rv_outer = SparseArrays.rowvals(BA)
+    ba_nz_outer = SparseArrays.nonzeros(BA)
 
     for (j, mod) in enumerate(modifications)
         e = mod.arc_index
         b_e = arc_sus[e]
 
-        @inbounds for i in eachindex(valid_ix)
-            work_ba_col[i] = BA[valid_ix[i], e]
+        # Sparse-only extraction of BA[:, e] into work_ba_col.
+        fill!(work_ba_col, 0.0)
+        @inbounds for k in SparseArrays.nzrange(BA, e)
+            valid_i = bus_to_valid_idx[ba_rv_outer[k]]
+            valid_i > 0 || continue
+            work_ba_col[valid_i] = ba_nz_outer[k]
         end
         lin_solve = _solve_factorization(K, work_ba_col)
 
@@ -160,29 +153,23 @@ function _compute_woodbury_factors(
 end
 
 """
-    _apply_woodbury_correction(mat, monitored_idx, wf) -> Vector{Float64}
+    _apply_woodbury_correction_impl(K, work_ba_col, temp_data, BA, arc_sus,
+                                    valid_ix, monitored_idx, wf) -> Vector{Float64}
 
-Compute the post-modification PTDF row for a monitored arc using
-precomputed Woodbury factors.
-
-Post-modification PTDF: `PTDF_m[mon,:] = b_mon_post · ν_mon⊤ · B_m⁻¹`
-Computed as: `b_mon_post · (z_m - Z · W⁻¹ · (ν_mon⊤ · Z))`
-
-!!! warning
-    Not thread-safe. Mutates scratch vectors in `mat`. Do not call
-    concurrently on the same VirtualPTDF/VirtualMODF instance.
+Pure-data Woodbury correction. Mutates `work_ba_col` and `temp_data`; the
+caller owns exclusive access to those buffers.
 """
-function _apply_woodbury_correction(
-    mat::PowerNetworkMatrix,
+function _apply_woodbury_correction_impl(
+    K,
+    work_ba_col::Vector{Float64},
+    temp_data::Vector{Float64},
+    BA::SparseArrays.SparseMatrixCSC{Float64, Int},
+    arc_sus::Vector{Float64},
+    valid_ix::Vector{Int},
+    bus_to_valid_idx::Vector{Int},
     monitored_idx::Int,
     wf::WoodburyFactors,
 )::Vector{Float64}
-    K = _get_K(mat)
-    BA = _get_BA(mat)
-    arc_sus = _get_arc_susceptances(mat)
-    valid_ix = _get_valid_ix(mat)
-    temp_data = _get_temp_data(mat)
-    work_ba_col = _get_work_ba_col(mat)
     n_bus = length(temp_data)
 
     M = length(wf.arc_indices)
@@ -198,10 +185,15 @@ function _apply_woodbury_correction(
         return zeros(n_bus)
     end
 
-    # z_m = B⁻¹ν_m / b_mon_pre via KLU solve on BA column
+    # z_m = B⁻¹ν_m / b_mon_pre via sparse-only BA-column extraction + solve.
     b_mon_pre = arc_sus[monitored_idx]
-    @inbounds for i in eachindex(valid_ix)
-        work_ba_col[i] = BA[valid_ix[i], monitored_idx]
+    fill!(work_ba_col, 0.0)
+    ba_rv_mon = SparseArrays.rowvals(BA)
+    ba_nz_mon = SparseArrays.nonzeros(BA)
+    @inbounds for k in SparseArrays.nzrange(BA, monitored_idx)
+        valid_i = bus_to_valid_idx[ba_rv_mon[k]]
+        valid_i > 0 || continue
+        work_ba_col[valid_i] = ba_nz_mon[k]
     end
     lin_solve = _solve_factorization(K, work_ba_col)
 
@@ -231,4 +223,40 @@ function _apply_woodbury_correction(
     # Post-modification PTDF row = b_mon_post · (z_m - correction)
     temp_data .*= b_mon
     return copy(temp_data)
+end
+
+# Outer dispatchers: VirtualPTDF and VirtualMODF both acquire a solver and
+# matched per-worker scratch via `with_solver` / `with_worker`. The
+# VirtualMODF methods are defined in virtual_modf_calculations.jl alongside
+# the struct.
+
+function _compute_woodbury_factors(
+    mat::VirtualPTDF,
+    modifications::Tuple{Vararg{ArcModification}},
+)::WoodburyFactors
+    return with_solver(
+        mat.K, mat.work_ba_col, mat.temp_data, mat.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
+        _compute_woodbury_factors_impl(
+            K_solver, work_ba_col, temp_data,
+            mat.BA, mat.arc_susceptances, mat.valid_ix, mat.bus_to_valid_idx,
+            modifications,
+        )
+    end
+end
+
+function _apply_woodbury_correction(
+    mat::VirtualPTDF,
+    monitored_idx::Int,
+    wf::WoodburyFactors,
+)::Vector{Float64}
+    return with_solver(
+        mat.K, mat.work_ba_col, mat.temp_data, mat.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
+        _apply_woodbury_correction_impl(
+            K_solver, work_ba_col, temp_data,
+            mat.BA, mat.arc_susceptances, mat.valid_ix, mat.bus_to_valid_idx,
+            monitored_idx, wf,
+        )
+    end
 end

@@ -54,33 +54,33 @@ Base.CartesianIndices(A::PowerNetworkMatrix) =
 Base.eachindex(A::PowerNetworkMatrix) = CartesianIndices(size(A.data))
 
 """
-Gets bus indices to a certain branch index
+Gets the matrix index corresponding to a given key (arc tuple, bus number, etc.)
 """
 function lookup_index(i, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[i]
 end
 
 """
-Gets bus indices to a certain branch name
+Gets the matrix index for a `PSY.Arc`, converting it to an arc tuple first.
 
 # Arguments
-- `i::PSY.ACBranch`:
-        Power System AC branch
+- `i::PSY.Arc`:
+        Power System Arc object
 - `lookup::Dict`:
-        Dictionary mapping branch and buses
+        Dictionary mapping arc tuples or bus numbers to matrix indices
 """
 function lookup_index(i::PSY.Arc, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
 end
 
 """
-Gets bus indices to a certain branch name
+Gets the matrix index for a `PSY.ACBus`, converting it to a bus number first.
 
 # Arguments
-- `i::PSY.ACBranch`:
-        Power System AC branch
+- `i::PSY.ACBus`:
+        Power System AC bus
 - `lookup::Dict`:
-        Dictionary mapping branches and buses
+        Dictionary mapping arc tuples or bus numbers to matrix indices
 """
 function lookup_index(i::PSY.ACBus, lookup::Dict)
     return isa(i, Colon) ? Colon() : lookup[Base.to_index(i)]
@@ -169,11 +169,13 @@ function Base.eltype(iter::PowerNetworkMatrixKeys)
 end
 function Base.iterate(iter::PowerNetworkMatrixKeys)
     next = iterate(iter.product_iter)
-    return next === nothing ? nothing : (PowerNetworkMatrixKey(next[1]), next[2])
+    isnothing(next) && return nothing
+    return (PowerNetworkMatrixKey(next[1]), next[2])
 end
 function Base.iterate(iter::PowerNetworkMatrixKeys, state)
     next = iterate(iter.product_iter, state)
-    return next === nothing ? nothing : (PowerNetworkMatrixKey(next[1]), next[2])
+    isnothing(next) && return nothing
+    return (PowerNetworkMatrixKey(next[1]), next[2])
 end
 function Base.keys(a::PowerNetworkMatrix)
     return PowerNetworkMatrixKeys(Base.Iterators.product(a.axes...))
@@ -327,7 +329,7 @@ the UUID of `sys`. No-op when the matrix does not track system origin.
 """
 function _validate_system_uuid(mat::PowerNetworkMatrix, sys::PSY.System)
     mat_uuid = get_system_uuid(mat)
-    if mat_uuid !== nothing && mat_uuid != IS.get_uuid(sys)
+    if !isnothing(mat_uuid) && mat_uuid != IS.get_uuid(sys)
         error(
             "System UUID mismatch: the matrix was constructed from a system with " *
             "UUID $mat_uuid, but the provided system has UUID $(IS.get_uuid(sys)). " *
@@ -338,10 +340,10 @@ function _validate_system_uuid(mat::PowerNetworkMatrix, sys::PSY.System)
 end
 
 """
-    returns the lookup tuple of the `PowerNetworkMatrix`. The first entry corresponds
-    to the first dimension and the second entry corresponds to the second dimension. For
-    instance in Ybus the first dimension is buses and second dimension is buses too, and in
-    PTDF the first dimension is branches and the second dimension is buses
+    returns the lookup tuple of the `PowerNetworkMatrix`. The entries correspond
+    to the dimensions of the underlying `axes` tuple, and each lookup dictionary maps
+    arc tuples `(from_bus, to_bus)` or bus numbers to integer indices into the stored
+    data.
 """
 get_lookup(mat::PowerNetworkMatrix) = mat.lookup
 

@@ -1,5 +1,15 @@
 using Documenter, PowerNetworkMatrices
 import DataStructures: OrderedDict
+using Literate
+using DocumenterInterLinks
+
+links = InterLinks(
+    "PowerSystems" => "https://sienna-platform.github.io/PowerSystems.jl/stable/",
+    "PowerSystemCaseBuilder" => "https://sienna-platform.github.io/PowerSystemCaseBuilder.jl/stable/",
+)
+
+include(joinpath(@__DIR__, "make_tutorials.jl"))
+make_tutorials()
 
 pages = OrderedDict(
     "Welcome Page" => "index.md",
@@ -10,6 +20,7 @@ pages = OrderedDict(
         "VirtualPTDF matrix" => "tutorials/tutorial_VirtualPTDF_matrix.md",
         "LODF matrix" => "tutorials/tutorial_LODF_matrix.md",
         "VirtualLODF matrix" => "tutorials/tutorial_VirtualLODF_matrix.md",
+        "Industry DFAX values" => "tutorials/tutorial_DFAX.md",
         "Radial Reduction" => "tutorials/tutorial_RadialReduction.md",
         "Degree Two Reduction" => "tutorials/tutorial_DegreeTwoReduction.md",
     ],
@@ -21,10 +32,12 @@ pages = OrderedDict(
         "Computational Considertaions" => "explanation/computational_considerations.md",
         "DC Power Flow Approximation" => "explanation/dc_power_flow_approximation.md",
         "Network Reduction Theory" => "explanation/network_reduction_theory.md",
+        "Flowgate Methodology" => "explanation/flowgate_methodology.md",
     ],
     "Reference" => Any[
         "Matrix Overview" => "reference/network_matrices_overview.md",
         "Public API" => "reference/public.md",
+        "Internals" => "reference/internals.md",
     ],
 )
 
@@ -40,10 +53,11 @@ makedocs(;
     authors = "Jose Daniel Lara, Matt Bossart, Alessandro Francesco Castelli",
     pages = Any[p for p in pages],
     clean = true,
+    plugins = [links],
 )
 
 deploydocs(;
-    repo = "github.com/NREL-Sienna/PowerNetworkMatrices.jl.git",
+    repo = "github.com/Sienna-Platform/PowerNetworkMatrices.jl.git",
     target = "build",
     branch = "gh-pages",
     devurl = "dev",

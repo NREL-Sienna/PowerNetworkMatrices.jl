@@ -6,6 +6,23 @@ function _add_to_collection!(
     return
 end
 
+"""
+    _build_bus_to_valid_idx(n_buses, valid_ix) -> Vector{Int}
+
+Build the inverse of `valid_ix`: a length-`n_buses` vector where entry `b`
+is the position of bus `b` inside `valid_ix`, or 0 if `b` is a reference
+bus. Used by the Virtual\\* row-computation hot path so it can iterate the
+nonzeros of a sparse `BA` column directly (O(nnz_col)) instead of scanning
+the full bus axis (O(n_buses)) and bisecting the CSC for each entry.
+"""
+function _build_bus_to_valid_idx(n_buses::Int, valid_ix::Vector{Int})
+    bus_to_valid_idx = zeros(Int, n_buses)
+    @inbounds for (i, b) in enumerate(valid_ix)
+        bus_to_valid_idx[b] = i
+    end
+    return bus_to_valid_idx
+end
+
 function _add_to_collection!(
     collection_tr3w::Vector{PSY.ThreeWindingTransformer},
     transformer_tr3w::PSY.ThreeWindingTransformer,
@@ -102,11 +119,11 @@ function get_arc_tuple(br::PSY.ACTransmission, nr::NetworkReductionData)
 end
 
 # Parallel branches: all oriented in same direction, so just take arc of first.
-function get_arc_tuple(br::BranchesParallel, nr::NetworkReductionData)
+function get_arc_tuple(br::AbstractBranchesParallel, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(first(br)), nr)
 end
 
-function get_arc_tuple(br::BranchesParallel)
+function get_arc_tuple(br::AbstractBranchesParallel)
     return get_arc_tuple(PSY.get_arc(first(br)))
 end
 
@@ -194,8 +211,8 @@ end
 Validates that the user bus input is consistent with the ybus axes and the prior reductions.
 Is used to check `irreducible_buses` for `Radial` and `DegreeTwo` reductions and `study_buses` for `WardReduction`.
 """
-function validate_buses(A::AdjacencyMatrix, buses::Vector{Int})
-    reverse_bus_search_map = A.network_reduction_data.reverse_bus_search_map
+function validate_buses(A::PowerNetworkMatrix, buses::Set{Int})
+    reverse_bus_search_map = get_network_reduction_data(A).reverse_bus_search_map
     for bus_no in buses
         reduced_bus_no = get(reverse_bus_search_map, bus_no, bus_no)
         if reduced_bus_no ∉ get_bus_axis(A)
@@ -288,8 +305,8 @@ end
 """
     _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{$YBUS_ELTYPE})
 
-Takes as input a 2x2 Matrix{$YBUS_ELTYPE} representing the Ybus contribution of either a
-BranchesParallel or BranchesSeries object.
+Takes as input a 2x2 Matrix{$YBUS_ELTYPE} representing the Ybus contribution of either an
+AbstractBranchesParallel (homogeneous or mixed) or BranchesSeries object.
 Returns a dictionary of equivalent parameters, matching the PowerModels data format.
 """
 function _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{YBUS_ELTYPE})
@@ -345,7 +362,7 @@ function has_time_series(
 end
 
 function has_time_series(
-    branch::BranchesParallel,
+    branch::AbstractBranchesParallel,
     ts_type::Type{T},
     ts_name::String,
 ) where {
@@ -388,7 +405,7 @@ function get_device_with_time_series(
 end
 
 function get_device_with_time_series(
-    branch::BranchesParallel,
+    branch::AbstractBranchesParallel,
     ts_type::Type{T},
     ts_name::String,
 ) where {
@@ -477,7 +494,7 @@ function _segment_susceptance_after_outage(
 end
 
 function _segment_susceptance_after_outage(
-    segment::BranchesParallel,
+    segment::AbstractBranchesParallel,
     tripped_set::Set{<:PSY.ACTransmission},
 )::Float64
     b_remaining = 0.0

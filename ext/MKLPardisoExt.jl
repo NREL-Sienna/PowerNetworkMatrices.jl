@@ -171,28 +171,15 @@ function PNM._calculate_LODF_matrix_MKLPardiso(
     a::SparseArrays.SparseMatrixCSC{Int8, Int},
     ptdf::Matrix{Float64},
 )
+    # The demand matrix `diag(1 - PTDF·A[i,i])` is diagonal, so the
+    # "solve" is a row-wise element-wise division. The Pardiso path that
+    # used to factor it and back-solve via `_pardiso_sequential_LODF!` /
+    # `_pardiso_single_LODF!` is no longer needed for this stage.
     linecount = size(ptdf, 2)
     ptdf_denominator_t = a * ptdf
-    m_I = Int[]
-    m_V = Float64[]
-    for iline in 1:linecount
-        if (1.0 - ptdf_denominator_t[iline, iline]) < PNM.LODF_ENTRY_TOLERANCE
-            push!(m_I, iline)
-            push!(m_V, 1.0)
-        else
-            push!(m_I, iline)
-            push!(m_V, 1 - ptdf_denominator_t[iline, iline])
-        end
-    end
-    lodf_t = zeros(linecount, linecount)
-    A = SparseArrays.sparse(m_I, m_I, m_V)
-    if linecount > PNM.DEFAULT_LODF_CHUNK_SIZE
-        PNM._pardiso_sequential_LODF!(lodf_t, A, ptdf_denominator_t)
-    else
-        PNM._pardiso_single_LODF!(lodf_t, A, ptdf_denominator_t)
-    end
-    lodf_t[LinearAlgebra.diagind(lodf_t)] .= -1.0
-    return lodf_t
+    m_V = PNM._build_lodf_demand(ptdf_denominator_t, linecount)
+    PNM._apply_lodf_demand!(ptdf_denominator_t, m_V)
+    return ptdf_denominator_t
 end
 
 end # module

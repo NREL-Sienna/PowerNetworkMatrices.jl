@@ -21,7 +21,7 @@ import Aqua
 Aqua.test_unbound_args(PowerNetworkMatrices)
 Aqua.test_undefined_exports(PowerNetworkMatrices)
 Aqua.test_ambiguities(PowerNetworkMatrices)
-Aqua.test_stale_deps(PowerNetworkMatrices; ignore = [:AppleAccelerate, :Pardiso])
+Aqua.test_stale_deps(PowerNetworkMatrices; ignore = [:Pardiso])
 Aqua.test_deps_compat(PowerNetworkMatrices)
 Aqua.find_persistent_tasks_deps(PowerNetworkMatrices)
 Aqua.test_persistent_tasks(PowerNetworkMatrices)
@@ -57,7 +57,7 @@ function run_tests(args...; kwargs...)
     logger = global_logger()
     try
         logging_config_filename = get(ENV, "SIIP_LOGGING_CONFIG", nothing)
-        if logging_config_filename !== nothing
+        if !isnothing(logging_config_filename)
             config = IS.LoggingConfiguration(logging_config_filename)
         else
             config = IS.LoggingConfiguration(;

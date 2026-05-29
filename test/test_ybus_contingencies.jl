@@ -121,7 +121,7 @@ end
         break
     end
 
-    if parallel_branch !== nothing
+    if !isnothing(parallel_branch)
         mod = NetworkModification(vptdf, parallel_branch)
         result = apply_ybus_modification(ybus, mod)
 
@@ -143,16 +143,30 @@ end
     vptdf = VirtualPTDF(sys; network_reductions = reductions)
     nr = PNM.get_network_reduction_data(ybus)
 
-    # Find an ACBranch (not ThreeWindingTransformerWinding) in the series map
+    # Find an ACBranch (not ThreeWindingTransformerWinding) in the series map.
+    # Dict iteration order is not stable across Julia versions, so sort the
+    # candidates by name for determinism. Only standalone segments (not nested
+    # inside BranchesParallel) yield a full-chain outage when removed; partial
+    # series outages are unsupported by `_compute_arc_ybus_delta`.
     series_branch = nothing
-    for (br, _) in nr.reverse_series_branch_map
-        if !(br isa PNM.ThreeWindingTransformerWinding)
+    candidates = [
+        entry for entry in nr.reverse_series_branch_map
+        if !(entry[1] isa PNM.ThreeWindingTransformerWinding)
+    ]
+    sort!(candidates; by = entry -> PSY.get_name(entry[1]))
+    for (br, composite_arc) in candidates
+        series_chain = nr.series_branch_map[composite_arc]
+        is_standalone_segment = any(
+            seg -> seg === br,
+            Iterators.flatten(values(series_chain.branches)),
+        )
+        if is_standalone_segment
             series_branch = br
             break
         end
     end
 
-    if series_branch !== nothing
+    if !isnothing(series_branch)
         mod = NetworkModification(vptdf, series_branch)
         result = apply_ybus_modification(ybus, mod)
 

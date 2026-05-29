@@ -29,6 +29,9 @@ export DC_vPTDF_Matrix
 export DC_BA_Matrix
 export AC_Ybus_Matrix
 export YBUS_ELTYPE
+export get_sum_of_max_rating
+export get_single_element_contingency_rating
+export get_impedance_averaged_rating
 
 export apply_woodbury_correction
 export clear_all_caches!
@@ -64,15 +67,34 @@ import DataStructures: SortedDict
 import SparseArrays
 import SparseArrays: rowvals, nzrange
 import HDF5
-import KLU: klu
-import KLU
 import LinearAlgebra
 import LinearAlgebra: BLAS.gemm
 import LinearAlgebra: ldiv!, mul!, I, dot
 import LinearAlgebra: LAPACK.getrf!, LAPACK.getrs!
 import Preferences
 
+include("KLUWrapper/KLUWrapper.jl")
+import .KLUWrapper:
+    KLULinSolveCache,
+    klu_factorize,
+    symbolic_factor!,
+    symbolic_refactor!,
+    numeric_refactor!,
+    full_factor!,
+    full_refactor!,
+    solve!,
+    tsolve!,
+    solve_sparse!,
+    solve_sparse,
+    n_valid,
+    is_factored
+
+include("AccelerateWrapper/AccelerateWrapper.jl")
+import .AccelerateWrapper: AAFactorCache, aa_factorize, aa_spmm!, aa_spmv!
+
 include("linalg_settings.jl")
+include("solver_dispatch.jl")
+include("iterative_refinement.jl")
 
 function __init__()
     something(get_linalg_backend_check(), false) && check_linalg_backend()
@@ -94,12 +116,18 @@ include("NetworkReduction.jl")
 include("radial_reduction.jl")
 include("degree_two_reduction.jl")
 include("ward_reduction.jl")
+# ZIBR's spec marker must precede ReductionContainer (which dispatches
+# `validate_reduction_type` on it). Its `get_reduction(::Ybus, ...)` lives in
+# `apply_zero_impedance_reduction.jl`, included after `Ybus.jl` below.
+include("zero_impedance_branch_reduction.jl")
 include("ReductionContainer.jl")
 include("NetworkReductionData.jl")
 include("ArcAdmittanceMatrix.jl")
 include("YbusACBranches.jl")
 include("Ybus.jl")
+include("apply_zero_impedance_reduction.jl")
 include("IncidenceMatrix.jl")
+include("reduction_helpers.jl")
 include("AdjacencyMatrix.jl")
 include("connectivity_checks.jl")
 include("subnetworks.jl")
@@ -115,18 +143,17 @@ include("modf_definitions.jl")
 include("network_modification.jl")
 include("woodbury_kernel.jl")
 include("virtual_ptdf_modification.jl")
+include("modf_reduction_consistency.jl")
 include("virtual_modf_calculations.jl")
 include("system_utils.jl")
 include("serialization.jl")
 
-# Declare functions that will be defined by extensions
-# These need to be declared so extensions can extend them
+# Forward declarations for symbols still defined inside package extensions.
+# AppleAccelerate-related functions live in `src/` now (no extension needed)
+# and are not redeclared here.
 function _calculate_PTDF_matrix_MKLPardiso end
-function _calculate_PTDF_matrix_AppleAccelerate end
 function _calculate_LODF_matrix_MKLPardiso end
-function _calculate_LODF_matrix_AppleAccelerate end
 function _pardiso_sequential_LODF! end
 function _pardiso_single_LODF! end
-function _create_apple_accelerate_factorization end
 
 end

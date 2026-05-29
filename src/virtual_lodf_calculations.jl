@@ -9,9 +9,17 @@ The VirtualLODF is initialized with no row stored.
 
 The VirtualLODF struct is indexed using branch names.
 
+# Thread-safety
+
+Concurrent `getindex` (and `get_partial_lodf_row`) is safe but serialized:
+every libklu solve runs under `_LIBKLU_LOCK` (process-wide) and the per-cache
+`solver_lock`, and the row cache is guarded by `cache_lock`. Multi-threaded
+callers can issue requests concurrently; the libklu work runs one at a time.
+
 # Arguments
-- `K::KLU.KLUFactorization{Float64, Int}`:
-        LU factorization matrices of the ABA matrix, evaluated by means of KLU.
+- `K`:
+        ABA factorization cache (`KLULinSolveCache{Float64}` or `AAFactorization`).
+        Solves serialize via the locks above.
 - `BA::SparseArrays.SparseMatrixCSC{Float64, Int}`:
         BA matrix.
 - `A::SparseArrays.SparseMatrixCSC{Int8, Int}`:
@@ -45,20 +53,29 @@ The VirtualLODF struct is indexed using branch names.
 - `valid_ix::Vector{Int}`:
         Vector containing the row/columns indices of matrices related the buses
         which are not slack ones.
-- `temp_data::Vector{Float64}`:
-        Temporary vector for internal use.
+- `bus_to_valid_idx::Vector{Int}`:
+        Inverse of `valid_ix`: `bus_to_valid_idx[b]` is the position of bus
+        `b` inside `valid_ix`, or 0 if `b` is a reference bus. Lets the hot
+        path iterate the nonzeros of a `BA` column directly.
+- `temp_data::Vector{Vector{Float64}}`:
+        Single-element scratch vector kept as a `Vector{Vector{Float64}}` for
+        uniform `with_solver` callback signatures.
 - `cache::RowCache`:
-        Cache were LODF rows are stored.
+        Cache where LODF rows are stored.
+- `cache_lock::ReentrantLock`:
+        Guards `cache` reads/writes for parallel `getindex` callers.
 - `subnetworks::Dict{Int, Set{Int}}`:
         Dictionary containing the subsets of buses defining the different subnetwork of the system.
 - `tol::Base.RefValue{Float64}`:
         Tolerance related to scarification and values to drop.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
+- `work_ba_col::Vector{Vector{Float64}}`:
+        Single-element BA-column scratch buffer.
 """
-struct VirtualLODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}} <:
+struct VirtualLODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}, K} <:
        PowerNetworkMatrix{Float64}
-    K::KLU.KLUFactorization{Float64, Int}
+    K::K
     BA::SparseArrays.SparseMatrixCSC{Float64, Int}
     A::SparseArrays.SparseMatrixCSC{Int8, Int}
     inv_PTDF_A_diag::Vector{Float64}
@@ -69,12 +86,17 @@ struct VirtualLODF{Ax <: NTuple{2, Vector}, L <: NTuple{2, Dict}} <:
     axes::Ax
     lookup::L
     valid_ix::Vector{Int}
-    temp_data::Vector{Float64}
+    bus_to_valid_idx::Vector{Int}
+    temp_data::Vector{Vector{Float64}}
     cache::RowCache
+    cache_lock::ReentrantLock
     subnetwork_axes::Dict{Int, Ax}
     tol::Base.RefValue{Float64}
     network_reduction_data::NetworkReductionData
-    work_ba_col::Vector{Float64}
+    work_ba_col::Vector{Vector{Float64}}
+    # Serializes solves on this cache. `with_solver` always acquires it,
+    # for both the KLU and AppleAccelerate backends.
+    solver_lock::ReentrantLock
 end
 
 get_axes(M::VirtualLODF) = M.axes
@@ -93,8 +115,15 @@ function Base.show(io::IO, ::MIME{Symbol("text/plain")}, array::VirtualLODF)
     return
 end
 
+"""
+    _get_PTDF_A_diag(K, BA, A, ref_bus_positions) -> Vector{Float64}
+
+Compute `diag(PTDF · A)`. Each row of `A` has exactly two nonzeros (+1 at the
+from-bus, -1 at the to-bus), so the per-arc dot product reduces to two indexed
+reads into the solved PTDF row after a one-time transpose of `A`.
+"""
 function _get_PTDF_A_diag(
-    K::KLU.KLUFactorization{Float64, Int},
+    K,
     BA::SparseArrays.SparseMatrixCSC{Float64, Int},
     A::SparseArrays.SparseMatrixCSC{Int8, Int},
     ref_bus_positions::Set{Int},
@@ -103,36 +132,64 @@ function _get_PTDF_A_diag(
     n_buses = size(BA, 1)
     diag_ = zeros(n_branches)
 
-    # Pre-compute valid indices (non-reference buses)
     valid_ix = setdiff(1:n_buses, ref_bus_positions)
     n_valid = length(valid_ix)
+    bus_to_valid_idx = _build_bus_to_valid_idx(n_buses, valid_ix)
 
-    # Pre-allocate work arrays for efficiency
-    ba_col = zeros(n_valid)
-    ptdf_row = zeros(n_buses)
-
-    # For each branch, compute PTDF row and dot with incidence column
+    # Per-arc (from_valid, to_valid) via one transpose of A; 0 = ref bus.
+    A_T = SparseArrays.sparse(transpose(A))
+    arc_from_valid = Vector{Int}(undef, n_branches)
+    arc_to_valid = Vector{Int}(undef, n_branches)
+    at_rv = SparseArrays.rowvals(A_T)
+    at_nz = SparseArrays.nonzeros(A_T)
     for i in 1:n_branches
-        # Extract BA column for valid indices
+        f_valid = 0
+        t_valid = 0
+        @inbounds for k in SparseArrays.nzrange(A_T, i)
+            bus_ix = at_rv[k]
+            v = at_nz[k]
+            valid_i = bus_to_valid_idx[bus_ix]
+            if v > 0
+                f_valid = valid_i
+            elseif v < 0
+                t_valid = valid_i
+            end
+        end
+        arc_from_valid[i] = f_valid
+        arc_to_valid[i] = t_valid
+    end
+
+    ba_col = zeros(n_valid)
+    ba_rv = SparseArrays.rowvals(BA)
+    ba_nz = SparseArrays.nonzeros(BA)
+
+    for i in 1:n_branches
         fill!(ba_col, 0.0)
-        for idx in 1:n_valid
-            bus_idx = valid_ix[idx]
-            ba_col[idx] = BA[bus_idx, i]
+        @inbounds for k in SparseArrays.nzrange(BA, i)
+            valid_i = bus_to_valid_idx[ba_rv[k]]
+            valid_i > 0 || continue
+            ba_col[valid_i] = ba_nz[k]
         end
 
-        # Solve for PTDF row: ptdf_row_valid = ABA^(-1) * ba_col
-        ptdf_row_valid = K \ ba_col
+        # Read PTDF row from the returned buffer — backend-agnostic
+        # (KLU mutates `ba_col` and returns it; other backends may
+        # return a fresh vector, so capture the return value).
+        lin_solve = _solve_factorization(K, ba_col)
 
-        # Map back to full bus indices
-        fill!(ptdf_row, 0.0)
-        for idx in 1:n_valid
-            ptdf_row[valid_ix[idx]] = ptdf_row_valid[idx]
+        # H[e,e] = ptdf[from] - ptdf[to]; ref-bus entries are 0.
+        f = arc_from_valid[i]
+        t = arc_to_valid[i]
+        v_f = if f > 0
+            lin_solve[f]
+        else
+            0.0
         end
-
-        # Compute diagonal element: sum of PTDF[i,j] * A[i,j] for all buses j
-        for j in 1:n_buses
-            diag_[i] += ptdf_row[j] * A[i, j]
+        v_t = if t > 0
+            lin_solve[t]
+        else
+            0.0
         end
+        @inbounds diag_[i] = v_f - v_t
     end
     return diag_
 end
@@ -207,6 +264,9 @@ struct with an empty cache.
         PSY system for which the matrix is constructed
 
 # Keyword Arguments
+- `linear_solver::String = _default_linear_solver()`: Linear solver for the
+        ABA factorization. Options: "KLU", "AppleAccelerate". Defaults to
+        "AppleAccelerate" on macOS and "KLU" elsewhere.
 - `network_reduction::NetworkReduction`:
         Structure containing the details of the network reduction applied when computing the matrix
 - `kwargs...`:
@@ -215,6 +275,7 @@ struct with an empty cache.
 function VirtualLODF(
     sys::PSY.System;
     dist_slack::Vector{Float64} = Float64[],
+    linear_solver::String = _default_linear_solver(),
     tol::Float64 = eps(),
     max_cache_size::Int = MAX_CACHE_SIZE_MiB,
     persistent_arcs::Vector{Tuple{Int, Int}} = Vector{Tuple{Int, Int}}(),
@@ -224,6 +285,7 @@ function VirtualLODF(
     if length(dist_slack) != 0
         @info "Distributed bus"
     end
+    solver = resolve_linear_solver(linear_solver)
     Ymatrix = Ybus(
         sys;
         network_reductions = network_reductions,
@@ -238,17 +300,12 @@ function VirtualLODF(
     subnetwork_axes = make_arc_arc_subnetwork_axes(A)
     BA = BA_Matrix(Ymatrix)
     ABA = calculate_ABA_matrix(A.data, BA.data, Set(ref_bus_positions))
-    K = klu(ABA)
+    K = _create_factorization(solver, ABA)
     bus_ax = get_bus_axis(A)
 
-    temp_data = zeros(length(bus_ax))
     valid_ix = setdiff(1:length(bus_ax), ref_bus_positions)
-    PTDF_diag = _get_PTDF_A_diag(
-        K,
-        BA.data,
-        A.data,
-        Set(ref_bus_positions),
-    )
+    # PTDF diagonal precompute runs serially on the dispatcher thread.
+    PTDF_diag = _get_PTDF_A_diag(K, BA.data, A.data, Set(ref_bus_positions))
     PTDF_A_diag_raw = copy(PTDF_diag)
     arc_susceptances = _extract_arc_susceptances(BA.data)
     branch_susceptances_by_arc = _extract_branch_susceptances_by_arc(
@@ -268,8 +325,10 @@ function VirtualLODF(
             )
     end
 
-    # Pre-allocate work array for BA column extraction
-    work_ba_col = zeros(length(valid_ix))
+    # Single scratch slot — solves serialize via `solver_lock` + `_LIBKLU_LOCK`.
+    temp_data = [zeros(length(bus_ax))]
+    work_ba_col = [zeros(length(valid_ix))]
+    bus_to_valid_idx = _build_bus_to_valid_idx(length(bus_ax), valid_ix)
 
     return VirtualLODF(
         K,
@@ -283,12 +342,15 @@ function VirtualLODF(
         axes,
         look_up,
         valid_ix,
+        bus_to_valid_idx,
         temp_data,
         empty_cache,
+        ReentrantLock(),
         subnetwork_axes,
         Ref(tol),
         Ymatrix.network_reduction_data,
         work_ba_col,
+        ReentrantLock(),
     )
 end
 
@@ -322,37 +384,46 @@ if isdefined(Base, :print_array) # 0.7 and later
     Base.print_array(io::IO, X::VirtualLODF) = "VirtualLODF"
 end
 
+# Compute the LODF row for `row` using exclusive per-worker scratch. Pure
+# computation: no cache reads/writes, no tolerance application.
+function _compute_lodf_row(vlodf::VirtualLODF, row::Int)::Vector{Float64}
+    return with_solver(
+        vlodf.K, vlodf.work_ba_col, vlodf.temp_data, vlodf.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
+        # Sparse-only extraction: iterate BA[:, row] non-zeros (typically
+        # 2 per arc) instead of scanning the full bus axis.
+        fill!(work_ba_col, 0.0)
+        BA = vlodf.BA
+        bus_to_valid_idx = vlodf.bus_to_valid_idx
+        ba_rv = SparseArrays.rowvals(BA)
+        ba_nz = SparseArrays.nonzeros(BA)
+        @inbounds for k in SparseArrays.nzrange(BA, row)
+            valid_i = bus_to_valid_idx[ba_rv[k]]
+            valid_i > 0 || continue
+            work_ba_col[valid_i] = ba_nz[k]
+        end
+        lin_solve = _solve_factorization(K_solver, work_ba_col)
+
+        fill!(temp_data, 0.0)
+        @inbounds for i in eachindex(vlodf.valid_ix)
+            temp_data[vlodf.valid_ix[i]] = lin_solve[i]
+        end
+
+        lodf_row = (vlodf.A * temp_data) .* vlodf.inv_PTDF_A_diag
+        lodf_row[row] = -1.0
+        return lodf_row
+    end
+end
+
 function _getindex(
     vlodf::VirtualLODF,
     row::Int,
     column::Union{Int, Colon},
 )
-    # check if value is in the cache
-    if haskey(vlodf.cache, row)
-        return vlodf.cache.temp_cache[row][column]
-    else
-        # evaluate the value for the LODF column
-        # Use pre-allocated work array instead of collect() to reduce allocations
-        @inbounds for i in eachindex(vlodf.valid_ix)
-            vlodf.work_ba_col[i] = vlodf.BA[vlodf.valid_ix[i], row]
-        end
-        lin_solve = KLU.solve!(vlodf.K, vlodf.work_ba_col)
-
-        # get full lodf row
-        @inbounds for i in eachindex(vlodf.valid_ix)
-            vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
-        end
-
-        # now get the LODF row
-        lodf_row = (vlodf.A * vlodf.temp_data) .* vlodf.inv_PTDF_A_diag
-        lodf_row[row] = -1.0
-
-        if get_tol(vlodf) > eps()
-            vlodf.cache[row] = sparsify(lodf_row, get_tol(vlodf))
-        else
-            vlodf.cache[row] = copy(lodf_row)
-        end
-        return vlodf.cache[row][column]
+    return cached_row_lookup(
+        vlodf.cache, vlodf.cache_lock, row, column, get_tol(vlodf),
+    ) do
+        _compute_lodf_row(vlodf, row)
     end
 end
 
@@ -420,10 +491,7 @@ end
 
 Compute the partial LODF column for a susceptance change `delta_b` on arc `arc_idx`.
 
-!!! warning
-    This function is NOT thread-safe. It mutates `vlodf.work_ba_col` and
-    `vlodf.temp_data` on every call. Do not call concurrently on the same
-    `VirtualLODF` instance from multiple threads.
+Concurrent callers serialize on `vlodf.solver_lock` and `_LIBKLU_LOCK`.
 
 Uses the Sherman-Morrison (matrix inversion lemma) formula derived from DC power flow
 sensitivity analysis. For a change Δb in the susceptance of arc e, the change in flow
@@ -459,42 +527,54 @@ function _getindex_partial(
         return zeros(n_arcs)
     end
 
-    # Steps 1-2: Compute B⁻¹(b_e · ν_e) via KLU solve.
-    @inbounds for i in eachindex(vlodf.valid_ix)
-        vlodf.work_ba_col[i] = vlodf.BA[vlodf.valid_ix[i], arc_idx]
+    return with_solver(
+        vlodf.K, vlodf.work_ba_col, vlodf.temp_data, vlodf.solver_lock,
+    ) do K_solver, work_ba_col, temp_data
+        # Steps 1-2: Compute B⁻¹(b_e · ν_e) via sparse-only BA-column
+        # extraction + solve.
+        fill!(work_ba_col, 0.0)
+        BA = vlodf.BA
+        bus_to_valid_idx = vlodf.bus_to_valid_idx
+        ba_rv = SparseArrays.rowvals(BA)
+        ba_nz = SparseArrays.nonzeros(BA)
+        @inbounds for k in SparseArrays.nzrange(BA, arc_idx)
+            valid_i = bus_to_valid_idx[ba_rv[k]]
+            valid_i > 0 || continue
+            work_ba_col[valid_i] = ba_nz[k]
+        end
+        lin_solve = _solve_factorization(K_solver, work_ba_col)
+
+        # Step 3: Map solution back to full bus space.
+        fill!(temp_data, 0.0)
+        @inbounds for i in eachindex(vlodf.valid_ix)
+            temp_data[vlodf.valid_ix[i]] = lin_solve[i]
+        end
+
+        # Step 4: H_col[ℓ] = b_e · C[e,ℓ] for all monitoring arcs ℓ.
+        H_col = vlodf.A * temp_data
+
+        # Step 5: Scalar denominator: 1 - α · H[e,e].
+        # α = -Δb / b_e (positive for outage/decrease, negative for increase).
+        H_ee = vlodf.PTDF_A_diag[arc_idx]
+        alpha = -delta_b / b_arc
+        denom = 1.0 - alpha * H_ee
+
+        # Step 6: Partial LODF column: scale by b_ℓ/b_e to convert from C[e,ℓ] to b_ℓ·C[e,ℓ].
+        # partial_lodf[ℓ] = α · b_ℓ/b_e · H_col[ℓ] / denom
+        #                 = α · b_ℓ · C[e,ℓ] / (1 - α · H_ee)
+        partial_lodf =
+            (alpha / (denom * b_arc)) .* (vlodf.arc_susceptances .* H_col)
+
+        # By convention, the outaged arc's own redistribution factor is -1.0 for a full
+        # outage: the arc carries -100% of its own pre-contingency flow post-outage.
+        # The raw formula gives α·H[e,e]/denom for the self-element, which is
+        # b_e·C[e,e]/(1-b_e·C[e,e]) = H_ee/(1-H_ee) ≠ -1 in general.
+        if abs(delta_b + b_arc) < eps() * b_arc
+            partial_lodf[arc_idx] = -1.0
+        end
+
+        return partial_lodf
     end
-    lin_solve = KLU.solve!(vlodf.K, vlodf.work_ba_col)
-
-    # Step 3: Map solution back to full bus space.
-    fill!(vlodf.temp_data, 0.0)
-    @inbounds for i in eachindex(vlodf.valid_ix)
-        vlodf.temp_data[vlodf.valid_ix[i]] = lin_solve[i]
-    end
-
-    # Step 4: H_col[ℓ] = b_e · C[e,ℓ] for all monitoring arcs ℓ.
-    H_col = vlodf.A * vlodf.temp_data
-
-    # Step 5: Scalar denominator: 1 - α · H[e,e].
-    # α = -Δb / b_e (positive for outage/decrease, negative for increase).
-    H_ee = vlodf.PTDF_A_diag[arc_idx]
-    alpha = -delta_b / b_arc
-    denom = 1.0 - alpha * H_ee
-
-    # Step 6: Partial LODF column: scale by b_ℓ/b_e to convert from C[e,ℓ] to b_ℓ·C[e,ℓ].
-    # partial_lodf[ℓ] = α · b_ℓ/b_e · H_col[ℓ] / denom
-    #                 = α · b_ℓ · C[e,ℓ] / (1 - α · H_ee)
-    partial_lodf =
-        (alpha / (denom * b_arc)) .* (vlodf.arc_susceptances .* H_col)
-
-    # By convention, the outaged arc's own redistribution factor is -1.0 for a full
-    # outage: the arc carries -100% of its own pre-contingency flow post-outage.
-    # The raw formula gives α·H[e,e]/denom for the self-element, which is
-    # b_e·C[e,e]/(1-b_e·C[e,e]) = H_ee/(1-H_ee) ≠ -1 in general.
-    if abs(delta_b + b_arc) < eps() * b_arc
-        partial_lodf[arc_idx] = -1.0
-    end
-
-    return partial_lodf
 end
 
 """
