@@ -56,7 +56,7 @@
         @test isapprox(sum(total_error3), 0.0, atol = 1e-3)
     end
 
-    if PowerNetworkMatrices._has_apple_accelerate_ext()
+    if PowerNetworkMatrices._has_apple_accelerate_backend()
         L5NS_from_ptdf4 = LODF(A, P5; linear_solver = "AppleAccelerate")
         @test getindex(L5NS_from_ptdf4, "5", "6") - -0.3071 <= 1e-4
         total_error4 = 0.0

@@ -70,9 +70,9 @@ end
     tww2 = PNM.ThreeWindingTransformerWinding(trf, 2)
 
     # No time series attached — should return nothing
-    @test PNM.get_device_with_time_series(bp, PSY.SingleTimeSeries, "rating") === nothing
-    @test PNM.get_device_with_time_series(bs, PSY.SingleTimeSeries, "rating") === nothing
-    @test PNM.get_device_with_time_series(tww1, PSY.SingleTimeSeries, "rating") === nothing
+    @test isnothing(PNM.get_device_with_time_series(bp, PSY.SingleTimeSeries, "rating"))
+    @test isnothing(PNM.get_device_with_time_series(bs, PSY.SingleTimeSeries, "rating"))
+    @test isnothing(PNM.get_device_with_time_series(tww1, PSY.SingleTimeSeries, "rating"))
 
     # Add time series to line1 in BranchesParallel
     PSY.add_time_series!(sys, line1, _make_test_time_series("rating"))

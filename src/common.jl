@@ -6,6 +6,23 @@ function _add_to_collection!(
     return
 end
 
+"""
+    _build_bus_to_valid_idx(n_buses, valid_ix) -> Vector{Int}
+
+Build the inverse of `valid_ix`: a length-`n_buses` vector where entry `b`
+is the position of bus `b` inside `valid_ix`, or 0 if `b` is a reference
+bus. Used by the Virtual\\* row-computation hot path so it can iterate the
+nonzeros of a sparse `BA` column directly (O(nnz_col)) instead of scanning
+the full bus axis (O(n_buses)) and bisecting the CSC for each entry.
+"""
+function _build_bus_to_valid_idx(n_buses::Int, valid_ix::Vector{Int})
+    bus_to_valid_idx = zeros(Int, n_buses)
+    @inbounds for (i, b) in enumerate(valid_ix)
+        bus_to_valid_idx[b] = i
+    end
+    return bus_to_valid_idx
+end
+
 function _add_to_collection!(
     collection_tr3w::Vector{PSY.ThreeWindingTransformer},
     transformer_tr3w::PSY.ThreeWindingTransformer,
@@ -102,11 +119,11 @@ function get_arc_tuple(br::PSY.ACTransmission, nr::NetworkReductionData)
 end
 
 # Parallel branches: all oriented in same direction, so just take arc of first.
-function get_arc_tuple(br::BranchesParallel, nr::NetworkReductionData)
+function get_arc_tuple(br::AbstractBranchesParallel, nr::NetworkReductionData)
     get_arc_tuple(PSY.get_arc(first(br)), nr)
 end
 
-function get_arc_tuple(br::BranchesParallel)
+function get_arc_tuple(br::AbstractBranchesParallel)
     return get_arc_tuple(PSY.get_arc(first(br)))
 end
 
@@ -191,23 +208,11 @@ function find_slack_positions(buses, bus_lookup::Dict{Int, Int})::Set{Int}
 end
 
 """
-Validates if the selected linear solver is supported.
-"""
-function validate_linear_solver(linear_solver::String)
-    if linear_solver ∉ SUPPORTED_LINEAR_SOLVERS
-        error(
-            "Invalid linear solver. Supported linear solvers are: $(SUPPORTED_LINEAR_SOLVERS)",
-        )
-    end
-    return
-end
-
-"""
 Validates that the user bus input is consistent with the ybus axes and the prior reductions.
 Is used to check `irreducible_buses` for `Radial` and `DegreeTwo` reductions and `study_buses` for `WardReduction`.
 """
-function validate_buses(A::AdjacencyMatrix, buses::Vector{Int})
-    reverse_bus_search_map = A.network_reduction_data.reverse_bus_search_map
+function validate_buses(A::PowerNetworkMatrix, buses::Set{Int})
+    reverse_bus_search_map = get_network_reduction_data(A).reverse_bus_search_map
     for bus_no in buses
         reduced_bus_no = get(reverse_bus_search_map, bus_no, bus_no)
         if reduced_bus_no ∉ get_bus_axis(A)
@@ -300,8 +305,8 @@ end
 """
     _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{$YBUS_ELTYPE})
 
-Takes as input a 2x2 Matrix{$YBUS_ELTYPE} representing the Ybus contribution of either a
-BranchesParallel or BranchesSeries object.
+Takes as input a 2x2 Matrix{$YBUS_ELTYPE} representing the Ybus contribution of either an
+AbstractBranchesParallel (homogeneous or mixed) or BranchesSeries object.
 Returns a dictionary of equivalent parameters, matching the PowerModels data format.
 """
 function _get_equivalent_physical_branch_parameters(equivalent_ybus::Matrix{YBUS_ELTYPE})
@@ -357,7 +362,7 @@ function has_time_series(
 end
 
 function has_time_series(
-    branch::BranchesParallel,
+    branch::AbstractBranchesParallel,
     ts_type::Type{T},
     ts_name::String,
 ) where {
@@ -400,7 +405,7 @@ function get_device_with_time_series(
 end
 
 function get_device_with_time_series(
-    branch::BranchesParallel,
+    branch::AbstractBranchesParallel,
     ts_type::Type{T},
     ts_name::String,
 ) where {
@@ -425,4 +430,125 @@ function get_device_with_time_series(
         return branch
     end
     return nothing
+end
+
+"""
+    _resolve_branch_arc(nr::NetworkReductionData, component::PSY.ACTransmission)
+        -> Tuple{Symbol, Union{Tuple{Int, Int}, Nothing}}
+
+Classify a branch component by looking up which reverse map it belongs to in the
+`NetworkReductionData`. Returns `(tag, arc_tuple)` where `tag` is one of:
+- `:direct`       -- branch is the sole branch on its arc
+- `:parallel`     -- branch is one of several parallel branches on its arc
+- `:series`       -- branch is part of a series chain on its arc
+- `:transformer3w` -- branch is a three-winding transformer winding
+- `:not_found`    -- branch is not in any map (e.g., eliminated by radial reduction)
+
+The second element is the arc tuple `(from_bus, to_bus)`, or `nothing` when `:not_found`.
+"""
+function _resolve_branch_arc(
+    nr::NetworkReductionData,
+    component::PSY.ACTransmission,
+)::Tuple{Symbol, Union{Tuple{Int, Int}, Nothing}}
+    if haskey(nr.reverse_direct_branch_map, component)
+        return (:direct, nr.reverse_direct_branch_map[component])
+    elseif haskey(nr.reverse_parallel_branch_map, component)
+        return (:parallel, nr.reverse_parallel_branch_map[component])
+    elseif haskey(nr.reverse_series_branch_map, component)
+        return (:series, nr.reverse_series_branch_map[component])
+    elseif haskey(nr.reverse_transformer3W_map, component)
+        return (:transformer3w, nr.reverse_transformer3W_map[component])
+    else
+        return (:not_found, nothing)
+    end
+end
+
+"""
+    _assert_not_phase_shifting(component::PSY.ACTransmission)
+
+No-op for non-PST branches. Throws `ErrorException` for `PhaseShiftingTransformer`.
+"""
+_assert_not_phase_shifting(::PSY.ACTransmission) = nothing
+
+function _assert_not_phase_shifting(component::PSY.PhaseShiftingTransformer)
+    return error(
+        "Contingencies on PhaseShiftingTransformer are not supported. " *
+        "Component: $(PSY.get_name(component)).",
+    )
+end
+
+"""
+    _segment_susceptance_after_outage(segment, tripped_set) -> Float64
+
+Compute the remaining susceptance of a series chain segment after removing
+tripped components. Dispatches on segment type to handle both single branches
+and parallel groups within a series chain.
+
+Returns 0.0 if the segment (or all branches in a parallel group) is fully tripped.
+"""
+function _segment_susceptance_after_outage(
+    segment::PSY.ACTransmission,
+    tripped_set::Set{<:PSY.ACTransmission},
+)::Float64
+    return segment ∈ tripped_set ? 0.0 : get_series_susceptance(segment)
+end
+
+function _segment_susceptance_after_outage(
+    segment::AbstractBranchesParallel,
+    tripped_set::Set{<:PSY.ACTransmission},
+)::Float64
+    b_remaining = 0.0
+    for branch in segment.branches
+        if branch ∉ tripped_set
+            b_remaining += get_series_susceptance(branch)
+        end
+    end
+    return b_remaining
+end
+
+"""
+    _compute_series_outage_delta_b(series_chain::BranchesSeries, component::PSY.ACTransmission) -> Float64
+
+Compute the change in equivalent arc susceptance when `component` is tripped
+from `series_chain`. Delegates to the vector version.
+"""
+function _compute_series_outage_delta_b(
+    series_chain::BranchesSeries,
+    component::PSY.ACTransmission,
+)::Float64
+    return _compute_series_outage_delta_b(series_chain, [component])
+end
+
+"""
+    _compute_series_outage_delta_b(series_chain::BranchesSeries, tripped::Vector{<:PSY.ACTransmission}) -> Float64
+
+Compute the change in equivalent arc susceptance when multiple components are
+simultaneously tripped from a series chain.
+
+For a series chain with segments of susceptance b₁, b₂, ..., bₙ, the equivalent
+susceptance is: b_eq = 1 / (1/b₁ + 1/b₂ + ... + 1/bₙ).
+
+Segments can be individual branches or `BranchesParallel` groups. When a tripped
+component is inside a parallel group, only that branch's susceptance is removed
+from the group — the rest of the parallel group remains in the series chain.
+
+Returns Δb = b_new - b_old (always negative for outages).
+If all segments are fully tripped, returns -b_eq (full arc outage).
+"""
+function _compute_series_outage_delta_b(
+    series_chain::BranchesSeries,
+    tripped::Vector{<:PSY.ACTransmission},
+)::Float64
+    b_old = get_series_susceptance(series_chain)
+    tripped_set = Set{PSY.ACTransmission}(tripped)
+    remaining_inv_sum = 0.0
+    for segment in series_chain
+        b_seg = _segment_susceptance_after_outage(segment, tripped_set)
+        if b_seg == 0.0
+            return -b_old
+        end
+        remaining_inv_sum += 1.0 / b_seg
+    end
+    b_new = 1.0 / remaining_inv_sum
+    return b_new - b_old
 end

@@ -8,8 +8,8 @@
         @info "Skipped MKLPardiso tests (extension not loaded)"
         continue
     end
-    if !PowerNetworkMatrices._has_apple_accelerate_ext() && solver == "AppleAccelerate"
-        @info "Skipped AppleAccelerate tests (extension not loaded)"
+    if !PowerNetworkMatrices._has_apple_accelerate_backend() && solver == "AppleAccelerate"
+        @info "Skipped AppleAccelerate tests (backend unavailable on this platform)"
         continue
     end
     sys5 = PSB.build_system(PSB.PSITestSystems, "c_sys5")
