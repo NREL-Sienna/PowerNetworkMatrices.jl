@@ -21,10 +21,10 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 
 [sources]
-InfrastructureSystems = {url = "https://github.com/NREL-Sienna/InfrastructureSystems.jl", rev = "lk/units-domain-agnostic-is4"}
-PowerFlowFileParser = {url = "https://github.com/luke-kiernan/PowerFlowFileParser.jl", rev = "lk/units-fixes"}
-PowerSystemCaseBuilder = {url = "https://github.com/NREL-Sienna/PowerSystemCaseBuilder.jl", rev = "lk/units-table-driven"}
-PowerSystems = {url = "https://github.com/NREL-Sienna/PowerSystems.jl", rev = "lk/units-fold-psu"}
+InfrastructureSystems = {url = "https://github.com/NREL-Sienna/InfrastructureSystems.jl", rev = "IS4"}
+PowerFlowFileParser = {url = "https://github.com/NREL-Sienna/PowerFlowFileParser.jl", rev = "main"}
+PowerSystemCaseBuilder = {url = "https://github.com/NREL-Sienna/PowerSystemCaseBuilder.jl", rev = "psy6"}
+PowerSystems = {url = "https://github.com/NREL-Sienna/PowerSystems.jl", rev = "psy6"}
 
 [compat]
 julia = "^1.10"
