@@ -156,4 +156,8 @@ function _calculate_LODF_matrix_MKLPardiso end
 function _pardiso_sequential_LODF! end
 function _pardiso_single_LODF! end
 
+# Must be last: the workload exercises the matrix constructors and the KLU
+# linear solvers defined above so their native code is cached in the image.
+include("precompile.jl")
+
 end

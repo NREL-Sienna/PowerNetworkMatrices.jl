@@ -97,6 +97,30 @@ set_linalg_backend_check(check::Bool) =
 
 get_linalg_backend_check() = Preferences.@load_preference("linalg_backend_check")
 
+"""
+    set_precompile_workload(run::Bool)
+
+Enable (`true`, the default) or disable (`false`) the precompilation workload
+that bakes the Ybus-assembly and sparse linear-solver (KLU) native code into
+the package image to cut "time to first model". Disabling it makes PNM
+precompile faster at the cost of paying JIT latency on the first
+`Ybus` / `PTDF` / `LODF` / `VirtualPTDF` call of each session.
+
+This is a tracked `Preferences` setting: changing it forces PNM (and therefore
+the linear-solver code exercised by the workload) to be recompiled. Restart
+Julia after calling this for the change to take effect.
+"""
+set_precompile_workload(run::Bool) =
+    Preferences.@set_preferences!("precompile_workload" => run)
+
+"""
+    get_precompile_workload() -> Bool
+
+Whether the precompilation workload runs during PNM precompilation. Defaults
+to `true`. See [`set_precompile_workload`](@ref).
+"""
+get_precompile_workload() = Preferences.@load_preference("precompile_workload", true)
+
 function check_lbt_library()
     lb_msg(lib) = """The $(lib) library is being used for Julia's BLAS and LAPACK routines,
                  including dense linear algebra operations such as `BLAS.gemm``."""
