@@ -189,13 +189,10 @@ end
 
 Base.finalize(cache::AAFactorCache) = _free_handles!(cache)
 
-# `deepcopy` is UNSAFE on this cache: `numeric`/`symbolic` are opaque libSparse
-# factorization structs holding raw factor pointers, freed by `finalizer(_free_handles!`.
-# A naive `deepcopy` bit-copies those pointers, yielding two caches that alias one
-# libSparse factor; when one copy is collected its `SparseCleanup` frees the factor
-# out from under the other — the next `solve!` reads freed memory (SIGSEGV / SIGILL
-# inside `SparseSolve`). Throw so the offending caller is identified by the backtrace;
-# the owning Virtual matrix must be shared by reference, not deepcopied.
+# `deepcopy` is unsafe: it would bit-copy the raw libSparse factor handles,
+# aliasing one factorization across two finalizer-owning caches (a
+# double-free/use-after-free). Throw so the caller shares the owning matrix by
+# reference instead; the backtrace names the offending site.
 function Base.deepcopy_internal(::AAFactorCache, ::IdDict)
     error(
         "deepcopy of an AAFactorCache is unsafe and was attempted: the cache holds raw " *

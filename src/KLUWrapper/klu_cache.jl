@@ -512,16 +512,10 @@ end
 # stays unexported per the KLUWrapper convention).
 Base.finalize(cache::KLULinSolveCache) = _free_klu_handles!(cache)
 
-# `deepcopy` is UNSAFE on this cache: `symbolic`/`numeric` are raw `Ptr{Cvoid}`
-# handles into libklu. A naive `deepcopy` bit-copies the pointer values, yielding
-# two cache objects that alias one libklu factorization; each carries
-# `finalizer(_free_klu_handles!, …)`, so when one copy is collected its finalizer
-# frees the handle out from under the other — the next `solve!` reads freed/reused
-# memory (garbage `Numeric.n` → `KLU_INVALID`, or `SIGSEGV` inside `klu_l_solve`).
-# Throw instead, so the offending caller is identified by the backtrace. The owning
-# `Virtual{PTDF,LODF,MODF}` must be shared by reference, not deepcopied. (A future
-# deepcopy-safe path can re-factorize from the cached `colptr`/`rowval`/`nzval` into
-# an independent handle; until then, copying is rejected.)
+# `deepcopy` is unsafe: it would bit-copy the raw libklu `symbolic`/`numeric`
+# pointers, aliasing one factorization across two finalizer-owning caches (a
+# double-free/use-after-free). Throw so the caller shares the owning matrix by
+# reference instead; the backtrace names the offending site.
 function Base.deepcopy_internal(::KLULinSolveCache, ::IdDict)
     error(
         "deepcopy of a KLULinSolveCache is unsafe and was attempted: the cache holds " *
