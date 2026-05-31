@@ -22,11 +22,28 @@
 #   julia --project=. scripts/benchmarks/profile_ttfx.jl workload_off
 #   julia --project=. -e 'using PowerNetworkMatrices: set_precompile_workload; set_precompile_workload(true)'
 #   julia --project=. scripts/benchmarks/profile_ttfx.jl workload_on
+#
+# Flipping `set_precompile_workload` marks PNM's cache stale, so the next
+# `using PowerNetworkMatrices` would *recompile* PNM. That one-time
+# precompilation is NOT session TTFX (it is amortized across all future
+# sessions), so this script forces it via `Pkg.precompile()` BEFORE — and
+# outside of — the timed `using` block below. That keeps `T_LOAD` a pure
+# image-load measurement and makes a single run per label directly comparable;
+# no throwaway warm-up run is needed.
 
 const LABEL = length(ARGS) >= 1 ? ARGS[1] : "run"
 const N_BUSES = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 60
 
-# ── Package load time (compile / image load) ────────────────────────────────
+# ── Separate precompilation from the timed load ─────────────────────────────
+# `Pkg.precompile` rebuilds a stale cache in worker subprocesses WITHOUT
+# loading the package into this process, so the compile cost lands here
+# (untimed) instead of inside the `using` below. After a `set_precompile_*`
+# flip this is where the workload actually recompiles.
+import Pkg
+println("Ensuring PowerNetworkMatrices is precompiled (untimed) …")
+Pkg.precompile("PowerNetworkMatrices")
+
+# ── Package load time (image load only; cache is already warm) ───────────────
 const _T0 = time_ns()
 using PowerNetworkMatrices
 import PowerSystems as PSY
@@ -45,8 +62,8 @@ function build_grid(n::Int)
     sys = PSY.System(100.0)
     buses = PSY.ACBus[]
     for i in 1:n
-        bt =
-            i == 1 ? PSY.ACBusTypes.REF : (isodd(i) ? PSY.ACBusTypes.PV : PSY.ACBusTypes.PQ)
+        bt = i == 1 ? PSY.ACBusTypes.REF :
+             (isodd(i) ? PSY.ACBusTypes.PV : PSY.ACBusTypes.PQ)
         b = PSY.ACBus(;
             number = i,
             name = "b$i",
@@ -55,23 +72,25 @@ function build_grid(n::Int)
             angle = 0.0,
             magnitude = 1.0,
             voltage_limits = (min = 0.9, max = 1.1),
-            base_voltage = 138.0,
+            base_voltage = 138.0
         )
         PSY.add_component!(sys, b)
         push!(buses, b)
     end
-    mkline(name, f, t) = PSY.Line(;
-        name = name,
-        available = true,
-        active_power_flow = 0.0,
-        reactive_power_flow = 0.0,
-        arc = PSY.Arc(; from = f, to = t),
-        r = 0.01,
-        x = 0.1,
-        b = (from = 0.001, to = 0.001),
-        rating = 5.0,
-        angle_limits = (min = -1.0, max = 1.0),
-    )
+    function mkline(name, f, t)
+        PSY.Line(;
+            name = name,
+            available = true,
+            active_power_flow = 0.0,
+            reactive_power_flow = 0.0,
+            arc = PSY.Arc(; from = f, to = t),
+            r = 0.01,
+            x = 0.1,
+            b = (from = 0.001, to = 0.001),
+            rating = 5.0,
+            angle_limits = (min = -1.0, max = 1.0)
+        )
+    end
     for i in 1:n
         j = i == n ? 1 : i + 1
         PSY.add_component!(sys, mkline("ring_$(i)_$(j)", buses[i], buses[j]))
@@ -101,7 +120,7 @@ push!(results, ("Ybus #1 (cold)", timed(() -> Ybus(SYS))))
 push!(results, ("Ybus #2 (warm)", timed(() -> Ybus(SYS))))
 push!(
     results,
-    ("Ybus arc-adm #1", timed(() -> Ybus(SYS; make_arc_admittance_matrices = true))),
+    ("Ybus arc-adm #1", timed(() -> Ybus(SYS; make_arc_admittance_matrices = true)))
 )
 
 # Supporting matrices.
@@ -130,11 +149,29 @@ let
     push!(results, ("VirtualLODF row #1 (cold)", timed(() -> vlodf[arc, :])))
 end
 
+# VirtualMODF: build + first lazy contingency-row query. The first query is the
+# MODF-specific compile cost — it drives the Woodbury solve path
+# (compute_woodbury_factors / apply_woodbury_correction) that nothing else above
+# touches. A single-line (N-1) outage on a ring edge keeps the network meshed,
+# so no islanding short-circuits the Woodbury path.
+let
+    vmodf = VirtualMODF(SYS)
+    t_build = timed(() -> VirtualMODF(SYS))
+    push!(results, ("VirtualMODF build #1", t_build))
+    outaged = 1                                  # ring edge -> no islanding
+    b_out = vmodf.arc_susceptances[outaged]
+    mod = NetworkModification("ttfx_outage", [ArcModification(outaged, -b_out)])
+    monitored = length(vmodf.arc_susceptances) > 1 ? 2 : 1
+    push!(results, ("VirtualMODF row #1 (cold)", timed(() -> vmodf[monitored, mod])))
+    push!(results, ("VirtualMODF row #2 (warm)", timed(() -> vmodf[monitored, mod])))
+end
+
 # ── Report ──────────────────────────────────────────────────────────────────
 # "First model" = package load + every first/cold call (everything tagged
 # "#1"); warm "#2" re-runs are excluded since they are steady-state, not TTFX.
-const T_FIRST_MODEL = sum(t for (name, t) in results if name == "load (using PNM)" ||
-    occursin("#1", name))
+const T_FIRST_MODEL = sum(t
+for (name, t) in results if name == "load (using PNM)" ||
+                            occursin("#1", name))
 
 println("\n" * "="^64)
 println("TTFX profile   label=$(LABEL)   buses=$(NB)   julia=$(VERSION)")

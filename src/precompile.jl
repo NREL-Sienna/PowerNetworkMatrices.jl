@@ -8,7 +8,10 @@
 # compiled on the user's first call:
 #
 #   1. Ybus assembly      — `Ybus(sys)` and the matrices derived from it
-#                           (Incidence / BA / ABA / PTDF / LODF / Virtual*).
+#                           (Incidence / BA / ABA / PTDF / LODF / Virtual*),
+#                           including the VirtualMODF Woodbury contingency-update
+#                           path (`compute_woodbury_factors` /
+#                           `apply_woodbury_correction`).
 #   2. The sparse linear   — `klu_factorize` + `solve!` / `solve_sparse!` /
 #      solvers (KLU)        `tsolve!` / `numeric_refactor!` for both the
 #                           Float64 and ComplexF64 instantiations.
@@ -114,7 +117,7 @@ function _precompile_build_system()
             angle = 0.0,
             magnitude = 1.0,
             voltage_limits = (min = 0.9, max = 1.1),
-            base_voltage = 138.0,
+            base_voltage = 138.0
         )
     end
     b1 = _bus(1, "b1", ACBusTypes.REF)
@@ -134,7 +137,7 @@ function _precompile_build_system()
             x = 0.1,
             b = (from = 0.001, to = 0.001),
             rating = 2.0,
-            angle_limits = (min = -1.0, max = 1.0),
+            angle_limits = (min = -1.0, max = 1.0)
         )
     end
     PSY.add_component!(sys, _line("l12", b1, b2))
@@ -161,6 +164,18 @@ function _precompile_system_matrices(sys)
     vptdf[first(get_arc_axis(vptdf)), :]      # lazy row solve -> KLU solve!
     vlodf = VirtualLODF(sys)
     vlodf[first(get_arc_axis(vlodf)), :]      # lazy row solve
+    # VirtualMODF drives the Woodbury contingency-update path
+    # (compute_woodbury_factors / apply_woodbury_correction) that the PTDF/LODF
+    # solves above never touch, so without this the first user contingency-row
+    # query pays the full Woodbury compile cost. An N-1 outage on arc 1 of the
+    # 3-bus loop keeps the network connected (no islanding short-circuit).
+    vmodf = VirtualMODF(sys)
+    mod = NetworkModification(
+        "precompile_outage",
+        [ArcModification(1, -vmodf.arc_susceptances[1])]
+    )
+    monitored = length(vmodf.arc_susceptances) > 1 ? 2 : 1
+    vmodf[monitored, mod]                     # lazy Woodbury solve
     return nothing
 end
 
@@ -173,7 +188,7 @@ if get_precompile_workload()
         sys = try
             _precompile_build_system()
         catch err
-            @debug "PNM precompile: system build skipped" exception = err
+            @debug "PNM precompile: system build skipped" exception=err
             nothing
         end
         @compile_workload begin
@@ -189,8 +204,7 @@ if get_precompile_workload()
                     try
                         _precompile_system_matrices(sys)
                     catch err
-                        @debug "PNM precompile: system matrices skipped" exception =
-                            err
+                        @debug "PNM precompile: system matrices skipped" exception=err
                     end
                 end
             end
