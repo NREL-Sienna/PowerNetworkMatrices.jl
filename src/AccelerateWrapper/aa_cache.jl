@@ -189,6 +189,23 @@ end
 
 Base.finalize(cache::AAFactorCache) = _free_handles!(cache)
 
+# `deepcopy` is UNSAFE on this cache: `numeric`/`symbolic` are opaque libSparse
+# factorization structs holding raw factor pointers, freed by `finalizer(_free_handles!`.
+# A naive `deepcopy` bit-copies those pointers, yielding two caches that alias one
+# libSparse factor; when one copy is collected its `SparseCleanup` frees the factor
+# out from under the other — the next `solve!` reads freed memory (SIGSEGV / SIGILL
+# inside `SparseSolve`). Throw so the offending caller is identified by the backtrace;
+# the owning Virtual matrix must be shared by reference, not deepcopied.
+function Base.deepcopy_internal(::AAFactorCache, ::IdDict)
+    error(
+        "deepcopy of an AAFactorCache is unsafe and was attempted: the cache holds raw " *
+        "libSparse factor handles that deepcopy would alias by value, causing a " *
+        "double-free / use-after-free of the factorization (SIGSEGV/SIGILL in SparseSolve). " *
+        "Share the owning Virtual matrix by reference instead of deepcopying it. The " *
+        "backtrace identifies the offending call site.",
+    )
+end
+
 # Build the libSparse `SparseMatrixStructure` view that points into the
 # cache's owned arrays. Always marked `ATT_ORDINARY` — the LU path treats
 # `cache.nzval` as the full matrix with no symmetry assumed.
