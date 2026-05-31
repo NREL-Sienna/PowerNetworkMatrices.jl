@@ -47,6 +47,12 @@ LocalPreferences.toml
 .vscode
 *.h5
 
+# Benchmark / profiling outputs (scripts/benchmarks/profile_ttfx.jl, perf tests)
+ttfx_results.csv
+precompile_times.txt
+execute_time_*.csv
+precompile_time_*.txt
+
 ################################################################################
 #                              Operating systems                               #
 ################################################################################
