@@ -45,7 +45,8 @@ function build_grid(n::Int)
     sys = PSY.System(100.0)
     buses = PSY.ACBus[]
     for i in 1:n
-        bt = i == 1 ? PSY.ACBusTypes.REF : (isodd(i) ? PSY.ACBusTypes.PV : PSY.ACBusTypes.PQ)
+        bt =
+            i == 1 ? PSY.ACBusTypes.REF : (isodd(i) ? PSY.ACBusTypes.PV : PSY.ACBusTypes.PQ)
         b = PSY.ACBus(;
             number = i,
             name = "b$i",
@@ -98,7 +99,10 @@ push!(results, ("load (using PNM)", T_LOAD))
 # Ybus — the headline path.
 push!(results, ("Ybus #1 (cold)", timed(() -> Ybus(SYS))))
 push!(results, ("Ybus #2 (warm)", timed(() -> Ybus(SYS))))
-push!(results, ("Ybus arc-adm #1", timed(() -> Ybus(SYS; make_arc_admittance_matrices = true))))
+push!(
+    results,
+    ("Ybus arc-adm #1", timed(() -> Ybus(SYS; make_arc_admittance_matrices = true))),
+)
 
 # Supporting matrices.
 push!(results, ("IncidenceMatrix #1", timed(() -> IncidenceMatrix(SYS))))
